@@ -100,7 +100,7 @@ export function SoundPanel() {
           <Button size="sm" variant="primary" className="flex-1" icon={<AudioLines size={14} />} loading={busy === "design"} onClick={() => void busyWhile("design", () => runSoundDesign(session, intensity))}>
             Add sound design
           </Button>
-          <Button size="sm" icon={<Zap size={14} />} loading={busy === "snappy"} onClick={() => void busyWhile("snappy", () => runMakeItSnappy(session, { intensity }))}>
+          <Button size="sm" icon={<Zap size={14} />} loading={busy === "snappy"} onClick={() => void busyWhile("snappy", () => runMakeItSnappy(session))}>
             Make it snappy
           </Button>
         </div>

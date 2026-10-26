@@ -6,7 +6,7 @@ import { editorToolRunner } from "./editorTools";
 import { EditorSession } from "./session/EditorSession";
 import { MediaLibrary } from "./session/media";
 import { mainSequence } from "./cuts";
-import { makeItSnappy, snappyUndoAll, snappyUndoSteps } from "./snappy";
+import { makeItSnappy, snappySummary, snappyUndoAll, snappyUndoSteps, type SnappyOutcome } from "./snappy";
 
 const reader: ReaderInfo = {
   type: "FFmpegReader",
@@ -107,5 +107,40 @@ describe("make it snappy", () => {
     expect(labels).toHaveLength(depth);
     expect(undoAll()).toBe(false);
     expect(session.doc.undoLabels).toEqual(labels);
+  });
+
+  it("designs the sound as loud as the transitions: hype cuts get hype sound", async () => {
+    for (const [style, intensity] of [["hype", "hype"], [undefined, "hype"], ["cinematic", "normal"]] as const) {
+      const session = sessionWithCuts(3);
+      const args: Record<string, unknown>[] = [];
+      const real = editorToolRunner(session);
+      await makeItSnappy(() => session.project, (name, a) => (name === "auto_sound_design_tool" && args.push(a), real(name, a)), { style });
+      expect(args).toEqual([{ intensity }]);
+    }
+  });
+
+  it("leads its summary with one line of what changed, from the receipts", async () => {
+    const session = sessionWithCuts(3);
+    const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
+    const summary = snappySummary(outcomes);
+    const [headline] = summary.description.split("\n");
+    expect(headline).toMatch(/^2 transitions · \d+ sounds?( · mastered to −\d+ LUFS)?$/);
+    expect(summary.issues).toEqual([]);
+    expect(summary.details).toContain("✓ Motion transitions: Added 2 motion transition(s)");
+    expect(summary.details).toMatch(/\d undo steps; Undo all takes them back\.$/);
+  });
+
+  it("calls out a failed step in one line, and says once that mastering is missing", () => {
+    const outcomes: SnappyOutcome[] = [
+      { step: "transitions", label: "Motion transitions", status: "done", detail: "Added 23 motion transition(s) on Track 1 (hype): whip@0.50s, …", brief: "23 transitions", undoSteps: 1 },
+      { step: "sound", label: "Sound design", status: "failed", detail: "failed to store the sound effects: quota exceeded. Free some space and retry.", undoSteps: 0 },
+      { step: "master", label: "Master audio", status: "skipped", detail: "Not mastered: mastering is not in this build yet.", undoSteps: 0 },
+    ];
+    const summary = snappySummary(outcomes);
+    expect(summary.description).toBe("23 transitions\nNot mastered: mastering is not in this build yet.");
+    expect(summary.issues).toEqual(["Sound design failed: failed to store the sound effects"]);
+    expect(summary.details).not.toContain("mastering");
+    expect(summary.details).toContain("✕ Sound design: failed to store the sound effects: quota exceeded. Free some space and retry.");
+    expect(snappySummary([{ ...outcomes[2]!, step: "master", status: "done", brief: "mastered to −14 LUFS", undoSteps: 1 }]).description).toBe("mastered to −14 LUFS");
   });
 });
