@@ -1,0 +1,24 @@
+.cc-win { position: absolute; border-radius: var(--radius); background: var(--surface); overflow: hidden; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 40px 90px -30px rgba(0, 0, 0, 0.6); }
+.is-dark .cc-win { border: 1.5px solid var(--line); }
+.cc-bar { display: flex; align-items: center; gap: 12px; height: 76px; padding: 0 30px; border-bottom: 1.5px solid var(--line); }
+.cc-dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--muted); opacity: 0.6; }
+.cc-tab { margin-left: 22px; font-family: var(--font-mono); font-size: 24px; color: var(--ink); opacity: 0.8; }
+.cc-body { position: relative; padding: 34px 40px 40px 0; font-family: var(--font-mono); line-height: 1.6; }
+.cc-line { position: relative; display: flex; white-space: pre; }
+.cc-num { flex: none; width: 3.4em; padding-right: 1.2em; text-align: right; color: var(--muted); opacity: 0.55; }
+.cc-code { position: relative; }
+.cc-lit { position: absolute; left: 0; right: 0; height: 1.6em; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.cc-caret { position: absolute; width: 0.55em; height: 1.25em; margin-top: 0.18em; background: var(--accent); opacity: 0.9; border-radius: 2px; }
+.t-keyword { color: var(--accent); }
+.t-string { color: var(--secondary); }
+.t-number { color: color-mix(in srgb, var(--accent) 50%, var(--secondary)); }
+.t-comment { color: var(--muted); font-style: italic; }
+.t-function { color: var(--ink); font-weight: 650; }
+.t-type { color: color-mix(in srgb, var(--secondary) 55%, var(--ink)); }
+.t-punct { color: var(--muted); }
+.t-plain { color: var(--ink); }
+.cc-run { position: relative; overflow: hidden; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.cc-run::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: var(--accent); }
+.cc-out { display: flex; align-items: center; gap: 18px; padding: 30px 44px; font-family: var(--font-mono); font-size: 30px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.cc-out .icon { width: 30px; height: 30px; display: block; color: var(--accent); flex: none; }
+.cc-prompt { color: var(--muted); }
