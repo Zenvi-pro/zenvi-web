@@ -3210,6 +3210,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `align` | "left" \| "center" |  | Text alignment (kinetic_type, end_card plain). |
 | `position` | "top" \| "center" \| "bottom" |  | Where the text sits (kinetic_type). |
 | `backdrop` | boolean |  | Draw the template's own background (end_card default true; type_search and word_scroll default false). |
+| `font_family` | string |  | Set the template's type in a bundled family, drawn as outlines (same on every surface): inter (grotesk), anton (condensed), bebas-neue (condensed), archivo-black (display), instrument-serif (serif), space-mono (mono), varela-round (rounded), caveat-brush (hand), silkscreen (pixel). A mono family replaces the monospace labels. Default: the system sans. |
 
 ### search_pexels_videos_tool
 

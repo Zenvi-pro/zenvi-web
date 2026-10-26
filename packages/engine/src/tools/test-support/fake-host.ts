@@ -27,6 +27,7 @@ import type {
   ToolHost,
   ToolImage,
 } from "../types.js";
+import { readBundledFont } from "../../typography/test-fonts.js";
 import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
 /** A 1×1 PNG. */
@@ -663,6 +664,12 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         const textValue = assets[path];
         if (textValue === undefined) throw new Error(`No asset ${path}`);
         return textValue;
+      },
+      // The real bundled fonts: the typesetter's tests set real outlines.
+      readBytes: async (path) => {
+        calls.push(`asset ${path}`);
+        if (!path.startsWith("fonts/")) throw new Error(`No asset ${path}`);
+        return readBundledFont(path);
       },
     };
   }

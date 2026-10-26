@@ -120,7 +120,7 @@ export function effectIconUrl(className: string): string | null {
 // Transitions and titles (engine catalogs + bundled asset URLs)
 // ---------------------------------------------------------------------------
 
-const assetFiles = import.meta.glob(["../../../../../packages/engine/assets/transitions/**/*", "../../../../../packages/engine/assets/titles/*.svg"], {
+const assetFiles = import.meta.glob(["../../../../../packages/engine/assets/transitions/**/*", "../../../../../packages/engine/assets/titles/*.svg", "../../../../../packages/engine/assets/fonts/*/*.ttf"], {
   eager: true,
   query: "?url",
   import: "default",

@@ -492,6 +492,33 @@ describe("list_title_templates_tool", () => {
 });
 
 describe("edit_title_tool", () => {
+  it("sets a title in a bundled family as outlines, and redraws them on the next edit", async () => {
+    const { doc, h, clipA } = twoClipTitle();
+    const r = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 2", font: "Anton" });
+    expect(r.summary).toMatch(/^Updated title/);
+    const first = svgOf(h, String(data(r).path));
+    expect(first).toContain('data-zenvi-outline="anton"');
+    expect(first.match(/<path d=/g)!.length).toBeGreaterThan(0);
+    // The words stay in the file (hidden) for the Title Editor and the next edit.
+    expect(lineTexts(parseTitleSvg(first))).toEqual(["Day 2", "Tokyo"]);
+    const again = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 3" });
+    expect(again.summary).toMatch(/^Updated title/);
+    const second = svgOf(h, String(data(again).path));
+    expect(second.match(/data-zenvi-outline=/g)!.length).toBe(first.match(/data-zenvi-outline=/g)!.length);
+    expect(lineTexts(parseTitleSvg(second))).toEqual(["Day 3", "Tokyo"]);
+    const back = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "Helvetica" });
+    expect(svgOf(h, String(data(back).path))).not.toContain("data-zenvi-outline");
+  });
+
+  it("warns about characters no bundled font can draw", async () => {
+    const { doc, h, clipA } = twoClipTitle();
+    const r = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 漢", font: "Anton" });
+    expect(r.summary).toMatch(/^Updated title/);
+    expect(r.warnings).toEqual(["No bundled font has a glyph for 漢; those characters are left out."]);
+    const plain = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 漢", font: "Helvetica" });
+    expect(plain.warnings).toEqual([]);
+  });
+
   it("changes every clip's title to a new version; undo restores it", async () => {
     const { doc, h, fileId, clipA, clipB, path } = twoClipTitle();
     const undo = doc.undoLabels.length;

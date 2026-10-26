@@ -546,6 +546,8 @@ export interface AssetHost {
    * folder, e.g. `titles/Bar_1.svg`. Rejects when there is no such asset.
    */
   readText(path: string): Promise<string>;
+  /** Bytes of a bundled binary asset (`fonts/inter/Inter[opsz,wght].ttf`). Rejects when there is no such asset. */
+  readBytes?(path: string): Promise<Uint8Array>;
 }
 
 export interface ToolHost {

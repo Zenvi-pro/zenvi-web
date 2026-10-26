@@ -26,8 +26,11 @@ import { gridFromBeats, tempoGrid } from "../../motion/grid.js";
 import { PALETTES, withAccent } from "../../motion/palettes.js";
 import { MOTION_TEMPLATE_IDS, MotionInputError, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
 import { TEMPLATES } from "../../motion/templates/index.js";
+import { bundledFamily } from "../../typography/families.js";
 import { PALETTE_IDS, type BeatGrid, type MotionLayer, type MotionMedia, type MotionPlan, type PaletteId } from "../../motion/types.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
+import { FONT_FAMILY_LIST, loadFamilies, missingGlyphWarnings, unknownFamily } from "../fonts.js";
+import { planInTypeface } from "../../motion/typeface.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
@@ -76,6 +79,7 @@ const input = z.strictObject({
   align: z.enum(["left", "center"]).optional().describe("Text alignment (kinetic_type, end_card plain)."),
   position: z.enum(["top", "center", "bottom"]).optional().describe("Where the text sits (kinetic_type)."),
   backdrop: z.boolean().optional().describe("Draw the template's own background (end_card default true; type_search and word_scroll default false)."),
+  font_family: z.string().max(40).optional().describe(`Set the template's type in a bundled family, drawn as outlines (same on every surface): ${FONT_FAMILY_LIST}. A mono family replaces the monospace labels. Default: the system sans.`),
 });
 
 type Input = z.infer<typeof input>;
@@ -275,6 +279,15 @@ export const motionTemplateTools: CatalogTool[] = [
       } catch (error) {
         if (error instanceof MotionInputError) return refused(TOOL, `Error: ${error.message}.`);
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (args.font_family !== undefined) {
+        const family = bundledFamily(args.font_family);
+        if (!family) return refused(TOOL, unknownFamily(args.font_family));
+        const lib = await loadFamilies(call, [family]);
+        if (typeof lib === "string") return refused(TOOL, lib);
+        const typed = planInTypeface(plan, lib, family);
+        plan = typed.plan;
+        warnings.push(...missingGlyphWarnings(typed.missing));
       }
       const end = start + plan.frames / fps;
       const stack = planOverlayStack(project, start, end, plan.tracks);

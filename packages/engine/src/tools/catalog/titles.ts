@@ -45,7 +45,6 @@ import {
   fadeAlpha,
   fpsOfProject,
   guarded,
-  installedFontFamilies,
   isVertical,
   planOverlayTrack,
   pyRoundTo,
@@ -56,6 +55,7 @@ import {
   type ScreenPosition,
 } from "../titles-text.js";
 import { text } from "./common.js";
+import { missingGlyphWarnings, outlineTitle, titleFontFamilies } from "../fonts.js";
 import { TitleStyle, assignTexts, fieldRows, readProjectSvg, writeTitle } from "./title-templates.js";
 
 /** #183's add_title_tool tried these in order when no template was named (titles_text.DEFAULT_TEMPLATES). */
@@ -165,7 +165,7 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   // Where it goes, before anything is written: a refused call leaves no file and no undo step.
   planOverlayTrack(project, position, end, track);
   const taken = project.files.map((f) => String(f.path ?? "")).filter((p) => p.toLowerCase().endsWith(".svg")).map(basename);
-  const families = await installedFontFamilies(call);
+  const families = await titleFontFamilies(call);
   style.resolveFont(families);
 
   for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index)!);
@@ -178,7 +178,9 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
 
   const firstText = slots.map((s) => values.get(s.index) ?? "").find((v) => v.trim()) || name;
   const fileName = uniqueTitleName(text(input.file_name) || firstText, taken);
-  const media = await writeTitle(call, fileName, titleSvgText(doc));
+  const outlined = await outlineTitle(call, titleSvgText(doc));
+  if (typeof outlined === "string") toolError(outlined.replace(/^Error: /, ""));
+  const media = await writeTitle(call, fileName, outlined.svg);
 
   const fadeIn = Number(input.fade_in_seconds ?? 0);
   const fadeOut = Number(input.fade_out_seconds ?? 0);
@@ -220,7 +222,7 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   if (fadeIn || fadeOut) Object.assign(data, { fade_in: fadeIn, fade_out: fadeOut });
   if (Object.keys(fitted).length > 0) data.text_shrunk_to_fit = fitted;
   if (lift) data.lifted_for_vertical_ui = lift;
-  return applied(tool, summaryLine(summary), { data });
+  return applied(tool, summaryLine(summary), { data, warnings: missingGlyphWarnings(outlined.missing) });
 }
 
 export const titleTools: CatalogTool[] = [

@@ -55,7 +55,6 @@ import {
   OVERLAY_ROLE,
   colorHexAlpha,
   guarded,
-  installedFontFamilies,
   isLocked,
   pyRoundTo,
   resolveFont,
@@ -63,6 +62,7 @@ import {
   toolError,
   uiTrackNumber,
 } from "../titles-text.js";
+import { missingGlyphWarnings, outlineTitle, titleFontFamilies } from "../fonts.js";
 import { animatedCatalog } from "./animated-titles.js";
 
 /** What each bundled template looks like (titles_text.py TEMPLATE_PURPOSE, from rendering all 50). */
@@ -526,7 +526,7 @@ export const titleTemplateTools = [
         const name = String(file.name || basename(srcPath));
         if (hasText && slots.length === 0) toolError(`${name} has no text to change`);
         const values = hasText ? assignTexts(slots, text, subtitle, lines, name, false) : new Map<number, string>();
-        const families = await installedFontFamilies(call);
+        const families = await titleFontFamilies(call);
         style.resolveFont(families);
 
         const scopeUsed = scope === "this_clip" && clips.length <= 1 ? "all_clips" : scope;
@@ -555,7 +555,9 @@ export const titleTemplateTools = [
           outName = free === null ? null : `${free}.svg`;
         }
         if (!outName) toolError(scopeUsed === "all_clips" ? `no free version name for ${pyReprString(basename(srcPath))}` : "no free name for the copy");
-        const media = await writeTitle(call, outName, svg);
+        const outlined = await outlineTitle(call, svg);
+        if (typeof outlined === "string") toolError(outlined.replace(/^Error: /, ""));
+        const media = await writeTitle(call, outName, outlined.svg);
 
         const result = call.commit((tx) => {
           if (scopeUsed === "all_clips") {
@@ -592,7 +594,7 @@ export const titleTemplateTools = [
           scopeUsed === "all_clips"
             ? [`The edited title is a new Project Files entry (${result.fileId}) that replaced ${file.id} in every clip; use the new file_id from now on.`]
             : [];
-        return applied(tool, summaryLine(summary), { data, notes });
+        return applied(tool, summaryLine(summary), { data, notes, warnings: missingGlyphWarnings(outlined.missing) });
       }),
   }),
 ];

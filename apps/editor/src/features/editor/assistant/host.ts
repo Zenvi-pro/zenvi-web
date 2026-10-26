@@ -94,6 +94,15 @@ async function readAsset(path: string): Promise<string> {
   return response.text();
 }
 
+/** A bundled binary asset (the typesetter's fonts), fetched when a tool first needs it. */
+async function readAssetBytes(path: string): Promise<Uint8Array> {
+  const url = assetUrl(path);
+  if (!url) throw new Error(`No bundled asset ${path}`);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not load ${path} (${response.status})`);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 /** A download's file name for a path a tool gave (its base name, made safe), with a fallback name. */
 function downloadName(path: string, fallback: string, extension: string): string {
   const base = path.split(/[\\/]/).pop() ?? "";
@@ -296,7 +305,7 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       supports: (format, videoCodec, audioCodec, frame) => canExportWith(format, videoCodec, audioCodec, frame),
     };
   }
-  host.assets = { readText: readAsset };
+  host.assets = { readText: readAsset, readBytes: readAssetBytes };
   host.frames = {
     async renderFrame(project, seconds, options): Promise<ToolImage> {
       return renderFrame(project, seconds, options ?? {}, session.media);

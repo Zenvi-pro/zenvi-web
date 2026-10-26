@@ -60,6 +60,8 @@ export interface MediaProber {
 /** Files bundled with the engine (`packages/engine/assets/…`), e.g. `titles/Bar_1.svg`. */
 export interface AssetSource {
   readText(path: string): Promise<string>;
+  /** Bytes of a binary asset (the bundled fonts). */
+  readBytes?(path: string): Promise<Uint8Array>;
 }
 
 /** Mono RMS envelope of a local file's audio (`@zenvi/render-node` `analyzeAudio`). */
