@@ -73,3 +73,19 @@ describe("card_shuffle", () => {
     expect(shown).toHaveLength(1);
   });
 });
+
+describe("dock_magnify", () => {
+  it("keeps each icon's colour at its dock position when one colour is malformed", async () => {
+    const { build } = await import("./dock_magnify/block.js");
+    const manifest = BLOCKS.find((b) => b.id === "dock_magnify")!;
+    const checked = checkParams(manifest, { colors: ["#112233", "red", "#445566"] });
+    if (!checked.ok) throw new Error(checked.error);
+    const ctx = createContext(document, { block: "dock_magnify", params: checked.params, width: 1080, height: 1920, fps: 30, seconds: 4.5, alpha: false, media: {}, draft: false });
+    await build(ctx);
+    const faces = Array.from(ctx.root.querySelectorAll<HTMLElement>(".dm-face")).map((f) => f.style.background);
+    // jsdom serialises the hex colours as rgb().
+    expect(faces[0]).toContain("rgb(17, 34, 51)");
+    expect(faces[1]).toContain("rgb(47, 192, 168)");
+    expect(faces[2]).toContain("rgb(68, 85, 102)");
+  });
+});

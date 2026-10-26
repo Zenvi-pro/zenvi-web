@@ -23,8 +23,9 @@ export async function build(ctx: BlockContext): Promise<void> {
   const apps = p.apps as string[];
   const n = apps.length;
   const target = Math.min(n - 1, Number(p.target));
-  const given = (p.colors as string[]).filter((c) => HEX.test(c));
-  const fill = (i: number): string => (i === target ? palette.accent : (given[i] ?? FILLS[i % FILLS.length]!));
+  // Colours are by dock position: a malformed one falls back for its icon only, not shifting the rest.
+  const given = p.colors as string[];
+  const fill = (i: number): string => (i === target ? palette.accent : HEX.test(given[i] ?? "") ? given[i]! : FILLS[i % FILLS.length]!);
   const face = (i: number): string => `linear-gradient(160deg, color-mix(in srgb, ${fill(i)} 78%, #fff), ${fill(i)} 45%, color-mix(in srgb, ${fill(i)} 80%, #000))`;
   const glyph = (i: number): keyof typeof ICONS => GLYPHS[i % GLYPHS.length]!;
   const open = p.open !== false;
