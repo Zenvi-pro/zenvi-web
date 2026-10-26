@@ -1267,6 +1267,34 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { clip_id: "NOPE000000" }, status: "refused", summary: /^Error: unknown timeline clip NOPE000000\.$/ },
   },
 
+  search_sfx_tool: {
+    happy: {
+      args: { query: "whoosh", provider: "openverse" },
+      // Commercial-use licences only: the non-commercial riser is left out.
+      summary: /^2 sound effects for 'whoosh' \(commercial-ok\):\n {2}provider=openverse {2}id=0e8a6e2a-\S+ {2}"Deep Whoosh #1" {2}1\.20 s {2}CC0 1\.0 \(no credit needed\)/,
+      check: ({ doc, before, host }) => {
+        expect(doc.project).toEqual(before);
+        expect(host.calls).toContain("library https://api.openverse.org/v1/audio/?q=whoosh&license=cc0%2Cpdm%2Cby%2Cby-sa&page_size=12&mature=false");
+      },
+    },
+    failure: { args: { query: "whoosh", provider: "openverse" }, host: { without: ["library"] }, status: "refused", summary: /^Error: Openverse search failed: this surface cannot reach Openverse\.$/ },
+  },
+  list_credits_tool: {
+    happy: { summary: /^No library sounds on the timeline: nothing to credit\.$/, check: ({ doc, before }) => expect(doc.project).toEqual(before) },
+    failure: null,
+  },
+  create_sound_kit_tool: {
+    happy: {
+      args: { name: "Promo", tone: "dark" },
+      summary: /^Created sound kit 'Promo' \(procedural, dark\):\n {2}whoosh: whoosh_\w+ \(pitch -?[\d.]+, brightness [\d.]+\)/,
+      check: ({ doc }) => {
+        expect(doc.undoLabels.at(-1)).toBe("Create sound kit 'Promo'");
+        expect((doc.project.settings as Record<string, unknown>).zenvi_sound_kit).toMatchObject({ name: "Promo", source: "procedural", tone: "dark" });
+      },
+    },
+    failure: { args: { style: "cinematic" }, status: "refused", summary: /^Error: style goes with source=library or mixed\.$/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {

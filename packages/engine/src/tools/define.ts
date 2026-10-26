@@ -97,6 +97,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   motion: "Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)",
   scenes3d: "Zenvi 3D (Blender on this computer)",
   fx: "Zenvi FX (ffmpeg renders on this computer)",
+  library: "the public sound libraries (Openverse)",
 };
 
 /**

@@ -18,6 +18,8 @@ export interface SfxClipMark {
   /** Placed by auto_sound_design_tool (replaced when it runs again). */
   auto: boolean;
   reason?: string;
+  /** Library sounds: `provider:id` of the sound it plays. */
+  library?: string;
 }
 
 /** True for a clip a sound-design tool placed. */

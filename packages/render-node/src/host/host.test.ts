@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { createClip, createProject, createTransition } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { analyzeAudio, NoAudioError } from "../audio/analyze.js";
+import { analyzeAudio, decodePcm, NoAudioError } from "../audio/analyze.js";
 import { probe } from "../probe/probe.js";
 import { makeAudio, makeImage, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { createBackendHost } from "./backend.js";
@@ -272,5 +272,18 @@ describe("analyzeAudio", () => {
     expect(mid).toBeLessThan(0.38);
     const silent = await makeVideo(dir, "noaudio.mp4", { duration: 1, width: 64, height: 48 });
     await expect(analyzeAudio(silent)).rejects.toBeInstanceOf(NoAudioError);
+  });
+});
+
+describe("decodePcm", () => {
+  it("decodes mono by default and both channels when asked (a mono source on both sides)", async () => {
+    const tone = await makeAudio(dir, "tone-pcm.wav", { hz: 440, duration: 0.5, amplitude: 0.5 });
+    const mono = await decodePcm(tone, { sampleRate: 48000 });
+    expect(mono.right).toBeUndefined();
+    const stereo = await decodePcm(tone, { sampleRate: 48000, channels: 2 });
+    expect(stereo.samples.length).toBe(mono.samples.length);
+    expect(stereo.right).toHaveLength(mono.samples.length);
+    expect(stereo.right![1000]).toBeCloseTo(stereo.samples[1000]!, 5);
+    expect(Math.max(...stereo.samples.slice(0, 4800).map(Math.abs))).toBeGreaterThan(0.3);
   });
 });

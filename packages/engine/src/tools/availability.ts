@@ -203,11 +203,21 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote:
       "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
   },
-  add_sfx_tool: { methods: ["media.writeGenerated"] },
+  add_sfx_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["library", "media.importUrl", "audio.decodePcm"],
+    partialNote: "without Openverse, downloads and audio decoding only procedural recipes (and Freesound sounds where they can be downloaded and decoded) can be placed",
+  },
   auto_sound_design_tool: {
     methods: ["media.writeGenerated"],
-    optional: ["audio.decodePcm"],
-    partialNote: "without audio decoding cuts are weighed by `beats` (when given) instead of the music, and the climax comes only from `climax_seconds`",
+    optional: ["audio.decodePcm", "library", "media.importUrl"],
+    partialNote:
+      "without audio decoding cuts are weighed by `beats` (when given) instead of the music, the climax comes only from `climax_seconds`, and sources=library / mixed are refused; without Openverse library sounds come from Freesound (signed in)",
+  },
+  search_sfx_tool: { optional: ["library", "backend"], partialNote: "without Openverse only procedural recipes and (signed in) Freesound are searched" },
+  create_sound_kit_tool: {
+    optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
+    partialNote: "without Openverse (or the Zenvi backend), downloads and audio decoding only procedural kits are made",
   },
   match_cut_montage_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated", "frames"],
@@ -355,7 +365,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   editor: {
     title: "Web editor (Zenvi Assistant, command palette)",
     host: "apps/editor/src/features/editor/assistant/host.ts",
-    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
+    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio", "library"],
     methods: [
       "media.importUrl",
       "media.pickFiles",
@@ -386,7 +396,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "library"],
     methods: [
       "media.importPath",
       "media.listPaths",

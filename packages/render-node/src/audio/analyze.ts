@@ -64,18 +64,19 @@ export async function analyzeAudio(
   return { sampleRate, frameSize, rms: Float32Array.from(rms) };
 }
 
-/** Mono float PCM of `file`'s audio (`AudioHost.decodePcm`). */
+/** Float PCM of `file`'s audio (`AudioHost.decodePcm`): mono, or with `channels: 2` the left channel and `right`. */
 export async function decodePcm(
   file: string,
-  options: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal } = {},
-): Promise<{ sampleRate: number; samples: Float32Array }> {
+  options: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; channels?: 1 | 2; signal?: AbortSignal } = {},
+): Promise<{ sampleRate: number; samples: Float32Array; right?: Float32Array }> {
   const sampleRate = options.sampleRate ?? 22050;
+  const channels = options.channels === 2 ? 2 : 1;
   const maxSeconds = options.maxSeconds ?? 600;
   if (!(sampleRate >= 1000 && maxSeconds > 0)) throw new RangeError("sampleRate must be ≥ 1000 and maxSeconds > 0");
   const seek = options.startSeconds && options.startSeconds > 0 ? ["-ss", String(options.startSeconds)] : [];
   const managed = spawnManaged(
     resolveBinary("ffmpeg"),
-    ["-hide_banner", "-loglevel", "error", "-nostdin", ...seek, "-i", file, "-t", String(maxSeconds), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", String(sampleRate), "-f", "f32le", "-acodec", "pcm_f32le", "pipe:1"],
+    ["-hide_banner", "-loglevel", "error", "-nostdin", ...seek, "-i", file, "-t", String(maxSeconds), "-map", "0:a:0", "-vn", "-ac", String(channels), "-ar", String(sampleRate), "-f", "f32le", "-acodec", "pcm_f32le", "pipe:1"],
     { signal: options.signal },
   );
   const chunks: Buffer[] = [];
@@ -94,5 +95,13 @@ export async function decodePcm(
   // Copy into an aligned buffer: Buffer pools may start at an odd offset.
   const samples = new Float32Array(usable / 4);
   new Uint8Array(samples.buffer).set(bytes.subarray(0, usable));
-  return { sampleRate, samples };
+  if (channels === 1) return { sampleRate, samples };
+  // Interleaved stereo (ffmpeg upmixes a mono source to two equal channels).
+  const left = new Float32Array(samples.length >> 1);
+  const right = new Float32Array(samples.length >> 1);
+  for (let i = 0; i < left.length; i += 1) {
+    left[i] = samples[2 * i]!;
+    right[i] = samples[2 * i + 1]!;
+  }
+  return { sampleRate, samples: left, right };
 }
