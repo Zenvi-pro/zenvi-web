@@ -7,6 +7,7 @@ import type { Writable } from "node:stream";
 import { Command, CommanderError } from "commander";
 import { Auth } from "./auth/session.js";
 import { registerAccountCommands } from "./commands/account.js";
+import { registerBridgeCommands } from "./commands/bridge.js";
 import type { CommandContext, GlobalFlags } from "./commands/context.js";
 import { registerEditCommands } from "./commands/edit.js";
 import { registerHostCommands } from "./commands/hosts.js";
@@ -64,6 +65,7 @@ Examples:
   registerAccountCommands(program, ctx);
   registerIntegrationCommands(program, ctx);
   registerHostCommands(program, ctx);
+  registerBridgeCommands(program, ctx);
   for (const cmd of program.commands) {
     cmd.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
     for (const sub of cmd.commands) sub.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
