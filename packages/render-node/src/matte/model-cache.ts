@@ -45,7 +45,7 @@ export const RVM_MOBILENETV3: ModelDescriptor = {
   },
   licenseText: {
     file: "LICENSE",
-    url: "https://raw.githubusercontent.com/PeterL1n/RobustVideoMatting/master/LICENSE",
+    url: "https://raw.githubusercontent.com/PeterL1n/RobustVideoMatting/v1.0.0/LICENSE",
     sha256: "8b1ba204bb69a0ade2bfcf65ef294a920f6bb361b317dba43c7ef29d96332b9b",
   },
 };
