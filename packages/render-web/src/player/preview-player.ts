@@ -24,7 +24,8 @@ import type { DecodeMode } from "../video/decode-cursor.js";
 import { bindCanvas, type PreviewCanvas } from "./canvas-binding.js";
 import { audibleContextTime, audioClock, performanceClock, type PlaybackClock } from "./clock.js";
 import { PreviewRenderer, type PreviewTarget, type RenderErrorEvent } from "./preview-renderer.js";
-import { WorkerPreview } from "./worker/client.js";
+import { isTransferred, PreviewWorkerError, standInCanvas, workerFailure, WorkerPreview } from "./worker/client.js";
+import type { RendererLook } from "./worker/protocol.js";
 
 export interface PlayerState {
   playing: boolean;
@@ -66,7 +67,9 @@ export interface PreviewPlayerOptions {
    * Render in this Worker (one running `@zenvi/render-web/preview-worker`; it
    * may serve several players). Needs an `HTMLCanvasElement` that can
    * `transferControlToOffscreen` (see `canPreviewInWorker`); the Worker uses
-   * the default engine. The caller owns the Worker.
+   * the default engine. The caller owns the Worker. If it fails to start or
+   * dies, the player renders on the page instead (over a stand-in canvas when
+   * this one was transferred) and warns once on the console.
    */
   worker?: Worker;
 }
@@ -89,7 +92,10 @@ export class PreviewPlayer {
   private project: Project | null = null;
   private readonly engine: RenderEngine;
   private readonly media: MediaRegistry;
-  private readonly target: PreviewTarget;
+  private target: PreviewTarget;
+  private readonly canvas: PreviewCanvas;
+  private readonly look: RendererLook;
+  private readonly stills: StillCache | undefined;
   private readonly audioRenderer: AudioRenderer;
   private audioContext: AudioContext | null;
   private readonly ownsAudioContext: boolean;
@@ -114,7 +120,8 @@ export class PreviewPlayer {
   private readonly errorListeners = new Set<(event: PlayerErrorEvent) => void>();
   private readonly reported = new Set<string>();
   private disposed = false;
-  private readonly unbind: (() => void)[];
+  private unbindTarget: (() => void)[] = [];
+  private readonly cleanup: (() => void)[] = [];
 
   constructor(canvas: PreviewCanvas, options: PreviewPlayerOptions) {
     this.media = options.media;
@@ -126,12 +133,16 @@ export class PreviewPlayer {
       ...(options.frameCacheBytes !== undefined ? { frameCacheBytes: options.frameCacheBytes } : {}),
       ...(options.adaptiveResolution ? { adaptive: true } : {}),
     };
-    if (options.worker) {
+    this.canvas = canvas;
+    this.look = look;
+    this.stills = options.stills;
+    if (options.worker && !workerFailure(options.worker)) {
       if (!("transferControlToOffscreen" in canvas)) throw new Error("A Worker preview needs an HTMLCanvasElement");
-      this.target = new WorkerPreview(options.worker, canvas, this.media, look);
+      const preview = new WorkerPreview(options.worker, canvas, this.media, look);
+      preview.onFail(() => this.fallBack());
+      this.target = preview;
     } else {
-      const surface = bindCanvas(canvas, { transparent: letterbox === "transparent" });
-      this.target = new PreviewRenderer(surface, { media: this.media, engine: this.engine, ...look, ...(options.stills ? { stills: options.stills } : {}) });
+      this.target = this.pageTarget();
     }
     this.audioRenderer = new AudioRenderer({
       media: this.media,
@@ -140,15 +151,7 @@ export class PreviewPlayer {
     });
     this.audioContext = options.audioContext ?? null;
     this.ownsAudioContext = !options.audioContext;
-    this.unbind = [
-      this.target.onResize(() => this.redraw()),
-      this.target.onBusy((busy) => {
-        if (this.playing || this.disposed) return;
-        this.emitState();
-        if (!busy) this.scheduleIdleSweep();
-      }),
-      this.target.onError((key, event) => this.report(key, event)),
-    ];
+    this.bindTarget();
   }
 
   // -------------------------------------------------------------------------
@@ -330,7 +333,10 @@ export class PreviewPlayer {
   /** The picture on screen, at most `maxWidth` wide (close it); null before the first frame. */
   snapshot(maxWidth: number): Promise<ImageBitmap | null> {
     this.assertLive();
-    return this.target.snapshot(maxWidth);
+    return this.target.snapshot(maxWidth).catch((error: unknown) => {
+      if (error instanceof PreviewWorkerError && !this.disposed) return this.target.snapshot(maxWidth);
+      throw error;
+    });
   }
 
   onTime(listener: (seconds: number) => void): () => void {
@@ -357,8 +363,9 @@ export class PreviewPlayer {
     this.clock = null;
     this.stopLoop();
     if (this.idleSweep !== null) clearTimeout(this.idleSweep);
-    for (const off of this.unbind) off();
+    for (const off of this.unbindTarget.splice(0)) off();
     this.target.dispose();
+    for (const fn of this.cleanup.splice(0)) fn();
     this.audio?.dispose();
     void this.audioRenderer.dispose();
     if (this.ownsAudioContext) void this.audioContext?.close().catch(() => undefined);
@@ -370,6 +377,42 @@ export class PreviewPlayer {
   // -------------------------------------------------------------------------
   // Rendering
   // -------------------------------------------------------------------------
+
+  /** Render on this thread: on the canvas, or on a stand-in when a worker holds its pixels. */
+  private pageTarget(): PreviewTarget {
+    let canvas = this.canvas;
+    if (isTransferred(canvas)) {
+      const standIn = standInCanvas(canvas as HTMLCanvasElement);
+      this.cleanup.push(() => standIn.remove());
+      canvas = standIn.canvas;
+    }
+    const surface = bindCanvas(canvas, { transparent: this.look.letterbox === "transparent" });
+    return new PreviewRenderer(surface, { media: this.media, engine: this.engine, ...this.look, ...(this.stills ? { stills: this.stills } : {}) });
+  }
+
+  private bindTarget(): void {
+    this.unbindTarget = [
+      this.target.onResize(() => this.redraw()),
+      this.target.onBusy((busy) => {
+        if (this.playing || this.disposed) return;
+        this.emitState();
+        if (!busy) this.scheduleIdleSweep();
+      }),
+      this.target.onError((key, event) => this.report(key, event)),
+    ];
+  }
+
+  /** The worker failed: carry on on the page, from the same frame and project. */
+  private fallBack(): void {
+    if (this.disposed) return;
+    for (const off of this.unbindTarget.splice(0)) off();
+    this.target.dispose();
+    this.target = this.pageTarget();
+    this.bindTarget();
+    if (this.project) this.target.setProject(this.project);
+    this.redraw();
+    this.emitState();
+  }
 
   private redraw(): void {
     const project = this.project;
@@ -387,7 +430,11 @@ export class PreviewPlayer {
   /** `request`, resolving once rendering goes idle. */
   private show(frame: number, mode: DecodeMode): Promise<void> {
     this.request(frame, mode);
-    return this.target.whenIdle();
+    return this.target.whenIdle().catch((error: unknown) => {
+      // The worker died with this frame on its way; the page target has it now.
+      if (error instanceof PreviewWorkerError && !this.disposed) return this.target.whenIdle();
+      throw error;
+    });
   }
 
   private scheduleIdleSweep(): void {

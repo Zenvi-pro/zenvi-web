@@ -29,12 +29,26 @@ export function servePreviewWorker(scope: Scope, options: PreviewWorkerOptions =
 
   const listener = (event: MessageEvent<ToWorker>) => {
     const message = event.data;
+    if (message.type === "ping") {
+      scope.postMessage({ type: "pong", id: message.id }, []);
+      return;
+    }
     if (message.type === "open") {
-      const canvas = message.canvas ?? canvases.get(message.surface);
-      if (!canvas) return;
-      canvases.set(message.surface, canvas);
       sessions.get(message.id)?.close();
-      sessions.set(message.id, new Session(scope, message.id, canvas, message, options));
+      sessions.delete(message.id);
+      const canvas = message.canvas ?? canvases.get(message.surface);
+      if (!canvas) {
+        scope.postMessage({ type: "opened", id: message.id, error: `No canvas ${message.surface} in this worker` }, []);
+        return;
+      }
+      canvases.set(message.surface, canvas);
+      try {
+        sessions.set(message.id, new Session(scope, message.id, canvas, message, options));
+      } catch (error) {
+        scope.postMessage({ type: "opened", id: message.id, error: cloneableError(error) }, []);
+        return;
+      }
+      scope.postMessage({ type: "opened", id: message.id }, []);
       return;
     }
     const session = sessions.get(message.id);
@@ -95,7 +109,7 @@ class Session {
     this.renderer.onError((key, event) => this.post({ type: "error", id, key, event: cloneableEvent(event) }));
   }
 
-  receive(message: Exclude<ToWorker, { type: "open" | "close" }>): void {
+  receive(message: Exclude<ToWorker, { type: "open" | "close" | "ping" }>): void {
     switch (message.type) {
       case "project":
         this.renderer.setProject(message.project);

@@ -1,7 +1,9 @@
 /**
  * Messages between a `WorkerPreview` (page) and the preview worker. Each
  * player has an `id`; one worker can serve several. Calls (`call` → `reply`)
- * carry a number unique per sender.
+ * carry a number unique per sender. The worker answers each `open` with
+ * `opened` and each `ping` with `pong`, so the page can tell a worker that
+ * never started or died from one that is busy.
  */
 
 import type { Project } from "@zenvi/engine";
