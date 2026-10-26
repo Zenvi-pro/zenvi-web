@@ -1,6 +1,6 @@
 /** @zenvi/motion/node: render motion blocks with headless Chrome + ffmpeg. */
 
-export { ChromeMissingError, chromeCacheDir, findChrome, installChrome, launchChrome } from "./chrome.js";
+export { ChromeLaunchError, ChromeMissingError, LAUNCH_TIMEOUT_MS, chromeCacheDir, closeChrome, findChrome, installChrome, launchChrome, leaseChrome } from "./chrome.js";
 export { blockPage, motionDir, pageHtml, writeBlockPages, type BlockPage } from "./page.js";
 export {
   designSize,
@@ -16,4 +16,4 @@ export {
   type RenderBlockOptions,
   type RenderedBlock,
 } from "./render.js";
-export { blockInfo, createMotionHost, type MotionHostOptions } from "./host.js";
+export { blockInfo, createMotionHost, runtimeStatus, type MotionHostOptions } from "./host.js";

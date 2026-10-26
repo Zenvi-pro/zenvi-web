@@ -21,7 +21,7 @@ import { addFile, updateFile, writeFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
 import { placeOverlayClip } from "../../ops/overlays.js";
 import { LINK_KEY, motionLink, readMotionLink, type MotionLinkSpec } from "../../links/zenvi-link.js";
-import { directTool, type CatalogTool, type ToolCall } from "../define.js";
+import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged } from "../receipt.js";
 import type { MotionBlockInfo, MotionHost, MotionRender } from "../types.js";
 import { clipsInWindow, errorText, planOverlayTrack, projectSize, snapToFrame, TextToolError, trackInfo } from "../titles-text.js";
@@ -29,6 +29,7 @@ import { clipsInWindow, errorText, planOverlayTrack, projectSize, snapToFrame, T
 const LIST = "list_motion_blocks_tool";
 const ADD = "add_motion_block_tool";
 const UPDATE = "update_motion_block_tool";
+const SETUP = "setup_motion_runtime_tool";
 const TRACK_LABEL = "Motion";
 
 const round = (t: number): number => Math.round(t * 1000) / 1000;
@@ -158,18 +159,51 @@ export const motionBlockTools: CatalogTool[] = [
     input: listInput,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     requires: ["motion"],
-    run: (call, args: z.infer<typeof listInput>) => {
-      const all = call.host.motion!.blocks();
+    run: async (call, args: z.infer<typeof listInput>) => {
+      const motion = call.host.motion!;
+      const all = motion.blocks();
+      // A block that cannot render yet is worse than none: say so before the agent plans around it.
+      const runtime = await motion.runtime?.();
+      const notReady = runtime && !runtime.ready ? runtime : undefined;
+      const warnings = notReady ? [notReady.detail] : [];
+      const note = notReady ? `\nWarning: ${notReady.detail}` : "";
+      const status = runtime ? { runtime } : {};
       if (args.block) {
         const b = all.find((x) => x.id === args.block);
         if (!b) return refused(LIST, `Error: unknown motion block ${args.block}; blocks: ${all.map((x) => x.id).join(", ")}.`);
         const params = b.params.map((p) => `${p.name} (${p.type}${p.options ? `: ${p.options.join("|")}` : ""}${p.default !== undefined ? `, default ${JSON.stringify(p.default)}` : ""}): ${p.description}`);
-        return applied(LIST, `${blockLine(b)}\nParams:\n${params.join("\n")}`, { data: { blocks: [b] } }, 0);
+        return applied(LIST, `${blockLine(b)}\nParams:\n${params.join("\n")}${note}`, { warnings, data: { blocks: [b], ...status } }, 0);
       }
       const blocks = args.tag ? all.filter((b) => b.tags.includes(args.tag!.toLowerCase())) : all;
-      return applied(LIST, `${blocks.length} motion block(s):\n${blocks.map(blockLine).join("\n")}\nlist_motion_blocks_tool block=<id> gives a block's params.`, {
-        data: { blocks: blocks.map((b) => ({ id: b.id, title: b.title, tags: b.tags, duration: b.duration, aspects: b.aspects, alpha: b.alpha, params: b.params.map((p) => p.name) })) },
+      return applied(LIST, `${blocks.length} motion block(s):\n${blocks.map(blockLine).join("\n")}\nlist_motion_blocks_tool block=<id> gives a block's params.${note}`, {
+        warnings,
+        data: { blocks: blocks.map((b) => ({ id: b.id, title: b.title, tags: b.tags, duration: b.duration, aspects: b.aspects, alpha: b.alpha, params: b.params.map((p) => p.name) })), ...status },
       }, 0);
+    },
+  }),
+  directTool({
+    name: SETUP,
+    title: "Set up the motion runtime",
+    description:
+      "Install what Zenvi Motion blocks render with on this computer: headless Chrome (chrome-headless-shell, a one-time download of about 90 MB, the same as `zenvi motion setup`). " +
+      "Call it when list_motion_blocks_tool or mcp_health_tool says the runtime is missing, or an add_motion_block_tool call asks for it; it does nothing when Chrome is already installed. " +
+      "Only this computer's hosts have it: Zenvi Cloud renders blocks itself and refuses.",
+    input: z.strictObject({}),
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: true },
+    requires: ["motion"],
+    run: async (call) => {
+      const motion = call.host.motion!;
+      if (!motion.setup) return unavailable(SETUP, "this host renders motion blocks itself (or somewhere else), so there is nothing to install here.");
+      const before = await motion.runtime?.();
+      if (before?.ready) return unchanged(SETUP, `${before.detail} Nothing to download.`, { data: { runtime: before } });
+      let status;
+      try {
+        status = await motion.setup(call.signal);
+      } catch (error) {
+        return failed(SETUP, errorText(`the motion runtime could not be installed: ${error instanceof Error ? error.message : String(error)}. Check the internet connection and call setup_motion_runtime_tool again, or run \`zenvi motion setup\`.`));
+      }
+      if (!status.ready) return refused(SETUP, errorText(status.detail));
+      return applied(SETUP, `Installed headless Chrome. ${status.detail} Motion blocks can render now.`, { data: { runtime: status } }, 0);
     },
   }),
   directTool({
@@ -221,6 +255,7 @@ export const motionBlockTools: CatalogTool[] = [
       const doc = call.doc.project;
       const track = trackInfo(doc, plan.layer);
       return applied(ADD, `Added ${block.title} at ${start.toFixed(2)}-${(start + seconds).toFixed(2)}s on track ${track.track ?? plan.layer}${alpha ? " over the video" : " full frame"}${rendered.render.cached ? " (cached render)" : ""}.`, {
+        warnings: checked.warnings,
         data: { file_id: placed.file.id, timeline_clip_id: placed.clip.id, position: round(start), duration: round(seconds), ...track, new_track: plan.created, ...renderData(rendered) },
       });
     },
@@ -278,7 +313,7 @@ export const motionBlockTools: CatalogTool[] = [
       const rendered = await renderSpec(call, motion, project, spec);
       if (typeof rendered === "string") return failed(UPDATE, rendered);
       if (rendered.render.fingerprint === current.fingerprint) {
-        return unchanged(UPDATE, `${block.title} already shows these params; nothing changed.`, { data: { file_id: file.id, ...renderData(rendered) } });
+        return unchanged(UPDATE, `${block.title} already shows these params; nothing changed.`, { warnings: checked.warnings, data: { file_id: file.id, ...renderData(rendered) } });
       }
       const fileId = String(file.id);
       const oldSeconds = Number(file.duration) || current.seconds;
@@ -300,6 +335,7 @@ export const motionBlockTools: CatalogTool[] = [
         return written;
       }, `Update motion block ${block.id}`);
       return applied(UPDATE, `Re-rendered ${block.title}; ${result.updatedClipIds.length} clip(s) now play the new render.`, {
+        warnings: checked.warnings,
         data: { file_id: fileId, timeline_clip_ids: result.updatedClipIds, ...renderData(rendered) },
       });
     },

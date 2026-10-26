@@ -1012,6 +1012,14 @@ const SPECS: Record<string, Spec> = {
     happy: { args: {}, summary: /^1 motion block\(s\):\nkinetic_headline \(1\.5-10 s, default 3; over video\)/ },
     failure: { args: { block: "nope" }, status: "refused", summary: /^Error: unknown motion block nope; blocks: kinetic_headline\.$/ },
   },
+  setup_motion_runtime_tool: {
+    happy: { args: {}, status: "unchanged", summary: /^Headless Chrome is installed \(\/cache\/chrome\)\. Nothing to download\.$/ },
+    failure: { args: {}, host: { without: ["motion"] }, status: "refused", summary: /not available/ },
+  },
+  mcp_health_tool: {
+    happy: { args: {}, summary: /^Zenvi is up\. Zenvi Motion blocks: ready\.$/ },
+    failure: null,
+  },
   add_motion_block_tool: {
     happy: {
       args: { block: "kinetic_headline", params: { text: "Big news" }, position_seconds: "1" },
