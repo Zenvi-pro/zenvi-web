@@ -89,6 +89,9 @@ describe("slots", () => {
     expect(fitsSlot("riser", "2 Impact Wet")).toBe(false);
     expect(fitsSlot("riser", "Impact", ["riser", "build"])).toBe(false);
     expect(fitsSlot("riser", "Cinematic build up")).toBe(true);
+    // Played as an impact when placed by hand, but a kit never takes a sound nothing names.
+    expect(fitsSlot("hit", "Untitled 4")).toBe(false);
+    expect(fitsSlot("boom", "Untitled 4")).toBe(false);
   });
 
   it("takes whooshes, swishes, hits, booms and risers from the library in a mixed kit", () => {

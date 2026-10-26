@@ -283,15 +283,21 @@ const SLOT_FITS: Readonly<Record<KitSlot, readonly KitSlot[]>> = {
   glitch: ["glitch"],
 };
 
-/** Whether a library sound's title and tags say it can play `slot` (library searches are loose: "riser" also finds impacts). */
+/** Whether a library sound's title and tags say it can play `slot` (library searches are loose: "riser" also finds impacts). A sound nothing names fits no slot. */
 export function fitsSlot(slot: KitSlot, title: string, tags: readonly string[] = []): boolean {
-  return SLOT_FITS[slot].includes(guessSlot(title, tags));
+  const named = namedSlot(title, tags);
+  return named !== undefined && SLOT_FITS[slot].includes(named);
+}
+
+/** The slot a library sound's title names, else its tags; undefined when neither does. */
+function namedSlot(title: string, tags: readonly string[]): KitSlot | undefined {
+  for (const text of [title.toLowerCase(), tags.join(" ").toLowerCase()]) {
+    for (const [slot, re] of SLOT_WORDS) if (re.test(text)) return slot;
+  }
+  return undefined;
 }
 
 /** The slot a library sound most likely plays (its hit point and mix level follow): the title decides first, then the tags; an impact when nothing says. */
 export function guessSlot(title: string, tags: readonly string[] = []): KitSlot {
-  for (const text of [title.toLowerCase(), tags.join(" ").toLowerCase()]) {
-    for (const [slot, re] of SLOT_WORDS) if (re.test(text)) return slot;
-  }
-  return "hit";
+  return namedSlot(title, tags) ?? "hit";
 }
