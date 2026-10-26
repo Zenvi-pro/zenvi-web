@@ -110,6 +110,65 @@
       }
     },
     {
+      "id": "rotator",
+      "tool": "add_motion_block_tool",
+      "args": {
+        "block": "word_rotator",
+        "params": {
+          "prefix": "Agents",
+          "words": [
+            "writing",
+            "planning"
+          ],
+          "suffix": "for you"
+        },
+        "position_seconds": 2,
+        "duration_seconds": 2,
+        "draft": true
+      },
+      "skipWhen": [
+        "headless Chrome",
+        "zenvi motion setup"
+      ],
+      "timeoutSeconds": 600,
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "end_card",
+      "tool": "add_motion_block_tool",
+      "args": {
+        "block": "logo_reveal_end",
+        "params": {
+          "brand": "Zenvi"
+        },
+        "position_seconds": 2,
+        "duration_seconds": 2,
+        "draft": true
+      },
+      "skipWhen": [
+        "headless Chrome",
+        "zenvi motion setup"
+      ],
+      "timeoutSeconds": 600,
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 1
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "fx",
       "tool": "apply_fx_tool",
       "args": {
