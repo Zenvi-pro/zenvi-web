@@ -183,8 +183,8 @@ export async function nodeMotionHosts(env: NodeJS.ProcessEnv = process.env): Pro
 
 /**
  * Subject mattes with Robust Video Matting when onnxruntime-node is
- * installed, or why not. The weights come from Zenvi's cache folder (the
- * image downloads them at build time; elsewhere on first use).
+ * installed, or why not. The weights download into Zenvi's cache folder on
+ * first use (SHA-256 checked), so a fresh container fetches them again.
  */
 export function nodeMatteHosts(env: NodeJS.ProcessEnv = process.env): { factory?: MatteHostFactory; reason?: string } {
   if (env.ZENVI_MATTES?.trim() === "0") return { reason: "turned off (ZENVI_MATTES=0)" };
