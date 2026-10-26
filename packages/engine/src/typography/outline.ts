@@ -12,7 +12,8 @@
  * there (an Inkscape line); `text-anchor` (or Inkscape's `text-align`) of a
  * chunk's first run aligns it. Whitespace collapses unless
  * `xml:space="preserve"`. The original `<text>` stays in the file, hidden
- * (`display="none"`), so the words are still there to read and to edit.
+ * (`display="none"`), so the words are still there to read and to edit;
+ * `stripOutlines` turns the file back into its text before an edit.
  */
 
 import { getAttr, parseXml, serializeXml, setAttr, type XmlElement, type XmlNode } from "../titles/xml.js";
@@ -23,6 +24,8 @@ import { outlineCommands, setRun, type SetGlyph, type TypeStyle } from "./typese
 
 /** Marks the `<g>` that draws an outlined `<text>`: its value is the family. */
 export const OUTLINE_ATTR = "data-zenvi-outline";
+/** Marks a `<text>` hidden because outlines draw it. */
+export const OUTLINED_ATTR = "data-zenvi-outlined";
 
 export interface OutlineChunk {
   /** The chunk's characters. */
@@ -262,6 +265,7 @@ export function outlineSvgText(svg: string, lib: FontLibrary, options: OutlineOp
         }
       }
       setAttr(child, "display", "none");
+      setAttr(child, OUTLINED_ATTR, "1");
       el.children.splice(el.children.indexOf(child as XmlNode) + 1, 0, group);
       outlined += 1;
     }
@@ -274,4 +278,30 @@ export function outlineSvgText(svg: string, lib: FontLibrary, options: OutlineOp
 function sizeForCap(lib: FontLibrary, family: FontFamilyId, style: Computed, share: number): number {
   const face = lib.face(family, { weight: style.weight, italic: style.italic, opticalSize: style.size });
   return (style.size * share * face.unitsPerEm) / face.capHeight;
+}
+
+/** `svg` without its outlines: the outline groups removed, the texts they drew shown again. */
+export function stripOutlines(svg: string): string {
+  if (!svg.includes(OUTLINE_ATTR)) return svg;
+  const doc = parseXml(svg);
+  const visit = (el: XmlElement): void => {
+    el.children = el.children.filter((child) => !(child.kind === "element" && child.name === "g" && child.attrs.some(([k]) => k === OUTLINE_ATTR)));
+    for (const child of el.children) {
+      if (child.kind !== "element") continue;
+      if (child.name === "text" && child.attrs.some(([k]) => k === OUTLINED_ATTR)) child.attrs = child.attrs.filter(([k]) => k !== OUTLINED_ATTR && k !== "display");
+      visit(child);
+    }
+  };
+  visit(doc.root);
+  return serializeXml(doc);
+}
+
+/** The bundled families an SVG's text names (first family of each font-family). */
+export function svgBundledFamilies(svg: string, resolve: (css: string) => FontFamilyId | null): FontFamilyId[] {
+  const out = new Set<FontFamilyId>();
+  for (const m of svg.matchAll(/font-family\s*[:=]\s*"?([^;"]+)/g)) {
+    const family = resolve(firstFamily(m[1]!.replace(/&quot;|&apos;/g, "'")));
+    if (family) out.add(family);
+  }
+  return [...out];
 }
