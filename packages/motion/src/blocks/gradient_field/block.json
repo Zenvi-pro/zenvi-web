@@ -1,0 +1,18 @@
+{
+  "id": "gradient_field",
+  "version": 1,
+  "title": "Gradient field",
+  "description": "A soft moving background: big gradient orbs drifting, an aurora of wide colour bands, or floating bokeh, with an optional dot grid and film grain. Opaque; put text or UI blocks over it.",
+  "tags": ["background", "gradient", "orbs", "bokeh", "aurora", "ambient"],
+  "duration": { "default": 6, "min": 1, "max": 30 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": false,
+  "tokens": { "palette": "light" },
+  "params": {
+    "style": { "type": "enum", "options": ["orbs", "aurora", "bokeh"], "default": "orbs", "description": "orbs: large soft blobs; aurora: wide flowing bands; bokeh: many small out-of-focus lights." },
+    "colors": { "type": "strings", "maxItems": 5, "maxLength": 9, "default": [], "description": "Orb colours as #rrggbb (empty: the palette's accent, secondary and tints)." },
+    "speed": { "type": "number", "min": 0, "max": 4, "default": 1, "description": "Drift speed (1 = one slow loop in about 10 s)." },
+    "dots": { "type": "boolean", "default": false, "description": "A fine dot grid over the field, fading at the edges." },
+    "grain": { "type": "boolean", "default": true, "description": "Subtle animated film grain (hides gradient banding)." }
+  }
+}

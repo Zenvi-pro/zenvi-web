@@ -1,0 +1,25 @@
+{
+  "name": "@zenvi/motion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zenvi Motion: parametric HTML motion blocks, their deterministic animation runtime, and the headless-Chrome renderer that turns a block into a video.",
+  "license": "GPL-3.0-or-later",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@puppeteer/browsers": "^3.2.6",
+    "@zenvi/engine": "*",
+    "@zenvi/render-node": "*",
+    "esbuild": "^0.28.2",
+    "puppeteer-core": "^25.16.0"
+  },
+  "devDependencies": {
+    "jsdom": "^27.4.0"
+  }
+}

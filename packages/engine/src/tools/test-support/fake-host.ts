@@ -28,6 +28,7 @@ import type {
   ToolImage,
 } from "../types.js";
 import { readBundledFont } from "../../typography/test-fonts.js";
+import { fakeMotionHost } from "./fake-motion.js";
 import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
 /** A 1×1 PNG. */
@@ -661,6 +662,7 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       return { language: opts?.language || "en", model: "whisper-1", words: structuredClone(SPOKEN_WORDS), segments: [], durationSeconds: 8 };
     };
   }
+  if (!without.has("motion")) host.motion = fakeMotionHost();
   if (!without.has("assets")) {
     host.assets = {
       readText: async (path) => {

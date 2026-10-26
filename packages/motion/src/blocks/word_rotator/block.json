@@ -1,0 +1,73 @@
+{
+  "id": "word_rotator",
+  "version": 1,
+  "title": "Word rotator",
+  "description": "A line of text where one word cycles through a list: a slot column that scrolls with the neighbours fading above and below, or words that flip in and out. The line re-centres as the word's width changes; on vertical frames prefix, word and suffix stack. For taglines and end cards (\"Made for *storytellers*\").",
+  "tags": [
+    "type",
+    "kinetic",
+    "rotator",
+    "tagline",
+    "end card"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 2,
+    "max": 14
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": true,
+  "tokens": {
+    "palette": "dark",
+    "display": "sans"
+  },
+  "params": {
+    "prefix": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "Made for",
+      "description": "Text before the rotating word (empty: none)."
+    },
+    "words": {
+      "type": "strings",
+      "minItems": 2,
+      "maxItems": 10,
+      "maxLength": 24,
+      "default": [
+        "editors",
+        "storytellers",
+        "small teams",
+        "you"
+      ],
+      "description": "The words, in order; the last one stays."
+    },
+    "suffix": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "",
+      "description": "Text after the rotating word (empty: none)."
+    },
+    "style": {
+      "type": "enum",
+      "options": [
+        "auto",
+        "slot",
+        "flip"
+      ],
+      "default": "auto",
+      "description": "slot: a scrolling column with faded neighbours; flip: each word rolls up and out; auto: slot on landscape, flip on vertical (where the line is stacked)."
+    },
+    "size": {
+      "type": "number",
+      "min": 24,
+      "max": 220,
+      "default": 0,
+      "description": "Font size, px at 1080 (0: fit the safe width)."
+    }
+  }
+}
