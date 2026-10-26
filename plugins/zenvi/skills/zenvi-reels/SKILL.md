@@ -11,6 +11,15 @@ moves and look, flashes on downbeats, an opening hook title, shot labels,
 an end card, and the music bed faded out. Your job is the part a director
 does: the brief, the footage, the music, the words, and the final check.
 
+When the ask names a genre or technique `build_reel_tool` does not cover
+(match cuts aligned on a subject, flash montages, kinetic captions, glass UI
+promos, 3D product shots, grid montages, video essays), points at a reference
+video, or has to hold up next to a professional edit, use the
+`zenvi-motion-director` skill: it plans the edit with timings and adds
+motion transitions, motion blocks, 3D scenes, matte composites and sound
+design on every cut. This skill stays the quick path; its steps 4b and 4c
+below are the director's minimum.
+
 ## 1. Write the brief first (show it to the person)
 
 ```
@@ -146,6 +155,27 @@ cut it should punch (zoom blur 0.2-0.4 s into a cut, a 0.3 s glitch on a
 hit) rather than the whole clip, keep one look per section, and remove one
 with `remove_fx_tool` if it reads as a filter instead of a moment.
 
+For a match-cut reel prefer `match_cut_montage_tool` over the `match_cut`
+style: it cuts 3-8 frame shots on the music's hits and aligns the shared
+subject (`subjects` boxes, or circles found by `detect_subject_tool`) so it
+sits at the same place and size on every cut.
+
+### 4b. Move the cuts (optional, after the cut is final)
+
+`apply_motion_transitions_tool` `track: "1"`, `style: "hype"` (whips and a
+crash zoom) or `"cinematic"` (slides, blur dissolves, a zoom-through at the
+end) puts velocity on the cuts; one direction per reel. Re-cutting later
+means `remove_motion_transition_tool` on the track first.
+
+### 4c. Sound design (last, when the picture is locked)
+
+`auto_sound_design_tool` with the receipt's `beats` (`intensity`: `subtle`
+for minimal and cinematic, `normal`, `hype` for hype and match-cut reels)
+puts whooshes on cuts and transitions, hits on downbeats and flashes, clicks
+on title entrances and a riser into the climax. In professional reels a cut
+lands on a sound far more often than on the beat: this step is most of the
+"snap". Add single effects with `add_sfx_tool` (`list_sfx_tool` lists them).
+
 ## 5. Watch the cut, fix it, watch it again
 
 Frames one at a time never show pacing. After cutting, call
@@ -178,6 +208,12 @@ the bottom fifth, where the apps put their buttons.
 
 ## 6. Render and hand off
 
-`render_video` (mp4, the project's size). Then offer `launch_editor` (the
+Before rendering: `unify_grade_tool` if the shots come from different
+sources (it matches exposure and white balance across the cut; pass a LUT
+as `look` to keep one look on top), then `master_audio_tool` (`preset:
+"social"`) as the last audio step. `render_video` (mp4, the project's size),
+then `review_render_tool` on the file: fix every `PROBLEM` line (an end on
+black, clipping, a shot repeated within 3 s) and render again. Then offer
+`launch_editor` (the
 desktop app) or `push_to_cloud` (a zenvi.pro link) so the person can tweak
 it, and list the music and footage credits.

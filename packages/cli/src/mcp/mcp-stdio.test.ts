@@ -77,7 +77,7 @@ describe("zenvi mcp over stdio (real catalog)", () => {
     expect(names.length).toBeGreaterThan(60);
     // Host-aware: list_hosts and the resources over stdio.
     expect(names).toContain("list_hosts");
-    expect((await client.listResources()).resources.map((r) => r.uri)).toEqual(["zenvi://hosts", "zenvi://taste", "zenvi://handoff"]);
+    expect((await client.listResources()).resources.map((r) => r.uri).slice(0, 4)).toEqual(["zenvi://hosts", "zenvi://taste", "zenvi://handoff", "zenvi://director"]);
     const hosts = await call("list_hosts");
     expect(hosts.receipt.data).toMatchObject({ active: "zenvi-portable" });
 

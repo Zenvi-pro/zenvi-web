@@ -6,7 +6,7 @@ import { AE_TOOLS } from "@zenvi/adobe-link";
 import { makeTempDir, removeDir } from "@zenvi/render-node/test-support";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GEN_FILE, HANDOFF_TOOLS, syncText } from "../../scripts/sync-desktop-handoff-tools.mjs";
-import { tasteModule } from "../../scripts/sync-taste.mjs";
+import { directorModule, readDirector, tasteModule } from "../../scripts/sync-taste.mjs";
 import { DESKTOP_HANDOFF_TOOLS } from "../hosts/handoff.js";
 import { fakeLinkHost } from "../test-support/adobe.js";
 import { fakeDesktop, testEnv, writeDiscovery, zenvi } from "../test-support/harness.js";
@@ -185,6 +185,10 @@ describe("generated files", () => {
   it("taste.gen.ts embeds docs/TASTE.md exactly", async () => {
     const markdown = await readFile(path.resolve(here, "..", "..", "..", "..", "docs", "TASTE.md"), "utf8");
     expect(await readFile(path.resolve(here, "..", "hosts", "taste.gen.ts"), "utf8")).toBe(tasteModule(markdown));
+  });
+
+  it("director.gen.ts embeds the zenvi-motion-director skill and its recipes exactly", async () => {
+    expect(await readFile(path.resolve(here, "..", "hosts", "director.gen.ts"), "utf8")).toBe(directorModule(readDirector()));
   });
 
   it("desktop-handoff-tools.gen.json lists SPEC §3.5's forwarded tools in order with strict object schemas", async () => {
