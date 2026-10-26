@@ -83,9 +83,9 @@ that track (`remove_motion_transition_tool track=...`) and re-running sound.
 - **Sound on every cut.** In the references a cut lands on an audio
   transient 50-100 % of the time and on the beat only 20-40 %: the whoosh or
   hit makes the cut. Risers end on the drop, an impact lands on it.
-- **Loud enough.** References sit at about −13…−16 dB RMS. Never turn music
-  down without speech over it; never leave a stretch silent unless the
-  silence is the moment.
+- **Loud enough, not louder.** Music-led references sit at about −13…−16 dB
+  RMS, calm studio pieces lower. Never bury music under nothing; never leave
+  a stretch silent unless the silence is the moment.
 - **Pace by genre, not by default.** Flash montage 3-6 frames, match chain
   3-8, hype 4-8, b-roll 1-1.5 s, motion promo a new state every 1-2.5 s. A
   2 s hold in a fast genre is a slideshow.
@@ -135,9 +135,11 @@ scrim), never straight on a busy photo ·
 one focal point · grade consistent with the previous shot. Then the timeline:
 `get_timeline_state_tool` — no gaps, shot lengths as planned, an SFX clip at
 every cut, music covers the whole piece and fades out. Audio:
-`analyze_timeline_audio_tool` for each clip's level; the mix should sit
-near −13…−16 dB RMS: lower a hot mastered track (`set_clip_volume_tool`
-`level_db: -4`) rather than burying the effects, raise nothing above 0 dB.
+`analyze_timeline_audio_tool` for each clip's level; music-led edits sit
+near −13…−16 dB RMS, calm product and studio pieces at −20…−24 (the recipe
+says which): lower a hot mastered track (`set_clip_volume_tool`
+`level_db: -4` or more) rather than burying the effects; raise nothing
+above 0 dB.
 
 Fix what fails with the tool that made it (or `undo_tool` and redo with other
 arguments), then look at that frame again. Report what you checked.
