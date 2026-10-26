@@ -56,7 +56,7 @@ export const FX_PARAMS = {
     center_y: unit(0.5, "Lens centre, 0 top to 1 bottom."),
   }),
   bloom: z.strictObject({
-    threshold: unit(0.62, "Brightness above which light blooms (0-1)."),
+    threshold: unit(0.55, "Brightness above which light blooms (0-1)."),
     radius: unit(0.5, "Glow size, 0 tight to 1 wide."),
   }),
   glitch: z.strictObject({
@@ -120,7 +120,7 @@ export const FX_INFO: Readonly<Record<FxId, FxInfo>> = {
   radial_blur: { id: "radial_blur", title: "Zoom blur", summary: "Radial zoom blur out from a centre point, for punch-ins and zoom-through cuts.", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0 },
   directional_blur: { id: "directional_blur", title: "Directional blur", summary: "Motion-style blur along one direction, for whips and fast pans.", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0 },
   echo: { id: "echo", title: "Echo / trails", summary: "Ghosted copies of the motion (echo) or decaying light streaks (trails).", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0.5 },
-  chromatic_aberration: { id: "chromatic_aberration", title: "Chromatic aberration", summary: "Lens-style RGB fringing that grows toward the frame edges.", defaultAmount: 0.4, retimes: false, lookbackSeconds: 0 },
+  chromatic_aberration: { id: "chromatic_aberration", title: "Chromatic aberration", summary: "Lens-style RGB fringing that grows toward the frame edges.", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0 },
   bloom: { id: "bloom", title: "Bloom", summary: "Highlights glow and bleed into their surroundings.", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0 },
   glitch: { id: "glitch", title: "Glitch", summary: "Seeded digital bursts: slices and blocks jump sideways with RGB splits.", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0 },
   pixel_sort: { id: "pixel_sort", title: "Pixel sort", summary: "Bright pixels streak in one direction like a pixel sort (an approximation: a luma-keyed one-way smear, not a true per-row sort).", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0 },

@@ -225,7 +225,7 @@ function radialBlur(g: Graph, input: string, e: FxEffect<"radial_blur">): string
 
 /** Red scaled out from the lens centre, green half as much, blue in place: fringes grow toward the edges. */
 function chromaticAberration(g: Graph, input: string, e: FxEffect<"chromatic_aberration">): string {
-  const s = 0.003 + 0.027 * e.amount;
+  const s = 0.004 + 0.03 * e.amount;
   const { center_x: cx, center_y: cy } = e.params;
   const [gIn, bIn, rIn] = g.split(input, 3);
   const gs = zoomed(g, gIn!, 1 + s / 2, cx, cy);
@@ -253,8 +253,9 @@ function bloom(g: Graph, input: string, e: FxEffect<"bloom">): string {
   g.add(`[${near}]gblur=sigma=${num(sigma)}[${n}]`);
   g.add(`[${far}]gblur=sigma=${num(sigma * 3.5)}[${f}]`);
   const glow = g.label();
-  g.add(`[${n}][${f}]blend=all_mode=addition,scale=${w}:${h}:flags=bicubic${g.ctx.alpha ? ",format=gbrap" : ""}[${glow}]`);
-  return g.blend(base!, glow, "screen", 0.35 + 0.65 * e.amount);
+  const gain = num(1 + 1.5 * e.amount);
+  g.add(`[${n}][${f}]blend=all_mode=addition,colorchannelmixer=rr=${gain}:gg=${gain}:bb=${gain},scale=${w}:${h}:flags=bicubic${g.ctx.alpha ? ",format=gbrap" : ""}[${glow}]`);
+  return g.blend(base!, glow, "screen", 0.5 + 0.5 * e.amount);
 }
 
 /**
@@ -480,49 +481,54 @@ function lightLeak(g: Graph, input: string, e: FxEffect<"light_leak">, span: Spa
   const mh = Math.max(8, Math.round(h / 8));
   const [r0, g0, b0] = rgb(e.params.color);
   const burn = e.params.style === "burn";
-  const blobs = burn ? 3 : 2;
   const terms = { r: [] as string[], g: [] as string[], b: [] as string[] };
+  // Leaks come in from one side of the frame (seeded) as long soft streaks along that edge.
+  const side = Math.floor(rand() * 4);
+  const blobs = burn ? 4 : 3;
   for (let i = 0; i < blobs; i++) {
-    // Blobs live near an edge: x or y pinned outside the middle, the other coordinate drifting.
-    const side = Math.floor(rand() * 4);
-    const along = rand();
-    const drift = 0.3 + rand() * 0.4;
-    const speed = 0.6 + rand() * 0.8;
+    const along = 0.15 + rand() * 0.7;
+    const drift = 0.25 + rand() * 0.35;
+    const speed = 0.7 + rand() * 1.1;
     const phase = rand() * Math.PI * 2;
     const pos = `(${num(along)}+${num(drift)}*sin(${num(speed)}*T+${num(phase)}))`;
-    const edge = num(rand() * 0.3);
+    const depth = num(-0.05 + rand() * (burn ? 0.35 : 0.2));
+    const vertical = side >= 2;
     const [bx, by] = [
-      [pos, edge],
-      [pos, `(1-${edge})`],
-      [edge, pos],
-      [`(1-${edge})`, pos],
+      [pos, depth],
+      [pos, `(1-${depth})`],
+      [depth, pos],
+      [`(1-${depth})`, pos],
     ][side]!;
-    const size = burn ? 0.5 + rand() * 0.3 : 0.45 + rand() * 0.3;
-    const pulse = `(0.75+0.45*sin(${num(0.8 + rand() * 1.5)}*T+${num(rand() * 6.28)}))`;
-    const blob = `exp(-(pow((X/${mw}-${bx})*${num(w / h)},2)+pow(Y/${mh}-${by},2))/${num(size * size)})*${pulse}`;
-    // The first blob takes the leak colour; the others drift toward amber and rose.
+    // Narrow across the edge, long along it.
+    const across = (burn ? 0.22 : 0.16) + rand() * 0.14;
+    const length = 0.35 + rand() * 0.35;
+    const [sx, sy] = vertical ? [across, length] : [length, across];
+    const pulse = `(0.7+0.5*sin(${num(0.9 + rand() * 1.8)}*T+${num(rand() * 6.28)}))`;
+    const blob = `exp(-(pow((X/${mw}-${bx})*${num(w / h)}/${num(sx)},2)+pow((Y/${mh}-${by})/${num(sy)},2)))*${pulse}`;
+    // The first streak takes the leak colour, the others rose and gold; the gain clips their cores toward yellow-white like overexposed film.
     const tint = [
       [r0, g0, b0],
-      [255, 190, 90],
-      [255, 80, 120],
+      [255, 46, 77],
+      [255, 194, 74],
+      [255, 110, 30],
     ][i]!;
-    // Gain past 1 so the core saturates (clipped) and the leak reads as light, not haze.
+    const gain = burn ? 2.6 : 2;
     for (const [c, value] of [
       ["r", tint[0]!],
       ["g", tint[1]!],
       ["b", tint[2]!],
-    ] as const) terms[c].push(`${num(value * 1.7)}*${blob}`);
+    ] as const) terms[c].push(`${num(value * gain)}*${blob}`);
   }
   if (burn) {
-    const flare = `pow(max(0,sin(${num(1.3 + rand())}*T+${num(rand() * 6.28)})),3)`;
-    const core = `exp(-(pow((X/${mw}-${num(0.15 + rand() * 0.7)})*${num(w / h)},2)+pow(Y/${mh}-${num(0.1 + rand() * 0.3)},2))/0.04)*${flare}`;
-    for (const c of ["r", "g", "b"] as const) terms[c].push(`255*${core}`);
+    const flare = `pow(max(0,sin(${num(1.3 + rand())}*T+${num(rand() * 6.28)})),2)`;
+    const core = `exp(-(pow((X/${mw}-${num(0.2 + rand() * 0.6)})*${num(w / h)},2)+pow(Y/${mh}-${num(0.2 + rand() * 0.6)},2))/0.06)*${flare}`;
+    for (const c of ["r", "g", "b"] as const) terms[c].push(`300*${core}`);
   }
   const solid = g.solid(mw, mh, span.from, span.to);
   const layer = g.label("l");
   const expr = (c: "r" | "g" | "b") => `clip(${terms[c].join("+")},0,255)`;
   g.add(`[${solid}]geq=r='${expr("r")}':g='${expr("g")}':b='${expr("b")}',scale=${w}:${h}:flags=bicubic,format=${g.work}[${layer}]`);
-  return g.blend(input, layer, "screen", 0.3 + 0.7 * e.amount);
+  return g.blend(input, layer, "screen", 0.35 + 0.65 * e.amount);
 }
 
 /** atempo takes 0.5-2 per stage: chain stages down to the speed. */

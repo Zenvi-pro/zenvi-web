@@ -14,7 +14,7 @@ function stack(raw: unknown[], duration = 4): FxEffect[] {
 describe("FX stacks", () => {
   it("fill each effect's defaults", () => {
     const [bloom] = stack([{ effect: "bloom" }]);
-    expect(bloom).toEqual({ effect: "bloom", amount: FX_INFO.bloom.defaultAmount, params: { threshold: 0.62, radius: 0.5 } });
+    expect(bloom).toEqual({ effect: "bloom", amount: FX_INFO.bloom.defaultAmount, params: { threshold: 0.55, radius: 0.5 } });
     const [halftone] = stack([{ effect: "halftone", params: { ink: "#ff0000" } }]);
     expect(halftone?.params).toEqual({ cell: 12, ink: "#FF0000", paper: "#F4EFE6" });
   });
