@@ -22,6 +22,9 @@ export function serverBundleOptions(outfile, entry = "src/main.ts") {
     legalComments: "none",
     logLevel: "info",
     define: { __ZENVI_BUNDLE__: "true" },
+    // onnxruntime-node: native, optional, loaded on first use (subject mattes), resolved from the image's node_modules.
+    // esbuild: Zenvi Motion builds block pages with it only from source; the bundle ships them prebuilt (dist/motion).
+    external: ["onnxruntime-node", "esbuild"],
     // CommonJS dependencies bundled into ESM still call require() for Node built-ins.
     banner: { js: "import { createRequire as __zenviCreateRequire } from 'node:module'; const require = __zenviCreateRequire(import.meta.url);" },
   };
