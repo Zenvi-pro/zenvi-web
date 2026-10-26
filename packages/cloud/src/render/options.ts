@@ -85,7 +85,6 @@ function presetSize(project: Project, preset: string, shortSide: number): { widt
     throw new ApiError(
       400,
       "invalid_request",
-      
       `The ${preset} preset makes the short side ${shortSide} px, which on this ${project.width}×${project.height} project is ` +
         `${size.width}×${size.height}, larger than Zenvi Cloud renders (${MAX_WIDTH}×${MAX_HEIGHT}). Pick a smaller preset or pass height.`,
     );
