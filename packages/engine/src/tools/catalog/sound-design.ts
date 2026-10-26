@@ -68,7 +68,8 @@ const addInput = z.strictObject({
     .enum(["peak", "start"])
     .optional()
     .describe("peak (default): the sound's hit point lands on the moment (a whoosh's peak, an impact's transient, a riser's end). start: the sound starts there."),
-  gain_db: z.number().min(-40).max(2).optional().describe("Clip gain, dB. Default: the recipe's mix level (peaks around -8…-14 dBFS, under music)."),
+  // libopenshot's clip volume runs 0..1, and files peak at -1 dBFS: 0 dB is as loud as an effect gets.
+  gain_db: z.number().min(-40).max(0).optional().describe("Clip gain, dB, -40..0. Default: the recipe's mix level (peaks around -8…-14 dBFS, under music)."),
   ...paramShape,
 });
 
@@ -338,10 +339,12 @@ export const soundDesignTools: CatalogTool[] = [
 
       const after = call.doc.project;
       const summary =
-        `Sound-designed the edit (${intensity}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
-        (plan.climax !== null ? `, ${plan.riser ? "a build into the climax and an impact on it" : "an impact on the climax"} at ${plan.climax.toFixed(2)} s` : "") +
-        (previous.length > 0 ? `; replaced ${previous.length} from the last run` : "") +
-        ".";
+        placed.rows.length === 0
+          ? `Removed the ${previous.length} effects of the last run: no moment of this edit is strong enough at ${intensity} intensity.`
+          : `Sound-designed the edit (${intensity}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
+            (plan.climax !== null ? `, ${plan.riser ? "a build into the climax and an impact on it" : "an impact on the climax"} at ${plan.climax.toFixed(2)} s` : "") +
+            (previous.length > 0 ? `; replaced ${previous.length} from the last run` : "") +
+            ".";
       return applied(AUTO, summary, {
         warnings,
         clips: placed.rows.slice(0, 30).map(({ clip, cue, hit }) => clipRow(after, clip, { recipe: cue.recipe, hit_seconds: hit, gain_db: cue.gainDb, reason: cue.reason })),

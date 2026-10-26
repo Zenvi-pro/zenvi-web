@@ -3242,7 +3242,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `edge` | "start" \| "end" |  | With clip_id: the clip's start (default) or end. |
 | `marker_id` | string |  | Or: a marker's id; the moment is the marker's position. |
 | `align` | "peak" \| "start" |  | peak (default): the sound's hit point lands on the moment (a whoosh's peak, an impact's transient, a riser's end). start: the sound starts there. |
-| `gain_db` | number |  | Clip gain, dB. Default: the recipe's mix level (peaks around -8…-14 dBFS, under music). (min -40, max 2) |
+| `gain_db` | number |  | Clip gain, dB, -40..0. Default: the recipe's mix level (peaks around -8…-14 dBFS, under music). (min -40, max 0) |
 | `duration` | number |  | Seconds (each recipe has its own range; list_sfx_tool shows it). Default: the recipe's. (max 8) |
 | `pitch` | number |  | Semitones, -12..12 (default 0). Lower = bigger and heavier. (min -12, max 12) |
 | `brightness` | number |  | 0 (dark, distant) .. 1 (bright, close). Default 0.5. (min 0, max 1) |

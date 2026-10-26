@@ -158,6 +158,8 @@ describe("add_sfx_tool", () => {
       { recipe: "pop", at_seconds: 1, edge: "end" },
       { recipe: "nope", at_seconds: 1 },
       { recipe: "riser_noise", at_seconds: 0 },
+      // Above unity: libopenshot's clip volume runs 0..1.
+      { recipe: "pop", at_seconds: 1, gain_db: 2 },
     ]) {
       const doc = editProject();
       const host = fakeHost();
@@ -296,6 +298,21 @@ describe("auto_sound_design_tool", () => {
     expect((result.data as { status: string }).status).toBe("unchanged");
     expect(doc.undoLabels).toHaveLength(before);
     expect(host.written.size).toBe(0);
+  });
+
+  it("says so when a rerun places nothing and only removes the last run", async () => {
+    const doc = new ProjectDocument(createProject({ id: "QUIETPROJ2" }));
+    doc.transaction("three shots", (tx) => {
+      const layer = tx.project.layers[0]!.number;
+      for (const name of ["aa", "bb"]) addFile(tx, media(`/media/${name}.mp4`, videoInfo(`/media/${name}.mp4`, 30)), { id: `SHOT${name.toUpperCase()}XXXX` });
+      ["SHOTAAXXXX", "SHOTBBXXXX", "SHOTAAXXXX"].forEach((fileId, i) => addClip(tx, { fileId, position: i, layer, start: 0, end: 1 }));
+    });
+    const host = fakeHost();
+    expect(data<{ cues: unknown[] }>(await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "hype" })).cues.length).toBeGreaterThan(0);
+    const subtle = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "subtle" });
+    expect(subtle.ok, subtle.text).toBe(true);
+    expect((subtle.data as { summary: string }).summary).toMatch(/^Removed the \d+ effects of the last run/);
+    expect(doc.project.clips.filter(isAutoSfxClip)).toHaveLength(0);
   });
 
   it("refuses an empty timeline and a climax past the end, leaving history untouched", async () => {

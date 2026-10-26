@@ -1,6 +1,6 @@
 /**
  * Automatic sound design: which effect goes where, from the moments of an
- * edit (sfx/timeline.ts finds them). Pure, so every surface plans the same.
+ * edit (sfx/moments.ts finds them). Pure, so every surface plans the same.
  *
  * Taste, distilled from the reference reels (cuts land on an audio
  * transient 50-100 % of the time, on the music's beat only 20-40 %):
