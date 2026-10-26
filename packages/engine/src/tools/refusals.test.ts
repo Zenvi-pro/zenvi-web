@@ -45,6 +45,8 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   import_image_sequence_tool: { path: "/frames" },
   add_motion_template_tool: { template: "end_card", text: "Zenvi" },
   add_sfx_tool: { recipe: "pop", at_seconds: "1" },
+  add_motion_block_tool: { block: "kinetic_headline" },
+  update_motion_block_tool: { file_id: "MOTIONFILE" },
 };
 
 async function expectNotAvailable(name: string, args: Record<string, unknown>, host: FakeHostOptions): Promise<void> {

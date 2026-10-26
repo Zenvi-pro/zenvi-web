@@ -1,0 +1,6 @@
+.ts { position: absolute; display: flex; flex-direction: column; gap: 0.12em; }
+.ts-label { font-family: var(--font-mono); font-size: 24px; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 0.6em; }
+.ts-line { position: relative; font-family: var(--font-display); font-weight: 600; letter-spacing: 0.02em; line-height: 1.1; white-space: pre; color: var(--ink); }
+.ts-ghost { visibility: hidden; }
+.ts-live { position: absolute; left: 0; top: 0; }
+.ts-front { position: absolute; left: 0; top: 0.08em; height: 0.95em; width: 0.62em; background: var(--accent); }

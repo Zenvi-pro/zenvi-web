@@ -1,0 +1,20 @@
+{
+  "id": "particle_burst",
+  "version": 1,
+  "title": "Particle burst",
+  "description": "A pop that punctuates a beat: an optional word or badge scales in with overshoot, ripple rings spread, and seeded particles (dots, confetti squares, streaks or sparkle lines) burst out and fall away. Transparent, to drop on a cut or a click.",
+  "tags": ["particles", "burst", "confetti", "pop", "transition", "accent"],
+  "duration": { "default": 2, "min": 0.8, "max": 6 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "light" },
+  "params": {
+    "label": { "type": "string", "maxLength": 24, "default": "", "description": "A short word or emoji in a pill that pops in at the centre (empty: none)." },
+    "shape": { "type": "enum", "options": ["mixed", "dot", "square", "streak", "sparkle"], "default": "mixed", "description": "Particle shape: dots, confetti squares, motion streaks, sparkle lines (a ring of short rays), or a mix." },
+    "count": { "type": "integer", "min": 8, "max": 400, "default": 90, "description": "How many particles." },
+    "origin": { "type": "points", "maxItems": 1, "default": [{ "x": 0.5, "y": 0.5 }], "description": "Where it bursts, {x, y} from 0 to 1." },
+    "colors": { "type": "strings", "maxItems": 5, "maxLength": 9, "default": [], "description": "Particle colours as #rrggbb (empty: accent, secondary and ink)." },
+    "rings": { "type": "boolean", "default": true, "description": "Ripple rings spreading from the origin." },
+    "gravity": { "type": "number", "min": 0, "max": 4000, "default": 900, "description": "How fast particles fall, px/s² at 1080." }
+  }
+}

@@ -1,0 +1,10 @@
+.kh { position: absolute; display: flex; flex-direction: column; gap: 0.18em; }
+.kh-kicker { font-family: var(--font-mono); font-size: 24px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 28px; }
+.kh-text { font-family: var(--font-display); font-weight: 650; letter-spacing: -0.035em; line-height: 1.02; color: var(--ink); }
+.kh-line { display: block; overflow: hidden; padding: 0.04em 0.06em 0.1em; margin: -0.04em -0.06em -0.1em; }
+.kh-inner { display: inline-block; white-space: nowrap; }
+.kh .word { display: inline-block; }
+.kh .em { color: var(--accent); }
+.kh-serif .em { font-family: var(--font-serif); font-style: italic; font-weight: 400; letter-spacing: -0.01em; font-size: 1.08em; }
+.kh-display .em { font-family: 'Anton', var(--font-display); font-weight: 400; letter-spacing: 0; text-transform: uppercase; }
+.kh-pop .kh-line { overflow: visible; }

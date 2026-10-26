@@ -1,0 +1,6 @@
+.ct { position: absolute; display: flex; flex-direction: column; gap: 18px; }
+.ct-number { font-family: var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -0.06em; line-height: 1; color: var(--ink); display: flex; align-items: baseline; white-space: nowrap; }
+.ct-affix { letter-spacing: -0.04em; }
+.ct-label { font-family: var(--font-mono); font-size: 28px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 14px; }
+.ct-label::before { content: ""; width: 14px; height: 14px; background: var(--accent); display: block; }
+.ct .odo-window { margin-right: -0.04em; }

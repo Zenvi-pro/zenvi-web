@@ -12,6 +12,7 @@ import type { CommandContext, GlobalFlags } from "./commands/context.js";
 import { registerEditCommands } from "./commands/edit.js";
 import { registerHostCommands } from "./commands/hosts.js";
 import { registerIntegrationCommands } from "./commands/integrations.js";
+import { registerMotionCommands } from "./commands/motion.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerRenderCommands } from "./commands/render.js";
 import { registerToolCommands } from "./commands/tools.js";
@@ -66,6 +67,7 @@ Examples:
   registerIntegrationCommands(program, ctx);
   registerHostCommands(program, ctx);
   registerBridgeCommands(program, ctx);
+  registerMotionCommands(program, ctx);
   for (const cmd of program.commands) {
     cmd.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
     for (const sub of cmd.commands) sub.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });

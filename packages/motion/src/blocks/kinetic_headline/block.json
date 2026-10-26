@@ -1,0 +1,90 @@
+{
+  "id": "kinetic_headline",
+  "version": 1,
+  "title": "Kinetic headline",
+  "description": "A big editorial headline that builds word by word: rise out of a mask, blur in, scale pop or a wipe. Two faces: *starred words* switch to the condensed display face (or the serif italic, or just the accent colour). Fits the safe area on any aspect.",
+  "tags": [
+    "type",
+    "kinetic",
+    "headline",
+    "editorial",
+    "title"
+  ],
+  "duration": {
+    "default": 3.5,
+    "min": 1.5,
+    "max": 10
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": true,
+  "tokens": {
+    "palette": "mono",
+    "display": "sans"
+  },
+  "params": {
+    "text": {
+      "type": "string",
+      "maxLength": 160,
+      "default": "Cut less. / *Say* more.",
+      "description": "The headline. '/' breaks a line; *words* in stars get the emphasis face."
+    },
+    "kicker": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "",
+      "description": "A small mono label above the headline, e.g. 'NO. 01' (empty: none)."
+    },
+    "style": {
+      "type": "enum",
+      "options": [
+        "rise",
+        "blur",
+        "pop",
+        "wipe"
+      ],
+      "default": "rise",
+      "description": "Entrance: rise (words slide up out of a line mask), blur (focus in), pop (letters scale in with a small overshoot), wipe (lines revealed left to right)."
+    },
+    "emphasis": {
+      "type": "enum",
+      "options": [
+        "serif",
+        "display",
+        "accent"
+      ],
+      "default": "display",
+      "description": "How starred words differ: serif italic, the condensed display face, or only the accent colour."
+    },
+    "align": {
+      "type": "enum",
+      "options": [
+        "center",
+        "left"
+      ],
+      "default": "center",
+      "description": "Text alignment."
+    },
+    "position": {
+      "type": "enum",
+      "options": [
+        "center",
+        "upper",
+        "lower"
+      ],
+      "default": "center",
+      "description": "Where the block of text sits."
+    },
+    "max_size": {
+      "type": "number",
+      "min": 40,
+      "max": 400,
+      "default": 260,
+      "description": "Largest font size, px at 1080 (the text shrinks to fit the safe width)."
+    }
+  }
+}

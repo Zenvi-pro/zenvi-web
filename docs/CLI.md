@@ -164,6 +164,24 @@ zenvi frame <t> [output.png|.jpg] [--width 1280] [--jpeg] [--grid]
 draws the same 0-1 coordinate grid and frame caption the desktop's inspect
 tools show models.
 
+### Motion blocks (Zenvi Motion)
+
+```bash
+zenvi motion setup                      # once: chrome-headless-shell (~90 MB) into Zenvi's cache
+zenvi motion list [block]               # the blocks; one block's params
+zenvi motion render <block> [param=value …] [-o out.mov|.mp4] [--size 1080x1920] [--fps 30]
+             [--seconds s] [--alpha|--opaque] [--motion-blur 4] [--draft] [--media background=photo.jpg]
+zenvi call add_motion_block_tool block=prompt_bar params='{"prompt":"Plan my trip"}' position_seconds=2
+```
+
+Blocks are parametric HTML motion graphics (prompt bars, glass UI cards,
+kinetic type, word rotators, counters, text scramble, HUD callouts, gradient
+backgrounds, particle bursts) rendered in headless Chrome: ProRes 4444 `.mov`
+with alpha, H.264 `.mp4` without. `add_motion_block_tool` renders at the
+project's size into `<project>_assets/links/zenvi-motion/` and places the
+block in one undo step; `update_motion_block_tool` re-renders it with new
+params. `ZENVI_CHROME` names another Chrome. See packages/motion/README.md.
+
 ### Desktop app, agents, account
 
 | Command | What it does |
