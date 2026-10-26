@@ -287,7 +287,7 @@ const PROPOSALS: Array<{ tool?: string; pattern: RegExp; proposal: string }> = [
   { pattern: /size must be at least N|radius must be at most N/, proposal: "A block default outside its own range (word_rotator size 0, logo_reveal_end radius 999): fixed in this branch; the manifest test checks filled defaults now." },
   { pattern: /shape must be one of/, proposal: "particle_burst v2 renamed its shapes: fixed in this branch (enum aliases for the v1 names, and a wrong plural is taken)." },
   { pattern: /grid with N tiles needs at least N s/, proposal: "Fit the tiles to the duration given (fewer tiles, or a faster fill) and say so in a warning, instead of refusing." },
-  { pattern: /needs text \(or subtitle \/ lines\)/, proposal: "Agents send a blank title (text=' ') for a solid colour card: accept it for Solid_Color-style templates, or point at add_motion_block_tool / a colour clip." },
+  { pattern: /needs text \(or subtitle \/ lines\)/, proposal: "Agents make white flash frames as a blank title (text=' ', background_color='#FFFFFF', 0.1 s): accept blank text when a background_color is given, or name apply_motion_transition_tool flash_white in the refusal." },
   { pattern: /Additional properties are not allowed \('bpm'/, proposal: "build_reel_tool: accept bpm (beats every 60/bpm s from the first downbeat) or refuse naming beats=, which it does take." },
   {
     pattern: /must be one of/,
