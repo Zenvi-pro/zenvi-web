@@ -10,6 +10,10 @@
  *               big frame last (DePJQgiIWSj's contact-sheet frame)
  *   mosaic      irregular bento: the region cut again and again along its long
  *               side, the bigger part getting the larger share
+ *   repeat      one shot in columns × rows of copies (2 to 16), a field
+ *               (Ddt-jwsIZKW's facade repeated into infinity)
+ *   kaleidoscope 2 4 6 8 segments in columns × rows, alternate ones mirrored
+ *               (DbeRyIvNrga, Ddt-jwsIZKW's towers folding round the sky)
  *
  * A `band` is a region narrower than the frame: the 16:9 band across the
  * middle of a 9:16 frame (DecuXPxxDXU), the rest of the frame bars.
@@ -24,7 +28,7 @@ export interface Rect {
   h: number;
 }
 
-export const GRID_LAYOUTS = ["grid", "strips_v", "strips_h", "film_strip", "mosaic"] as const;
+export const GRID_LAYOUTS = ["grid", "strips_v", "strips_h", "film_strip", "mosaic", "repeat", "kaleidoscope"] as const;
 export type GridLayoutId = (typeof GRID_LAYOUTS)[number];
 
 /** Tile counts each layout takes. */
@@ -34,10 +38,15 @@ export const TILE_COUNTS: Readonly<Record<GridLayoutId, readonly number[]>> = {
   strips_h: [2, 3, 4, 5, 6],
   film_strip: [3, 4, 5, 6, 7],
   mosaic: [3, 4, 5, 6, 7, 8, 9],
+  repeat: [2, 3, 4, 6, 8, 9, 12, 16],
+  kaleidoscope: [2, 4, 6, 8],
 };
 
+/** Layouts of one shot: every tile shows the same clip, in step (a field rather than a montage). */
+export const FIELD_LAYOUTS: readonly GridLayoutId[] = ["repeat", "kaleidoscope"];
+
 /** Tiles a layout shows when `tiles` is not given. */
-export const DEFAULT_TILES: Readonly<Record<GridLayoutId, number>> = { grid: 4, strips_v: 3, strips_h: 3, film_strip: 5, mosaic: 6 };
+export const DEFAULT_TILES: Readonly<Record<GridLayoutId, number>> = { grid: 4, strips_v: 3, strips_h: 3, film_strip: 5, mosaic: 6, repeat: 9, kaleidoscope: 4 };
 
 /** The largest rectangle of width / height `aspect` in the frame, centred (the whole frame when `aspect` is null). */
 export function bandRect(frame: Pick<MotionFrame, "width" | "height">, aspect: number | null): Rect {
@@ -50,7 +59,7 @@ export function bandRect(frame: Pick<MotionFrame, "width" | "height">, aspect: n
 
 /** Columns and rows of a grid of `count` tiles in a region `w` × `h`. */
 export function gridDims(count: number, w: number, h: number): { cols: number; rows: number } {
-  const wide: Readonly<Record<number, [number, number]>> = { 2: [2, 1], 3: [3, 1], 4: [2, 2], 6: [3, 2], 9: [3, 3] };
+  const wide: Readonly<Record<number, [number, number]>> = { 2: [2, 1], 3: [3, 1], 4: [2, 2], 6: [3, 2], 8: [4, 2], 9: [3, 3], 12: [4, 3], 16: [4, 4] };
   const [cols, rows] = wide[count] ?? [count, 1];
   return h > w ? { cols: rows, rows: cols } : { cols, rows };
 }
@@ -131,7 +140,9 @@ export function filmStrip(region: Rect, count: number, gap: number): FilmStrip {
 /** The tiles of a layout in reveal order. `count` must be one of TILE_COUNTS[layout]. */
 export function tileRects(layout: GridLayoutId, count: number, region: Rect, gap: number): Rect[] {
   switch (layout) {
-    case "grid": {
+    case "grid":
+    case "repeat":
+    case "kaleidoscope": {
       const { cols, rows } = gridDims(count, region.w, region.h);
       return cells(region, cols, rows, gap);
     }
@@ -146,6 +157,45 @@ export function tileRects(layout: GridLayoutId, count: number, region: Rect, gap
     case "mosaic":
       return reading(cut(region, count, gap, 0));
   }
+}
+
+/**
+ * Which tiles of a kaleidoscope (or a mirrored repeat) are flipped: every
+ * other column left-right and every other row top-bottom, so neighbours meet
+ * as mirrors. Tiles are in reading order (row by row).
+ */
+export function mirrorFlips(count: number, region: Rect): { x: boolean; y: boolean }[] {
+  const { cols } = gridDims(count, region.w, region.h);
+  return Array.from({ length: count }, (_, i) => ({ x: i % cols % 2 === 1, y: Math.floor(i / cols) % 2 === 1 }));
+}
+
+/**
+ * The window of a shot every kaleidoscope segment shows (fractions of the
+ * picture, like a Crop): the picture covers the region, and the window is one
+ * tile of it placed so the mirror lines meet at `centre` (0-1 on the picture)
+ * in the middle of the region. With an even number of tiles across, the
+ * middle is the edge between two tiles and the window ends (or, when the
+ * tile left of it is mirrored, starts) at the centre; with an odd number, the
+ * window is centred on it. Kept inside the picture.
+ */
+export function kaleidoscopeWindow(
+  picture: { width: number; height: number },
+  region: Rect,
+  tile: Rect,
+  count: number,
+  centre: { x: number; y: number },
+): { left: number; top: number; right: number; bottom: number } {
+  const { cols, rows } = gridDims(count, region.w, region.h);
+  const cover = Math.max(region.w / picture.width, region.h / picture.height);
+  const axis = (n: number, size: number, own: number, c: number): [number, number] => {
+    const frac = Math.min(1, size / (own * cover));
+    const at = n % 2 === 1 ? c - frac / 2 : (n / 2 - 1) % 2 === 1 ? c : c - frac;
+    const start = Math.max(0, Math.min(1 - frac, at));
+    return [start, 1 - frac - start];
+  };
+  const [left, right] = axis(cols, tile.w, picture.width, centre.x);
+  const [top, bottom] = axis(rows, tile.h, picture.height, centre.y);
+  return { left, top, right, bottom };
 }
 
 /** The shortest side among `rects`, px. */

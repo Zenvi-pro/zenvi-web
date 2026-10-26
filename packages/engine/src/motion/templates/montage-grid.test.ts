@@ -5,7 +5,7 @@ import { buildMotionTemplate } from "../build.js";
 import { TemplateBeats, tempoGrid } from "../grid.js";
 import { PALETTES } from "../palettes.js";
 import { MotionInputError, type GridOptions, type MotionContent } from "../template.js";
-import { GRID_LAYOUTS, TILE_COUNTS, bandRect, parseBand, shortestSide, tileRects, type Rect } from "../tiles.js";
+import { FIELD_LAYOUTS, GRID_LAYOUTS, TILE_COUNTS, bandRect, kaleidoscopeWindow, mirrorFlips, parseBand, shortestSide, tileRects, type Rect } from "../tiles.js";
 import type { MotionFrame, MotionLayer, MotionMedia, MotionPlan } from "../types.js";
 import { MIN_TILE, gridBeats, slotsOf } from "./montage-grid.js";
 
@@ -18,9 +18,10 @@ const MEDIA: MotionMedia[] = [
   { fileId: "VIDEO00001", kind: "video", width: 1920, height: 1080, duration: 12 },
   { fileId: "VIDEO00002", kind: "video", width: 1080, height: 1920, duration: 9 },
   { fileId: "PHOTO00001", kind: "image", width: 1600, height: 1200, duration: 0 },
+  { fileId: "SHORT00001", kind: "video", width: 1080, height: 1920, duration: 2.5 },
 ];
 const MEDIA_BY_ID = new Map(MEDIA.map((m) => [m.fileId, m]));
-const FILES = MEDIA.map((m) => m.fileId);
+const FILES = MEDIA.slice(0, 3).map((m) => m.fileId);
 
 function build(frame: MotionFrame, grid: GridOptions, extra: Partial<MotionContent> = {}, o: { seconds?: number; start?: number; bpm?: number } = {}): { plan: MotionPlan; beats: TemplateBeats } {
   const start = o.start ?? 2;
@@ -33,7 +34,8 @@ function build(frame: MotionFrame, grid: GridOptions, extra: Partial<MotionConte
     grid: tempo,
     palette: PALETTES.ui_dark,
     media: MEDIA_BY_ID,
-    content: { fileIds: FILES, grid, ...extra },
+    // A field (repeat, kaleidoscope) shows one clip: the portrait video.
+    content: { fileIds: grid.layout && FIELD_LAYOUTS.includes(grid.layout) ? ["VIDEO00002"] : FILES, grid, ...extra },
   });
   return { plan, beats: new TemplateBeats(tempo, start, frame.fps) };
 }
@@ -313,5 +315,186 @@ describe("montage grid length and refusals", () => {
   it("refuses tiles too small to read on a phone, and a template too short for the layout", () => {
     expect(refusal({ layout: "strips_h", tiles: 6, band: "21:9" })).toMatch(/px on their short side/);
     expect(refusal({ steps: [3, 4, 6, 9], merge: true }, {}, { seconds: 3 })).toMatch(/needs at least [\d.]+ s/);
+  });
+});
+
+describe.each(Object.entries(FRAMES))("repeat and kaleidoscope fields, %s", (_name, frame) => {
+  const inFrame = (l: MotionLayer) => (l.source.kind === "media" ? Math.round(l.source.start * frame.fps) : 0);
+  const sign = (l: MotionLayer, prop: string) => Math.sign(evaluate(l.props[prop] as Keyframe, keyX(l, frame, 1)));
+  /** A tile's box at clip frame `n`, whatever the sign of its scale. */
+  const abs = (l: MotionLayer, n: number): Rect => {
+    const b = boxAt(l, frame, keyX(l, frame, n));
+    return { x: Math.min(b.x, b.x + b.w), y: Math.min(b.y, b.y + b.h), w: Math.abs(b.w), h: Math.abs(b.h) };
+  };
+  /** Boxes of every tile on screen at template frame `f`. */
+  const boxesAt = (plan: MotionPlan, f: number) => tiles(plan).filter((l) => l.start <= f && f < l.start + l.frames).map((l) => abs(l, f - l.start + 1));
+
+  it("repeat: copies of one clip, one per beat, every copy on one clock so they stay in step", () => {
+    const { plan } = build(frame, { layout: "repeat", tiles: 9 });
+    const t = tiles(plan);
+    expect(t).toHaveLength(9);
+    expect(new Set(t.map((l) => l.source.kind === "media" && l.source.fileId))).toEqual(new Set(["VIDEO00002"]));
+    expect(new Set(t.map((l) => l.start)).size).toBe(9);
+    // The source frame at a template frame is the same on every copy: in-point minus the tile's start.
+    expect(new Set(t.map((l) => inFrame(l) - l.start)).size).toBe(1);
+    // Gapless and cut on (no entrance motion): one key per property, every copy full size.
+    expect(t.every((l) => !l.props.scale_x || (l.props.scale_x as Keyframe).Points.length === 1)).toBe(true);
+    expect(t.every((l) => sign(l, "scale_x") > 0 && sign(l, "scale_y") > 0)).toBe(true);
+  });
+
+  it("repeat with a phase: each copy runs `phase` seconds ahead of the one before", () => {
+    const { plan } = build(frame, { layout: "repeat", tiles: 4, phase: 0.2 });
+    const t = tiles(plan);
+    const offsets = t.map((l) => inFrame(l) - l.start);
+    offsets.forEach((o, i) => expect(o - offsets[0]!).toBe(i * 6));
+  });
+
+  it("repeat narrows the phase a short clip cannot hold, and slows a clip shorter than the field (all copies alike)", () => {
+    const { plan } = build(frame, { layout: "repeat", tiles: 4, phase: 1 }, { fileIds: ["VIDEO00002"] }, { seconds: 6 });
+    const t = tiles(plan);
+    for (const l of t) expect(l.source.kind === "media" && l.source.end).toBeLessThanOrEqual(9 + 1e-6);
+    const short = tiles(build(frame, { layout: "repeat", tiles: 4 }, { fileIds: ["SHORT00001"] }, { seconds: 4 }).plan);
+    const speeds = new Set(short.map((l) => l.source.kind === "media" && l.source.speed));
+    expect(speeds.size).toBe(1);
+    const [speed] = [...speeds] as number[];
+    expect(speed).toBeLessThan(1);
+    expect(speed).toBeGreaterThanOrEqual(0.5);
+    // Every copy lasts to the end of the template.
+    for (const l of short) expect(l.start + l.frames).toBe(Math.round(4 * frame.fps));
+  });
+
+  it("mirror flips alternate copies; a kaleidoscope always does, all segments on one beat", () => {
+    const mirrored = tiles(build(frame, { layout: "repeat", tiles: 4, mirror: true }).plan);
+    expect(mirrored.map((l) => [sign(l, "scale_x"), sign(l, "scale_y")])).toEqual([
+      [1, 1],
+      [-1, 1],
+      [1, -1],
+      [-1, -1],
+    ]);
+    for (const count of TILE_COUNTS.kaleidoscope) {
+      const { plan, beats } = build(frame, { layout: "kaleidoscope", tiles: count });
+      const t = tiles(plan);
+      expect(new Set(t.map((l) => l.start))).toEqual(new Set([beats.frame(0)]));
+      const flips = mirrorFlips(count, bandRect(frame, null));
+      expect(t.map((l) => [sign(l, "scale_x") < 0, sign(l, "scale_y") < 0])).toEqual(flips.map((f) => [f.x, f.y]));
+      // Every segment shows the same window of the shot.
+      const crops = t.map((l) => JSON.stringify(l.effects.find((e) => (e as { class_name?: string }).class_name === "Crop")));
+      expect(new Set(crops).size).toBe(1);
+    }
+  });
+
+  it("gapless fields cover the frame with neighbours overlapping by a hair", () => {
+    for (const layout of FIELD_LAYOUTS) {
+      for (const count of TILE_COUNTS[layout]) {
+        const { plan } = build(frame, { layout, tiles: count }, {}, { seconds: 12 });
+        const boxes = boxesAt(plan, plan.frames - 1);
+        expect(boxes, `${layout} ${count}`).toHaveLength(count);
+        // Sample points across the frame (including every tile edge) all land inside some tile.
+        for (let y = 0.5; y < frame.height; y += frame.height / 37) {
+          for (let x = 0.5; x < frame.width; x += frame.width / 41) {
+            expect(boxes.some((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h), `${layout} ${count} ${x},${y}`).toBe(true);
+          }
+        }
+        for (const b of boxes) {
+          expect(b.x).toBeGreaterThanOrEqual(-1.5);
+          expect(b.x + b.w).toBeLessThanOrEqual(frame.width + 1.5);
+        }
+      }
+    }
+  });
+
+  it("the kaleidoscope's mirror lines meet at the shot's centre (or the given point)", () => {
+    const region = bandRect(frame, null);
+    const picture = { width: 1080, height: 1920 };
+    const tile = tileRects("kaleidoscope", 4, region, 0)[0]!;
+    const w = kaleidoscopeWindow(picture, region, tile, 4, { x: 0.5, y: 0.5 });
+    // 2 × 2: the unflipped top-left segment ends at the centre on both axes.
+    expect(w.right).toBeCloseTo(0.5, 6);
+    expect(w.bottom).toBeCloseTo(0.5, 6);
+    // The picture covers the region on one axis exactly (a half-picture window there); on the other the centre can move.
+    const square = { width: 3000, height: 3000 };
+    const moved = kaleidoscopeWindow(square, region, tile, 4, { x: 0.6, y: 0.4 });
+    if (frame.height > frame.width) expect(moved.right).toBeCloseTo(0.4, 6);
+    else expect(moved.bottom).toBeCloseTo(0.6, 6);
+    // A window keeps the tile's shape on the picture as it covers the region.
+    const cover = Math.max(region.w / picture.width, region.h / picture.height);
+    const ww = (1 - w.left - w.right) * picture.width * cover;
+    const wh = (1 - w.top - w.bottom) * picture.height * cover;
+    expect(ww / wh).toBeCloseTo(tile.w / tile.h, 6);
+    // Eight segments: the tile left of the middle is mirrored, so the window starts at the centre.
+    const eight = tileRects("kaleidoscope", 8, region, 0);
+    const across = frame.width > frame.height ? 4 : 2;
+    const w8 = kaleidoscopeWindow(picture, region, eight[0]!, 8, { x: 0.5, y: 0.5 });
+    if (across === 4) expect(w8.left).toBeCloseTo(0.5, 6);
+    else expect(w8.right).toBeCloseTo(0.5, 6);
+  });
+
+  it("drift: the field moves as one, edge to edge on every frame, and never shows an edge", () => {
+    for (const drift of ["in", "out", "left", "right", "up", "down"] as const) {
+      const { plan } = build(frame, { layout: "repeat", tiles: 4, drift }, {}, { seconds: 6 });
+      for (const f of [plan.frames - 1, Math.round(plan.frames * 0.7), Math.round(plan.frames * 0.85)]) {
+        const boxes = boxesAt(plan, f);
+        expect(boxes).toHaveLength(4);
+        const x0 = Math.min(...boxes.map((b) => b.x));
+        const x1 = Math.max(...boxes.map((b) => b.x + b.w));
+        const y0 = Math.min(...boxes.map((b) => b.y));
+        const y1 = Math.max(...boxes.map((b) => b.y + b.h));
+        expect(x0, `${drift} ${f}`).toBeLessThanOrEqual(0.5);
+        expect(x1, `${drift} ${f}`).toBeGreaterThanOrEqual(frame.width - 0.5);
+        expect(y0, `${drift} ${f}`).toBeLessThanOrEqual(0.5);
+        expect(y1, `${drift} ${f}`).toBeGreaterThanOrEqual(frame.height - 0.5);
+        // Neighbours still overlap: the left column's right edge is past the right column's left edge.
+        const [a, b] = [...boxes].sort((p, q) => p.x - q.x || p.y - q.y);
+        const right = [...boxes].sort((p, q) => q.x - p.x)[0]!;
+        expect(Math.max(a!.x + a!.w, b!.x + b!.w), `${drift} ${f}`).toBeGreaterThanOrEqual(right.x);
+      }
+      const end = boxesAt(plan, plan.frames - 1);
+      const start = boxesAt(plan, Math.round(plan.frames * 0.7));
+      const width = (bs: Rect[]) => Math.max(...bs.map((b) => b.x + b.w)) - Math.min(...bs.map((b) => b.x));
+      if (drift === "in") expect(width(end)).toBeGreaterThan(width(start));
+      if (drift === "out") expect(width(end)).toBeLessThan(width(start));
+      if (drift === "left") expect(Math.min(...end.map((b) => b.x))).toBeLessThan(Math.min(...start.map((b) => b.x)));
+    }
+  });
+
+  it("kaleidoscope steps re-cut all segments on the beat", () => {
+    const { plan, beats } = build(frame, { layout: "kaleidoscope", steps: [2, 4, 8] }, {}, { seconds: 8 });
+    const starts = [...new Set(tiles(plan).map((l) => l.start))].sort((a, b) => a - b);
+    expect(starts).toHaveLength(3);
+    expect(starts[0]).toBe(beats.frame(0));
+    for (const at of starts) expect([0, 1, 2, 3, 4, 5, 6, 8].map((k) => beats.frame(k))).toContain(at);
+  });
+
+  it("works on photos", () => {
+    const { plan } = build(frame, { layout: "kaleidoscope", tiles: 6, drift: "in" }, { fileIds: ["PHOTO00001"] });
+    expect(tiles(plan)).toHaveLength(6);
+  });
+});
+
+describe("repeat and kaleidoscope refusals", () => {
+  const frame = FRAMES.portrait!;
+  const refusal = (grid: GridOptions, extra: Partial<MotionContent> = {}, o: { seconds?: number } = {}) => {
+    try {
+      build(frame, grid, extra, o);
+    } catch (error) {
+      expect(error).toBeInstanceOf(MotionInputError);
+      return (error as Error).message;
+    }
+    throw new Error("expected a refusal");
+  };
+
+  it("refuses options a layout cannot use", () => {
+    expect(refusal({ layout: "repeat" }, { fileIds: FILES })).toMatch(/one clip on every tile/);
+    expect(refusal({ layout: "kaleidoscope", tiles: 3 })).toMatch(/takes 2, 4, 6, 8 tiles/);
+    expect(refusal({ layout: "grid", phase: 0.2 })).toMatch(/phase only applies to the repeat/);
+    expect(refusal({ layout: "kaleidoscope", mirror: true })).toMatch(/always mirrored/);
+    expect(refusal({ layout: "mosaic", mirror: true })).toMatch(/mirror only applies to the repeat/);
+    expect(refusal({ layout: "kaleidoscope", merge: true })).toMatch(/kaleidoscope takes no merge/);
+    expect(refusal({ layout: "repeat", drift: "in", merge: true })).toMatch(/drift takes no merge/);
+    expect(refusal({ layout: "repeat", drift: "in", band: "16:9" })).toMatch(/takes no band/);
+    expect(refusal({ layout: "film_strip", drift: "in" })).toMatch(/film strip does not drift/);
+    expect(refusal({ layout: "repeat", phase: 3 })).toMatch(/phase must be 0 to 2/);
+    expect(refusal({ layout: "grid" }, { points: [{ x: 0.5, y: 0.5 }] })).toMatch(/points only apply to the kaleidoscope/);
+    expect(refusal({ layout: "repeat", tiles: 4 }, { fileIds: ["SHORT00001"] }, { seconds: 8 })).toMatch(/even at half speed/);
   });
 });

@@ -5,6 +5,12 @@
  *   strips_v    n vertical strips (DcfH_-aRlVg), strips_h n horizontal ones
  *   film_strip  small frames on sprocketed strips, the big frame arriving last
  *   mosaic      an irregular bento of 3 to 9 tiles
+ *   repeat      one shot copied over 2 to 16 tiles, the copies in step or
+ *               `phase` seconds apart, optionally mirrored (Ddt-jwsIZKW's
+ *               facade repeated into a field)
+ *   kaleidoscope 2 4 6 8 segments of one shot, alternate ones mirrored so the
+ *               edges meet as mirrors round the shot's centre (DbeRyIvNrga,
+ *               Ddt-jwsIZKW's towers folding round the sky)
  *
  * `band` letterboxes the tiles into the middle of the frame (DecuXPxxDXU's
  * 16:9 band on a 9:16 frame, the rest bars). `steps` re-cuts the grid on a beat
@@ -12,6 +18,17 @@
  * cut and the new ones fill one per beat. `merge` ends with the last tile
  * growing to fill the frame; `zoom_into` ends with the camera pushing into one
  * tile (De5_RqRup5w).
+ *
+ * `drift` moves a camera over the whole field for the template's length: a
+ * slow push in or pull out, or a pan across a field overscanned by the same
+ * share so no edge shows.
+ *
+ * repeat and kaleidoscope are fields of one clip: every copy reads the shot
+ * off one clock (in-point + template time, plus its phase), so a copy that
+ * arrives later, or a kept one re-placed by a layout step, shows the same
+ * moment as its neighbours. Mirrors are negative scales on centred clips;
+ * the tiles of a gapless field overlap by a pixel so no seam shows while the
+ * camera drifts. A kaleidoscope's segments all arrive on the stage's beat.
  *
  * Time is counted in slots of `unit` beats (a beat, or two on a fast tempo,
  * or half a beat when the template is short). A stage is its tile reveals,
@@ -21,12 +38,38 @@
 
 import { defaultEffectJson } from "../../effects/registry.js";
 import { makeKeyframePoint } from "../../keyframe/edit.js";
-import { Motion, backdrop, cropToAspect, enter, key, mediaCard, pose } from "../elements.js";
+import { Motion, backdrop, cropToAspect, enter, key, mediaCard, pose, samePose } from "../elements.js";
 import { entranceStep } from "../grid.js";
 import { keyframeThrough } from "../keyframes.js";
 import type { Layout } from "../layout.js";
-import { refuse, GRID_REVEALS, type GridOptions, type GridReveal, type MotionContent, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
-import { DEFAULT_TILES, GRID_LAYOUTS, TILE_COUNTS, bandRect, filmStrip, parseBand, shortestSide, tileRects, type GridLayoutId, type Rect } from "../tiles.js";
+import {
+  refuse,
+  GRID_DRIFTS,
+  GRID_REVEALS,
+  type GridDrift,
+  type GridOptions,
+  type GridReveal,
+  type MotionContent,
+  type NormPoint,
+  type TemplateInput,
+  type TemplateOutput,
+  type TemplateSpec,
+} from "../template.js";
+import {
+  DEFAULT_TILES,
+  FIELD_LAYOUTS,
+  GRID_LAYOUTS,
+  TILE_COUNTS,
+  bandRect,
+  filmStrip,
+  kaleidoscopeWindow,
+  mirrorFlips,
+  parseBand,
+  shortestSide,
+  tileRects,
+  type GridLayoutId,
+  type Rect,
+} from "../tiles.js";
 import type { Drawing } from "../svg.js";
 import type { Effect, Keyframe } from "../../model/types.js";
 import type { Element, Key, MediaSource, MotionMedia, Pose } from "../types.js";
@@ -37,6 +80,14 @@ const MAX_FILES = 9;
 export const MIN_TILE = 0.13;
 /** Longest the full grid is held before it merges or zooms, in slots. */
 const MAX_HOLD = 4;
+/** Longest phase between copies of a repeat, seconds. */
+const MAX_PHASE = 2;
+/** Share of the frame a drift pushes in by (or pans across, the field overscanned by it). */
+const DRIFT = 0.12;
+/** Slowest a field's clip plays to fill the template. */
+const MIN_FIELD_SPEED = 0.5;
+/** How far each tile of a gapless field reaches under its neighbours, px at 1080. */
+const OVERLAP = 1;
 
 interface Resolved {
   layout: GridLayoutId;
@@ -50,6 +101,15 @@ interface Resolved {
   merge: boolean;
   zoomInto: number | null;
   backdrop: boolean;
+  /** One clip on every tile (repeat, kaleidoscope). */
+  field: boolean;
+  /** A stage's tiles all arrive on its beat (kaleidoscope). */
+  together: boolean;
+  mirror: boolean;
+  phase: number;
+  drift: GridDrift | null;
+  /** The kaleidoscope's mirror centre on the shot. */
+  centre: NormPoint;
 }
 
 function countsOf(options: GridOptions | undefined): { layout: GridLayoutId; counts: number[] } {
@@ -73,15 +133,30 @@ function resolve(content: MotionContent, layout: Layout): Resolved {
   const { layout: kind, counts } = countsOf(o);
   const band = parseBand(o?.band);
   if (band === undefined) refuse(`grid band must be full, a ratio like 16:9 or 21:9, or a number between 0.2 and 8 (got ${String(o?.band)})`);
-  const gutter = o?.gutter ?? 6;
+  const gutter = o?.gutter ?? (FIELD_LAYOUTS.includes(kind) ? 0 : 6);
   if (!(gutter >= 0 && gutter <= 40)) refuse(`grid gutter must be 0 to 40 px (got ${gutter})`);
   const radius = o?.radius ?? 0;
   if (!(radius >= 0 && radius <= 120)) refuse(`grid radius must be 0 to 120 px (got ${radius})`);
-  const reveal = o?.reveal ?? "pop";
+  const field = FIELD_LAYOUTS.includes(kind);
+  const reveal = o?.reveal ?? (field ? "cut" : "pop");
   if (!GRID_REVEALS.includes(reveal)) refuse(`grid reveal must be one of ${GRID_REVEALS.join(", ")} (got ${String(reveal)})`);
   const merge = o?.merge ?? false;
   const zoom = o?.zoomInto;
   if (merge && zoom !== undefined) refuse("grid takes merge or zoom_into, not both");
+  if (kind === "kaleidoscope" && (merge || zoom !== undefined)) refuse("a kaleidoscope takes no merge or zoom_into (its segments are pieces of one shot)");
+  if (o?.phase !== undefined && kind !== "repeat") refuse("grid phase only applies to the repeat layout");
+  const phase = o?.phase ?? 0;
+  if (!(phase >= 0 && phase <= MAX_PHASE)) refuse(`grid phase must be 0 to ${MAX_PHASE} seconds (got ${phase})`);
+  if (o?.mirror !== undefined && kind !== "repeat") refuse(kind === "kaleidoscope" ? "a kaleidoscope is always mirrored; drop mirror" : "grid mirror only applies to the repeat layout");
+  const drift = o?.drift ?? null;
+  if (drift !== null) {
+    if (!GRID_DRIFTS.includes(drift)) refuse(`grid drift must be one of ${GRID_DRIFTS.join(", ")} (got ${String(drift)})`);
+    if (merge || zoom !== undefined) refuse("grid drift takes no merge or zoom_into (they move the camera too)");
+    if (band !== null) refuse("grid drift fills the frame; it takes no band");
+    if (kind === "film_strip") refuse("a film strip does not drift (its strips are drawn on the backdrop)");
+  }
+  const point = content.points?.[0];
+  if (point && kind !== "kaleidoscope") refuse("grid points only apply to the kaleidoscope layout (its mirror centre)");
   const last = counts[counts.length - 1]!;
   if (zoom !== undefined && !(Number.isInteger(zoom) && zoom >= 1 && zoom <= last)) refuse(`grid zoom_into must be a tile from 1 to ${last} (got ${zoom})`);
   return {
@@ -94,6 +169,12 @@ function resolve(content: MotionContent, layout: Layout): Resolved {
     merge,
     zoomInto: zoom ?? null,
     backdrop: content.backdrop ?? true,
+    field,
+    together: kind === "kaleidoscope",
+    mirror: kind === "kaleidoscope" || (o?.mirror ?? false),
+    phase,
+    drift,
+    centre: point ?? { x: 0.5, y: 0.5 },
   };
 }
 
@@ -112,13 +193,19 @@ interface Slots {
   end: number;
 }
 
-export function slotsOf(counts: readonly number[], finish: boolean): Slots {
+export function slotsOf(counts: readonly number[], finish: boolean, together = false): Slots {
   const stage: number[] = [];
   const reveal: number[][] = [];
   let slot = 0;
   counts.forEach((count, s) => {
     stage.push(slot);
     const kept = s > 0 ? counts[s - 1]! : 0;
+    if (together) {
+      // Every tile of the stage on its beat, then a slot of hold.
+      reveal.push(Array.from({ length: count }, () => slot));
+      slot += 2;
+      return;
+    }
     const first = slot + (s > 0 ? 1 : 0);
     reveal.push(Array.from({ length: count }, (_, i) => (i < kept ? slot : first + (i - kept))));
     slot = first + (count - kept) - 1 + 2;
@@ -129,13 +216,16 @@ export function slotsOf(counts: readonly number[], finish: boolean): Slots {
 /** Beats the grid takes at `bpm` (a slot is a beat, or two on a fast tempo). */
 export function gridBeats(content: MotionContent, bpm: number): number {
   let counts: number[];
+  let together = false;
   try {
-    counts = countsOf(content.grid).counts;
+    const parsed = countsOf(content.grid);
+    counts = parsed.counts;
+    together = parsed.layout === "kaleidoscope";
   } catch {
     counts = [4];
   }
   const finish = Boolean(content.grid?.merge) || content.grid?.zoomInto !== undefined;
-  const beats = slotsOf(counts, finish).end * entranceStep(bpm);
+  const beats = slotsOf(counts, finish, together).end * entranceStep(bpm);
   return beats + (beats % 2);
 }
 
@@ -161,6 +251,66 @@ function playOn(previous: Element, media: MotionMedia, seconds: number, fps: num
   return next + seconds <= media.duration ? next : undefined;
 }
 
+/** A field's clock: every copy shows `base + t × speed + its index × phase` at template time t (seconds). */
+interface Clock {
+  base: number;
+  speed: number;
+  phase: number;
+}
+
+/**
+ * The clock of a field of `count` copies over `seconds`: the copies' spread of
+ * phases is narrowed when the clip is too short for it, then dropped and the
+ * clip slowed (to half speed at most) when it is shorter than the template.
+ */
+function fieldClock(media: MotionMedia, seconds: number, count: number, phase: number, fps: number): Clock {
+  const lo = media.duration > 3 ? 0.2 : 0;
+  // A frame of room at the end: in-points are rounded to the frame grid.
+  const hi = media.duration > 3 ? media.duration - 0.1 : media.duration - 1 / fps;
+  const length = hi - lo;
+  const spread = (count - 1) * phase;
+  if (length >= seconds + spread) return { base: lo + (length - seconds - spread) * 0.3, speed: 1, phase };
+  if (length >= seconds) return { base: lo, speed: 1, phase: count > 1 ? (length - seconds) / (count - 1) : 0 };
+  const speed = length / seconds;
+  if (speed < MIN_FIELD_SPEED) {
+    refuse(`the clip is ${media.duration.toFixed(1)} s and the field ${seconds.toFixed(1)} s: even at half speed it runs out; give a duration_seconds of at most ${((length / MIN_FIELD_SPEED) * 0.98).toFixed(1)} or a longer clip`);
+  }
+  return { base: lo, speed, phase: 0 };
+}
+
+type Camera = (frame: number, p: Pose) => Pose;
+
+/** The drift's camera over `frames` frames: a linear push, pull or pan about the frame's centre. */
+function driftCamera(drift: GridDrift, frames: number, W: number, H: number): Camera {
+  return (frame, p) => {
+    const t = frames > 1 ? frame / (frames - 1) : 0;
+    const z = drift === "in" ? 1 + DRIFT * t : drift === "out" ? 1 + DRIFT * (1 - t) : 1 + DRIFT;
+    const pan = (DRIFT / 2) * (1 - 2 * t);
+    const dx = drift === "left" ? W * pan : drift === "right" ? -W * pan : 0;
+    const dy = drift === "up" ? H * pan : drift === "down" ? -H * pan : 0;
+    return { ...p, x: W / 2 + (p.x - W / 2) * z + dx, y: H / 2 + (p.y - H / 2) * z + dy, s: p.s * z, ...(p.radius !== undefined ? { radius: p.radius * z } : {}) };
+  };
+}
+
+/**
+ * `el` seen through the camera: a key at its last frame carries the drift to
+ * the end, and every still stretch moves linearly, so neighbouring tiles keyed
+ * on different frames stay edge to edge.
+ */
+function drifted(el: Element, camera: Camera): Element {
+  const keys = [...el.keys].sort((a, b) => a.frame - b.frame);
+  const last = el.to - 1;
+  if (keys[keys.length - 1]!.frame < last) keys.push(key(last, keys[keys.length - 1]!.pose, "linear"));
+  return {
+    ...el,
+    keys: keys.map((k, i) => ({ ...k, pose: camera(k.frame, k.pose), ease: i > 0 && samePose(k.pose, keys[i - 1]!.pose) ? "linear" : k.ease })),
+  };
+}
+
+function grow(r: Rect, by: number): Rect {
+  return { x: r.x - by, y: r.y - by, w: r.w + 2 * by, h: r.h + 2 * by };
+}
+
 function centre(r: Rect): Pose {
   return pose(r.x + r.w / 2, r.y + r.h / 2);
 }
@@ -174,6 +324,7 @@ function revealKeys(kind: GridReveal, rest: Pose, rect: Rect, region: Rect, at: 
     case "fade":
       return enter(rest, at, { s: 1.08, alpha: 0, frames: travel + 4, ease: "out" });
     case "wipe":
+    case "cut":
       return [key(at, rest)];
     case "slide": {
       // From the edge of the region the tile is nearest to: a column from the side, a row from above or below.
@@ -214,9 +365,9 @@ function paintBackdrop(d: Drawing, r: Resolved, input: TemplateInput, stage: num
 export const montageGrid: TemplateSpec = {
   id: "grid",
   summary:
-    "A montage of your clips in tiles that fill one per beat: a grid of 2 to 9 tiles, vertical or horizontal strips, a film strip with the big frame last, or an irregular mosaic; optionally in a letterbox band (a 16:9 band across a 9:16 frame), stepping through layouts (3 → 4 → 6), ending with the last tile growing to fill the frame or the camera pushing into one tile.",
+    "A montage of your clips in tiles that fill one per beat: a grid of 2 to 9 tiles, vertical or horizontal strips, a film strip with the big frame last, or an irregular mosaic; or one shot repeated into a field of 2 to 16 copies (in step or out of phase, optionally mirrored) or folded into a 2/4/6/8-segment kaleidoscope; optionally in a letterbox band (a 16:9 band across a 9:16 frame), stepping through layouts (3 → 4 → 6), drifting (a slow push, pull or pan over the field), ending with the last tile growing to fill the frame or the camera pushing into one tile.",
   reads:
-    "file_ids (the clips, cycled over the tiles), and the grid options layout (grid | strips_v | strips_h | film_strip | mosaic), tiles or steps, band, gutter, radius, reveal (pop | slide | wipe | fade), merge, zoom_into",
+    "file_ids (the clips, cycled over the tiles; one clip for repeat and kaleidoscope), points (kaleidoscope: its mirror centre on the shot), and the grid options layout (grid | strips_v | strips_h | film_strip | mosaic | repeat | kaleidoscope), tiles or steps, band, gutter, radius, reveal (pop | slide | wipe | fade | cut), merge, zoom_into, phase, mirror, drift",
   media: "required",
   beats: (content, bpm) => gridBeats(content, bpm),
   build(input: TemplateInput): TemplateOutput {
@@ -226,6 +377,7 @@ export const montageGrid: TemplateSpec = {
     const files = content.fileIds ?? [];
     if (files.length === 0) refuse("grid needs file_ids: the clips or photos that fill the tiles");
     if (files.length > MAX_FILES) refuse(`grid shows at most ${MAX_FILES} files`);
+    if (r.field && files.length > 1) refuse(`the ${r.layout} layout shows one clip on every tile (got ${files.length} file_ids); use layout grid or mosaic for several`);
     const finish = r.merge || r.zoomInto !== null;
     const region = bandRect(frame, r.band);
     const stages = r.counts.map((count) => tileRects(r.layout, count, region, r.gutter));
@@ -238,7 +390,7 @@ export const montageGrid: TemplateSpec = {
     });
 
     // The unit of the schedule: the largest that fits the template's length.
-    const need = slotsOf(r.counts, finish);
+    const need = slotsOf(r.counts, finish, r.together);
     const units = [...new Set([beats.step, 1, 0.5])];
     const unit = units.find((v) => beats.frame(need.end * v) <= frames);
     if (unit === undefined) {
@@ -270,6 +422,10 @@ export const montageGrid: TemplateSpec = {
     const cues = new Set<number>([0]);
     const fps = frame.fps;
     const lastStage = r.counts.length - 1;
+    const shot = media.get(files[0]!) as MotionMedia;
+    const clock = r.field && shot.kind === "video" ? fieldClock(shot, frames / fps, r.counts[lastStage]!, r.phase, fps) : null;
+    const camera = r.drift ? driftCamera(r.drift, frames, W, H) : null;
+    const overlap = r.field && r.gutter === 0 ? OVERLAP * layout.u : 0;
     const stageFrom = (s: number) => slotFrame(need.stage[s]!);
     const stageTo = (s: number) => (s < lastStage ? slotFrame(need.stage[s + 1]!) : frames);
 
@@ -295,6 +451,7 @@ export const montageGrid: TemplateSpec = {
       const rects = stages[s]!;
       const kept = s > 0 ? r.counts[s - 1]! : 0;
       const zoomT = s === lastStage && r.zoomInto !== null ? rects[target]! : null;
+      const flips = r.mirror ? mirrorFlips(r.counts[s]!, region) : null;
       const current: Element[] = [];
       rects.forEach((rect, i) => {
         const slot = need.reveal[s]![i]!;
@@ -305,7 +462,9 @@ export const montageGrid: TemplateSpec = {
         const to = stageTo(s);
         const seconds = (to - at) / fps;
         let start: number | undefined;
-        if (i < kept) {
+        if (r.field) {
+          start = clock ? clock.base + (at / fps) * clock.speed + i * clock.phase : undefined;
+        } else if (i < kept) {
           start = playOn(before[i]!, media0, seconds, fps);
         } else {
           const nth = seen.get(file) ?? 0;
@@ -314,7 +473,8 @@ export const montageGrid: TemplateSpec = {
           start = tileStart(media0, (frames - at) / fps, nth, uses.get(file)!) ?? tileStart(media0, seconds, nth, uses.get(file)!);
         }
         const focus = r.layout === "strips_v" ? { x: (i + 0.5) / rects.length, y: 0.5 } : r.layout === "strips_h" ? { x: 0.5, y: (i + 0.5) / rects.length } : undefined;
-        const crop = cropToAspect(media0, rect.w / rect.h, focus);
+        const drawn = overlap > 0 ? grow(rect, overlap) : rect;
+        const crop = r.layout === "kaleidoscope" ? kaleidoscopeWindow(media0, region, drawn, r.counts[s]!, r.centre) : cropToAspect(media0, drawn.w / drawn.h, focus);
         const rest = centre(rect);
         const travel = travelOf(slot);
         let keys = revealKeys(r.reveal, rest, rect, region, at, travel, i < kept);
@@ -334,7 +494,19 @@ export const montageGrid: TemplateSpec = {
           }
           keys = m.keys;
         }
-        const el = mediaCard(`tile-${s + 1}-${i + 1}`, track0 + i, at, to, media0, fps, { width: rect.w, radius: r.radius, ...(crop ? { crop } : {}), ...(start !== undefined ? { start } : {}) }, keys);
+        let el = mediaCard(
+          `tile-${s + 1}-${i + 1}`,
+          track0 + i,
+          at,
+          to,
+          media0,
+          fps,
+          { width: drawn.w, radius: r.radius, ...(crop ? { crop } : {}), ...(start !== undefined ? { start, ...(clock ? { speed: clock.speed } : {}) } : {}) },
+          keys,
+        );
+        const flip = flips?.[i];
+        if (flip && (flip.x || flip.y)) el = { ...el, source: { ...(el.source as MediaSource), flip } };
+        if (camera) el = drifted(el, camera);
         if (r.reveal === "wipe" && i >= kept) {
           const inFrames = Math.round((el.source as MediaSource).start * fps);
           el.effects = [wipeEffect(inFrames + 1, travel, r.layout === "strips_v")];

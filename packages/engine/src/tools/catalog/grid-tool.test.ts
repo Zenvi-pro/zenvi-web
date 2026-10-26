@@ -99,6 +99,8 @@ describe("add_motion_template_tool grid", () => {
       [{ template: "grid", file_ids: FILES, merge: true, zoom_into: 2 }, /merge or zoom_into/],
       [{ template: "grid" }, /needs file_ids/],
       [{ template: "ui_cards", file_ids: FILES, layout: "strips_v", tiles: 3 }, /layout, tiles only apply to the grid template/],
+      [{ template: "end_card", text: "Hi", phase: 0.2, drift: "in" }, /phase, drift only apply to the grid template/],
+      [{ template: "grid", file_ids: FILES, layout: "kaleidoscope" }, /one clip on every tile/],
     ] as const) {
       const result = await runTool({ doc, host: host() }, "add_motion_template_tool", { ...args, bpm: "120" });
       expect(result.ok).toBe(false);
@@ -106,6 +108,43 @@ describe("add_motion_template_tool grid", () => {
       expect((result.data as { summary: string }).summary).toMatch(summary);
     }
     expect(doc.undoLabels).toEqual([]);
+    expect(doc.project.clips).toEqual([]);
+  });
+
+  it("folds one clip into a mirrored kaleidoscope that pushes in, every segment drawn mirrored by the renderer, in one undo step", async () => {
+    const doc = verticalProject();
+    const result = await runTool({ doc, host: host() }, "add_motion_template_tool", {
+      template: "grid",
+      layout: "kaleidoscope",
+      tiles: "4",
+      drift: "in",
+      file_ids: [FILES[0]],
+      duration_seconds: "4",
+      bpm: "120",
+    });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Add motion template grid"]);
+    const tileIds = new Set(dataOf(result).layers.filter((l) => l.name.startsWith("tile-")).map((l) => l.timeline_clip_id));
+    expect(tileIds.size).toBe(4);
+    for (const frame of [2, 60, 119]) {
+      const layers = planFrame(doc.project, frame).layers.filter((l) => tileIds.has(l.clipId ?? ""));
+      expect(layers).toHaveLength(4);
+      // Top-left as shot, top-right mirrored left-right, bottom-left top-bottom, bottom-right both: the transform's signs.
+      const flips = layers.map((l) => [Math.sign(l.transform[0]), Math.sign(l.transform[3])]);
+      expect(new Set(flips.map((f) => f.join()))).toEqual(new Set(["1,1", "-1,1", "1,-1", "-1,-1"]));
+      // The four meet at the frame's centre and cover the frame.
+      const boxes = layers.map((l) => {
+        const [x0, y0] = apply(l.transform, 0, 0);
+        const [x1, y1] = apply(l.transform, l.drawWidth, l.drawHeight);
+        return { x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0: Math.min(y0, y1), y1: Math.max(y0, y1) };
+      });
+      expect(Math.min(...boxes.map((b) => b.x0))).toBeLessThanOrEqual(0);
+      expect(Math.max(...boxes.map((b) => b.x1))).toBeGreaterThanOrEqual(1080);
+      expect(Math.min(...boxes.map((b) => b.y0))).toBeLessThanOrEqual(0);
+      expect(Math.max(...boxes.map((b) => b.y1))).toBeGreaterThanOrEqual(1920);
+      for (const b of boxes) expect(b.x0 < 540 + 0.5 && b.x1 > 540 - 0.5 && b.y0 < 960 + 0.5 && b.y1 > 960 - 0.5).toBe(true);
+    }
+    doc.undo();
     expect(doc.project.clips).toEqual([]);
   });
 });

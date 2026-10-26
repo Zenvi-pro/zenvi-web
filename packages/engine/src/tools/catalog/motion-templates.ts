@@ -24,7 +24,7 @@ import { placeOverlayClip } from "../../ops/overlays.js";
 import { buildMotionTemplate } from "../../motion/build.js";
 import { gridFromBeats, tempoGrid } from "../../motion/grid.js";
 import { PALETTES, withAccent } from "../../motion/palettes.js";
-import { GRID_REVEALS, MOTION_TEMPLATE_IDS, MotionInputError, type GridOptions, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
+import { GRID_DRIFTS, GRID_REVEALS, MOTION_TEMPLATE_IDS, MotionInputError, type GridOptions, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
 import { GRID_LAYOUTS } from "../../motion/tiles.js";
 import { TEMPLATES } from "../../motion/templates/index.js";
 import { PALETTE_IDS, type BeatGrid, type MotionLayer, type MotionMedia, type MotionPlan, type PaletteId } from "../../motion/types.js";
@@ -65,10 +65,10 @@ const input = z.strictObject({
   text: z.string().max(200).optional().describe("Main text: the typed phrase (type_search), the headline (kinetic_type; * stands for an image tile), the title (end_card), the caption (step_card), the product name (callout)."),
   subtitle: z.string().max(120).optional().describe("A second line: end_card's subtitle, the text cards' line (ui_cards), the prompt above the search (type_search), a still header at the top (step_card)."),
   words: z.array(z.string().min(1).max(40)).max(12).optional().describe("word_scroll: the word list (2-10 words)."),
-  file_ids: z.array(z.string().min(1)).max(9).optional().describe("Media-bin videos or photos: the cards (ui_cards), the shot (crop_labels), the product (callout), the step's footage (step_card), the image tiles (kinetic_type), the clips that fill the tiles (grid; cycled when there are fewer than tiles)."),
+  file_ids: z.array(z.string().min(1)).max(9).optional().describe("Media-bin videos or photos: the cards (ui_cards), the shot (crop_labels), the product (callout), the step's footage (step_card), the image tiles (kinetic_type), the clips that fill the tiles (grid; cycled when there are fewer than tiles; one clip for layout repeat or kaleidoscope)."),
   labels: z.array(z.string().max(48)).max(8).optional().describe("Short labels: card captions (ui_cards), suggestions under the search (type_search), crop box labels (crop_labels), callout names (callout), corner labels (grid_background editorial)."),
   values: z.array(z.string().max(48)).max(8).optional().describe("callout: the second line of each callout (a spec, a number)."),
-  points: z.array(z.strictObject({ x: unit, y: unit })).max(8).optional().describe("callout: anchor points on the product picture (0-1 from its top left); step_card: the point the label's arrow points at."),
+  points: z.array(z.strictObject({ x: unit, y: unit })).max(8).optional().describe("callout: anchor points on the product picture (0-1 from its top left); step_card: the point the label's arrow points at; grid kaleidoscope: [the mirror centre on the shot] (default its middle)."),
   boxes: z.array(z.strictObject({ x: unit, y: unit, w: unit.gt(0), h: unit.gt(0) })).max(6).optional().describe("crop_labels: boxes on the frame (centre x, y and size w, h, 0-1). Default: a spread of boxes."),
   button: z.string().max(24).optional().describe("A button's label: type_search's search button, ui_cards' button the pointer clicks."),
   tag: z.string().max(32).optional().describe("A small tag: kinetic_type's (e.g. NO. 01), end_card plain's, step_card's label box, type_search's brand row, crop_labels' label prefix, callout's heading prefix (default ANATOMY)."),
@@ -78,21 +78,24 @@ const input = z.strictObject({
   align: z.enum(["left", "center"]).optional().describe("Text alignment (kinetic_type, end_card plain)."),
   position: z.enum(["top", "center", "bottom"]).optional().describe("Where the text sits (kinetic_type)."),
   backdrop: z.boolean().optional().describe("Draw the template's own background (end_card and grid default true; type_search and word_scroll default false)."),
-  layout: z.enum(GRID_LAYOUTS).optional().describe("grid: grid (2, 3, 4, 6 or 9 tiles), strips_v (vertical strips), strips_h, film_strip (small frames on sprocketed strips, the big frame last), mosaic (irregular, 3-9 tiles). Default grid."),
-  tiles: z.number().int().min(2).max(9).optional().describe("grid: how many tiles (grid 2/3/4/6/9, strips 2-6, film_strip 3-7, mosaic 3-9). Default per layout. Each tile shows a clip; they fill one per beat."),
-  steps: z.array(z.number().int().min(2).max(9)).min(1).max(4).optional().describe("grid: tile counts for layout steps, increasing, e.g. [3, 4, 6]: the grid is re-cut on a beat for each and fills again."),
+  layout: z.enum(GRID_LAYOUTS).optional().describe("grid: grid (2, 3, 4, 6 or 9 tiles), strips_v (vertical strips), strips_h, film_strip (small frames on sprocketed strips, the big frame last), mosaic (irregular, 3-9 tiles), repeat (one clip copied over 2/3/4/6/8/9/12/16 tiles: a multiplicity field), kaleidoscope (one clip in 2/4/6/8 segments, alternate ones mirrored so edges meet round the shot's centre). Default grid."),
+  tiles: z.number().int().min(2).max(16).optional().describe("grid: how many tiles (grid 2/3/4/6/9, strips 2-6, film_strip 3-7, mosaic 3-9, repeat 2/3/4/6/8/9/12/16, kaleidoscope 2/4/6/8). Default per layout (repeat 9, kaleidoscope 4). Tiles fill one per beat; a kaleidoscope's all at once."),
+  steps: z.array(z.number().int().min(2).max(16)).min(1).max(4).optional().describe("grid: tile counts for layout steps, increasing, e.g. [3, 4, 6]: the grid is re-cut on a beat for each and fills again."),
   band: z.union([z.string().max(12), z.number().min(0.2).max(8)]).optional().describe("grid: confine the tiles to a band across the middle of the frame, as a ratio '16:9', '21:9' or a number (width / height); the rest is bars (backdrop). Default: the whole frame."),
-  gutter: z.number().min(0).max(40).optional().describe("grid: gap between tiles, px at 1080 (default 6)."),
+  gutter: z.number().min(0).max(40).optional().describe("grid: gap between tiles, px at 1080 (default 6; repeat and kaleidoscope 0)."),
   radius: z.number().min(0).max(120).optional().describe("grid: tile corner radius, px at 1080 (default 0)."),
-  reveal: z.enum(GRID_REVEALS).optional().describe("grid: how a tile arrives on its beat: pop (springs up, default), slide (from the nearest edge), wipe, fade."),
+  reveal: z.enum(GRID_REVEALS).optional().describe("grid: how a tile arrives on its beat: pop (springs up, default), slide (from the nearest edge), wipe, fade, cut (just appears; default for repeat and kaleidoscope)."),
   merge: z.boolean().optional().describe("grid: end with the last tile growing to fill the frame."),
   zoom_into: z.number().int().min(1).max(9).optional().describe("grid: end with the camera pushing into this tile (1-based, in the final layout) until it fills the frame; not with merge."),
+  phase: z.number().min(0).max(2).optional().describe("grid repeat: seconds each copy runs ahead of the one before, so copies move out of phase (default 0: in step; narrowed when the clip is too short)."),
+  mirror: z.boolean().optional().describe("grid repeat: mirror alternate copies so their edges meet as mirrors (a kaleidoscope always is)."),
+  drift: z.enum(GRID_DRIFTS).optional().describe("grid: a slow camera move over the whole field for the template's length: in (push in 12 %), out (pull out), left, right, up, down (pan). Not with merge, zoom_into, band or film_strip."),
 });
 
 type Input = z.infer<typeof input>;
 
 /** Arguments only the grid template reads. */
-const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into"] as const satisfies readonly (keyof Input)[];
+const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift"] as const satisfies readonly (keyof Input)[];
 
 function displaySize(file: ProjectFile): { width: number; height: number } | null {
   const w = Number(file.width);
@@ -250,6 +253,9 @@ export const motionTemplateTools: CatalogTool[] = [
               ...(args.reveal ? { reveal: args.reveal } : {}),
               ...(args.merge !== undefined ? { merge: args.merge } : {}),
               ...(args.zoom_into !== undefined ? { zoomInto: args.zoom_into } : {}),
+              ...(args.phase !== undefined ? { phase: args.phase } : {}),
+              ...(args.mirror !== undefined ? { mirror: args.mirror } : {}),
+              ...(args.drift ? { drift: args.drift } : {}),
             }
           : undefined;
       const content: MotionContent = {
