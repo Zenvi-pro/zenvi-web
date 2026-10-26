@@ -90,6 +90,8 @@ const stepSchema = z
     checks: z.array(check).default([]),
     /** Refusals that mean "this host lacks it" (regexes on the summary): the step is skipped with that reason, not failed. */
     skipWhen: z.array(z.string()).default([]),
+    /** Steps this one needs besides those its references name (an export needs the edit it exports). */
+    after: z.array(z.string()).default([]),
     /** Only these runners (default: every runner that lists the tool). */
     runners: z.array(z.enum(["portable", "desktop"])).optional(),
     /** Per-runner replacement for tool/args (the desktop names some tools differently). */
@@ -136,6 +138,7 @@ export const scenarioSchema = z
     const seen = new Set<string>();
     for (const step of s.steps) {
       if (seen.has(step.id)) ctx.addIssue({ code: "custom", message: `duplicate step id ${step.id}` });
+      for (const dep of step.after) if (!seen.has(dep)) ctx.addIssue({ code: "custom", message: `${step.id} runs after ${dep}, which is not an earlier step` });
       seen.add(step.id);
     }
   });

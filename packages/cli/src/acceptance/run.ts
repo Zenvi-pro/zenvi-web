@@ -157,7 +157,7 @@ async function runStep(
   const rawArgs = override?.args ?? step.args;
   const expect = override?.expect ?? step.expect;
   const checks = override?.checks ?? step.checks;
-  const blocked = [...referencedRoots([rawArgs, checks])].map((r) => notDone.get(r)).find(Boolean);
+  const blocked = [...referencedRoots([rawArgs, checks]), ...step.after].map((r) => notDone.get(r)).find(Boolean);
   if (blocked) return skip(`needs ${blocked}`);
 
   let args: Record<string, unknown>;

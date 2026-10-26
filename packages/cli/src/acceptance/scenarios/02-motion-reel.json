@@ -175,6 +175,9 @@
     {
       "id": "transitions",
       "tool": "apply_motion_transitions_tool",
+      "after": [
+        "reel"
+      ],
       "args": {
         "track": "${reel.data.tracks.video}",
         "style": "hype"
@@ -188,6 +191,9 @@
     {
       "id": "sound",
       "tool": "auto_sound_design_tool",
+      "after": [
+        "reel"
+      ],
       "args": {
         "intensity": "normal"
       },
@@ -204,6 +210,9 @@
     {
       "id": "master",
       "tool": "master_audio_tool",
+      "after": [
+        "reel"
+      ],
       "args": {
         "preset": "social"
       }
@@ -211,6 +220,9 @@
     {
       "id": "review",
       "tool": "review_edit_tool",
+      "after": [
+        "reel"
+      ],
       "args": {
         "pace": "fast"
       },
@@ -232,6 +244,9 @@
     {
       "id": "export",
       "tool": "render_video",
+      "after": [
+        "master"
+      ],
       "args": {
         "output": "reel.mp4",
         "quality": "low",
