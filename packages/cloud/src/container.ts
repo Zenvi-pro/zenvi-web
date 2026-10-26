@@ -5,6 +5,7 @@
  */
 
 import { join } from "node:path";
+import type { StockHost } from "@zenvi/engine";
 import { BackendSessions } from "./auth/backend-session.js";
 import { Authenticator } from "./auth/principal.js";
 import type { SupabaseVerifier } from "./auth/supabase.js";
@@ -39,6 +40,7 @@ import { TokenRepo } from "./repos/tokens.js";
 import { DeviceService } from "./services/device.js";
 import { FrameService } from "./services/frames.js";
 import { MediaImporter } from "./services/importer.js";
+import { directStock } from "./services/stock.js";
 import { MediaService } from "./services/media.js";
 import { MediaVerifier } from "./services/verifier.js";
 import { ProjectService } from "./services/projects.js";
@@ -81,6 +83,8 @@ export interface Dependencies {
   renderDispatch?: RenderDispatch;
   /** Renders Zenvi Motion blocks (headless Chrome); absent = the motion block tools are not listed. */
   motion?: MotionHostFactory;
+  /** Stock search with this deployment's own keys (default: `config.stockKeys`). */
+  stock?: StockHost | null;
   /** Makes subject mattes (onnxruntime-node); absent = composites reuse mattes already in the bin. */
   mattes?: MatteHostFactory;
 }
@@ -101,6 +105,8 @@ export interface Services {
   clients: ClientRegistry;
   oauth: OAuthService;
   backendSessions: BackendSessions;
+  /** Stock search with this deployment's own keys, used when the backend is off; null without keys. */
+  stock: StockHost | null;
   generations: GenerationService;
   sessions: SessionStore;
   importer: MediaImporter;
@@ -191,6 +197,7 @@ export function createServices(deps: Dependencies): Services {
     devices: new DeviceService(tables, tokens, clock, config.editorUrl, config.tokens.devicePatDays),
     clients,
     backendSessions,
+    stock: deps.stock !== undefined ? deps.stock : directStock(config.stockKeys),
     generations,
     oauth: new OAuthService({
       tables,

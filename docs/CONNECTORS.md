@@ -279,7 +279,9 @@ servers; their egress lists are in §7).
   - `SUPABASE_SERVICE_ROLE_KEY`: the server mints its own Supabase session per
     person (admin recovery link, no email sent) and is the only one that
     refreshes it. Disconnecting the person's last app deletes it.
-  - neither: the backend tools are not offered.
+  - neither: the backend tools are not offered. Stock search still works
+    when the deployment has its own `PEXELS_API_KEY` / `FREESOUND_API_KEY`
+    (a lab or self-hosted copy; Freesound limited to CC0 and CC BY).
 - Redirect URIs known to work: `https://chatgpt.com/connector_platform_oauth_redirect`,
   `https://chatgpt.com/connector/oauth/{id}`, `https://claude.ai/api/mcp/auth_callback`,
   `http://localhost/callback` and `http://127.0.0.1/callback` on any port.

@@ -17,6 +17,8 @@
  *           save/open are refused;
  *   backend api.zenvi.pro as the connected person (search, stock, catalog,
  *           TTS; auth/backend-session.ts). AI video is a cloud job, not this host.
+ *   stock   Pexels/Freesound search: through the backend, or with this
+ *           deployment's own keys when it runs without one (services/stock.ts);
  *   exporter export_video_tool's renders as render jobs (`RenderService.startExport`):
  *           the answer carries the render_id, get_render_status the download link;
  *   motion   Zenvi Motion blocks rendered here with headless Chrome, and
@@ -30,12 +32,15 @@ import { join } from "node:path";
 import {
   TRANSCRIPTION_PATH,
   transcriptionHttpError,
+  type BackendHost,
   type CloudMediaRef,
   type HostCapability,
   type ImportedMedia,
   type Project,
+  type StockHost,
   type ToolHost,
 } from "@zenvi/engine";
+import { backendStock } from "@zenvi/engine/tools";
 import { ffmpegCanWrite } from "@zenvi/render-node";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
@@ -85,11 +90,25 @@ export function cloudCapabilities(services: Services): Set<HostCapability> {
   if (services.assets) caps.add("assets");
   if (services.analyzeAudio) caps.add("audio");
   if (services.backendSessions.enabled) caps.add("backend");
+  if (services.backendSessions.enabled || services.stock) caps.add("stock");
   if (services.renders.rendererAvailable) caps.add("exporter");
   // Both keep what they render as project media, which needs probing.
   if (services.motion && caps.has("media")) caps.add("motion");
   if (services.mattes && caps.has("media")) caps.add("mattes");
   return caps;
+}
+
+function backendFor(services: Services, userId: string, signal: AbortSignal): BackendHost {
+  return {
+    baseUrl: services.config.backendUrl,
+    request: (path, init) => services.backendSessions.request(userId, path, { ...init, signal: init?.signal ?? signal }),
+  };
+}
+
+/** Stock search for one person's calls: the backend as them, else this deployment's own keys (none: undefined). */
+export function stockSearch(services: Services, userId: string, signal: AbortSignal): StockHost | undefined {
+  if (services.backendSessions.enabled) return backendStock(backendFor(services, userId, signal));
+  return services.stock ?? undefined;
 }
 
 function baseName(path: string): string {
@@ -252,12 +271,8 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     };
   }
 
-  if (caps.has("backend")) {
-    host.backend = {
-      baseUrl: services.config.backendUrl,
-      request: (path, init) => services.backendSessions.request(userId, path, { ...init, signal: init?.signal ?? ctx.signal }),
-    };
-  }
+  if (caps.has("backend")) host.backend = backendFor(services, userId, ctx.signal);
+  host.stock = stockSearch(services, userId, ctx.signal);
 
   /** An export blob of this project and its download link (24 h). */
   const exportLink = async (name: string, type: string): Promise<string> =>

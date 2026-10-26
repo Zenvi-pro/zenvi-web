@@ -108,7 +108,7 @@ export function createApp(services: Services): Hono<AppEnv> {
   app.route("/mcp", mcpRoutes(services, tools, mcpAllowed));
   // Same server behind a proxy's public URL (MCP_URL_ALIASES), e.g. https://zenvi.pro/plugin → /plugin here.
   for (const alias of config.mcpUrlAliases) app.route(new URL(alias).pathname, mcpRoutes(services, tools, mcpAllowed, alias));
-  app.route("/editor", editorRoutes(config.editorDist, config.editorUrl));
+  app.route("/editor", editorRoutes(config.editorDist, config.editorUrl, [config.publicBaseUrl, ...config.publicBaseUrlAliases]));
 
   app.notFound((c) => c.json({ error: { code: "not_found", message: "No such endpoint." } }, 404));
 
