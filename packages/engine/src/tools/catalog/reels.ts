@@ -434,7 +434,8 @@ export const reelTools: CatalogTool[] = [
           if (index === plan.shots.length - 1 && style.fadeOut) fadeAlpha(tx, current, 1, 0, shot.end - Math.min(0.8, length / 2), shot.end);
           if (prepared.flash && flashes.has(index)) {
             const flash = addTitleClip(tx, { file: prepared.flash, position: shot.start, duration: FLASH_SECONDS, layer: track.flash, title: "Flash" }).clip;
-            fadeAlpha(tx, flash, 0.75, 0, shot.start, shot.start + FLASH_SECONDS);
+            // A section's flash opens on a full white frame; a flash on every downbeat stays lighter.
+            fadeAlpha(tx, flash, style.flash === "sections" ? 1 : 0.75, 0, shot.start, shot.start + FLASH_SECONDS);
           }
           // A label never shares the frame with the end card; one the card cuts down to a flicker is dropped.
           const label = shot.label ? prepared.labels.get(shot.label) : undefined;

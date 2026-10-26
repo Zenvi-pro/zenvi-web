@@ -53,8 +53,8 @@ describe("planReel", () => {
     expect(plan.lengthNote).toBe("16.00s, ends on a bar line at 120 BPM: the first one at or after the 15s asked for");
     expect(plan.downbeats.some((d) => Math.abs(d - plan.duration) < 1e-3)).toBe(true);
     expectContiguous(plan.shots, plan.duration);
-    // Every cut on a beat, half-beat or (climax bursts) quarter-beat of the 120 BPM grid.
-    for (const shot of plan.shots) expect(Math.abs(shot.start * (shot.climax ? 8 : 4) - Math.round(shot.start * (shot.climax ? 8 : 4)))).toBeLessThan(1e-6);
+    // Every cut on a beat, half-beat or (bursts) quarter-beat of the 120 BPM grid.
+    for (const shot of plan.shots) expect(Math.abs(shot.start * 8 - Math.round(shot.start * 8))).toBeLessThan(1e-6);
     expect(plan.shots[0]!.end).toBeCloseTo(1, 6);
     const body = plan.shots.filter((s) => !s.climax).slice(1, -1);
     const climax = plan.shots.filter((s) => s.climax).slice(0, -1);

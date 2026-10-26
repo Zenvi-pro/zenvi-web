@@ -117,9 +117,9 @@ export const REEL_STYLES: Readonly<Record<ReelStyleId, ReelStyle>> = {
     summary: "Energetic montage for launches, sports, events and travel: fast cuts on the beat, flashes on the downbeats, punchy colour.",
     defaultSeconds: 15,
     defaultBpm: 128,
-    // About 0.3 s a shot at 128 BPM, quarter-beat bursts (4 frames) in the climax: the references average 0.16-0.25 s.
-    pattern: [1, 0.5, 0.5, 1, 0.5, 0.5, 0.5, 0.5],
-    climax: [0.5, 0.5, 0.25, 0.25, 0.5, 0.25, 0.25, 0.5],
+    // About 0.23 s a shot at 128 BPM, quarter-beat bursts (3-4 frames) in the climax: the references average 0.16-0.25 s.
+    pattern: [0.5, 0.5, 0.5, 0.5, 1, 0.5, 0.25, 0.25],
+    climax: [0.5, 0.25, 0.25, 0.5, 0.25, 0.25, 0.25, 0.25],
     firstBeats: 2,
     lastBeats: 4,
     motion: { video: "animate.cam_push_in", image: "animate.ken_burns_in" },

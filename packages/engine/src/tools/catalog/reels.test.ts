@@ -131,6 +131,10 @@ describe("build_reel_tool", () => {
     };
     expect(data.drop).toBe(16);
     expect(data.flashes).toContain(16);
+    // A section's flash opens on a full white frame.
+    const flashes = doc.project.clips.filter((c) => c.layer === data.tracks.flash);
+    expect(flashes).toHaveLength(data.flashes.length);
+    for (const f of flashes) expect((f.alpha as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y).toBe(1);
     expect(data.transitions.find((t) => t.cut === 16)?.preset).toBe("glitch");
     const whips = data.transitions.filter((t) => t.preset === "whip");
     expect(whips.length).toBeGreaterThan(1);
