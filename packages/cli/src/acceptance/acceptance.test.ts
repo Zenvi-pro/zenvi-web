@@ -1,9 +1,10 @@
+import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeTempDir, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildReport, reportMarkdown } from "./report.js";
-import { buildReplayReport, extractCalls, groupFailures, normaliseMessage, pairIds, rewriteArgs, type ReplayCall } from "./replay.js";
+import { buildReplayReport, extractCalls, groupFailures, normaliseMessage, pairIds, replayTranscript, rewriteArgs, type ReplayCall } from "./replay.js";
 import { runScenario } from "./run.js";
 import { getPath, loadScenarios, MissingReference, parseScenario, resolveRefs, unmet } from "./scenario.js";
 import { startPortable } from "./targets.js";
@@ -92,6 +93,19 @@ describe("transcript replay", () => {
     // Media relative to the original folder is read from there, also inside a JSON-array string.
     const here = path.dirname(fileURLToPath(import.meta.url));
     expect(rewriteArgs({ paths: '["scenarios", "missing"]', output: "out.mp4" }, { ids, known, fromDir: here, toDir: "/tmp/new" }).args).toEqual({ paths: JSON.stringify([path.join(here, "scenarios"), "missing"]), output: "out.mp4" });
+    // A sibling folder that shares the prefix is not the original folder.
+    expect(rewriteArgs({ paths: '["/runs/x/project2/a.mp4"]' }, { ids, known, fromDir: "/runs/x/project", toDir: "/tmp/new" }).args).toEqual({ paths: '["/runs/x/project2/a.mp4"]' });
+  });
+
+  it("never writes outside the replay's folder, but keeps inputs that exist", () => {
+    const ctx = { ids: new Map<string, string>(), known: new Set<string>(), fromDir: "/runs/x/project", toDir: "/tmp/new" };
+    const here = fileURLToPath(import.meta.url);
+    expect(rewriteArgs({ output: "/Users/someone/Desktop/reel.mp4", path: "/elsewhere/missing.zvn", file_path: here }, ctx).args).toEqual({
+      output: path.join("/tmp/new", "reel.mp4"),
+      path: path.join("/tmp/new", "missing.zvn"),
+      file_path: here,
+    });
+    expect(rewriteArgs({ output: "/tmp/new/sub/reel.mp4" }, ctx).args).toEqual({ output: "/tmp/new/sub/reel.mp4" });
   });
 
   it("groups failures by their generalised message and proposes fixes for known ones", () => {
@@ -101,6 +115,22 @@ describe("transcript replay", () => {
     expect(top).toMatchObject({ tool: "add_clip_to_timeline_tool", count: 3, failedOriginally: 3, runs: ["r0", "r1"] });
     expect(top!.proposal).toMatch(/one past the stack/);
   });
+
+  it("skips tools this server lacks when they had worked, and fails names the agent made up", async () => {
+    const dir = await makeTempDir("zenvi-replay-test-");
+    dirs.push(dir);
+    const use = (id: string, name: string) => ({ type: "assistant", message: { content: [{ type: "tool_use", id, name: `mcp__zenvi__${name}`, input: {} }] } });
+    const answer = (id: string, status: string) => ({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, content: receipt(status, status === "applied" ? "ok" : "Error: no such tool") }] } });
+    const lines = [use("u1", "not_on_this_build_tool"), answer("u1", "applied"), use("u2", "made_up_tool"), answer("u2", "refused"), use("u3", "get_project_info_tool"), answer("u3", "ok")];
+    const file = path.join(dir, "transcript.jsonl");
+    await writeFile(file, lines.map((l) => JSON.stringify(l)).join("\n"));
+    const calls = await replayTranscript("r", file);
+    expect(calls.map((c) => [c.tool, c.outcome])).toEqual([
+      ["not_on_this_build_tool", "skipped"],
+      ["made_up_tool", "failed"],
+      ["get_project_info_tool", "ok"],
+    ]);
+  }, 60_000);
 
   it("counts regressions and calls fixed since the original session", () => {
     const row = (index: number, originalOk: boolean, outcome: ReplayCall["outcome"]): ReplayCall => ({ run: "r", index, tool: "t", args: "{}", originalOk, originalSummary: originalOk ? "ok" : "Error: was", outcome, summary: outcome === "failed" ? "Error: now" : "ok", ms: 1 });

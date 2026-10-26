@@ -127,6 +127,8 @@ function idsIn(value: unknown, into: Set<string>): void {
 }
 
 const OUTPUT_KEYS = new Set(["path", "output", "output_path", "out", "project_path", "file_path"]);
+/** Output keys some tools use for an input (import_files_tool path, open_project_file file_path). */
+const AMBIGUOUS_KEYS = new Set(["path", "file_path"]);
 
 /**
  * The arguments for the replay: ids mapped, the original folder moved to the
@@ -142,10 +144,14 @@ export function rewriteArgs(args: Record<string, unknown>, ctx: { ids: Map<strin
       if (ctx.known.has(id)) unmapped.add(id);
       return id;
     });
+    const output = key !== undefined && OUTPUT_KEYS.has(key);
+    if (ctx.fromDir && (out === ctx.fromDir || out.startsWith(ctx.fromDir + path.sep)) && (output || !existsSync(out))) return ctx.toDir + out.slice(ctx.fromDir.length);
+    // An output the session wrote elsewhere (an absolute render or save path) lands in the new folder too:
+    // a replay must not write over files outside its sandbox. `path`/`file_path` also name inputs, so those move only when missing.
+    if (output && path.isAbsolute(out) && !out.startsWith(ctx.toDir + path.sep) && (!AMBIGUOUS_KEYS.has(key) || !existsSync(out))) return path.join(ctx.toDir, path.basename(out));
     if (!ctx.fromDir) return out;
-    if (out.startsWith(ctx.fromDir) && ((key && OUTPUT_KEYS.has(key)) || !existsSync(out))) return ctx.toDir + out.slice(ctx.fromDir.length);
     // Media named relative to the original folder ("inputs/a.mp4") stays there; outputs land in the new one.
-    if (!(key && OUTPUT_KEYS.has(key)) && out && !path.isAbsolute(out) && !out.includes("\n") && existsSync(path.join(ctx.fromDir, out))) return path.join(ctx.fromDir, out);
+    if (!output && out && !path.isAbsolute(out) && !out.includes("\n") && existsSync(path.join(ctx.fromDir, out))) return path.join(ctx.fromDir, out);
     return out;
   };
   // Some tools take a JSON array as a string (import_files_tool paths='["a.mp4"]').
@@ -334,6 +340,7 @@ export async function replayTranscript(run: string, file: string, options: { bun
   const known = new Set<string>();
   const out: ReplayCall[] = [];
   try {
+    const listed = await target.tools();
     for (const call of calls) {
       const base = { run, index: call.index, tool: call.tool, originalOk: call.original.ok, originalSummary: call.original.summary.slice(0, 400) };
       const skip = (summary: string): void => {
@@ -342,6 +349,11 @@ export async function replayTranscript(run: string, file: string, options: { bun
       };
       if (NETWORK_TOOLS.has(call.tool)) {
         skip("network tool: not replayed");
+        continue;
+      }
+      // A tool this build lacks is the host's gap, not a failure (as in the scenarios); a name the agent made up still fails.
+      if (!listed.has(call.tool) && call.original.ok) {
+        skip("this server does not offer it");
         continue;
       }
       if (options.skipTools?.has(call.tool)) {
@@ -470,7 +482,7 @@ export function replayMarkdown(report: ReplayReport): string {
     "# Zenvi MCP transcript replay",
     "",
     `${t.runs} sessions, ${t.calls} Zenvi calls. Originally ${t.calls - t.originalFailed}/${t.calls} succeeded (${pct(t.calls - t.originalFailed, t.calls)}).`,
-    `Replayed ${t.replayed} (${t.skipped} skipped: network tools, missing downloads and calls that need their ids): ${t.ok} ok, ${t.failed} failed (${pct(t.ok, t.replayed)} success); ` +
+    `Replayed ${t.replayed} (${t.skipped} skipped: network tools, tools this server lacks, missing downloads and calls that need their ids): ${t.ok} ok, ${t.failed} failed (${pct(t.ok, t.replayed)} success); ` +
       `${t.regressions} failed that had succeeded, ${t.fixedSince} succeed that had failed.`,
     "",
     ...failureTable("Top failures now (replay)", report.topFailures),
