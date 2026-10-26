@@ -51,7 +51,7 @@ export function build(ctx: BlockContext): void {
   const row = ctx.el("div", "gc-cards");
   row.style.flexDirection = ctx.portrait ? "column" : "row";
   const n = titles.length;
-  const cardW = ctx.portrait ? Math.min(760, W - safe.left - safe.right) : Math.min(420, (W - safe.left - safe.right - 28 * (n - 1)) / n);
+  const cardW = ctx.portrait ? Math.min(760, W - safe.left - safe.right) : Math.min(540, (W - safe.left - safe.right - 28 * (n - 1)) / n);
   const toggles: { knob: HTMLElement; track: HTMLElement; detail: HTMLElement; on: HTMLElement; ring: HTMLElement; card: HTMLElement }[] = [];
   const cards = titles.map((title, i) => {
     const card = ctx.el("div", "gc-card glass", row);
