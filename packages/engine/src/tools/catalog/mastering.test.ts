@@ -10,10 +10,12 @@ import { measureLoudness } from "../../mastering/loudness.js";
 import { createProject } from "../../model/defaults.js";
 import type { Clip, Project } from "../../model/types.js";
 import { addClip } from "../../ops/clips.js";
+import { addEffect } from "../../ops/effects.js";
 import { addFile } from "../../ops/files.js";
 import { evaluateVolumeCurve, curvePoints, timelineToSourceFrame } from "../audio-mix.js";
 import type { MixPcm } from "../types.js";
 import { runTool } from "../registry.js";
+import { applyClipGain } from "./mastering.js";
 import type { ToolReceipt } from "../receipt.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
 import { L1, L2, L3, audioInfo, media, videoInfo } from "../test-support/fixture.js";
@@ -279,5 +281,15 @@ describe("master_audio_tool", { timeout: 60_000 }, () => {
     const receipt = await master(doc, host);
     expect(receipt.status).toBe("refused");
     expect(receipt.summary).toMatch(/not available/);
+  });
+
+  it("does not count a bypassed Compressor as gain", () => {
+    const doc = newDoc();
+    const id = add(doc, "music.mp3", { ai: indexed });
+    doc.transaction("bypassed", (tx) => addEffect(tx, id, "Compressor", { makeup_gain: 6, ratio: 1, threshold: 0, bypass: 1 }));
+    const result = doc.transaction("gain", (tx) => applyClipGain(tx, id, 6));
+    expect(result.makeupDb).toBeCloseTo(6, 6);
+    const live = doc.project.clips.find((c) => c.id === id)!.effects.filter((e) => Number((e.bypass as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y) === 0);
+    expect(live.map((e) => Number((e.makeup_gain as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y))).toEqual([6]);
   });
 });

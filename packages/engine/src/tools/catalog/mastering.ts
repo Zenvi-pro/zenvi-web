@@ -118,9 +118,9 @@ function measuredOf(report: LoudnessReport): Measured {
 const fmtLufs = (x: number | null): string => (x === null ? "silence" : `${x.toFixed(1)} LUFS`);
 const fmtPeak = (x: number | null): string => (x === null ? "-inf dBTP" : `${x.toFixed(1)} dBTP`);
 
-/** The effects that are only a gain: Compressors at ratio 1 (the stages this tool adds), in apply order. */
+/** The effects that are only a gain: live Compressors at ratio 1 (the stages this tool adds), in apply order. A bypassed one adds nothing. */
 function gainEffects(clip: Clip): Effect[] {
-  return (clip.effects ?? []).filter((e) => e.class_name === "Compressor" && keyframeValue(e.ratio, 1) === 1);
+  return (clip.effects ?? []).filter((e) => e.class_name === "Compressor" && keyframeValue(e.ratio, 1) === 1 && keyframeValue(e.bypass, 0) === 0);
 }
 
 function keyframeValue(kf: unknown, fallback: number): number {
