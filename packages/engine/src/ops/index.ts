@@ -40,3 +40,4 @@ export { timeCurveIsReversed } from "./retime.js";
 export * from "./project-files.js";
 export * from "./waveforms.js";
 export * from "./media-collect.js";
+export * from "./motion-transitions.js";
