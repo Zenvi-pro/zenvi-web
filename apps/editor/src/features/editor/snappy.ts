@@ -59,6 +59,30 @@ export function snappyUndoSteps(outcomes: readonly SnappyOutcome[]): number {
   return outcomes.reduce((n, o) => n + o.undoSteps, 0);
 }
 
+/**
+ * "Undo all" for a chain that just added `steps` undo steps: undoes them only
+ * while nothing else went into history since (no edit, undo or redo; untracked
+ * writes such as a finished cloud upload do not count), so the person's own
+ * edits are never undone. An undo-depth check alone is not enough: undo one
+ * step and make a new edit, and the depth is back where it was.
+ */
+export function snappyUndoAll(session: Pick<EditorSession, "doc" | "undo">, steps: number): () => boolean {
+  const depth = session.doc.undoLabels.length;
+  let touched = false;
+  const stop = session.doc.subscribe((event) => {
+    if (event.source === "untracked") return;
+    touched = true;
+    stop();
+  });
+  return () => {
+    if (touched || session.doc.undoLabels.length !== depth) return false;
+    touched = true;
+    stop();
+    for (let i = 0; i < steps; i += 1) session.undo();
+    return true;
+  };
+}
+
 const MARK: Record<SnappyOutcome["status"], string> = { done: "✓", unchanged: "–", skipped: "–", failed: "✕" };
 
 /** The palette / toolbar action: run the chain, then one toast with a line per step and "Undo all". */
@@ -72,17 +96,15 @@ export async function runMakeItSnappy(session: EditorSession, options: SnappyOpt
     toast.warning("Nothing to make snappy", { description });
     return outcomes;
   }
-  const depth = session.doc.undoLabels.length;
+  const undoAll = snappyUndoAll(session, steps);
   const title = `Made it snappy: ${steps} undo step${steps === 1 ? "" : "s"}`;
-  const undoAll = {
+  const undoAllAction = {
     label: "Undo all",
     onClick: () => {
-      // Only while nothing else was edited after the chain: never undo the person's own edits.
-      if (session.doc.undoLabels.length !== depth) return void toast.info("Edited since: undo step by step (Ctrl+Z)");
-      for (let i = 0; i < steps; i += 1) session.undo();
+      if (!undoAll()) toast.info("Edited since: undo step by step (Ctrl+Z)");
     },
   };
   const failed = outcomes.some((o) => o.status === "failed");
-  (failed ? toast.warning : toast.success)(title, { description, action: undoAll, duration: 10_000 });
+  (failed ? toast.warning : toast.success)(title, { description, action: undoAllAction, duration: 10_000 });
   return outcomes;
 }

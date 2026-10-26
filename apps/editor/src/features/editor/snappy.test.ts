@@ -1,4 +1,4 @@
-import { addClip, addFile, createProject, findProfile, type ReaderInfo } from "@zenvi/engine";
+import { addClip, addFile, createProject, findProfile, setClipProperty, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryMediaStore } from "@/lib/storage/media";
 import { MemoryProjectRepository } from "@/lib/storage/projects";
@@ -6,7 +6,7 @@ import { editorToolRunner } from "./editorTools";
 import { EditorSession } from "./session/EditorSession";
 import { MediaLibrary } from "./session/media";
 import { mainSequence } from "./cuts";
-import { makeItSnappy, snappyUndoSteps } from "./snappy";
+import { makeItSnappy, snappyUndoAll, snappyUndoSteps } from "./snappy";
 
 const reader: ReaderInfo = {
   type: "FFmpegReader",
@@ -83,5 +83,29 @@ describe("make it snappy", () => {
     const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
     expect(outcomes[0]).toMatchObject({ step: "transitions", status: "skipped", undoSteps: 0 });
     expect(outcomes[1]!.step).toBe("sound");
+  });
+
+  it("Undo all undoes the chain once, and never after another edit", async () => {
+    const session = sessionWithCuts(3);
+    const before = session.doc.undoLabels.length;
+    const steps = snappyUndoSteps(await makeItSnappy(() => session.project, editorToolRunner(session)));
+    const undoAll = snappyUndoAll(session, steps);
+    expect(undoAll()).toBe(true);
+    expect(session.doc.undoLabels.length).toBe(before);
+    expect(undoAll()).toBe(false);
+    expect(session.doc.undoLabels.length).toBe(before);
+  });
+
+  it("Undo all refuses once the person undid a step and edited (same undo depth)", async () => {
+    const session = sessionWithCuts(3);
+    const steps = snappyUndoSteps(await makeItSnappy(() => session.project, editorToolRunner(session)));
+    const undoAll = snappyUndoAll(session, steps);
+    const depth = session.doc.undoLabels.length;
+    session.undo();
+    session.edit("Rename", (tx) => setClipProperty(tx, session.project.clips[0]!.id, "title", "mine"));
+    const labels = session.doc.undoLabels;
+    expect(labels).toHaveLength(depth);
+    expect(undoAll()).toBe(false);
+    expect(session.doc.undoLabels).toEqual(labels);
   });
 });
