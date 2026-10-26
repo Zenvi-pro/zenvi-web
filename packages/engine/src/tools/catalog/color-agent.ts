@@ -166,7 +166,7 @@ function colorTargetError(project: Project, action: string): string {
 }
 
 /** `_filter_unlocked_color_clip_ids`: drop missing and locked-track clips (with warnings) before any change. */
-function filterUnlocked(project: Project, ids: readonly string[], warnings: string[]): string[] {
+export function filterUnlocked(project: Project, ids: readonly string[], warnings: string[]): string[] {
   const kept: string[] = [];
   for (const cid of ids) {
     const clip = project.clips.find((c) => c.id === cid);
@@ -184,7 +184,7 @@ function filterUnlocked(project: Project, ids: readonly string[], warnings: stri
 }
 
 /** `_resolve_lut_file`: a LUT id, bundled path or file → what `lut_path` stores; refused before any change. */
-async function resolveLutFile(call: ToolCall, raw: unknown): Promise<string> {
+export async function resolveLutFile(call: ToolCall, raw: unknown): Promise<string> {
   const value = text(raw);
   const look = resolveLookId(value);
   if (look.kind !== "lut") throw new ColorValueError(`'${value}' is a ${look.kind} look, not a LUT; use apply_look_tool`);
@@ -206,7 +206,7 @@ async function resolveLutFile(call: ToolCall, raw: unknown): Promise<string> {
 // ---------------------------------------------------------------------------
 
 /** `create_color_grade_effect_json` / `_create_film_grain_effect_json`: a fresh effect with a new id. */
-function effectFactory(project: Project): (className: string) => Json {
+export function effectFactory(project: Project): (className: string) => Json {
   const nextId = idFactory(project);
   return (className) => createEffect(className, {}, { id: nextId() }) as unknown as Json;
 }
@@ -230,7 +230,7 @@ function replaceFirstGrade(effects: readonly Effect[], effect: Json): Effect[] {
 }
 
 /** The clip's effects with `existing` grade (created and appended when missing) merged with `patch`. */
-function mergedGradeEffects(effects: Effect[], patch: Json, create: (cn: string) => Json): { effects: Effect[]; merged: Json } {
+export function mergedGradeEffects(effects: Effect[], patch: Json, create: (cn: string) => Json): { effects: Effect[]; merged: Json } {
   let existing = findColorGrade(effects) as Json | null;
   let list = effects;
   if (existing === null) {
@@ -342,7 +342,7 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T, 
   return out;
 }
 
-interface ProfilePack {
+export interface ProfilePack {
   profile: Json;
   scopes_samples: number;
   sample_frames: number[];
@@ -351,7 +351,7 @@ interface ProfilePack {
 }
 
 /** `_profile_clip_dense`: a LookProfile from frames spread across the clip (isolated renders). */
-async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number): Promise<ProfilePack> {
+export async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number): Promise<ProfilePack> {
   const rate = fps(call.doc.project);
   const duration = clipDurationSeconds(clip);
   let n = sampleCountForDuration(duration);
@@ -366,7 +366,7 @@ async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number)
 }
 
 /** `_profile_media_path`: a LookProfile of a media-bin file (or a local file the host imports). */
-async function profileMediaFile(call: ToolCall, file: ProjectFile): Promise<ProfilePack> {
+export async function profileMediaFile(call: ToolCall, file: ProjectFile): Promise<ProfilePack> {
   const project = call.doc.project;
   const rate = fps(project);
   const still = Boolean(file.has_single_image) || String(file.media_type ?? "") === "image";
@@ -437,7 +437,7 @@ function jsonResult(call: ToolCall, result: Json, previews: Previews): { receipt
   return { receipt: applied(call.tool, JSON.stringify(result), { data: result }, 0), images: previews.images };
 }
 
-async function colorTool(call: ToolCall, body: () => Promise<ToolReceipt | { receipt: ToolReceipt; images: ToolImage[] } | string>) {
+export async function colorTool(call: ToolCall, body: () => Promise<ToolReceipt | { receipt: ToolReceipt; images: ToolImage[] } | string>) {
   try {
     return await body();
   } catch (error) {

@@ -198,6 +198,7 @@ Availability follows each tool's required host capabilities and the host methods
 | [`add_transition_tool`](#add_transition_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`probe_media_tool`](#probe_media_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`build_reel_tool`](#build_reel_tool) | mcp, cli, editor | yes | yes | yes | — |
+| [`unify_grade_tool`](#unify_grade_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`add_motion_template_tool`](#add_motion_template_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`kinetic_captions_tool`](#kinetic_captions_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`search_pexels_videos_tool`](#search_pexels_videos_tool) | mcp, cli, editor | yes | yes | yes | — |
@@ -3177,6 +3178,27 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `words` | string[] |  | Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial). |
 | `beats` | number[] |  | Beat times of the music in seconds (e.g. from detect_beats_tool) instead of analysing it here. |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (they are removed in the same undo step). |
+
+### unify_grade_tool
+
+**Unify grade** (direct tool). Grade continuity for a whole cut: measures every footage clip's exposure, white balance and contrast on frames across it, corrects each clip's ColorGrade toward one target (a reference clip/file, or the clips' median look in a neutral band) until it sits within tolerance (saturation is reported, not matched), then optionally lays one LUT look over all of them.
+
+Surfaces: mcp, cli, editor. edits. Needs: frames.
+
+Availability: editor yes; cli yes; cloud yes (only when the render worker is configured); desktop — (web-only direct tool).
+
+| Argument | Type | Required | Description |
+| --- | --- | --- | --- |
+| `timeline_clip_ids` | string[] |  | Clips to unify. Default: every footage clip (video or photo; not SVG titles, cards or audio) on unlocked tracks. |
+| `track` | string |  | Only the footage clips on this track (UI track number or name). |
+| `reference_clip_id` | string |  | Timeline clip whose look the others match (it is not corrected). Default: the clips' median look, pulled into a neutral band. |
+| `reference_file_id` | string |  | Media-bin video or image whose look the clips match, instead of a timeline clip. |
+| `strength` | number |  | Share of each correction applied, 0.1-1 (default 1). Lower keeps more of each shot's own character. (min 0.1, max 1) |
+| `look` | string |  | A LUT look laid over every unified clip after the correction (list_looks_tool ids, e.g. 'teal_cinema', 'warm_cinema'), so the look lands on matched plates. |
+| `look_intensity` | number |  | Strength of the look, 0-1 (default the LUT's own, 1). (min 0, max 1) |
+| `samples` | integer |  | Frames measured per clip (default 5). (min 1, max 16) |
+| `max_iterations` | integer |  | Measure-and-correct passes per clip (default 4; a pass that clips the picture is dropped and retried gentler). (min 1, max 6) |
+| `dry_run` | boolean |  | Measure and report the corrections without changing anything. |
 
 ### add_motion_template_tool
 

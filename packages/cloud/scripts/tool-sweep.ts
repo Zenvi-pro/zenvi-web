@@ -410,6 +410,7 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   // Custom profiles live in Zenvi desktop's profiles folder: refused in the cloud.
   manage_custom_profiles_tool: () => ({ action: "create", name: "Sweep square", width: 1000, height: 1000, fps: 30 }),
   match_color_to_reference_tool: (c) => ({ timeline_clip_id: c.clips.b, referenceClipId: c.clips.a }),
+  unify_grade_tool: (c) => ({ timeline_clip_ids: [c.clips.a, c.clips.b], dry_run: true }),
   list_project_files_tool: () => ({ usage: "used", detail: "full" }),
   list_projects: () => ({ limit: 5 }),
   list_timeline_transitions_tool: () => ({ track: "2" }),
