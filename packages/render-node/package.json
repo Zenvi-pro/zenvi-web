@@ -15,5 +15,8 @@
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
     "@zenvi/engine": "*"
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "^1.30.0"
   }
 }

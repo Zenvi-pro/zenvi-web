@@ -299,6 +299,17 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote: "without file saving the frame is attached to the result",
     webNote: "the CLI writes the file (a relative path starts at the project's folder, the desktop's default is its export folder); the web editor downloads it; Zenvi Cloud answers with a download link and renders PNG only",
   },
+  // Subject mattes: made by the host (the CLI runs Robust Video Matting); composites reuse a matte already in the bin.
+  ...Object.fromEntries(
+    ["text_behind_subject_tool", "replace_background_tool", "subject_glow_tool", "pop_out_tool"].map((name) => [
+      name,
+      {
+        methods: ["media.writeGenerated"],
+        optional: ["mattes"],
+        partialNote: "without subject matting only footage whose matte is already in the bin (made by the zenvi CLI) can be composited",
+      } satisfies ToolNeeds,
+    ]),
+  ),
   export_files_to_folder_tool: {
     methods: ["storage.exportMedia"],
     optional: ["exporter"],
@@ -354,7 +365,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -377,7 +388,11 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "exporter.supports",
       "frames.fontFamilies",
     ],
-    conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" },
+    conditional: {
+      backend: "signed in with zenvi login",
+      "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
+      mattes: "onnxruntime-node is installed; the matting model downloads on first use",
+    },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",

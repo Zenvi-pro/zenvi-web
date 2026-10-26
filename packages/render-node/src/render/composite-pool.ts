@@ -191,12 +191,15 @@ export class CompositePool {
       return layer.source.kind === "image" || layer.source.kind === "svg" ? stable(image) : { image };
     });
     const images = [...prepared.images].map(([p, image]): [string, WireImage] => [p, stable(image)]);
+    // Video frames an effect reads are new every frame: inline, so they never push stills out of the cache.
+    const layerImages = prepared.layerImages.map((own) => (own ? [...own].map(([p, image]): [string, WireImage] => [p, { image }]) : null));
     const request: CompositeRequest = {
       type: "composite",
       id: this.nextId++,
       plan,
       layers,
       images,
+      layerImages,
       texts: [...prepared.texts],
       audio: prepared.audio,
       text,

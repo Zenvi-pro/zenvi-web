@@ -13,7 +13,7 @@ import type { Project } from "../model/types.js";
 import type { ReceiptStatus, ToolReceipt } from "./receipt.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
-import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf } from "./test-support/fixture.js";
+import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf, videoInfo } from "./test-support/fixture.js";
 import { createProject } from "../model/defaults.js";
 import { addClip } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
@@ -95,6 +95,14 @@ function withTransitions(doc: ProjectDocument): void {
     addTransition(tx, { layer: L1, position: 9, duration: 1, maskId: "common/fade", direction: "out", id: "TRANSFADE1" });
     addTransition(tx, { layer: L1, position: 12, duration: 1, maskId: "common/circle_in_to_out", id: "TRANSCIRC1" });
   });
+}
+
+/** A matting host that "mattes" any file into /assets/mattes/<id>.mp4 (the composites' plumbing, not a model). */
+function withMattes(_doc: ProjectDocument, host: FakeHost): void {
+  host.mattes = {
+    subjects: ["person"],
+    generate: async (path) => ({ media: media(`/assets/mattes/${path.split("/").pop()}`, videoInfo(path, 30, { has_audio: false })), model: "fake", version: "0", license: "MIT", frames: 900, fps: 30 }),
+  };
 }
 
 const SPECS: Record<string, Spec> = {
@@ -950,6 +958,26 @@ const SPECS: Record<string, Spec> = {
 
   // --- direct tools ----------------------------------------------------------------------------------------
   describe_project_tool: { happy: { summary: /^1280x720 30\/1 fps, 5 track\(s\), 5 clip\(s\), 0 transition\(s\), 4 file\(s\); content ends at 19\.00s\.$/ }, failure: null },
+  generate_subject_matte_tool: {
+    happy: { args: { clip_id: IDS.clipA }, setup: withMattes, summary: /^Made a person matte of interview\.mp4: 900 frames at 30\.0 fps/ },
+    failure: { args: { clip_id: IDS.clipLogo }, setup: withMattes, summary: /^Error: clip CLIPLOGO01 is not video/ },
+  },
+  text_behind_subject_tool: {
+    happy: { args: { clip_id: IDS.clipA, text: "TIME" }, setup: withMattes, summary: /^Put "TIME" behind the subject of clip CLIPINTV01: text on track \d+, cut-out on track \d+\.$/ },
+    failure: { args: { clip_id: IDS.clipA, text: "TIME" }, summary: /^Error: text_behind_subject_tool is not available in this Zenvi surface: .* has no person matte yet/ },
+  },
+  replace_background_tool: {
+    happy: { args: { clip_id: IDS.clipA, background: "blur" }, setup: withMattes, summary: /^Replaced the background of clip CLIPINTV01 with the footage blurred/ },
+    failure: { args: { clip_id: IDS.clipA, background: "file" }, setup: withMattes, summary: /^Error: background=file needs file_id$/ },
+  },
+  subject_glow_tool: {
+    happy: { args: { clip_id: IDS.clipA, look: "thermal" }, setup: withMattes, summary: /^Made the subject of clip CLIPINTV01 a thermal silhouette on track \d+ \(background: cold\)\.$/ },
+    failure: { args: { clip_id: "NOPE" }, setup: withMattes, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
+  pop_out_tool: {
+    happy: { args: { clip_id: IDS.clipA }, setup: withMattes, summary: /^Letterboxed clip CLIPINTV01 at 2\.39:1 with the subject popping out/ },
+    failure: { args: { clip_id: IDS.clipA, band_aspect: "1.2" }, setup: withMattes, summary: /no bars/ },
+  },
   move_clip_tool: {
     happy: { args: { clip_id: IDS.clipLogo, position_seconds: "6", track: "4" }, summary: /^Moved clip CLIPLOGO01\.$/, check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)).toMatchObject({ position: 6, layer: 4_000_000 }) },
     failure: { args: { clip_id: "NOPE", position_seconds: "6" }, summary: /^Error: No timeline clip with id='NOPE'\.$/ },

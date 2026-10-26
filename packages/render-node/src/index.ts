@@ -34,3 +34,7 @@ export * from "./svg/opentype.js";
 export * from "./svg/text.js";
 export * from "./svg/fonts.js";
 export * from "./render/audio-effects.js";
+export * from "./matte/model-cache.js";
+export * from "./matte/rvm.js";
+export * from "./matte/generate.js";
+export * from "./matte/host.js";

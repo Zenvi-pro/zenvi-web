@@ -50,9 +50,9 @@ export interface LayerResources {
   /**
    * An image by path stretched to exactly `width × height` (masks, effect
    * images); `time` picks the frame (seconds from its first frame) when the
-   * image is a video.
+   * image is a video, read on the asking clip's `lane`.
    */
-  image(path: string, width: number, height: number, time: number | undefined, mode: DecodeMode): Promise<RgbaImage | null>;
+  image(path: string, width: number, height: number, time: number | undefined, mode: DecodeMode, lane: string): Promise<RgbaImage | null>;
   /** A text resource by path (ColorMap `.cube` LUTs). */
   text(path: string): Promise<string | null>;
   /** The audio window a layer's kernels read (`LayerPlan.audio`). */
@@ -235,7 +235,7 @@ export class Compositor {
     layer.masks.forEach((instance, index) => {
       const [w, h] = stageSize(instance.applyBeforeClip === false);
       tasks.push(
-        resources.image(instance.maskPath, w, h, instance.maskTime, mode).then((image) => {
+        resources.image(instance.maskPath, w, h, instance.maskTime, mode, layer.clipId).then((image) => {
           if (image) masks[index] = { instance, image };
         }, fail("mask")),
       );
@@ -245,7 +245,7 @@ export class Compositor {
       const [w, h] = stageSize(canvasStage);
       const target = canvasStage ? prepared.canvasImages : prepared.sourceImages;
       for (const path of effect.images ?? []) {
-        tasks.push(resources.image(path, w, h, effect.imageFrames?.[path]?.time, mode).then((image) => image && target.set(path, image), fail("resource")));
+        tasks.push(resources.image(path, w, h, effect.imageFrames?.[path]?.time, mode, layer.clipId).then((image) => image && target.set(path, image), fail("resource")));
       }
       for (const path of effect.texts ?? []) {
         tasks.push(resources.text(path).then((text) => text !== null && prepared.texts.set(path, text), fail("resource")));

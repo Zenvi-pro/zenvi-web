@@ -48,7 +48,7 @@ interface Harness {
   kernelCalls: KernelCall[];
   maskCalls: { transitionId: string; w: number; h: number; after: number }[];
   released: string[];
-  imageRequests: { path: string; w: number; h: number; time: number | undefined }[];
+  imageRequests: { path: string; w: number; h: number; time: number | undefined; lane: string }[];
 }
 
 /** `kernels` maps an effect type to the size it resizes to (or null to keep the size), or "throw". */
@@ -87,9 +87,12 @@ function harness(kernels: Record<string, [number, number] | null | "throw"> = {}
       const image = new FakeImage(l.drawWidth, l.drawHeight, `pic:${l.clipId}`);
       return { image: image as unknown as ImageBitmap, width: image.width, height: image.height, release: () => released.push(l.clipId) };
     },
-    async image(path, width, height, time) {
-      imageRequests.push({ path, w: width, h: height, time });
-      return { width, height, data: new Uint8ClampedArray(width * height * 4) };
+    async image(path, width, height, time, _mode, lane) {
+      imageRequests.push({ path, w: width, h: height, time, lane });
+      // The first byte tells which frame of a video this is.
+      const data = new Uint8ClampedArray(width * height * 4);
+      data[0] = Math.round((time ?? 0) * 10);
+      return { width, height, data };
     },
     async text(path) {
       return `text:${path}`;
@@ -260,7 +263,20 @@ describe("Compositor", () => {
     const context = kernelCalls[0]!.context;
     expect(context).toMatchObject({ frame: 9, effectId: "V", fps: { num: 30, den: 1 }, timelineWidth: 1920, timelineHeight: 1080, clip: { mappedFrame: 9, readerFps: 25, duration: 4 } });
     expect(context.audio?.channels[0]).toHaveLength(1600);
-    expect(imageRequests).toEqual([{ path: "map.webm", w: 160, h: 90, time: 0.16 }]);
+    expect(imageRequests).toEqual([{ path: "map.webm", w: 160, h: 90, time: 0.16, lane: "C1" }]);
+  });
+
+  it("gives each clip its own frame of a video matte two clips read at once, each on its own lane", async () => {
+    const { compositor, resources, kernelCalls, imageRequests } = harness({ Mask: null });
+    const ctx = mainContext();
+    const mask = (time: number): EffectInstance => ({ id: `M${time}`, type: "Mask", frame: 1, params: {}, images: ["matte.mp4"], imageFrames: { "matte.mp4": { frame: time * 30 + 1, time } } });
+    const p = plan([layer({ clipId: "A", effects: [mask(0.5)] }), layer({ clipId: "B", effects: [mask(1.5)] })]);
+    expect(await compositor.render(p, asContext(ctx), resources)).toEqual([]);
+    expect(kernelCalls.map((k) => k.context.images.get("matte.mp4")!.data[0])).toEqual([5, 15]);
+    expect(imageRequests.map((r) => [r.time, r.lane])).toEqual([
+      [0.5, "A"],
+      [1.5, "B"],
+    ]);
   });
 
   it("isolates a failing kernel: the layer still draws and the error is reported", async () => {

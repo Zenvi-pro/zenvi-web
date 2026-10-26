@@ -48,6 +48,8 @@ const result = await build({
   entryPoints: [path.join(cliRoot, "src", "bin.ts")],
   outfile: path.join(dist, "zenvi.mjs"),
   bundle: true,
+  // Native, optional, loaded on first use (subject mattes): resolved next to the bundle at run time.
+  external: ["onnxruntime-node"],
   platform: "node",
   format: "esm",
   target: "node22",

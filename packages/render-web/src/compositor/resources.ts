@@ -52,11 +52,12 @@ export function mediaResources({ media, frames, stills, audio }: MediaResourcesO
       });
     },
 
-    async image(path: string, width: number, height: number, time: number | undefined, mode: DecodeMode): Promise<RgbaImage | null> {
+    async image(path: string, width: number, height: number, time: number | undefined, mode: DecodeMode, lane: string): Promise<RgbaImage | null> {
       const ref: MediaRef = { path };
       if (media.kindOf(ref) !== "av") return stills.rgba(ref, width, height);
-      // A video mask or displacement map: this frame's picture, stretched.
-      const picture = await frames.frame({ ref, sourceTime: time ?? 0, width, height, lane: `image:${path}`, mode });
+      // A video mask or displacement map: this frame's picture, stretched. A
+      // cursor per clip, so clones reading one matte at different times do not seek it back and forth.
+      const picture = await frames.frame({ ref, sourceTime: time ?? 0, width, height, lane: `image:${lane}:${path}`, mode });
       if (!picture) return null;
       try {
         const w = Math.max(1, Math.round(width));

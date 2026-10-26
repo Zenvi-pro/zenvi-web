@@ -26,6 +26,8 @@ export interface CompositeRequest {
   plan: FramePlan;
   layers: (WireImage | null)[];
   images: Array<[string, WireImage]>;
+  /** Per layer index: frames of videos its effects read, by path (`PreparedFrame.layerImages`). */
+  layerImages: (Array<[string, WireImage]> | null)[];
   texts: Array<[string, string]>;
   audio: (KernelAudio | null)[];
   /** The frame needs the font rasterizer (Caption, Timer). */
@@ -56,6 +58,7 @@ async function handle(request: CompositeRequest): Promise<CompositeResponse> {
   const image = compositeFrame(request.plan, {
     layers: request.layers.map((l) => (l ? resolveImage(l) : null)),
     images: new Map(request.images.map(([path, wire]) => [path, resolveImage(wire)])),
+    layerImages: request.layerImages.map((own) => (own ? new Map(own.map(([path, wire]) => [path, resolveImage(wire)])) : null)),
     texts: new Map(request.texts),
     audio: request.audio,
     text: rasterizer,

@@ -14,6 +14,8 @@ export interface CompositeSources {
   layers: readonly (RgbaImage | null | undefined)[];
   /** Masks and effect images by path, natural size. */
   images?: ReadonlyMap<string, RgbaImage>;
+  /** Per layer index: frames of videos its effects read (a video matte), by path, over `images`. */
+  layerImages?: readonly (ReadonlyMap<string, RgbaImage> | null | undefined)[];
   /** LUT texts by path. */
   texts?: ReadonlyMap<string, string>;
   /** Font hook for Caption/Timer. */
