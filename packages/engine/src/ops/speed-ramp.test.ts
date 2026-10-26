@@ -220,6 +220,13 @@ describe("planSpeedRamp / applySpeedRamp", () => {
       expect(refuse(doc, { preset: "velocity", hitAt: 6, fast: 4 }).message).toMatch(/runs out/);
     });
 
+    it("custom points whose media runs out before hit_at", () => {
+      // 4x for 20 s of media is 5 s of clip: the slowest point at 15 s is never reached.
+      const doc = docWithClip(0, 4, 0);
+      const points = [{ atSeconds: 0, speed: 4 }, { atSeconds: 1, speed: 0.2 }, { atSeconds: 2, speed: 4 }];
+      expect(refuse(doc, { preset: "custom", hitAt: 15, points }).message).toMatch(/runs out .* before the slowest point/);
+    });
+
     it("a ramp-out longer than the footage", () => {
       expect(refuse(docWithClip(2, 3), { preset: "ramp_out", rampSeconds: 20 }).message).toMatch(/too short/);
     });
@@ -262,7 +269,8 @@ describe("planSpeedRamp / applySpeedRamp", () => {
     });
 
     it("an unknown clip", () => {
-      expectRefused(docWithClip(), "not_found", () => planSpeedRamp(docWithClip().project, "NOPE", { preset: "hero" }));
+      const doc = docWithClip();
+      expectRefused(doc, "not_found", () => planSpeedRamp(doc.project, "NOPE", { preset: "hero" }));
     });
   });
 });

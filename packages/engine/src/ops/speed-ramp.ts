@@ -420,6 +420,9 @@ export function planSpeedRamp(project: Project, clipId: string, request: RampReq
   // The curve ran the footage out before it finished (ramp_in and ramp_out end that way by design).
   if (stepped.exhausted && preset !== "ramp_in" && preset !== "ramp_out") {
     const seconds = frames / rate;
+    if (endFrame !== undefined && hit !== undefined && seconds < hit) {
+      throw invalid(`The media runs out ${seconds.toFixed(2)} s into the clip, before the slowest point at ${hit.toFixed(2)} s. Lower the speeds before it or pick an earlier hit_at.`);
+    }
     if (endFrame !== undefined) {
       warnings.push(`The media ends ${seconds.toFixed(2)} s into the ramp; the clip is cut there and the last points are not reached.`);
     } else if (hit !== undefined) {
