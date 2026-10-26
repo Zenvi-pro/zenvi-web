@@ -81,6 +81,16 @@ describe("zenvi mcp", () => {
     expect(saved.history.undo.length).toBeGreaterThan(0);
   });
 
+  it("creates a project from a social preset name (W25a E2E bug 9)", async () => {
+    const client = await connect();
+    const opened = await call(client, "open_project_file", { path: "reel", profile: "instagram_reel" });
+    expect(opened.receipt.status).toBe("applied");
+    const saved = JSON.parse(await readFile(path.join(work, "reel.zvn"), "utf8")) as { profile: string; width: number; height: number };
+    expect([saved.profile, saved.width, saved.height]).toEqual(["FHD Vertical 1080p 30 fps", 1080, 1920]);
+    const bad = await call(client, "open_project_file", { path: "bad", profile: "betamax" });
+    expect(bad.receipt.summary).toMatch(/Unknown profile "betamax"/);
+  });
+
   it("picks up edits other processes made to the file", async () => {
     const file = path.join(work, "shared.zvn");
     expect((await zenvi(["new", file], { cwd: work, env: testEnv(home), registry: testRegistry() })).code).toBe(0);

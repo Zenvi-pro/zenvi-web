@@ -15,7 +15,7 @@ import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/pr
 import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { exportCeilingDb, frameContaining, isSequenceFormat, maxFrame, projectAtFrameRate, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
+import { audioCutNote, defaultExportEnd, exportCeilingDb, frameContaining, isSequenceFormat, lastFrameBefore, projectAtFrameRate, type ExportEnd, type ExportResult, type Fraction, type FramePlan, type Project, type RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
 import { SourceManager, type MediaResolver } from "../decode/sources.js";
@@ -90,9 +90,21 @@ function validFps(fps: Fraction | undefined, fallback: Fraction): Fraction {
   return fps && fps.num > 0 && fps.den > 0 ? fps : fallback;
 }
 
-/** 1-based inclusive frame range to export. */
-export function exportFrameRange(project: Project, fps: Fraction, range?: { start: number; end: number }): { first: number; last: number } {
-  if (!range) return { first: 1, last: maxFrame(project, fps) };
+/**
+ * 1-based inclusive frame range to export. With no range, a format with
+ * video ends at the last picture (`defaultExportEnd`); `cut` says what that
+ * left out.
+ */
+export function exportFrameRange(
+  project: Project,
+  fps: Fraction,
+  range?: { start: number; end: number },
+  picture = true,
+): { first: number; last: number; cut?: ExportEnd } {
+  if (!range) {
+    const cut = defaultExportEnd(project, picture);
+    return { first: 1, last: lastFrameBefore(cut.end, fps), cut };
+  }
   const first = frameContaining(Math.max(0, range.start), fps);
   const frames = range.end * (fps.num / fps.den);
   const last = Math.max(0, Math.ceil(frames - 1e-4));
@@ -119,7 +131,7 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
   if (!(width >= 16 && height >= 16 && width <= 16384 && height <= 16384)) {
     throw new RenderError(`Invalid export size ${width}x${height}.`);
   }
-  const { first, last } = exportFrameRange(project, fps, options.range);
+  const { first, last, cut } = exportFrameRange(project, fps, options.range, info.video);
   const frames = last - first + 1;
   if (frames <= 0) throw new RenderError("Nothing to render: the timeline is empty.");
   const fpsValue = fps.num / fps.den;
@@ -148,6 +160,8 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
   const scriptPath = path.join(outDir, `.zenvi-render-${token}.filtergraph`);
 
   const warnings: string[] = [...(engine.limitations ?? [])];
+  const cutNote = cut ? audioCutNote(cut) : null;
+  if (cutNote) warnings.push(`${cutNote[0]!.toUpperCase()}${cutNote.slice(1)}.`);
   const tempDirs: string[] = [];
   const sources = new SourceManager(project, { resolveMedia: opts.resolveMedia, quality: opts.scaleQuality ?? "export", signal });
   let encoder: ReturnType<typeof spawnManaged> | undefined;

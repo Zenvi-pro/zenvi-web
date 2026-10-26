@@ -23,7 +23,7 @@ import {
   type StreamTargetChunk,
   type Target,
 } from "mediabunny";
-import { exportCeilingDb, projectAtFrameRate, TruePeakLimiter, type Project } from "@zenvi/engine";
+import { audioCutNote, defaultExportEnd, exportCeilingDb, lastFrameBefore, projectAtFrameRate, TruePeakLimiter, type Project } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
 import type { ContainerFormat, ExportOptions } from "@zenvi/engine/tools";
 import { mixRange, planHasSound } from "../audio/mixdown.js";
@@ -196,6 +196,21 @@ function audioBufferOf(pcm: readonly Float32Array[], sampleRate: number): AudioB
   return buffer;
 }
 
+/**
+ * The seconds an export covers. An explicit range may run past the last clip
+ * (black, silent frames); without one, video ends with the last picture
+ * (`defaultExportEnd`) and `note` says what sound that left out.
+ */
+export function exportSpan(project: Project, options: Pick<ExportOptions, "format" | "range">, engine: RenderEngine = defaultEngine): { start: number; end: number; note: string | null } {
+  const start = Math.max(0, options.range?.start ?? 0);
+  if (options.range) return { start, end: Math.max(start, options.range.end), note: null };
+  const cut = defaultExportEnd(project, options.format !== "wav");
+  const last = lastFrameBefore(cut.end, project.fps);
+  const end = last > 0 ? engine.frameTime(project, last + 1) : 0;
+  const note = audioCutNote(cut);
+  return { start, end, note: note ? `${note[0]!.toUpperCase()}${note.slice(1)}.` : null };
+}
+
 /** The export pipeline, writing to any Mediabunny target. */
 async function encode(source: Project, media: MediaRegistry, options: ExportOptions, run: ExportRunOptions, target: Target): Promise<{ mimeType: string }> {
   const engine = run.engine ?? defaultEngine;
@@ -206,11 +221,7 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
   // Frames at the export's rate, keyframes rescaled to it (as the desktop's export and render-node do).
   const project = projectAtFrameRate(source, fps);
   const rate = fps.num / fps.den;
-  const last = engine.lastFrame(project);
-  const timelineEnd = last > 0 ? engine.frameTime(project, last + 1) : 0;
-  const start = Math.max(0, options.range?.start ?? 0);
-  // An explicit range may run past the last clip (black, silent frames).
-  const end = options.range ? Math.max(start, options.range.end) : timelineEnd;
+  const { start, end, note } = exportSpan(project, options, engine);
   const frameCount = Math.round((end - start) * rate);
   if (!(frameCount > 0)) throw new ExportError("empty-range", "Nothing to export: the range has no frames");
 
@@ -232,7 +243,8 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
     },
     run.support ?? defaultSupport,
   );
-  if (choice.notes.length > 0) run.onNotes?.(choice.notes, choice);
+  const notes = note ? [note, ...choice.notes] : choice.notes;
+  if (notes.length > 0) run.onNotes?.(notes, choice);
 
   const output = new Output({ format: outputFormat(choice.container), target });
   const frames = choice.videoCodec ? new FrameRenderer({ media, engine, ...(run.svgRasterizer ? { svgRasterizer: run.svgRasterizer } : {}) }) : null;

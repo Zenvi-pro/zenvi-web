@@ -73,7 +73,9 @@ describe("build_reel_tool", () => {
     expect(data.bpm).toBeLessThan(122);
     // The quiet intro is skipped: the music starts in the loud part, on a beat.
     expect(data.music_start).toBeGreaterThanOrEqual(7.9);
-    expect(data.duration).toBeLessThanOrEqual(15);
+    // Rounded up to the bar line after the 15 s asked for (never more than a bar longer).
+    expect(data.duration).toBeGreaterThanOrEqual(15);
+    expect(data.duration).toBeLessThanOrEqual(15 + (4 * 60) / data.bpm + 0.05);
     expect(data.shots[data.shots.length - 1]!.file_id).toBe("STRIKEXXXX");
     expect(data.brief.format).toMatch(/vertical 9:16/);
     expect(data.brief.story).toMatch(/^huddle.*ends on strike$/);
