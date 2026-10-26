@@ -57,6 +57,22 @@ describe("typeset", () => {
     expect(typeset(lib, "Optical", { family: "inter", size: 80 }).width).toBeCloseTo(display.width, 3);
   });
 
+  it("varies every point of tuples that move all points (Inter's D and J, gvar.ts)", () => {
+    // fontTools instancer at wght 700, ControlBoundsPen, font units: [xMin, yMin, xMax, yMax].
+    const expected: Record<string, number[]> = {
+      D: [134.6, 0, 1385.2, 1490],
+      J: [67.6, -20, 1061.9, 1490],
+      é: [81.3, -21.8, 1142.6, 1571],
+    };
+    for (const [char, bounds] of Object.entries(expected)) {
+      const block = typeset(lib, char, { family: "inter", size: 2048, weight: 700, opticalSize: "off" });
+      const ink = inkBox(block.glyphs)!;
+      const base = block.glyphs[0]!.baseline;
+      const got = [ink.x, base - ink.y - ink.height, ink.x + ink.width, base - ink.y];
+      got.forEach((v, i) => expect(Math.abs(v - bounds[i]!), `${char} ${i}`).toBeLessThan(1.5));
+    }
+  });
+
   it("adds tracking between glyphs, not after the last", () => {
     const base = typeset(lib, "ABC", { family: "inter", size: 100 });
     const tracked = typeset(lib, "ABC", { family: "inter", size: 100, tracking: 0.1 });

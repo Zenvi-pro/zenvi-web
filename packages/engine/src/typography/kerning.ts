@@ -11,35 +11,10 @@
  * kerning is used at every weight).
  */
 
+import { reader, tableOffset, type Reader } from "./sfnt.js";
+
 /** Kerning between two glyph ids, font units. */
 export type KerningLookup = (left: number, right: number) => number;
-
-interface Reader {
-  u16(at: number): number;
-  i16(at: number): number;
-  u32(at: number): number;
-  tag(at: number): string;
-}
-
-function reader(bytes: Uint8Array): Reader {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  return {
-    u16: (at) => view.getUint16(at),
-    i16: (at) => view.getInt16(at),
-    u32: (at) => view.getUint32(at),
-    tag: (at) => String.fromCharCode(view.getUint8(at), view.getUint8(at + 1), view.getUint8(at + 2), view.getUint8(at + 3)),
-  };
-}
-
-/** Offset of a table in the font file, or -1. */
-function tableOffset(r: Reader, tag: string): number {
-  const count = r.u16(4);
-  for (let i = 0; i < count; i += 1) {
-    const rec = 12 + i * 16;
-    if (r.tag(rec) === tag) return r.u32(rec + 8);
-  }
-  return -1;
-}
 
 /** Bytes of a value record of `format`. */
 const valueSize = (format: number): number => {

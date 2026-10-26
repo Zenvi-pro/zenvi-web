@@ -3,11 +3,13 @@
  * advances in font units (y up), pair kerning, vertical metrics.
  *
  * Variable faces (Inter: `wght` 100-900, `opsz` 14-32) are instanced through
- * opentype.js's gvar support; a face without a real italic is slanted 12°
+ * opentype.js's gvar support (repaired where it misreads all-points
+ * tuples, gvar.ts); a face without a real italic is slanted 12°
  * (`slant`), as browsers synthesize an oblique.
  */
 
 import type { Font, Glyph, PathCommand } from "./opentype.js";
+import { repairGlyph, type AllPointTuples } from "./gvar.js";
 import type { KerningLookup } from "./kerning.js";
 
 /** A glyph ready to set: its id, advance and outline, font units, y up. */
@@ -27,15 +29,20 @@ export class Face {
   readonly capHeight: number;
   readonly xHeight: number;
   private readonly glyphs = new Map<string, GlyphShape | null>();
+  private readonly font: Font;
+  private readonly kerning: KerningLookup;
 
   constructor(
-    private readonly font: Font,
-    private readonly kerning: KerningLookup,
+    /** The parsed file: its font, kerning and gvar repairs (gvar.ts). */
+    private readonly file: { font: Font; kerning: KerningLookup; allPoints: AllPointTuples; repaired: Set<number> },
     /** Variation coordinates of a variable face (null: the default instance). */
     private readonly coords: Readonly<Record<string, number>> | null,
     /** Horizontal shear of the outlines (tan of the angle): 0, or OBLIQUE for a synthesized italic. */
     readonly slant: number,
   ) {
+    const font = file.font;
+    this.font = font;
+    this.kerning = file.kerning;
     const os2 = (font.tables.os2 ?? {}) as { sTypoAscender?: number; sTypoDescender?: number; sCapHeight?: number; sxHeight?: number };
     this.unitsPerEm = font.unitsPerEm;
     this.ascender = font.ascender;
@@ -51,7 +58,10 @@ export class Face {
     let shape: GlyphShape | null = null;
     if (this.font.hasChar(char)) {
       let glyph: Glyph = this.font.charToGlyph(char);
-      if (this.coords && this.font.variation) glyph = this.font.variation.getTransform(glyph, { ...this.coords });
+      if (this.coords && this.font.variation) {
+        repairGlyph(this.font, glyph, this.file.allPoints, this.file.repaired);
+        glyph = this.font.variation.getTransform(glyph, { ...this.coords });
+      }
       const commands = this.slant ? glyph.path.commands.map((c) => shear(c, this.slant)) : glyph.path.commands;
       shape = { index: glyph.index, advance: glyph.advanceWidth ?? 0, commands };
     }
