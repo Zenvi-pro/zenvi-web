@@ -50,11 +50,17 @@ async function* frames(stream: AsyncIterable<Buffer>, size: number): AsyncGenera
   }
 }
 
+/** Write with backpressure; rejects when the encoder goes away instead of waiting for a drain that never comes. */
 function write(stream: NodeJS.WritableStream, bytes: Uint8Array): Promise<void> {
   return new Promise((resolve, reject) => {
+    const gone = () => reject(new Error("the matte encoder stopped"));
     const ok = stream.write(bytes, (error) => (error ? reject(error) : undefined));
-    if (ok) resolve();
-    else stream.once("drain", resolve);
+    if (ok) return resolve();
+    stream.once("close", gone);
+    stream.once("drain", () => {
+      stream.removeListener("close", gone);
+      resolve();
+    });
   });
 }
 
