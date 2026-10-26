@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { alignRing, centroid, circle, morphRings, perimeter, prepareMorph, resampleRing, ringsPath, roundRect, signedArea, star, toOutline, transformRing } from "./morph.js";
 import { traceContours } from "./outline.js";
+import type { Point } from "./morph.js";
 
 const square = (s: number, x = 0, y = 0) => transformRing(roundRect(s, s, 0, 1), { x, y });
 
@@ -76,6 +77,36 @@ describe("prepareMorph / morphRings", () => {
     expect(early[1]).toBe(m.pairs[1]![0]);
     expect(early[0]).not.toBe(m.pairs[0]![0]);
     expect(morphRings(m, 1, { delay })[1]).toBe(m.pairs[1]![1]);
+  });
+});
+
+describe("prepareMorph counters", () => {
+  /** Nonzero winding number of `rings` around `p` (0: unfilled). */
+  const winding = (rings: Point[][], p: Point): number =>
+    rings.reduce((w, r) => {
+      let n = 0;
+      for (let i = 0; i < r.length; i += 1) {
+        const a = r[i]!;
+        const b = r[(i + 1) % r.length]!;
+        const side = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
+        if (a.y <= p.y && b.y > p.y && side > 0) n += 1;
+        else if (a.y > p.y && b.y <= p.y && side < 0) n -= 1;
+      }
+      return w + n;
+    }, 0);
+  // An "o" (square with a counter) and an "l", against three bars: the "o" splits (or the bars merge into it).
+  const ol = toOutline([square(10), square(4), square(10, 30)]);
+  const bars = toOutline([square(8, -20), square(8), square(8, 20)]);
+  const counter = { x: 0, y: 0.3 };
+
+  it("keeps a splitting letter's counter open at the start", () => {
+    expect(winding(morphRings(prepareMorph(ol, bars), 0), counter)).toBe(0);
+    expect(winding(morphRings(prepareMorph(ol, bars), 0.02), counter)).toBe(0);
+  });
+
+  it("opens a counter in a letter several rings merge into at the end", () => {
+    expect(winding(morphRings(prepareMorph(bars, ol), 1), counter)).toBe(0);
+    expect(winding(morphRings(prepareMorph(bars, ol), 0.98), counter)).toBe(0);
   });
 });
 

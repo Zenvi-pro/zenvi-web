@@ -149,28 +149,60 @@ function byPosition(rings: Point[][]): Point[][] {
   return rings.map((r) => ({ r, c: centroid(r) })).sort((a, b) => a.c.x - b.c.x || a.c.y - b.c.y).map((e) => e.r);
 }
 
-function pairUp(from: Point[][], to: Point[][], spacing: number, out: [Point[], Point[]][]): void {
-  const a = byPosition(from);
-  const b = byPosition(to);
+function pair(ra: Point[] | undefined, rb: Point[] | undefined, spacing: number): [Point[], Point[]] {
+  const n = Math.max(24, Math.min(400, Math.ceil(Math.max(ra ? perimeter(ra) : 0, rb ? perimeter(rb) : 0) / spacing)));
+  // No partner: collapse to (or grow from) a point at the ring's centre.
+  const sa = ra ? resampleRing(ra, n) : new Array<Point>(n).fill(centroid(rb!));
+  const sb = rb ? resampleRing(rb, n) : new Array<Point>(n).fill(centroid(ra!));
+  return [sa, ra && rb ? alignRing(sa, sb) : sb];
+}
+
+/**
+ * Pair rings by position. With `reuse`, the side with fewer rings maps
+ * proportionally (neighbours split from, or merge into, one ring); without,
+ * a ring is used once and the extra pairs grow from (or collapse to) points.
+ * Returns how many pairs each ring of `a` and of `b` is in.
+ */
+function pairUp(a: Point[][], b: Point[][], reuse: boolean, spacing: number, out: [Point[], Point[]][]): [number[], number[]] {
   const k = Math.max(a.length, b.length);
+  const usesA = a.map(() => 0);
+  const usesB = b.map(() => 0);
   for (let i = 0; i < k; i += 1) {
-    // Proportional mapping: with fewer rings on one side, neighbours split from (or merge into) one ring.
-    const ra = a.length > 0 ? a[Math.floor((i * a.length) / k)]! : undefined;
-    const rb = b.length > 0 ? b[Math.floor((i * b.length) / k)]! : undefined;
-    const n = Math.max(24, Math.min(400, Math.ceil(Math.max(ra ? perimeter(ra) : 0, rb ? perimeter(rb) : 0) / spacing)));
-    // No partner: collapse to (or grow from) a point at the ring's centre.
-    const sa = ra ? resampleRing(ra, n) : new Array<Point>(n).fill(centroid(rb!));
-    const sb = rb ? resampleRing(rb, n) : new Array<Point>(n).fill(centroid(ra!));
-    out.push([sa, ra && rb ? alignRing(sa, sb) : sb]);
+    const ia = Math.floor((i * a.length) / k);
+    const ib = Math.floor((i * b.length) / k);
+    const ra = a.length > 0 && (reuse || usesA[ia] === 0) ? a[ia] : undefined;
+    const rb = b.length > 0 && (reuse || usesB[ib] === 0) ? b[ib] : undefined;
+    if (ra) usesA[ia]! += 1;
+    if (rb) usesB[ib]! += 1;
+    out.push(pair(ra, rb, spacing));
   }
+  return [usesA, usesB];
+}
+
+/**
+ * Each hole as many times as the smallest solid around it is used: a solid
+ * that splits into two copies needs two copies of its counters, or under
+ * nonzero fill the copies (+2) outweigh the one hole (−1) and fill it.
+ */
+function holesFor(solids: Point[][], uses: number[], holes: Point[][]): Point[][] {
+  return holes.flatMap((h) => {
+    let best = -1;
+    for (let i = 0; i < solids.length; i += 1) {
+      if (contains(solids[i]!, h[0]!) && (best < 0 || Math.abs(signedArea(solids[i]!)) < Math.abs(signedArea(solids[best]!)))) best = i;
+    }
+    return new Array<Point[]>(Math.max(1, best >= 0 ? uses[best]! : 1)).fill(h);
+  });
 }
 
 /** Prepare a morph from one outline to another (build time; seeking is cheap). */
 export function prepareMorph(from: Outline, to: Outline, options: MorphOptions = {}): Morph {
   const spacing = options.spacing ?? 6;
   const pairs: [Point[], Point[]][] = [];
-  pairUp(from.solids, to.solids, spacing, pairs);
-  pairUp(from.holes, to.holes, spacing, pairs);
+  const a = byPosition(from.solids);
+  const b = byPosition(to.solids);
+  const [usesA, usesB] = pairUp(a, b, true, spacing, pairs);
+  // Holes are each used once per copy (reusing one would wind −2 against a solid's +1, filling it).
+  pairUp(byPosition(holesFor(a, usesA, from.holes)), byPosition(holesFor(b, usesB, to.holes)), false, spacing, pairs);
   return { pairs };
 }
 
