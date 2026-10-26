@@ -134,12 +134,20 @@ interface PlaybackStats {
   slowEvents: { count: number; worst: number };
 }
 
+/** Raw series for charts: animation-frame times and long tasks (start, duration), ms from play. */
+interface PlaybackTrace {
+  raf: number[];
+  longTasks: [number, number][];
+}
+
 /** Play `ms` of the open project while typing into a text field; main-thread numbers plus frames presented. */
-async function playAndType(page: Page, ms: number): Promise<PlaybackStats> {
+async function playAndType(page: Page, ms: number): Promise<PlaybackStats & { trace: PlaybackTrace }> {
   type Debug = { __zenvi: { session: { play: () => void; pause: () => void; engine: { stats?: () => { presented: number; worker: boolean; scale: number } } } } };
   const recording = page.evaluate(async (duration) => {
     const intervals: number[] = [];
+    const stamps: number[] = [];
     const longTasks: number[] = [];
+    const taskSpans: [number, number][] = [];
     const slowEvents: number[] = [];
     const delays: number[] = [];
     const field = document.createElement("input");
@@ -152,12 +160,16 @@ async function playAndType(page: Page, ms: number): Promise<PlaybackStats> {
     let running = true;
     const loop = (t: number) => {
       intervals.push(t - last);
+      stamps.push(t);
       last = t;
       if (running) requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
     const tasks = new PerformanceObserver((list) => {
-      for (const e of list.getEntries()) longTasks.push(Math.round(e.duration));
+      for (const e of list.getEntries()) {
+        longTasks.push(Math.round(e.duration));
+        taskSpans.push([e.startTime, e.duration]);
+      }
     });
     const events = new PerformanceObserver((list) => {
       for (const e of list.getEntries()) if (e.name === "keydown" || e.name === "keypress" || e.name === "input") slowEvents.push(Math.round(e.duration));
@@ -188,7 +200,9 @@ async function playAndType(page: Page, ms: number): Promise<PlaybackStats> {
       return Math.round((sorted[Math.min(sorted.length - 1, Math.floor(at * sorted.length))] ?? 0) * 10) / 10;
     };
     const frames = intervals.slice(2);
+    const trace = { raf: stamps.map((t) => Math.round(t - started)), longTasks: taskSpans.map(([at, d]): [number, number] => [Math.round(at - started), Math.round(d)]) };
     return {
+      trace,
       worker,
       playbackScale,
       presentedFps: Math.round((presented / (elapsed / 1000)) * 10) / 10,
@@ -207,6 +221,7 @@ async function playAndType(page: Page, ms: number): Promise<PlaybackStats> {
 test.describe("heavy effects preview", () => {
   test("a 1080p timeline with Blur + ColorShift + Glow on every clip plays without blocking typing", async ({ browser }) => {
     const report: Record<string, PlaybackStats> = {};
+    const traces: Record<string, PlaybackTrace> = {};
     // "main" composites on the main thread (the fallback); "auto" is what the editor picks (a Worker where supported).
     for (const mode of ["main", "auto"] as const) {
       const context = await browser.newContext({ viewport: { width: 2560, height: 1440 }, deviceScaleFactor: 1 });
@@ -246,10 +261,14 @@ test.describe("heavy effects preview", () => {
       });
       await expect(page.locator('[data-kind="clip"]')).toHaveCount(4);
       await page.waitForTimeout(1500);
-      report[mode] = await playAndType(page, 6000);
+      const { trace, ...stats } = await playAndType(page, 6000);
+      report[mode] = stats;
+      traces[mode] = trace;
       await context.close();
     }
     writeFileSync(join(shots, "perf-heavy.json"), `${JSON.stringify(report, null, 2)}\n`);
+    // ZENVI_PERF_TRACE=<file> keeps the raw series too (frame-time charts).
+    if (process.env.ZENVI_PERF_TRACE) writeFileSync(process.env.ZENVI_PERF_TRACE, JSON.stringify({ report, traces }));
     console.log(JSON.stringify(report));
     // The Worker path must keep the main thread free and present at least as many frames
     // (a little slack: the two runs share one loaded machine).

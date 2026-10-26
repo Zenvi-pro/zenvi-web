@@ -19,11 +19,11 @@ describe("AdaptiveScale", () => {
     expect(run(scale, 20, 40).every((s) => s === 1)).toBe(true);
   });
 
-  it("jumps to the largest scale predicted to fit, after a few frames", () => {
+  it("jumps to the largest scale predicted to fit, after two frames", () => {
     const scale = new AdaptiveScale();
     const seen = run(scale, 4 * BUDGET, 20);
     // 4× over budget: half the linear size is a quarter of the pixels.
-    expect(seen.slice(0, 3)).toEqual([1, 1, 1]);
+    expect(seen[0]).toBe(1);
     expect(seen.at(-1)).toBe(0.5);
   });
 

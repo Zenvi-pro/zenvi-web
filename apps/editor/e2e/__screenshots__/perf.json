@@ -9,10 +9,10 @@
     "longTasks": []
   },
   "scroll": {
-    "frames": 178,
+    "frames": 169,
     "p50": 16.7,
-    "p95": 16.7,
-    "worst": 49.9,
+    "p95": 16.8,
+    "worst": 166.6,
     "longTasks": []
   }
 }

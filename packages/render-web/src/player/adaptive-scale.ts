@@ -10,7 +10,7 @@
 export const PLAYBACK_SCALES = [1, 0.75, 0.5, 0.375] as const;
 
 /** Frames measured after a change before deciding again (decoders and caches settle). */
-const SETTLE_FRAMES = 4;
+const SETTLE_FRAMES = 2;
 /** Smoothing of the per-frame cost. */
 const WEIGHT = 0.3;
 
