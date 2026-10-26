@@ -163,14 +163,23 @@ async function analyseMusic(call: ToolCall, bed: Clip | undefined, args: AutoInp
   };
 }
 
+const FAMILY_WORDS: Record<SfxFamily, [string, string]> = {
+  whoosh: ["whoosh", "whooshes"],
+  impact: ["hit", "hits"],
+  riser: ["riser", "risers"],
+  transition: ["swoosh-hit", "swoosh-hits"],
+  click: ["click", "clicks"],
+  ui: ["UI sound", "UI sounds"],
+  texture: ["texture", "textures"],
+};
+
 function familyCounts(cues: readonly SfxCue[]): string {
-  const counts = new Map<string, number>();
+  const counts = new Map<SfxFamily, number>();
   for (const cue of cues) {
     const family = sfxRecipe(cue.recipe)!.family;
-    const word = family === "whoosh" ? "whooshes" : family === "impact" ? "hits" : family === "riser" ? "risers" : family === "transition" ? "swoosh-hits" : "clicks and accents";
-    counts.set(word, (counts.get(word) ?? 0) + 1);
+    counts.set(family, (counts.get(family) ?? 0) + 1);
   }
-  return [...counts].map(([word, n]) => `${n} ${word}`).join(", ");
+  return [...counts].map(([family, n]) => `${n} ${FAMILY_WORDS[family][n === 1 ? 0 : 1]}`).join(", ");
 }
 
 export const soundDesignTools: CatalogTool[] = [
@@ -304,7 +313,10 @@ export const soundDesignTools: CatalogTool[] = [
         if (previous.length > 0) deleteClips(tx, previous.map((c) => c.id), { ripple: false });
         const rows: { clip: Clip; cue: SfxCue }[] = [];
         cues.forEach((cue, i) => {
-          const clip = placeSfx(tx, sounds[i]!, { at: cue.at, align: "peak", gainDb: cue.gainDb, auto: true, reason: cue.reason });
+          // A moment too close to the start for the sound's lead-in starts the sound instead of cutting into it.
+          const sound = sounds[i]!;
+          const align = cue.at >= sound.hit ? "peak" : "start";
+          const clip = placeSfx(tx, sound, { at: cue.at, align, gainDb: cue.gainDb, auto: true, reason: cue.reason });
           if (clip) rows.push({ clip, cue });
         });
         const removedFiles = removeUnusedSfxFiles(tx);

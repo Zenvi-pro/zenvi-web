@@ -139,7 +139,7 @@ function noiseRiser(v: Voice, level: number): void {
   for (let i = 0; i < v.out.length; i += 1) {
     const t = i / s;
     const x = t / d;
-    const env = expCurve(x, 3.2) * clamp01((d - t) / 0.004);
+    const env = expCurve(x, 2.4) * clamp01((d - t) / 0.004);
     const fc = expLerp(260, 9000, Math.pow(x, 1.3)) * v.tune * v.bright;
     const q = lerp(0.9, 3.2, x);
     tremPhase += (4 + 22 * x * x) / s;
@@ -168,7 +168,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Fast cuts and quick slides (0.2-0.5 s moves): peak on the cut. The everyday transition sound; vary pitch and seed so a run of them does not machine-gun.",
     hit: "peak",
     duration: { default: 0.45, min: 0.2, max: 1 },
-    mixDb: -10,
+    mixDb: -9,
     render: (v) => whooshRecipe(v, { peak: 0.58, riseK: 3, fall: 0.18, low: 260, high: 2600, q: 1.5, air: 0.4, roar: 0.15, flutter: 0.2 }),
   },
   {
@@ -178,7 +178,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Push-ins, slides and transitions of about half a second to a second; the default for a cut between two moving shots.",
     hit: "peak",
     duration: { default: 0.85, min: 0.4, max: 1.6 },
-    mixDb: -11,
+    mixDb: -10,
     render: (v) => whooshRecipe(v, { peak: 0.6, riseK: 3.2, fall: 0.16, low: 170, high: 2200, q: 1.3, air: 0.35, roar: 0.35, flutter: 0.3 }),
   },
   {
@@ -188,7 +188,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Slow zoom-throughs, camera fly-bys, a title sweeping across a held shot (1-3 s). Too long for fast cutting: it smears the rhythm.",
     hit: "peak",
     duration: { default: 1.7, min: 0.9, max: 3.5 },
-    mixDb: -12,
+    mixDb: -11,
     render: (v) => whooshRecipe(v, { peak: 0.62, riseK: 3.6, fall: 0.15, low: 110, high: 1900, q: 1.1, air: 0.3, roar: 0.6, flutter: 0.45 }),
   },
   {
@@ -198,7 +198,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Something arriving: a card flying in, a zoom that lands on the cut. Builds to the end; put its end on the moment of arrival.",
     hit: "peak",
     duration: { default: 0.9, min: 0.3, max: 2.5 },
-    mixDb: -11,
+    mixDb: -10,
     render: (v) => whooshRecipe(v, { peak: 0.9, riseK: 3.8, fall: 0.05, low: 150, high: 3200, q: 1.4, air: 0.45, roar: 0.25, flutter: 0.25 }),
   },
   {
@@ -208,7 +208,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Something leaving: an element flying out, a zoom-out after a hit. Loudest at the start, trails away; put its start on the exit.",
     hit: "peak",
     duration: { default: 0.9, min: 0.3, max: 2.5 },
-    mixDb: -11,
+    mixDb: -10,
     render: (v) => whooshRecipe(v, { peak: 0.07, riseK: 1, fall: 0.25, low: 140, high: 2800, q: 1.3, air: 0.35, roar: 0.3, flutter: 0.3 }),
   },
   {
@@ -218,7 +218,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Light motion: text sliding, UI panels, a card flip, a cloth-like swipe. Thin and bright, it sits above music without muddying it.",
     hit: "peak",
     duration: { default: 0.35, min: 0.15, max: 0.8 },
-    mixDb: -13,
+    mixDb: -12,
     render: (v) => whooshRecipe(v, { peak: 0.5, riseK: 2.5, fall: 0.14, low: 1400, high: 6500, q: 2.2, air: 0.9, roar: 0, flutter: 0.35 }),
   },
   {
@@ -228,7 +228,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Whip pans and smash cuts between shots: a very fast sweep that snaps at the peak. Peak exactly on the cut; one per whip, not on ordinary cuts.",
     hit: "peak",
     duration: { default: 0.32, min: 0.15, max: 0.7 },
-    mixDb: -10,
+    mixDb: -9,
     render: (v) => {
       const peak = whooshRecipe(v, { peak: 0.55, riseK: 5, fall: 0.09, low: 300, high: 3600, q: 1.6, air: 0.7, roar: 0.25, flutter: 0.15 });
       crack(v, peak, 0.35 + 0.35 * v.intensity);
@@ -344,7 +344,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Tension into a drop, a reveal or the climax: filtered noise sweeping up, accelerating flutter, ends abruptly on the hit. Put its end on the moment and an impact right after it.",
     hit: "end",
     duration: { default: 2.5, min: 1, max: 8 },
-    mixDb: -12,
+    mixDb: -10,
     render: (v) => {
       noiseRiser(v, 1);
       return v.duration;
@@ -357,7 +357,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "Hype builds: a detuned saw stack gliding up an octave or more with an opening filter. Musical, so keep it for edits whose music has no build of its own.",
     hit: "end",
     duration: { default: 2.5, min: 1, max: 8 },
-    mixDb: -14,
+    mixDb: -12,
     render: (v) => {
       const d = v.duration;
       const s = sr(v);
@@ -391,7 +391,7 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     use: "A breath before the hit: a reversed reverb tail that swells into the cut. Softer than a riser; good into a title reveal or a slow-motion moment.",
     hit: "end",
     duration: { default: 1.6, min: 0.6, max: 4 },
-    mixDb: -12,
+    mixDb: -11,
     render: (v) => {
       const d = v.duration;
       noiseBurst(v, { at: 0.002, mode: "band", freq: 1400, freqEnd: 600, q: 0.7, attack: 0.001, decay: 0.05, level: 0.9, width: 0.6, pink: true });

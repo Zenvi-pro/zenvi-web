@@ -190,7 +190,8 @@ describe("auto_sound_design_tool", () => {
       expect(c.gain_db).toBeGreaterThanOrEqual(-16);
       // Every hit lands on its moment.
       const clip = clips.find((x) => x.id === c.clip_id)!;
-      expect(clip.position - clip.start + hitOf(doc, clip)).toBeCloseTo(c.at, 6);
+      if (c.at >= hitOf(doc, clip)) expect(clip.position - clip.start + hitOf(doc, clip)).toBeCloseTo(c.at, 6);
+      else expect(clip.position).toBeCloseTo(c.at, 6);
     }
     expect(new Set(d.cues.map((c) => c.recipe)).size).toBeGreaterThan(3);
   });

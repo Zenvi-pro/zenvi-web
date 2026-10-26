@@ -98,18 +98,19 @@ function limitWidth(buffer: StereoBuffer): void {
   }
 }
 
-function finish(buffer: StereoBuffer): void {
+function finish(buffer: StereoBuffer, fadeOutSeconds: number): void {
   const sr = buffer.sampleRate;
   const dc = [new Svf(sr), new Svf(sr)];
   const fadeIn = Math.min(buffer.length, 24);
-  const fadeOut = Math.min(buffer.length, Math.round(0.008 * sr));
+  const fadeOut = Math.min(buffer.length, Math.max(1, Math.round(fadeOutSeconds * sr)));
   const channels = [buffer.left, buffer.right];
   channels.forEach((ch, c) => {
     for (let i = 0; i < ch.length; i += 1) {
       let x = dc[c]!.highpass(ch[i]!, 16);
       if (i < fadeIn) x *= i / fadeIn;
       const fromEnd = ch.length - 1 - i;
-      if (fromEnd < fadeOut) x *= fromEnd / fadeOut;
+      // Raised-cosine fade: a tail cut short never clicks.
+      if (fromEnd < fadeOut) x *= 0.5 - 0.5 * Math.cos((Math.PI * fromEnd) / fadeOut);
       ch[i] = Number.isFinite(x) ? x : 0;
     }
   });
@@ -140,7 +141,8 @@ export function renderSfx(recipeId: string, params: SfxParams = {}): SfxAudio {
     duration: p.duration,
   };
   const hit = recipe.render(voice);
-  finish(out);
+  // A riser ends dead on its hit; everything else fades its tail out, never into the hit.
+  finish(out, recipe.hit === "end" ? 0.004 : Math.max(0.004, Math.min(p.duration * 0.15, p.duration - hit - 0.005)));
   return { recipe: recipe.id, params: p, sampleRate, left: out.left, right: out.right, hit: Math.min(Math.max(hit, 0), p.duration), duration: out.length / sampleRate };
 }
 
