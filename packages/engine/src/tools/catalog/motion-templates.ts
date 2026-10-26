@@ -150,16 +150,16 @@ export function planOverlayStack(project: Project, start: number, end: number, c
   return { layers, created };
 }
 
-function ensureTrack(tx: Transaction, layer: number): void {
+function ensureTrack(tx: Transaction, layer: number, label: string): void {
   if (findLayer(tx.project, layer)) return;
   const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
-  tx.insert(["layers"], createLayer(layer, id, TRACK_LABEL));
+  tx.insert(["layers"], createLayer(layer, id, label));
 }
 
 /** Prepared drawing files, by layer name. */
-type Written = Map<string, ImportedMedia>;
+export type Written = Map<string, ImportedMedia>;
 
-async function writeDrawings(call: ToolCall, plan: MotionPlan, prefix: string): Promise<Written | string> {
+export async function writeDrawings(call: ToolCall, plan: MotionPlan, prefix: string): Promise<Written | string> {
   const media = call.host.media!;
   const out: Written = new Map();
   for (const layer of plan.layers) {
@@ -176,8 +176,17 @@ async function writeDrawings(call: ToolCall, plan: MotionPlan, prefix: string): 
 }
 
 /** Place a plan's layers (inside a transaction). Returns the clip of each layer. */
-export function placeMotionPlan(tx: Transaction, plan: MotionPlan, written: Written, position: number, fps: number, tracks: readonly number[], title: string): { layer: MotionLayer; clip: Clip; fileId: string }[] {
-  for (const layer of tracks) ensureTrack(tx, layer);
+export function placeMotionPlan(
+  tx: Transaction,
+  plan: MotionPlan,
+  written: Written,
+  position: number,
+  fps: number,
+  tracks: readonly number[],
+  title: string,
+  trackLabel = TRACK_LABEL,
+): { layer: MotionLayer; clip: Clip; fileId: string }[] {
+  for (const layer of tracks) ensureTrack(tx, layer, trackLabel);
   const nextId = idFactory(tx.project);
   const placed: { layer: MotionLayer; clip: Clip; fileId: string }[] = [];
   for (const layer of plan.layers) {
