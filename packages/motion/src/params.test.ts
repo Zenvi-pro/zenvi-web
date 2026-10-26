@@ -29,6 +29,9 @@ describe("block manifests", () => {
       }
       const checked = checkParams(b, {});
       expect(checked.ok ? "ok" : checked.error, b.id).toBe("ok");
+      // The renderer checks the filled params again: every default must pass its own limits.
+      const again = checked.ok ? checkParams(b, checked.params) : checked;
+      expect(again.ok ? "ok" : again.error, `${b.id} defaults`).toBe("ok");
     }
   });
 });
@@ -73,6 +76,14 @@ describe("checkParams", () => {
     expect(checkParams(block, { style: "spin" })).toMatchObject({ ok: false, error: "style must be one of odometer, count" });
     expect(checkParams(block, { values: [] })).toMatchObject({ ok: false, error: "values needs at least 1 items" });
     expect(checkParams(block, { label: "x".repeat(61) })).toMatchObject({ ok: false, error: "label is longer than 60 characters" });
+  });
+
+  it("takes an enum's old names and the wrong plural (bench sessions sent shape=dot and square)", () => {
+    const burst = getBlock("particle_burst")!;
+    expect(checkParams(burst, { shape: "dot" })).toMatchObject({ ok: true, params: { shape: "dots" } });
+    expect(checkParams(burst, { shape: "Square" })).toMatchObject({ ok: true, params: { shape: "confetti" } });
+    expect(checkParams(burst, { shape: "spark" })).toMatchObject({ ok: true, params: { shape: "sparks" } });
+    expect(checkParams(burst, { shape: "toString" })).toMatchObject({ ok: false, error: expect.stringContaining("shape must be one of sparks") });
   });
 
   it("keeps a text value that happens to start with the param's name", () => {
