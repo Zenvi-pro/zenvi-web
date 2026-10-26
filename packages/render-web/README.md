@@ -109,8 +109,13 @@ new PreviewPlayer(canvas: HTMLCanvasElement | OffscreenCanvas, {
   registry, filled from the page's `MediaRegistry` on first use and dropped entry by entry when the
   page's bytes change; URL refresh, custom `fetch` and SVG rasterization call back to the page. A
   canvas is transferred once: later players on the same canvas and worker (a remount) reuse it. The
-  worker uses the default engine (`engine` only drives the page-side clock). Without `worker`
-  everything runs on the page, as before.
+  worker uses the default engine (`engine` only drives the page-side clock). If the worker fails to
+  start (an `error` before its first message, or no answer to `open` within 15 s), loses a message
+  (`messageerror`) or stays silent for 8 s while a frame is pending (pings unanswered: terminated or
+  crashed), the player warns once on the console and carries on on the page: pending `seek`s resolve
+  there, and the transferred canvas is hidden behind a stand-in `<canvas>` with its attributes. Later
+  players on that worker render on the page at once. An uncaught exception in a running worker is
+  reported as a `render` error. Without `worker` everything runs on the page, as before.
 - **Adaptive resolution.** With `adaptiveResolution`, playback frames that take longer than a
   frame lasts are planned in a smaller box (0.75, 0.5, then 0.375 of the canvas) and scaled up;
   cheap frames grow it back. Paused frames, seeks and scrubs always render at full resolution.
