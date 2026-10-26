@@ -73,6 +73,10 @@ describe("planSoundDesign", () => {
     const line = plan.cues.filter((c) => c.recipe !== "sub_drop").sort((a, b) => a.at - b.at);
     for (let i = 1; i < line.length; i += 1) expect(line[i]!.recipe, `${line[i]!.at}`).not.toBe(line[i - 1]!.recipe);
     expect(sfxRecipe(plan.cues.find((c) => Math.abs(c.at - 4.1) < 1e-6)!.recipe)!.family).toBe("whoosh");
+    // Plain cuts alternate light hits and short whooshes.
+    for (const cue of plan.cues.filter((c) => c.reason === "cut (light hit)")) expect(sfxRecipe(cue.recipe)!.family).toBe("impact");
+    const cutWhooshes = plan.cues.filter((c) => c.reason === "cut" && sfxRecipe(c.recipe)!.family === "whoosh");
+    expect(Math.abs(cutWhooshes.length - plan.cues.filter((c) => c.reason === "cut (light hit)").length)).toBeLessThanOrEqual(1);
     for (const at of [0.6, 7.9]) expect(["click", "ui", "impact"]).toContain(sfxRecipe(plan.cues.find((c) => Math.abs(c.at - at) < 1e-6)!.recipe)!.family);
     // Light hits sit under the strong ones.
     const light = plan.cues.filter((c) => c.reason === "cut (light hit)");

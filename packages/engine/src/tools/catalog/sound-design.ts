@@ -86,7 +86,7 @@ const autoInput = z.strictObject({
     .enum(SFX_DENSITIES)
     .optional()
     .describe(
-      "auto (default): the intensity's own spacing. every_cut: a sound on every cut, as hype edits have it (build_reel_tool's hype receipt asks for it): light hits and short whooshes alternate on the cuts, whooshes on whips, clicks on flashes and title slams, no sound twice in a row.",
+      "auto (default): the intensity's own spacing. every_cut: a sound on every cut, as hype edits have it (build_reel_tool's hype receipt asks for it): light hits and short whooshes alternating on the cuts, whooshes on whips, clicks on flashes and title slams, no sound twice in a row.",
     ),
   seed: z.number().int().optional().describe("Another variation of the whole design (default 1)."),
   beats: z

@@ -17,10 +17,11 @@
  *     shorter (placement cuts and fades whatever still runs over).
  *
  * The hype references put a sound on 90-100 % of their cuts: density
- * "every_cut" keeps every moment the 80 ms rule allows, alternating a light
- * hit and a short whoosh on plain cuts, whooshes on transitions (whips),
- * clicks on flashes and title slams (an impact where one may land), and no
- * recipe twice in a row.
+ * "every_cut" keeps every moment the 80 ms rule allows: plain cuts alternate
+ * a light hit and a short whoosh (hits on every cut smear into one roar at
+ * 0.25 s a shot: on the trailer demo 74 % of cuts land on a heard onset,
+ * alternating 88 %), whooshes on transitions (whips), clicks on flashes and
+ * title slams (an impact where one may land), and no recipe twice in a row.
  */
 
 import { Rng, clamp01 } from "./dsp.js";
@@ -254,7 +255,7 @@ export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
       continue;
     }
     if (everyCut && m.kind === "cut" && cutTurn++ % 2 === 0) {
-      // Every other plain cut a light hit, the others a short whoosh: a sound on each without a machine gun.
+      // A light hit: short and under the strong ones, so a cut every few frames does not machine-gun.
       const recipe = vary(["impact_punch", "impact_thud"], recentHits, rng);
       cues.push({ recipe, at: t, params: { ...base, duration: LIGHT_HIT_SECONDS, pitch: Math.min(pitch, 0.5), pan: (side = -side) * 0.2 }, gainDb: LIGHT_HIT_DB, reason: "cut (light hit)" });
       continue;
