@@ -299,6 +299,10 @@ describe("the cloud ToolHost", () => {
     expect(info).toMatchObject({ path, cloud: { sha256: sha("<svg>hi</svg>"), content_type: "image/svg+xml", name: "Hi.svg" } });
     expect(await h.services.media.get(USER_A, sha("<svg>hi</svg>"))).toMatchObject({ verified: true });
     await expect(host.media!.writeGenerated!("x.html", bytes, "text/html")).rejects.toThrow("does not store");
+    // Discarded: this call no longer serves it, and the stored (shared, content-addressed) bytes stay.
+    await host.media!.discardGenerated!([path]);
+    await expect(host.media!.probe(path)).rejects.toThrow();
+    expect(await h.services.media.get(USER_A, sha("<svg>hi</svg>"))).toMatchObject({ verified: true });
     await dispose();
   });
 });

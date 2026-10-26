@@ -408,6 +408,10 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         written.set(path, bytes);
         return path;
       };
+      host.media.discardGenerated = async (paths) => {
+        calls.push(`discardGenerated ${paths.join(",")}`);
+        for (const p of paths) written.delete(p);
+      };
     }
     if (!omit.has("media.fetchWebVideo")) {
       const fetchWebVideo = options.webVideo ?? (async (request: WebVideoRequest) => fakeWebVideoDownload(request));

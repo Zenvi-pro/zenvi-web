@@ -176,6 +176,26 @@ describe("ProjectDocument", () => {
     expect(doc.undoLabels).toHaveLength(5);
   });
 
+  it("serializes whole steps only, the newest even past historyLimit", () => {
+    const doc = new ProjectDocument(project(), { newTransactionId: ids, historyLimit: 3 });
+    doc.transaction("move", (tx) => tx.update(["clips", { id: "A" }], { position: 1 }));
+    doc.transaction("move twice", (tx) => {
+      tx.update(["clips", { id: "A" }], { position: 2 });
+      tx.update(["clips", { id: "B" }], { position: 20 });
+    });
+    // Two whole steps fit in three actions.
+    expect(doc.toJSON().history.undo).toHaveLength(3);
+    doc.transaction("big", (tx) => {
+      for (let i = 0; i < 4; i += 1) tx.update(["clips", { id: "A" }], { position: 3 + i });
+    });
+    const saved = doc.toJSON();
+    expect(saved.history.undo).toHaveLength(4);
+    const reopened = new ProjectDocument(JSON.parse(JSON.stringify(saved)) as Project, { newTransactionId: ids });
+    reopened.undo();
+    expect(getAt(reopened.project, ["clips", { id: "A" }, "position"])).toBe(2);
+    expect(reopened.canUndo).toBe(false);
+  });
+
   it("setUntracked changes state without an undo step", () => {
     const doc = new ProjectDocument(project(), { newTransactionId: ids });
     doc.setUntracked(["playhead_position"], 12.5);
