@@ -1,0 +1,6 @@
+zenvi-motion-director adapts rules from HeyGen HyperFrames
+(https://github.com/heygen-com/hyperframes), skills `motion-doctrine`,
+`cut-the-curve`, `oversized-cursor` and `captions-overlay`:
+Copyright HeyGen, licensed under the Apache License, Version 2.0
+(http://www.apache.org/licenses/LICENSE-2.0). The text here is a rewrite for
+Zenvi's tools, not a copy; no HyperFrames code is included.
