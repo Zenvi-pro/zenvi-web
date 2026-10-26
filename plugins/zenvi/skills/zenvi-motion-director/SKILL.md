@@ -28,7 +28,7 @@ is the rules every genre shares. Do not plan before you have read it.
 | type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
 | tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
 | voice-over essay, story, explainer | `recipes/documentary.md` | TTS, add_captions_tool, build_reel_tool cinematic, grid collage |
-| sport, cars, launch hype, "fast" | `recipes/hype-reel.md` | build_reel_tool hype (ramp, glitch drop, whips, flashes built in), review_edit_tool |
+| sport, cars, launch hype, "fast", "hype", "trailer", "edit to this song" | `recipes/hype-reel.md` | **build_reel_tool hype first** (ramp, glitch drop, whips, flashes, one look built in), auto_sound_design_tool every_cut, review_edit_tool |
 | how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
 | intro, showreel, "about me" | `recipes/showreel-intro.md` | title_3d, word_rotator, grid zoom_into, particle_burst |
 
