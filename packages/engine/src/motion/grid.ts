@@ -31,6 +31,11 @@ export function gridFromBeats(times: readonly number[], downbeats?: readonly num
   return { bpm: 60 / median, beats, downbeats: downbeats && downbeats.length > 0 ? [...downbeats].sort((a, b) => a - b) : beats.filter((_, i) => i % 4 === 0) };
 }
 
+/** Beats between entrances at `bpm`: 1, or 2 when the beat is too fast to follow. */
+export function entranceStep(bpm: number): number {
+  return 60 / bpm < FASTEST_EVENT ? 2 : 1;
+}
+
 export class TemplateBeats {
   /** Index in `grid.beats` of the template's beat 0. */
   private readonly first: number;
@@ -54,7 +59,7 @@ export class TemplateBeats {
     }
     this.first = first;
     this.period = 60 / grid.bpm;
-    this.step = this.period < FASTEST_EVENT ? 2 : 1;
+    this.step = entranceStep(grid.bpm);
   }
 
   /** Timeline seconds of beat `k` (fractional beats interpolate). */

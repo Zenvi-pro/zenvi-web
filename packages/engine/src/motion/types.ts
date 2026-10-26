@@ -65,7 +65,9 @@ export type Ease = "linear" | "hold" | "smooth" | "out" | "out_strong" | "out_ba
 /**
  * An element's pose: its centre on the frame (px), scale relative to rest,
  * opacity, rotation (degrees), and an extra horizontal stretch `sx` (a line
- * drawing on from its start: the element's centre is that start).
+ * drawing on from its start: the element's centre is that start). `radius`
+ * is a media card's corner radius on screen (px) at that pose; without it
+ * the corners keep the card's own radius, scaled with the pose.
  */
 export interface Pose {
   x: number;
@@ -74,6 +76,7 @@ export interface Pose {
   alpha: number;
   rotation: number;
   sx?: number;
+  radius?: number;
 }
 
 /** A key of an element's motion at a template frame; `ease` shapes the segment that ends here. */

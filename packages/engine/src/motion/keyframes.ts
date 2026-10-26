@@ -201,7 +201,15 @@ function mediaLayer(el: Element, source: MediaSource, keys: Key[], frame: Motion
         rotation: pose((p) => p.rotation),
       }),
     };
-    if (source.radius > 0) {
+    if (keys.some((k) => k.pose.radius !== undefined)) {
+      // A radius that changes (a tile growing to the full frame squares its corners).
+      const short = rest * Math.min(fit.width, fit.height);
+      props.corner_radius = keyframeThrough(
+        frames,
+        pose((p) => Math.min(0.5, (p.radius ?? source.radius * sOf(p)) / (short * sOf(p)))),
+        eases,
+      );
+    } else if (source.radius > 0) {
       // corner_radius is a share of the drawn picture's short side (Clip.cpp:1416).
       const fraction = Math.min(0.5, source.radius / (rest * Math.min(fit.width, fit.height)));
       props.corner_radius = { Points: [makeKeyframePoint(1, round6(fraction))] };
