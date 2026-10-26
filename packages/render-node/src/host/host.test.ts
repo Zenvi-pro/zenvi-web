@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
@@ -225,6 +226,17 @@ describe("media host", () => {
     expect(b).toBe(path.join(dir, "gen", "edit_assets", "title", "title (2).svg"));
     const c = await host.writeGenerated!("../voice.mp3", new Uint8Array([1]), "audio/mpeg");
     expect(c).toBe(path.join(dir, "gen", "edit_assets", "media", "voice.mp3"));
+  });
+
+  it("discards only the generated files it wrote", async () => {
+    const projectFile = path.join(dir, "discard", "edit.zvn");
+    const host = createNodeMediaHost({ projectFile: () => projectFile });
+    const made = await host.writeGenerated!("title.svg", new TextEncoder().encode("<svg/>"), "image/svg+xml");
+    const other = path.join(dir, "discard", "edit_assets", "title", "mine.svg");
+    await writeFile(other, "<svg/>");
+    await host.discardGenerated!([made, other]);
+    expect(existsSync(made)).toBe(false);
+    expect(existsSync(other)).toBe(true);
   });
 });
 
