@@ -35,6 +35,15 @@ add_motion_template_tool {
 }
 ```
 
+   Size it to the piece: the grid takes about one beat per tile plus a
+   beat per step and two for the merge, from the `beats` you pass. At 150
+   bpm, `steps: [3, 4, 6]` is about 6.5 s; for a 15 s piece pass every second
+   beat (tiles on half-time, ~12 s), or follow the merge with full-band cuts
+   on the beat. The merged shot holds 2 s at most: a long hold after the
+   last tile is the slideshow moment of this genre. (`merge` grows the tile
+   to the whole frame, out of the band; to stay letterboxed end on
+   `zoom_into` instead.)
+
    `layout: "strips_v"` for vertical strips (hype reels), `film_strip` for a
    sprocketed strip, `mosaic` for an irregular collage, `zoom_into: N` to end
    by pushing into one tile instead of `merge`.
@@ -56,6 +65,8 @@ leftover tile edges). The tool refuses tiles under 13 % of the short side: on
 
 - Tiles filling off the beat: pass `beats`, or put the music on the timeline
   before the grid call.
+- The grid finished in 6 s of a 15 s piece and one shot holds for the rest:
+  pass half-time beats or plan the cuts after it.
 - The same clip in neighbouring tiles: give at least as many files as the
   largest step.
 - Camera moves on the whole grid: the layout is the motion; keep it still
