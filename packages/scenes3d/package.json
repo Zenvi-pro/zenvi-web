@@ -1,0 +1,17 @@
+{
+  "name": "@zenvi/scenes3d",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zenvi 3D: procedural Blender scenes (bpy scripts) and the Node runner that renders them to movies with a persistent Blender worker, a fingerprint cache and ffmpeg.",
+  "license": "GPL-3.0-or-later",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@zenvi/engine": "*"
+  }
+}
