@@ -179,7 +179,8 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
     }
     // Last on the mix, after any normalisation: nothing that reaches the file passes the ceiling.
     if (audio && options.truePeakLimit !== false) {
-      audio.filter = appendToOutput(audio.filter, truePeakLimiterFilter(sampleRate, exportCeilingDb(isLossyAudio(format, options.audioCodec))));
+      const ceiling = exportCeilingDb(isLossyAudio(format, options.audioCodec));
+      audio.filter = appendToOutput(audio.filter, truePeakLimiterFilter(sampleRate, ceiling, await ffmpegMajor()));
     }
 
     const command = encoderCommand({

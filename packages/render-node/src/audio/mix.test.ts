@@ -7,7 +7,7 @@ import { createRgba } from "../image/rgba.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderProject } from "../render/render-project.js";
 import { makeAudio, makeTempDir, removeDir } from "../test-support/fixtures.js";
-import { loudnormPass2, renderMixPcm } from "./mix.js";
+import { loudnormPass2, renderMixPcm, truePeakLimiterFilter } from "./mix.js";
 
 let dir: string;
 let quiet: string;
@@ -104,6 +104,11 @@ describe("renderMixPcm", () => {
 });
 
 describe("export true-peak limiter", () => {
+  it("oversamples to the meter's rate and asks for latency compensation only where ffmpeg has it", () => {
+    expect(truePeakLimiterFilter(48000, -2, 7)).toBe("aresample=192000,alimiter=limit=0.78524:attack=5:release=50:level=disabled:latency=1,aresample=48000");
+    expect(truePeakLimiterFilter(192000, -1, 4)).toBe("alimiter=limit=0.88105:attack=5:release=50:level=disabled");
+  });
+
   // Both sines at gain 20 (amplitude 1 each on the upmix): about +3 dBTP summed.
   const loud: () => RenderEngine = () => ({
     ...engine(),

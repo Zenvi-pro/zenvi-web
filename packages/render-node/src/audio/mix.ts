@@ -195,10 +195,14 @@ const RESAMPLE_MARGIN_DB = 0.1;
  * lookahead limiter at the true-peak meter's oversampled rate, so it holds
  * the peaks between samples too, with the engine limiter's timing
  * (`@zenvi/engine` `TruePeakLimiter`, which the browser export runs).
+ * alimiter's `latency` (FFmpeg 5.1+) puts the mix back in place; before it,
+ * the option would fail every render, so older builds keep the attack's
+ * 5 ms delay instead.
  */
-export function truePeakLimiterFilter(sampleRate: number, ceilingDb: number): string {
+export function truePeakLimiterFilter(sampleRate: number, ceilingDb: number, ffmpegMajor = 99): string {
   const { factor } = truePeakInterpolator(sampleRate);
-  const limit = `alimiter=limit=${num(10 ** ((ceilingDb - RESAMPLE_MARGIN_DB) / 20), 5)}:attack=${num(LIMITER_LOOKAHEAD_SECONDS * 1000, 3)}:release=${num(LIMITER_RELEASE_SECONDS * 1000, 3)}:level=disabled:latency=1`;
+  const latency = ffmpegMajor >= 5 ? ":latency=1" : "";
+  const limit = `alimiter=limit=${num(10 ** ((ceilingDb - RESAMPLE_MARGIN_DB) / 20), 5)}:attack=${num(LIMITER_LOOKAHEAD_SECONDS * 1000, 3)}:release=${num(LIMITER_RELEASE_SECONDS * 1000, 3)}:level=disabled${latency}`;
   return factor === 1 ? limit : `aresample=${sampleRate * factor},${limit},aresample=${sampleRate}`;
 }
 
