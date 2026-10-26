@@ -64,13 +64,19 @@ const MAX_TEXT_BYTES = 16 * 1024 * 1024;
  */
 export function createAssetHost(dir: string): AssetHost {
   const root = path.resolve(dir);
+  const inside = async (assetPath: string): Promise<string> => {
+    const file = path.resolve(root, assetPath);
+    const rel = path.relative(root, file);
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
+    if ((await stat(file)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
+    return file;
+  };
   return {
     async readText(assetPath) {
-      const file = path.resolve(root, assetPath);
-      const rel = path.relative(root, file);
-      if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
-      if ((await stat(file)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
-      return readFile(file, "utf8");
+      return readFile(await inside(assetPath), "utf8");
+    },
+    async readBytes(assetPath) {
+      return new Uint8Array(await readFile(await inside(assetPath)));
     },
   };
 }
