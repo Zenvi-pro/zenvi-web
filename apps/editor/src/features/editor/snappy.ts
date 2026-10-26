@@ -1,16 +1,18 @@
 /**
  * "Make it snappy": the finishing pass editors do on a cut, as a chain of
- * the agents' own tools, each its own undo step: motion transitions on the
+ * the agents' own tools, each its own undo step: (one-frame gaps closed
+ * when that is all that keeps the clips from cutting,) motion transitions on the
  * main sequence's cuts (in the direction it already moves), sound design
  * that lands on them, then the mix mastered for social. A step that cannot
  * run is reported and the rest still run.
  */
 import { trackCuts, type Clip, type MotionTransitionStyle, type Project, type SfxIntensity } from "@zenvi/engine";
 import { toast } from "@/ui/Toast";
+import { tinyGapTrack } from "./cuts";
 import { editorToolRunner, editorToolState, type ToolRunner } from "./editorTools";
 import type { EditorSession } from "./session/EditorSession";
 
-export type SnappyStepId = "transitions" | "sound" | "master";
+export type SnappyStepId = "gaps" | "transitions" | "sound" | "master";
 
 export interface SnappyOutcome {
   step: SnappyStepId;
@@ -48,7 +50,12 @@ export async function makeItSnappy(project: () => Project, run: ToolRunner, opti
     outcomes.push({ step: id, label, status: !r.ok ? "failed" : r.status === "unchanged" ? "unchanged" : "done", detail: r.summary, undoSteps: r.undoSteps });
   };
 
-  const track = snappyTrack(project());
+  let track = snappyTrack(project());
+  const gaps = track ? null : tinyGapTrack(project());
+  if (gaps) {
+    await step("gaps", "Close frame gaps", "remove_gaps_tool", { track: String(gaps.layer), from_seconds: gaps.from });
+    track = snappyTrack(project());
+  }
   if (track) await step("transitions", "Motion transitions", "apply_motion_transitions_tool", { track: String(track.layer), style: options.style ?? "hype", direction: "auto" });
   else outcomes.push({ step: "transitions", label: "Motion transitions", status: "skipped", detail: "No clips play back to back, so there is no cut to move.", undoSteps: 0 });
 

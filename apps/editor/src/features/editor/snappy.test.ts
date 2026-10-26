@@ -25,15 +25,15 @@ const reader: ReaderInfo = {
   channel_layout: 3,
 };
 
-/** `count` 2-second clips back to back on the bottom track. */
-function sessionWithCuts(count: number) {
+/** `count` 2-second clips on the bottom track, back to back or `gap` seconds apart. */
+function sessionWithCuts(count: number, gap = 0) {
   const project = createProject({ profile: findProfile("HD 1080p 30 fps")! });
   const meta = { id: "local1", name: "Test", createdAt: 0, updatedAt: 0, width: 1920, height: 1080, fps: { num: 30, den: 1 }, duration: 0, clipCount: 0, fileCount: 0 };
   const media = new MediaLibrary({ store: async () => new MemoryMediaStore(), probe: vi.fn(async () => reader) });
   const session = new EditorSession({ meta, project, repository: new MemoryProjectRepository(), media, cloud: () => null });
   session.edit("Add", (tx) => {
     const file = addFile(tx, { path: "media/x/clip.webm", info: reader, name: "clip.webm" });
-    for (let i = 0; i < count; i += 1) addClip(tx, { fileId: file.id, position: i * 2, start: 0, end: 2, layer: tx.project.layers[0]!.number });
+    for (let i = 0; i < count; i += 1) addClip(tx, { fileId: file.id, position: i * (2 + gap), start: 0, end: 2, layer: tx.project.layers[0]!.number });
   });
   return session;
 }
@@ -62,6 +62,19 @@ describe("make it snappy", () => {
     for (let i = 0; i < steps; i += 1) session.undo();
     expect(session.doc.undoLabels.length).toBe(before);
     expect(session.project.clips).toHaveLength(3);
+  });
+
+  it("closes one-frame gaps (double-click placement) first, as its own undo step", async () => {
+    const session = sessionWithCuts(3, 1 / 30);
+    expect(snappyTrack(session.project)).toBeNull();
+    const before = session.doc.undoLabels.length;
+    const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
+    expect(outcomes.slice(0, 2).map((o) => [o.step, o.status])).toEqual([
+      ["gaps", "done"],
+      ["transitions", "done"],
+    ]);
+    expect(session.doc.undoLabels.length).toBe(before + snappyUndoSteps(outcomes));
+    expect(session.project.clips.filter((c) => c.layer === session.project.layers[0]!.number)[0]!.position).toBe(0);
   });
 
   it("skips the transitions without a cut and still designs the sound", async () => {

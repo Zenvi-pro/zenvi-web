@@ -5,7 +5,7 @@
  */
 import { findClip, type Clip, type MotionDirection, type MotionPresetInfo, type MotionTransitionStyle } from "@zenvi/engine";
 import { toast } from "@/ui/Toast";
-import { targetCut } from "../cuts";
+import { targetCut, tinyGapTrack } from "../cuts";
 import { runEditorTool, runToolWithToast } from "../editorTools";
 import type { EditorSession } from "../session/EditorSession";
 import { snappyTrack } from "../snappy";
@@ -30,13 +30,26 @@ function directionFor(info: MotionPresetInfo, choice: DirectionChoice): MotionDi
   return choice !== "auto" && info.directions.includes(choice) ? choice : "auto";
 }
 
-/** One motion transition on the cut the person points at (the selected clip's, else the one nearest the playhead). */
-export async function applyMotionTransition(session: EditorSession, info: MotionPresetInfo, choice: DirectionChoice, clipIds: readonly string[] = selected(session)): Promise<void> {
-  const cut = targetCut(session.project, clipIds, session.playback.getState().time);
-  if (!cut) {
+/** No cut to work on: say why, and offer to close one-frame gaps when those are what is in the way. */
+function noCut(session: EditorSession): void {
+  const gaps = tinyGapTrack(session.project);
+  if (!gaps) {
     toast.info("No cut to put it on", { description: "Put two clips back to back on a track first." });
     return;
   }
+  toast.info("The clips do not touch", {
+    description: `${gaps.gaps} gap${gaps.gaps === 1 ? "" : "s"} of a frame between clips. Close them, then add the transition.`,
+    action: {
+      label: "Close gaps",
+      onClick: () => void runToolWithToast(session, "remove_gaps_tool", { track: String(gaps.layer), from_seconds: gaps.from }, { done: "Gaps closed", failed: "Could not close the gaps" }),
+    },
+  });
+}
+
+/** One motion transition on the cut the person points at (the selected clip's, else the one nearest the playhead). */
+export async function applyMotionTransition(session: EditorSession, info: MotionPresetInfo, choice: DirectionChoice, clipIds: readonly string[] = selected(session)): Promise<void> {
+  const cut = targetCut(session.project, clipIds, session.playback.getState().time);
+  if (!cut) return noCut(session);
   await runToolWithToast(
     session,
     "apply_motion_transition_tool",
@@ -49,10 +62,7 @@ export async function applyMotionTransition(session: EditorSession, info: Motion
 export async function applyMotionStyle(session: EditorSession, style: MotionTransitionStyle, choice: DirectionChoice = "auto"): Promise<void> {
   const cut = targetCut(session.project, selected(session), session.playback.getState().time);
   const layer = cut?.layer ?? snappyTrack(session.project)?.layer;
-  if (layer === undefined) {
-    toast.info("No cuts yet", { description: "Put clips back to back on a track first." });
-    return;
-  }
+  if (layer === undefined) return noCut(session);
   await runToolWithToast(
     session,
     "apply_motion_transitions_tool",
