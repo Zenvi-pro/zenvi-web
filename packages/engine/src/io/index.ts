@@ -29,3 +29,4 @@ export {
   type EmojiSource,
   type OpenMojiMeta,
 } from "./emojis.js";
+export { encodeWav } from "./wav.js";

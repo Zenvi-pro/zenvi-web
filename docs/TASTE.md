@@ -125,6 +125,15 @@ Named easings every tool understands (cubic-bezier control points):
 - Audio: dialogue −12 to −6 dBFS peaks (≈ −16 LUFS integrated for social,
   −23 LUFS broadcast); music under dialogue −18 to −24 dB below; duck 6–10 dB
   with 0.3 s attack / 0.6 s release.
+- Sound design (`auto_sound_design_tool`, `add_sfx_tool`): in the reference
+  reels a cut lands on an audio transient 50–100 % of the time but on the
+  music's beat only 20–40 % — the effect makes the cut. A whoosh peaks on the
+  cut and is as long as the move; an impact's transient lands on hard cuts,
+  downbeats and flash frames, at most about once a bar; clicks and pops go on
+  UI moments and title entrances; a riser builds into the drop and an impact
+  lands on it. Never two transients within 80 ms; vary seed and pitch so
+  repeats do not machine-gun. Effects peak around −8…−14 dBFS under the
+  music and further under dialogue; no clicks over speech.
 
 ## 7. Review checklist (agents run this before reporting success)
 

@@ -1015,6 +1015,27 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
   },
 
+  // --- sound design --------------------------------------------------------------------
+  list_sfx_tool: {
+    happy: { args: { family: "impact" }, summary: /^\d+ sound effects: impact_punch, /, check: ({ doc, before }) => expect(doc.project).toEqual(before) },
+    failure: null,
+  },
+  add_sfx_tool: {
+    happy: {
+      args: { recipe: "impact_punch", clip_id: IDS.clipB },
+      summary: /^Added impact, punch with its transient on the start of clip CLIPBROL01 \(clip \w+, -8 dB\)\.$/,
+      check: ({ doc, host }) => {
+        expect(doc.project.layers.some((l) => l.label === "SFX")).toBe(true);
+        expect([...host.written.keys()].some((p) => /^\/generated\/sfx-impact_punch-[0-9a-f]{8}\.wav$/.test(p))).toBe(true);
+      },
+    },
+    failure: { args: { recipe: "pop" }, status: "refused", summary: /^Error: give exactly one of at_seconds, clip_id or marker_id\.$/ },
+  },
+  auto_sound_design_tool: {
+    happy: { args: { intensity: "hype" }, summary: /^Sound-designed the edit \(hype\): \d+ effects/, check: ({ doc }) => expect(doc.undoLabels.at(-1)).toBe("Automatic sound design") },
+    failure: { args: { climax_seconds: "999" }, status: "refused", summary: /^Error: climax_seconds \(999\) is after the end of the edit/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {

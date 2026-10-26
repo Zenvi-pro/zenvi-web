@@ -10,6 +10,7 @@ import {
   SPEECH_SAMPLE_RATE,
   TRANSCRIPTION_PATH,
   TranscriptionError,
+  encodeWav as encodeWavChannels,
   isTranscriptionError,
   mergeTranscriptions,
   parseTranscription,
@@ -27,29 +28,7 @@ export const WAV_CHUNK_SECONDS = 10 * 60;
 
 /** A WAV file of mono float samples as 16-bit PCM. */
 export function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array {
-  const bytes = new Uint8Array(44 + samples.length * 2);
-  const view = new DataView(bytes.buffer);
-  const ascii = (at: number, text: string) => {
-    for (let i = 0; i < text.length; i += 1) bytes[at + i] = text.charCodeAt(i);
-  };
-  ascii(0, "RIFF");
-  view.setUint32(4, 36 + samples.length * 2, true);
-  ascii(8, "WAVE");
-  ascii(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  ascii(36, "data");
-  view.setUint32(40, samples.length * 2, true);
-  for (let i = 0; i < samples.length; i += 1) {
-    const s = Math.max(-1, Math.min(1, samples[i]!));
-    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-  }
-  return bytes;
+  return encodeWavChannels([samples], sampleRate);
 }
 
 /** Sends one WAV piece; resolves with the backend's JSON answer. */
