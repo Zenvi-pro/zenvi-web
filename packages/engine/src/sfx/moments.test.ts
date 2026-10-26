@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ProjectDocument } from "../history/document.js";
 import { createProject } from "../model/defaults.js";
-import { addClip } from "../ops/clips.js";
+import { addClip, moveClip } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
 import { applyMotionTransition } from "../ops/motion-transitions.js";
 import { addTrack } from "../ops/tracks.js";
@@ -65,5 +65,18 @@ describe("soundMoments", () => {
     expect(times(doc, "transition")).toEqual([3]);
     // 9: the insert ends on the A-roll.
     expect(times(doc, "cut")).toEqual([6, 9]);
+  });
+
+  it("hears a whip where its cut is now, after the clips moved", () => {
+    const doc = edit((tx, top) => {
+      const a = addClip(tx, { fileId: "FILEBXXXXX", position: 0, layer: top, start: 0, end: 3 });
+      const b = addClip(tx, { fileId: "FILECXXXXX", position: 3, layer: top, start: 0, end: 3 });
+      applyMotionTransition(tx, { outClipId: a.id, inClipId: b.id, preset: "whip", frames: 8 });
+      moveClip(tx, b.id, { position: 5 });
+      moveClip(tx, a.id, { position: 2 });
+    });
+    expect(times(doc, "transition")).toEqual([5]);
+    // In and out of the pair over the A-roll; the whip's cut is not a cut too.
+    expect(times(doc, "cut")).toEqual([2, 8]);
   });
 });
