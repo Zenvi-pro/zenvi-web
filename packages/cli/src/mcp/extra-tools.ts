@@ -107,7 +107,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       name: "render_video",
       title: "Render the timeline",
       description:
-        "Render the project to a file: mp4 (default), webm, mov, mkv, gif, mp3, wav or png (frames). Returns the file path, size and duration. Use preview_frame first to check the edit.",
+        "Render the project to a file: mp4 (default), webm, mov, mkv, gif, mp3, wav or png (frames). Returns the file path, size and duration. Run review_edit_tool first to watch the cut (pacing, beats, holds, black frames, loudness) and preview_frame for single frames.",
       inputSchema: {
         type: "object",
         properties: {
@@ -165,7 +165,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       name: "preview_frame",
       title: "Look at a frame",
       description:
-        "Render one composited timeline frame and return it as an image, so you can check an edit (positions, titles, transitions, effects) before rendering. grid=true adds the 0-1 coordinate grid (origin top-left).",
+        "Render one composited timeline frame and return it as an image, so you can check one moment (positions, titles, transitions, effects) before rendering. grid=true adds the 0-1 coordinate grid (origin top-left). To judge the whole cut (pacing, cut rhythm against the music, flashes, black frames) call review_edit_tool once instead of previewing many frames.",
       inputSchema: {
         type: "object",
         properties: {
