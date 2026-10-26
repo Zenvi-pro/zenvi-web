@@ -208,4 +208,39 @@ describe("unify_grade_tool", { timeout: 60_000 }, () => {
     const bad = await unify(ed, { timeline_clip_ids: [v], look: "sunny" });
     expect(bad.summary).toMatch(/^Error: 'sunny' is a .* look, not a LUT/);
   });
+
+  it("skips locked tracks, keeps to one track, and measures a clip named twice once", async () => {
+    const ed = painted();
+    const dark = ed.addClip(ed.addFile("video", { name: "dark.mp4" }), { position: 0, end: 2 });
+    const bright = ed.addClip(ed.addFile("video", { name: "bright.mp4" }), { position: 2, end: 4 });
+    const locked = ed.addClip(ed.addFile("video", { name: "warm.mp4" }), { position: 0, end: 2, layer: 2_000_000 });
+    ed.lockTrack(2_000_000);
+    const { data, status, summary } = await unify(ed, { timeline_clip_ids: [dark, bright, dark, locked], dry_run: true });
+    expect(status, summary).toBe("applied");
+    expect((data.clips as Row[]).map((r) => r.timeline_clip_id)).toEqual([dark, bright]);
+    const result = await runTool({ doc: ed.doc, host: ed.host }, "unify_grade_tool", { dry_run: true });
+    expect(result.data!.warnings).toContain(`clip ${locked}: track locked — skipped`);
+    const onTrack = await unify(ed, { track: String(ed.clip(locked)!.layer) });
+    expect(onTrack.summary).toMatch(/^Error: no footage clips to unify/);
+    expect(ed.clip(locked)!.effects).toEqual([]);
+  });
+
+  it("writes nothing over an edit that lands while it renders, and refuses a look_intensity without a look", async () => {
+    const ed = painted();
+    const dark = ed.addClip(ed.addFile("video", { name: "dark.mp4" }), { position: 0, end: 2 });
+    ed.addClip(ed.addFile("video", { name: "bright.mp4" }), { position: 2, end: 4 });
+    let paints = 0;
+    ed.host.frames = pixelFrameHost((path, w, h) => {
+      // The person adds an effect to the dark clip while unify is measuring.
+      if ((paints += 1) === 8) ed.addEffect(dark, "Negate");
+      return ramp(w, h, path.includes("dark") ? 50 : 200);
+    });
+    const stale = await unify(ed, {});
+    expect(stale.status).toBe("refused");
+    expect(stale.summary).toBe(`Error: clip ${dark} was edited while unify_grade_tool rendered frames (effects); nothing changed, call it again`);
+    expect(ed.clip(dark)!.effects.map((e) => e.class_name)).toEqual(["Negate"]);
+    expect(ed.stepsSinceMark()).toBe(0);
+    const orphan = await unify(ed, { look_intensity: 0.5 });
+    expect(orphan.summary).toBe("Error: look_intensity needs a look (a LUT id from list_looks_tool)");
+  });
 });

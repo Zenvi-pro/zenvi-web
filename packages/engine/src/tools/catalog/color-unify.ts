@@ -102,7 +102,7 @@ function subjectsOf(call: ToolCall, args: Input, warnings: string[]): Clip[] {
   const project = call.doc.project;
   let clips: Clip[];
   if (args.timeline_clip_ids) {
-    const ids = filterUnlocked(project, args.timeline_clip_ids, warnings);
+    const ids = filterUnlocked(project, [...new Set(args.timeline_clip_ids)], warnings);
     clips = ids.map((id) => project.clips.find((c) => c.id === id)!);
     for (const clip of clips.filter((c) => !clipHasPicture(c))) warnings.push(`clip ${clip.id} has no picture — skipped`);
     clips = clips.filter(clipHasPicture);
@@ -221,6 +221,7 @@ export const colorUnifyTools: CatalogTool[] = [
       colorTool(call, async () => {
         const project = call.doc.project;
         if (args.reference_clip_id && args.reference_file_id) return refused(TOOL, "Error: pass reference_clip_id or reference_file_id, not both");
+        if (args.look_intensity !== undefined && !args.look) return refused(TOOL, "Error: look_intensity needs a look (a LUT id from list_looks_tool)");
         const warnings: string[] = [];
         let subjects: Clip[];
         try {
