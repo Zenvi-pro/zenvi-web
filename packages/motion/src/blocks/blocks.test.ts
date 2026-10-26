@@ -61,7 +61,7 @@ describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s", (id, manifest) => {
 
 describe("card_shuffle", () => {
   it("lands on a picture when given one file", async () => {
-    const { build } = await import("./card_shuffle/block.ts");
+    const { build } = await import("./card_shuffle/block.js");
     const manifest = BLOCKS.find((b) => b.id === "card_shuffle")!;
     const checked = checkParams(manifest, {});
     if (!checked.ok) throw new Error(checked.error);
