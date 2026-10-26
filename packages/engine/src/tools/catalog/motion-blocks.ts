@@ -287,6 +287,9 @@ export const motionBlockTools: CatalogTool[] = [
         // The new render's reader info, with every other key of the record kept (unknown keys survive).
         const next: Record<string, unknown> = { ...structuredClone(old), ...structuredClone(rendered.render.media.info), path: rendered.render.media.path, id: old.id, media_type: "video", [LINK_KEY]: linkOf(rendered) };
         if (rendered.render.media.fingerprint) next.fingerprint = structuredClone(rendered.render.media.fingerprint);
+        // The old content address names the old render's bytes: a cloud render job would fetch those.
+        if (rendered.render.media.cloud) next.cloud = structuredClone(rendered.render.media.cloud);
+        else delete next.cloud;
         const written = writeFile(tx, fileId, next);
         // Clips that showed the whole block follow a longer one, where their track is free.
         const longer = seconds > oldSeconds + 1e-6;
