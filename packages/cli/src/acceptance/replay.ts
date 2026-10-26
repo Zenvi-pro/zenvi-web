@@ -136,17 +136,31 @@ const OUTPUT_KEYS = new Set(["path", "output", "output_path", "out", "project_pa
 export function rewriteArgs(args: Record<string, unknown>, ctx: { ids: Map<string, string>; known: Set<string>; fromDir?: string; toDir: string }): { args: Record<string, unknown>; unmapped: string[] } {
   const unmapped = new Set<string>();
   const fixString = (s: string, key: string | undefined): string => {
-    let out = s.replace(ID_IN_TEXT, (id) => {
+    const out = s.replace(ID_IN_TEXT, (id) => {
       const mapped = ctx.ids.get(id);
       if (mapped) return mapped;
       if (ctx.known.has(id)) unmapped.add(id);
       return id;
     });
-    if (ctx.fromDir && out.startsWith(ctx.fromDir) && ((key && OUTPUT_KEYS.has(key)) || !existsSync(out))) out = ctx.toDir + out.slice(ctx.fromDir.length);
+    if (!ctx.fromDir) return out;
+    if (out.startsWith(ctx.fromDir) && ((key && OUTPUT_KEYS.has(key)) || !existsSync(out))) return ctx.toDir + out.slice(ctx.fromDir.length);
+    // Media named relative to the original folder ("inputs/a.mp4") stays there; outputs land in the new one.
+    if (!(key && OUTPUT_KEYS.has(key)) && out && !path.isAbsolute(out) && !out.includes("\n") && existsSync(path.join(ctx.fromDir, out))) return path.join(ctx.fromDir, out);
     return out;
   };
+  // Some tools take a JSON array as a string (import_files_tool paths='["a.mp4"]').
+  const fixMaybeJson = (s: string, key: string | undefined): string => {
+    if (!s.startsWith("[")) return fixString(s, key);
+    try {
+      const list: unknown = JSON.parse(s);
+      if (Array.isArray(list) && list.every((x) => typeof x === "string")) return JSON.stringify(list.map((x: string) => fixString(x, key)));
+    } catch {
+      // Not JSON: an ordinary string that starts with "[".
+    }
+    return fixString(s, key);
+  };
   const walk = (v: unknown, key?: string): unknown => {
-    if (typeof v === "string") return fixString(v, key);
+    if (typeof v === "string") return fixMaybeJson(v, key);
     if (Array.isArray(v)) return v.map((x) => walk(x, key));
     if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x, k)]));
     return v;

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { makeTempDir, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildReport, reportMarkdown } from "./report.js";
@@ -88,6 +89,9 @@ describe("transcript replay", () => {
     const out = rewriteArgs({ file_id: "AAAAAAAAA1", ids: '["CCCCCCCCC1"]', output: "/runs/x/project/out.mp4", text: "HELLO" }, { ids, known, fromDir: "/runs/x/project", toDir: "/tmp/new" });
     expect(out).toEqual({ args: { file_id: "BBBBBBBBB1", ids: '["DDDDDDDDD1"]', output: "/tmp/new/out.mp4", text: "HELLO" }, unmapped: [] });
     expect(rewriteArgs({ clip_id: "EEEEEEEEE1" }, { ids, known, toDir: "/tmp/new" }).unmapped).toEqual(["EEEEEEEEE1"]);
+    // Media relative to the original folder is read from there, also inside a JSON-array string.
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    expect(rewriteArgs({ paths: '["scenarios", "missing"]', output: "out.mp4" }, { ids, known, fromDir: here, toDir: "/tmp/new" }).args).toEqual({ paths: JSON.stringify([path.join(here, "scenarios"), "missing"]), output: "out.mp4" });
   });
 
   it("groups failures by their generalised message and proposes fixes for known ones", () => {
