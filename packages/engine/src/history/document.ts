@@ -57,6 +57,12 @@ export interface ChangeEvent {
   source: ChangeSource;
   /** Actions in the order they were applied (inverse actions for undo). */
   actions: UpdateAction[];
+  /**
+   * Per action, in the same order: an update recorded with
+   * `Transaction.replace` (the value replaced outright, not merged). Not
+   * part of the desktop action format; set on "apply" and "redo".
+   */
+  replaced?: boolean[];
   label?: string;
 }
 
@@ -221,6 +227,7 @@ export class ProjectDocument {
       previous: before,
       source: "apply",
       actions: open.actions.map((a) => a.action),
+      replaced: open.actions.map((a) => a.replace === true),
       label,
     });
     return result;
@@ -310,6 +317,7 @@ export class ProjectDocument {
         previous: before,
         source: "redo",
         actions: reapplied.map((a) => a.action),
+        replaced: reapplied.map((a) => a.replace === true),
         label: entry.label,
       });
     }

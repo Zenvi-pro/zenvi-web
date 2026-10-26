@@ -17,7 +17,7 @@ Plus two that already exist and are extended, not replaced:
 
 | Surface | Change |
 | --- | --- |
-| **Desktop editor** (zenvi-core, PyQt + libopenshot) | "Push to Zenvi Cloud" / "Open from Zenvi Cloud" |
+| **Desktop editor** (zenvi-core, PyQt + libopenshot) | "Push to Zenvi Cloud" / "Open from Zenvi Cloud"; runs engine tools it does not implement through the bundled CLI ([ENGINE_BRIDGE.md](ENGINE_BRIDGE.md), prototype, off by default) |
 | **Zenvi Assistant** (zenvi-backend agent) | can drive the web editor exactly like it drives the desktop |
 
 ```
