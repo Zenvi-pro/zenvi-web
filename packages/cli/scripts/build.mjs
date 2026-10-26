@@ -48,8 +48,9 @@ const result = await build({
   entryPoints: [path.join(cliRoot, "src", "bin.ts")],
   outfile: path.join(dist, "zenvi.mjs"),
   bundle: true,
-  // Native, optional, loaded on first use (subject mattes): resolved next to the bundle at run time.
-  external: ["onnxruntime-node"],
+  // onnxruntime-node: native, optional, loaded on first use (subject mattes), resolved next to the bundle at run time.
+  // esbuild: Zenvi Motion builds block pages with it only from source; the bundle ships them prebuilt (dist/motion).
+  external: ["onnxruntime-node", "esbuild"],
   platform: "node",
   format: "esm",
   target: "node22",
@@ -58,8 +59,6 @@ const result = await build({
   legalComments: "eof",
   metafile: true,
   logLevel: "warning",
-  // Zenvi Motion builds block pages with esbuild only from source; the bundle ships them prebuilt (dist/motion).
-  external: ["esbuild"],
   define: {
     __ZENVI_BUNDLE__: "true",
     __ZENVI_VERSION__: JSON.stringify(pkg.version),
