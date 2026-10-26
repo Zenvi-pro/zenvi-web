@@ -7,8 +7,8 @@ export function build(ctx: BlockContext): void {
   const status = String(p.status ?? "");
   const S = ctx.seconds;
 
-  const cardWidth = ctx.portrait ? W - safe.left - safe.right : Math.min(1180, W * 0.62);
-  const size = ctx.portrait ? 46 : 42;
+  const cardWidth = ctx.portrait ? W - safe.left - safe.right : Math.min(1240, W * 0.64);
+  const size = ctx.portrait ? 54 : 50;
   const wrap = ctx.el("div", "pb-wrap");
   wrap.style.width = `${cardWidth}px`;
   wrap.style.setProperty("--pb-size", `${size}px`);

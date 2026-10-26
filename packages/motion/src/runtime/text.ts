@@ -242,16 +242,16 @@ export function odometerPositions(value: number, digits: number): number[] {
 
 export interface Odometer {
   el: HTMLElement;
-  /** A track rolling the wheels to the counter's value. */
+  /** A track rolling the wheels to `value(t)`. */
   track: Track;
 }
 
 /**
  * An odometer of `digits` wheels (`.odo-wheel` columns of 0-9-0) inside a
- * `.odometer` span; leading zeros are hidden. Style the span's font; each
- * wheel is one line (1em) tall.
+ * `.odometer` span showing `value(t)`; leading zeros are hidden. Style the
+ * span's font; each wheel is one line (1em) tall.
  */
-export function odometer(doc: Document, digits: number, options: CounterOptions): Odometer {
+export function odometer(doc: Document, digits: number, value: (t: number) => number): Odometer {
   const el = doc.createElement("span");
   el.className = "odometer";
   el.style.display = "inline-flex";
@@ -274,9 +274,9 @@ export function odometer(doc: Document, digits: number, options: CounterOptions)
     wheels.push(wheel);
   }
   const track: Track = (t) => {
-    const v = counterValue(t, options);
+    const v = Math.max(0, value(t));
     const positions = odometerPositions(v, digits);
-    const significant = Math.max(1, String(Math.floor(Math.max(Math.abs(v), Math.abs(options.to)))).length);
+    const significant = Math.max(1, String(Math.floor(v)).length);
     wheels.forEach((wheel, i) => {
       const k = digits - 1 - i;
       wheel.style.transform = `translateY(${-positions[k]!}em)`;

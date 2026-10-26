@@ -1,0 +1,21 @@
+{
+  "id": "counter",
+  "version": 1,
+  "title": "Counter",
+  "description": "A huge number that counts or rolls like an odometer from one value to the next (several steps allowed: 51 → 79 → 70), with a prefix/suffix (k, %, $) and a small label. For stats, specs and results.",
+  "tags": ["type", "number", "stat", "counter", "odometer", "data"],
+  "duration": { "default": 3.5, "min": 1.5, "max": 12 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "mono", "display": "sans" },
+  "params": {
+    "values": { "type": "strings", "minItems": 1, "maxItems": 6, "maxLength": 16, "default": ["0", "58"], "description": "Numbers to count through, in order (the first is the start)." },
+    "prefix": { "type": "string", "maxLength": 4, "default": "", "description": "Before the number, e.g. $ (empty: none)." },
+    "suffix": { "type": "string", "maxLength": 6, "default": "k", "description": "After the number, e.g. k, %, x (empty: none)." },
+    "decimals": { "type": "integer", "min": 0, "max": 3, "default": 0, "description": "Digits after the point." },
+    "label": { "type": "string", "maxLength": 60, "default": "Thrust · kN", "description": "Small mono label under the number (empty: none)." },
+    "style": { "type": "enum", "options": ["odometer", "count"], "default": "odometer", "description": "odometer: digit wheels roll; count: the digits change in place." },
+    "align": { "type": "enum", "options": ["center", "left"], "default": "center", "description": "Alignment." },
+    "weight": { "type": "integer", "min": 200, "max": 900, "default": 500, "description": "Font weight of the number (the Inter face)." }
+  }
+}

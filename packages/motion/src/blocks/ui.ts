@@ -51,9 +51,47 @@ export function pointer(ctx: BlockContext, from: { x: number; y: number }, at: n
   };
 }
 
-/** A font size that fits `text` on `lines` lines of `width` px, between min and max (a rough per-face width ratio). */
-export function fitFontSize(text: string, width: number, lines: number, min: number, max: number, charWidth = 0.52): number {
-  const chars = Math.max(1, Array.from(text).length);
-  const size = (width * lines) / (chars * charWidth);
-  return Math.round(Math.max(min, Math.min(max, size)));
+/** One run of a rich line: plain, or *emphasised* (the second face, accent). */
+export interface RichRun {
+  text: string;
+  em: boolean;
+}
+
+/**
+ * Lines of runs from the rich text blocks take: `/` or a newline breaks a
+ * line, `*words*` are emphasised.
+ */
+export function parseRich(text: string): RichRun[][] {
+  return text
+    .split(/\s*(?:\/|\n)\s*/)
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const runs: RichRun[] = [];
+      line.split(/(\*[^*]+\*)/).forEach((part) => {
+        if (!part) return;
+        const em = part.startsWith("*") && part.endsWith("*") && part.length > 2;
+        runs.push({ text: em ? part.slice(1, -1) : part, em });
+      });
+      return runs;
+    });
+}
+
+/** The rich text without its markup. */
+export function plainRich(text: string): string {
+  return parseRich(text)
+    .map((runs) => runs.map((r) => r.text).join(""))
+    .join(" ");
+}
+
+/**
+ * Scale `el`'s font size so its widest line (`lines`, laid out with
+ * `white-space: nowrap`) fits `maxWidth`, at most `maxSize` px. Needs layout.
+ */
+export function fitWidth(el: HTMLElement, lines: readonly HTMLElement[], maxWidth: number, maxSize: number, minSize = 24): number {
+  const probe = 100;
+  el.style.fontSize = `${probe}px`;
+  const widest = Math.max(1, ...lines.map((l) => l.scrollWidth || l.getBoundingClientRect().width));
+  const size = Math.max(minSize, Math.min(maxSize, (probe * maxWidth) / widest));
+  el.style.fontSize = `${size}px`;
+  return size;
 }

@@ -1,0 +1,19 @@
+{
+  "id": "glass_cards",
+  "version": 1,
+  "title": "Glass cards",
+  "description": "Frosted-glass UI cards over a photo or video (real backdrop blur), entering in depth with a stagger; the pointer clicks one card's toggle on and a check pops. A headline can sit above. The SaaS promo look. Give `background` (a bin file id) for the glass to blur; without one a soft sky gradient is drawn.",
+  "tags": ["ui", "saas", "glass", "cards", "cursor", "promo"],
+  "duration": { "default": 5, "min": 2.5, "max": 14 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": false,
+  "tokens": { "palette": "light", "radius": 32 },
+  "params": {
+    "background": { "type": "media", "accept": ["image", "video"], "optional": true, "description": "Photo or video behind the glass (file id)." },
+    "headline": { "type": "string", "maxLength": 80, "default": "Every tool, *one* control plane", "description": "Headline above the cards; *words* in stars get the serif italic (empty: none)." },
+    "cards": { "type": "strings", "minItems": 1, "maxItems": 4, "maxLength": 24, "default": ["GitHub", "Salesforce", "HomeOps"], "description": "Card titles." },
+    "details": { "type": "strings", "maxItems": 4, "maxLength": 36, "default": ["14 repositories", "Sales pipeline", "No access"], "description": "Second line of each card." },
+    "click": { "type": "integer", "min": -1, "max": 3, "default": 1, "description": "Which card the pointer switches on (0-based; -1: no pointer)." },
+    "status": { "type": "string", "maxLength": 24, "default": "Connected", "description": "What the clicked card's second line becomes." }
+  }
+}

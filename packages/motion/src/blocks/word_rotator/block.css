@@ -1,0 +1,10 @@
+.wr { position: absolute; left: 0; top: 0; display: flex; align-items: center; white-space: nowrap; font-weight: 500; letter-spacing: -0.03em; color: var(--ink); line-height: 1.15; }
+.wr-fixed { display: inline-block; }
+.wr-slot { position: relative; display: inline-block; height: 1.15em; margin: 0 0.26em; }
+.wr-column { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; }
+.wr-word { display: block; width: max-content; height: 1.15em; color: var(--accent); }
+.wr-stack { flex-direction: column; left: 0; right: 0; }
+.wr-stack .wr-slot { margin: 0.05em 0; transform-origin: 50% 50%; }
+.wr-stack .wr-word { font-weight: 600; }
+.wr-flip .wr-slot { clip-path: inset(0 -50% 0 -50%); }
+.wr-flip .wr-word { position: absolute; left: 0; top: 0; }

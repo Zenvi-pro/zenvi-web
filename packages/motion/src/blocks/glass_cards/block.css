@@ -1,0 +1,20 @@
+.gc-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gc-sky { position: absolute; inset: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--secondary) 55%, #fff) 0%, color-mix(in srgb, var(--secondary) 18%, #fff) 55%, #f4efe6 100%); }
+.gc-cloud { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.85); filter: blur(40px); }
+.gc-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0) 40%, rgba(0,0,0,0.12)); }
+.gc-stage { position: absolute; inset: 0; }
+.gc-headline { position: absolute; left: 0; right: 0; text-align: center; font-family: var(--font-display); font-weight: 600; letter-spacing: -0.035em; line-height: 1.05; color: #fff; text-shadow: 0 2px 24px rgba(0,0,0,0.25); }
+.gc-headline .em { font-family: var(--font-serif); font-style: italic; font-weight: 400; letter-spacing: -0.01em; }
+.gc-headline .word { display: inline-block; }
+.gc-cards { position: absolute; display: flex; gap: 28px; perspective: 1400px; }
+.gc-card { position: relative; border-radius: var(--radius); padding: 30px; display: flex; flex-direction: column; gap: 26px; color: var(--ink); }
+.gc-top { display: flex; align-items: center; justify-content: space-between; }
+.gc-icon { width: 76px; height: 76px; border-radius: calc(var(--radius) * 0.6); display: grid; place-items: center; font-weight: 700; font-size: 36px; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 6px 14px rgba(0,0,0,0.12); }
+.gc-title { font-size: 36px; font-weight: 650; letter-spacing: -0.02em; }
+.gc-detail { font-size: 26px; color: var(--muted); font-weight: 500; margin-top: 6px; position: relative; height: 1.25em; }
+.gc-detail > span { position: absolute; left: 0; top: 0; white-space: nowrap; }
+.gc-detail .on { color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.gc-detail .on .icon { width: 26px; height: 26px; display: block; }
+.gc-toggle { position: relative; width: 92px; height: 52px; border-radius: 26px; background: rgba(120,120,128,0.28); }
+.gc-knob { position: absolute; left: 5px; top: 5px; width: 42px; height: 42px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0,0,0,0.2); }
+.gc-ring { position: absolute; inset: -3px; border-radius: calc(var(--radius) + 3px); border: 3px solid var(--accent); opacity: 0; }

@@ -1,0 +1,19 @@
+{
+  "id": "text_scramble",
+  "version": 1,
+  "title": "Text scramble",
+  "description": "Text that decodes out of random glyphs, left to right and line by line, with an accent block riding the decode front: the tech/HUD reveal. Mono by default; any face works.",
+  "tags": ["type", "scramble", "decode", "tech", "hud", "glitch"],
+  "duration": { "default": 3, "min": 1.2, "max": 10 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "mono", "display": "mono" },
+  "params": {
+    "text": { "type": "string", "maxLength": 160, "default": "SYSTEM ONLINE / ALL AGENTS READY", "description": "The text. '/' breaks a line." },
+    "glyphs": { "type": "enum", "options": ["letters", "binary", "symbols", "blocks"], "default": "letters", "description": "Glyphs shown while scrambling." },
+    "align": { "type": "enum", "options": ["center", "left"], "default": "center", "description": "Alignment." },
+    "size": { "type": "number", "min": 0, "max": 220, "default": 0, "description": "Font size, px at 1080 (0: fit the safe width, up to 120)." },
+    "label": { "type": "string", "maxLength": 40, "default": "", "description": "Small label above, e.g. 'STATUS · 01' (empty: none)." },
+    "highlight": { "type": "boolean", "default": true, "description": "An accent block at the decode front." }
+  }
+}
