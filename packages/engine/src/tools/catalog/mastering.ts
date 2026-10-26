@@ -334,7 +334,7 @@ export const masteringTools: CatalogTool[] = [
         }
         return gains;
       };
-      const unmoved = (gains: ReadonlyMap<string, number>): boolean => plan.duckDb === 0 && [...gains.values()].every((db) => Math.abs(db) < NO_CHANGE_DB);
+      const unmoved = (gains: ReadonlyMap<string, number>): boolean => beds.length === 0 && [...gains.values()].every((db) => Math.abs(db) < NO_CHANGE_DB);
 
       const before = measuredOf(plan.before.mix);
       const data: Record<string, unknown> = {
