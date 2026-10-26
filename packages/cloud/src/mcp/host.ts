@@ -303,7 +303,7 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         const file = await localCopy(path);
         const frames = Number((await services.prober.probe(file)).video_length);
         if (frames > MATTE_MAX_FRAMES) {
-          throw new Error(`Zenvi Cloud mattes videos up to ${MATTE_MAX_FRAMES} frames per call and this one has ${frames}: trim the media first, or make the matte with the zenvi CLI`);
+          throw new Error(`Zenvi Cloud mattes videos up to ${MATTE_MAX_FRAMES} frames per call and this one has ${frames}; a matte covers the whole file, so export the part you need and import it, or make the matte with the zenvi CLI`);
         }
         fetched.set(path, file);
         const maker = mattes({ workDir: await scratchDir(), resolveMedia: resolveFetched });
