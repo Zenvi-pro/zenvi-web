@@ -224,7 +224,7 @@ export const kineticCaptionTools: CatalogTool[] = [
       const fps = fpsFraction.num / fpsFraction.den;
       let built: KineticCaptionPlan;
       try {
-        built = buildKineticCaptions({ frame: { width, height, fps }, words, style, emphasis: emphasisArg(args.emphasis), avoid: (args.avoid ?? []) as AvoidBox[], ...colours, lib });
+        built = buildKineticCaptions({ frame: { width, height, fps }, words, style, emphasis: emphasisArg(args.emphasis), avoid: (args.avoid ?? []) as AvoidBox[], ...colours, behind: args.behind_subject ?? false, lib });
       } catch (error) {
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }

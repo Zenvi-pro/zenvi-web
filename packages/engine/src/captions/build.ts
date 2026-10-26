@@ -15,7 +15,8 @@
  *              that stays in the safe area (motion/layout.ts) and clear of
  *              every avoid box by 2 % of the frame width. When no spot is
  *              clear the block is set smaller (85 %, 70 %) before taking
- *              the spot that overlaps least.
+ *              the spot that overlaps least. Behind a cut-out speaker the
+ *              group goes across the top of the head instead (BEHIND).
  *   tracks     word-by-word styles put word n of every group on track n (the
  *              words of a group overlap in time); karaoke puts the line on
  *              one track and the moving marker on the next.
@@ -47,6 +48,8 @@ export interface KineticCaptionInput {
   avoid: readonly AvoidBox[];
   ink?: string;
   accent?: string;
+  /** The speaker is cut out above the captions: groups go high, where the words pass behind the head. */
+  behind?: boolean;
   lib: FontLibrary;
 }
 
@@ -96,6 +99,10 @@ interface GroupBlock {
 }
 
 const MARGIN = 0.02;
+/** Largest type size (px at a 1080 px short side) whose halo grows with it. */
+const HALO_TYPE_SIZE = 64;
+/** Where groups go behind a cut-out speaker: across the top of the head. */
+const BEHIND = { portrait: { x: 0.5, y: 0.2 }, landscape: { x: 0.5, y: 0.26 } } as const;
 
 function setWord(lib: FontLibrary, text: string, face: CaptionFace, size: number): TextBlock {
   return typeset(lib, text, { family: face.family, size, weight: face.weight, italic: face.italic ?? false, tracking: face.tracking, transform: face.transform });
@@ -224,7 +231,7 @@ interface Painted {
 }
 
 /** A drawing of words (block coordinates offset by -x, -y), with the shadow and the karaoke pill. */
-function drawWords(p: Painted, width: number, height: number, k: number, colours: { ink: string; accent: string }, style: CaptionStyle, marker: boolean): Drawing {
+function drawWords(p: Painted, width: number, height: number, k: number, colours: { ink: string; accent: string }, style: CaptionStyle, marker: boolean, u: number): Drawing {
   const d = new Drawing(width, height, k);
   for (const w of p.words) {
     const ox = w.x - p.x;
@@ -241,8 +248,10 @@ function drawWords(p: Painted, width: number, height: number, k: number, colours
     const outline = outlineCommands(w.block.glyphs, ox, oy);
     if (style.shadow) {
       // No renderer here blurs: a soft halo is two wide dark strokes under the letters, plus a short drop.
-      d.path(outline, { fill: "#000000", fillOpacity: 0.2, stroke: "#000000", strokeWidth: Math.max(2, size * 0.14), strokeOpacity: 0.2, linejoin: "round" });
-      d.path(outline, { fill: "none", stroke: "#000000", strokeWidth: Math.max(1, size * 0.06), strokeOpacity: 0.32, linejoin: "round" });
+      // The halo is for small type: display sizes keep a thin one (a wide one reads as an outline).
+      const halo = Math.min(size, HALO_TYPE_SIZE * u);
+      d.path(outline, { fill: "#000000", fillOpacity: 0.2, stroke: "#000000", strokeWidth: Math.max(2, halo * 0.14), strokeOpacity: 0.2, linejoin: "round" });
+      d.path(outline, { fill: "none", stroke: "#000000", strokeWidth: Math.max(1, halo * 0.06), strokeOpacity: 0.32, linejoin: "round" });
       d.path(outlineCommands(w.block.glyphs, ox + size * 0.02, oy + size * 0.035), { fill: "#000000", fillOpacity: 0.3 });
     }
     d.path(outline, { fill: w.face.fill === "accent" ? colours.accent : colours.ink });
@@ -285,7 +294,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
   const avoid = input.avoid.map((a): Box => ({ x: (a.x - a.w / 2) * W - margin, y: (a.y - a.h / 2) * H - margin, width: a.w * W + 2 * margin, height: a.h * H + 2 * margin }));
   const subject = input.avoid[0];
   const portrait = H > W * 1.05;
-  const spots = (portrait ? style.spots.portrait : style.spots.landscape).map((s) => ({ x: s.x * W, y: s.y * H }));
+  const spots = (input.behind ? [BEHIND[portrait ? "portrait" : "landscape"]] : portrait ? style.spots.portrait : style.spots.landscape).map((s) => ({ x: s.x * W, y: s.y * H }));
   const safeWidth = safe.right - safe.left;
   const frameOf = (t: number) => Math.round(t * fps);
   const f0 = frameOf(groups[0]!.start);
@@ -396,7 +405,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
         track,
         from: start,
         to: end,
-        source: { kind: "svg", name, width, height, cx: width / 2, cy: height / 2, draw: (k) => drawWords({ words: [w], x: left, y: top }, width, height, k, colours, style, marker) },
+        source: { kind: "svg", name, width, height, cx: width / 2, cy: height / 2, draw: (k) => drawWords({ words: [w], x: left, y: top }, width, height, k, colours, style, marker, u) },
         keys: keysFor(start, end, rest, style, fps, H, entrance),
       };
     };
@@ -415,7 +424,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
         track: 0,
         from,
         to,
-        source: { kind: "svg", name, width, height, cx: width / 2, cy: height / 2, draw: (k) => drawWords({ words: b.words, x: left, y: top }, width, height, k, colours, style, false) },
+        source: { kind: "svg", name, width, height, cx: width / 2, cy: height / 2, draw: (k) => drawWords({ words: b.words, x: left, y: top }, width, height, k, colours, style, false, u) },
         keys: keysFor(from, to, { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2, s: 1, alpha: 1, rotation: 0 }, style, fps, H),
       });
       if (style.marker) {
