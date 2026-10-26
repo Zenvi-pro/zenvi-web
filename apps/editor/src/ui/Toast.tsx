@@ -68,7 +68,7 @@ function ToastCard({ item }: { item: ToastItem }) {
       <span className="mt-0.5 shrink-0">{icons[item.kind]}</span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-fg">{item.title}</p>
-        {item.description ? <p className="mt-0.5 text-xs text-fg-subtle">{item.description}</p> : null}
+        {item.description ? <p className="mt-0.5 whitespace-pre-line text-xs text-fg-subtle">{item.description}</p> : null}
         {item.action ? (
           <button
             type="button"
