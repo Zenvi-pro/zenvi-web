@@ -18,6 +18,16 @@ export function pictureCuts(project: Project): MotionCut[] {
   return project.layers.flatMap((l) => trackCuts(project, l.number)).filter((c) => hasPicture(c.outClip) && hasPicture(c.inClip));
 }
 
+/** The main sequence: the picture track with the most cuts (the lower one on a tie, like the desktop's V1). */
+export function mainSequence(project: Project): { layer: number; cuts: number } | null {
+  let best: { layer: number; cuts: number } | null = null;
+  for (const layer of [...project.layers].sort((a, b) => a.number - b.number)) {
+    const cuts = trackCuts(project, layer.number).filter((c) => hasPicture(c.outClip) && hasPicture(c.inClip)).length;
+    if (cuts > 0 && (!best || cuts > best.cuts)) best = { layer: layer.number, cuts };
+  }
+  return best;
+}
+
 export function targetCut(project: Project, selectedClipIds: readonly string[], time: number): MotionCut | null {
   const cuts = pictureCuts(project);
   if (cuts.length === 0) return null;
