@@ -123,11 +123,17 @@ export function nodeAssetSource(): AssetSource | undefined {
   const dir = renderNode.engineAssetsDir();
   if (!dir || !existsSync(dir)) return undefined;
   const root = path.resolve(dir);
+  const inside = (assetPath: string): string => {
+    const full = path.resolve(root, assetPath.replace(/^\/+/, ""));
+    if (!full.startsWith(`${root}${path.sep}`)) throw new Error(`not a bundled asset: ${assetPath}`);
+    return full;
+  };
   return {
     async readText(assetPath) {
-      const full = path.resolve(root, assetPath.replace(/^\/+/, ""));
-      if (!full.startsWith(`${root}${path.sep}`)) throw new Error(`not a bundled asset: ${assetPath}`);
-      return readFile(full, "utf8");
+      return readFile(inside(assetPath), "utf8");
+    },
+    async readBytes(assetPath) {
+      return new Uint8Array(await readFile(inside(assetPath)));
     },
   };
 }

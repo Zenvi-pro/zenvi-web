@@ -163,7 +163,10 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
   }
 
   const assets = services.assets;
-  if (assets) host.assets = { readText: (path) => assets.readText(path) };
+  if (assets) {
+    const bytes = assets.readBytes?.bind(assets);
+    host.assets = { readText: (path) => assets.readText(path), ...(bytes ? { readBytes: (path: string) => bytes(path) } : {}) };
+  }
 
   const analyze = services.analyzeAudio;
   const decode = services.decodePcm;
