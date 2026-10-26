@@ -284,6 +284,9 @@ export const masteringTools: CatalogTool[] = [
         stem: role(entry.id, lists) ?? stemOf(entry),
         locked: Boolean(lockedTrackError(entry.layer, project.layers)),
       }));
+      if (staged.every((s) => s.locked)) {
+        return refused(TOOL, `Every clip with audio is on a locked track (${staged.slice(0, 5).map((s) => s.entry.id).join(", ")}): unlock the tracks to master them.`);
+      }
       const unclassified = staged.filter((s) => s.entry.role === "unknown" && !role(s.entry.id, lists) && hasVideoStream(s.entry.clip, s.entry.file));
 
       let stems;

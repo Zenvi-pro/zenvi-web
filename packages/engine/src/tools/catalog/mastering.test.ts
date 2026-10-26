@@ -258,7 +258,16 @@ describe("master_audio_tool", { timeout: 60_000 }, () => {
     const id = add(doc, "music.mp3", { ai: indexed, layer: L3 });
     doc.transaction("lock", (tx) => tx.update(["layers", { number: L3 }], { lock: true }));
     const snapshot = JSON.stringify(doc.project.clips.find((c) => c.id === id));
+    const steps = doc.undoLabels.length;
+    // Nothing it may move: refused, not "already mastered".
+    const allLocked = await master(doc, host);
+    expect(allLocked.status).toBe("refused");
+    expect(allLocked.summary).toMatch(/locked/);
+    expect(doc.undoLabels.length).toBe(steps);
+
+    add(doc, "whoosh.wav", { ai: indexed, position: 2, end: 1, layer: L1 });
     const receipt = await master(doc, host);
+    expect(receipt.status).toBe("applied");
     expect(JSON.stringify(doc.project.clips.find((c) => c.id === id))).toBe(snapshot);
     expect(receipt.warnings.join(" ")).toMatch(/locked/);
   });
