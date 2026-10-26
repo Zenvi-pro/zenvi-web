@@ -12,7 +12,7 @@
  * overrides) are answered as `update_untracked` calls, outside the undo step.
  */
 
-import { rm } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import {
   DesktopActionError,
@@ -27,12 +27,14 @@ import {
   type DesktopAction,
   type ImportedMedia,
   type MediaHost,
+  type MotionHost,
   type Project,
   type ToolHost,
   type ToolImage,
   type ToolSurface,
 } from "@zenvi/engine";
 import { parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
+import { createMotionHost } from "@zenvi/motion/node";
 import { createNodeHost, isInside, loadRoots, localPath, type NodeHostOptions } from "@zenvi/render-node";
 import type { Registry } from "../engine/registry.js";
 import { VERSION } from "../version.js";
@@ -103,7 +105,25 @@ export function bridgeHost(projectFile: string, written: string[], options: Omit
     ...(media.importPath ? { importPath: async (p) => noteCopy(localPath(p), await media.importPath!(p)) } : {}),
     ...(media.importUrl ? { importUrl: async (u, o) => noteCopy(/^file:/i.test(u) ? localPath(u) : undefined, await media.importUrl!(u, o)) } : {}),
   };
-  return { ...base, media: bridged };
+  const motion = createMotionHost({ projectFile: () => projectFile, resolveMedia: base.resolveMedia, env: options.env });
+  const tracked = trackMotionRenders(motion, path.join(assets, "links", "zenvi-motion"), note);
+  return { ...base, media: bridged, motion: tracked };
+}
+
+/**
+ * Zenvi Motion renders land in `<assets>/links/zenvi-motion` (`dir`). A render that reused a file
+ * already there (an earlier call's, maybe in the bin) wrote nothing: only new files belong to the call.
+ */
+export function trackMotionRenders(motion: MotionHost, dir: string, note: (p: string) => unknown): MotionHost {
+  return {
+    ...motion,
+    render: async (request, signal) => {
+      const before = new Set(await readdir(dir).catch(() => [] as string[]));
+      const render = await motion.render(request, signal);
+      if (!before.has(path.basename(render.media.path))) note(render.media.path);
+      return render;
+    },
+  };
 }
 
 function elapsed(since: number): number {
