@@ -268,6 +268,13 @@ async function openTab(browser: Browser, url: string, design: { width: number; h
   if (alpha) await cdp.send("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e instanceof Error ? e.message : String(e)));
+  // The page may load only the render's own server (and inline data): nothing from the network.
+  await page.setRequestInterception(true);
+  page.on("request", (request) => {
+    const u = request.url();
+    if (u.startsWith(url) || u.startsWith("data:") || u.startsWith("blob:")) void request.continue();
+    else void request.abort("blockedbyclient");
+  });
   await page.goto(url, { waitUntil: "load" });
   const failure = await page.evaluate(async () => {
     const z = (globalThis as unknown as PageGlobals).__zenvi;

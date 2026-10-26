@@ -253,7 +253,7 @@ export const motionBlockTools: CatalogTool[] = [
       }
       const checked = motion.check(block.id, merged);
       if (!checked.ok) return refused(UPDATE, errorText(checked.error));
-      const seconds = args.duration_seconds ?? current.seconds ?? block.duration.default;
+      const seconds = args.duration_seconds ?? (current.seconds || block.duration.default);
       if (seconds < block.duration.min || seconds > block.duration.max) {
         return refused(UPDATE, `Error: ${block.id} runs ${block.duration.min}-${block.duration.max} s (got ${seconds}).`);
       }
