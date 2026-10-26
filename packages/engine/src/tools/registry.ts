@@ -43,6 +43,7 @@ import { projectPrefsTools } from "./catalog/project-export-prefs.js";
 import { projectProfileTools } from "./catalog/project-export-profiles.js";
 import { projectRenderTools } from "./catalog/project-export-render.js";
 import { reelTools } from "./catalog/reels.js";
+import { reviewTools } from "./catalog/review.js";
 import { searchTools } from "./catalog/search.js";
 import { speechTools } from "./catalog/speech-tools.js";
 import { stockTools } from "./catalog/stock.js";
@@ -105,7 +106,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools]) {
+  for (const tool of [...implemented, ...directTools, ...reelTools, ...reviewTools, ...motionTemplateTools, ...stockTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -129,7 +130,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...reelTools, ...motionTemplateTools, ...stockTools];
+  return [...contract, ...directTools, ...reelTools, ...reviewTools, ...motionTemplateTools, ...stockTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */

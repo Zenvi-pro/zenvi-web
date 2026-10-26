@@ -997,6 +997,18 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
 
+  review_edit_tool: {
+    happy: {
+      args: { image: "false", audio: "false" },
+      summary: /^Reviewed 0\.00-[\d.]+ s: \d+ shots \(median [\d.]+ s, longest [\d.]+ s\), \d+ cuts/,
+      check: ({ receipt, doc }) => {
+        expect((receipt.data as { shots: { count: number } }).shots.count).toBeGreaterThan(0);
+        expect(doc.undoLabels).toEqual([]);
+      },
+    },
+    failure: { args: { start: "5", end: "2" }, status: "refused", summary: /^Error: end must be after start\.$/ },
+  },
+
   add_motion_template_tool: {
     happy: {
       args: { template: "end_card", text: "Northwind", subtitle: "Brews in four minutes", position_seconds: "1", bpm: "120" },

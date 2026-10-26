@@ -347,6 +347,31 @@ export interface FrameOverlay {
   caption?: string;
 }
 
+/** One frame of a contact sheet. */
+export interface SheetTileRequest {
+  /** Timeline seconds. */
+  seconds: number;
+  /** Printed on the tile. */
+  label: string;
+}
+
+export interface SheetLayoutRequest {
+  columns: number;
+  tileWidth: number;
+  tileHeight: number;
+  gap: number;
+  /** Tiles whose mean luma is at or above `bright` / at or below `dark` get a marked border (a flash, a black frame). */
+  mark?: { bright: number; dark: number };
+}
+
+export interface SheetResult {
+  image: ToolImage;
+  width: number;
+  height: number;
+  /** Mean brightness 0-1 of each tile, in request order (a frame that could not be rendered: null). */
+  luma: (number | null)[];
+}
+
 export interface FrameHost {
   /** Render one timeline frame for a model or a person to look at. */
   renderFrame(
@@ -354,6 +379,11 @@ export interface FrameHost {
     seconds: number,
     options?: { width?: number; format?: "png" | "jpeg"; overlay?: FrameOverlay },
   ): Promise<ToolImage>;
+  /**
+   * Render `tiles` of the timeline into one labelled contact sheet (JPEG),
+   * `layout.columns` across. Absent where the host cannot compose images.
+   */
+  renderSheet?(project: Project, tiles: readonly SheetTileRequest[], layout: SheetLayoutRequest, signal?: AbortSignal): Promise<SheetResult>;
   /**
    * The font families this host's renderer draws title text with (the SVG
    * rasterizer's fonts), as the fonts spell them: what a title may name, like
@@ -392,6 +422,15 @@ export interface AudioHost {
     options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
   ): Promise<{ sampleRate: number; samples: Float32Array }>;
   /**
+   * Mix the project's audio down over `range` (default: all of it) and
+   * measure it: loudness, peak, stretches below `silenceDb` (default -50 dBFS)
+   * lasting at least `minSilence` seconds (default 0.4), and mono PCM.
+   */
+  measureMix?(
+    project: Project,
+    options?: { range?: { start: number; end: number }; silenceDb?: number; minSilence?: number; signal?: AbortSignal },
+  ): Promise<MixMeasurement>;
+  /**
    * Transcribe the speech in `path`'s audio with word timings, through the
    * Zenvi backend (`POST /api/v1/transcription`, billed per started minute).
    * Hosts extract mono speech audio, split long media
@@ -401,6 +440,18 @@ export interface AudioHost {
    * without speech recognition…).
    */
   transcribe?(path: string, options?: TranscribeOptions): Promise<Transcription>;
+}
+
+/** The project's audio mixed down and measured, for reviewing an edit by ear. */
+export interface MixMeasurement {
+  /** EBU R128 integrated loudness, LUFS; null for silence. */
+  lufs: number | null;
+  /** Sample peak, dBFS; null for silence. */
+  peakDb: number | null;
+  /** Stretches quieter than the threshold, timeline seconds. */
+  silences: { start: number; end: number }[];
+  /** The mix as mono float PCM from the range start, for beat tracking. */
+  pcm: { sampleRate: number; samples: Float32Array };
 }
 
 export interface TranscribeOptions {
