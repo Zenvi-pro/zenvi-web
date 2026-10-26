@@ -221,6 +221,9 @@ describe("create_sound_kit_tool", () => {
     // The fake library's whoosh fits the whoosh role; synthesised roles stay procedural.
     expect(kit.slots.whoosh).toMatchObject({ source: "library", sounds: [{ provider: "openverse", id: WHOOSH_ID }] });
     expect(kit.slots.click?.source).toBe("procedural");
+    // The only riser the library has is non-commercial; its impacts are not risers: the riser is synthesised.
+    expect(kit.slots.riser?.source).toBe("procedural");
+    expect((result.data as { warnings: string[] }).warnings).toEqual(expect.arrayContaining([expect.stringMatching(/^No usable library riser for 'riser' \(\d found, 0 named like one\): it is synthesised\.$/)]));
     const fileIds = data<{ file_ids: string[] }>(result).file_ids;
     expect(fileIds.length).toBeGreaterThan(0);
     for (const id of fileIds) expect(doc.project.files.find((f) => f.id === id)?.zenvi_credit).toBeTruthy();

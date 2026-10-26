@@ -1034,7 +1034,7 @@ const SPECS: Record<string, Spec> = {
       summary: /^2 sound effects for 'whoosh' \(commercial-ok\):\n {2}provider=openverse {2}id=0e8a6e2a-\S+ {2}"Deep Whoosh #1" {2}1\.20 s {2}CC0 1\.0 \(no credit needed\)/,
       check: ({ doc, before, host }) => {
         expect(doc.project).toEqual(before);
-        expect(host.calls).toContain("library https://api.openverse.org/v1/audio/?q=whoosh&license=cc0%2Cpdm%2Cby%2Cby-sa&page_size=20&mature=false");
+        expect(host.calls).toContain("library https://api.openverse.org/v1/audio/?q=whoosh&license=cc0%2Cpdm%2Cby%2Cby-sa&page_size=12&mature=false");
       },
     },
     failure: { args: { query: "whoosh", provider: "openverse" }, host: { without: ["library"] }, status: "refused", summary: /^Error: Openverse search failed: this surface cannot reach Openverse\.$/ },

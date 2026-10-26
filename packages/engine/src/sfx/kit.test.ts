@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createProject } from "../model/defaults.js";
-import { KIT_SLOTS, SOUND_KIT_KEY, applyKit, guessSlot, kitFileIds, librarySlots, proceduralKit, readSoundKit, type SoundKit } from "./kit.js";
+import { KIT_SLOTS, SOUND_KIT_KEY, applyKit, fitsSlot, guessSlot, kitFileIds, librarySlots, proceduralKit, readSoundKit, type SoundKit } from "./kit.js";
 import type { SfxCue } from "./plan.js";
 
 const cue = (recipe: string, at: number, params: SfxCue["params"] = {}): SfxCue => ({ recipe, at, params, gainDb: -10, reason: "cut" });
@@ -81,6 +81,14 @@ describe("slots", () => {
     expect(guessSlot("Glass impact hit")).toBe("hit");
     expect(guessSlot("Untitled 4", ["ui", "click"])).toBe("click");
     expect(guessSlot("Untitled 4")).toBe("hit");
+  });
+
+  it("lets a punch be a boom and a swish a whoosh, but never an impact a riser", () => {
+    expect(fitsSlot("boom", "PUNCH-BOXING-01.wav")).toBe(true);
+    expect(fitsSlot("whoosh", "Swipe 3")).toBe(true);
+    expect(fitsSlot("riser", "2 Impact Wet")).toBe(false);
+    expect(fitsSlot("riser", "Impact", ["riser", "build"])).toBe(false);
+    expect(fitsSlot("riser", "Cinematic build up")).toBe(true);
   });
 
   it("takes whooshes, swishes, hits, booms and risers from the library in a mixed kit", () => {

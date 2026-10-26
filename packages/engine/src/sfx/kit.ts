@@ -269,6 +269,25 @@ const SLOT_WORDS: readonly [KitSlot, RegExp][] = [
   ["hit", /\b(hit|impact|punch|thud|slam|kick|knock|bang)\b/],
 ];
 
+/** Slots a sound guessed as one may still play: a punch can be a boom, a swish a whoosh; a riser is only ever a riser. */
+const SLOT_FITS: Readonly<Record<KitSlot, readonly KitSlot[]>> = {
+  whoosh: ["whoosh", "swish", "whip"],
+  swish: ["swish", "whoosh", "whip"],
+  whip: ["whip", "whoosh", "swish"],
+  hit: ["hit", "boom"],
+  boom: ["boom", "hit", "sub"],
+  sub: ["sub", "boom"],
+  riser: ["riser"],
+  click: ["click", "pop"],
+  pop: ["pop", "click"],
+  glitch: ["glitch"],
+};
+
+/** Whether a library sound's title and tags say it can play `slot` (library searches are loose: "riser" also finds impacts). */
+export function fitsSlot(slot: KitSlot, title: string, tags: readonly string[] = []): boolean {
+  return SLOT_FITS[slot].includes(guessSlot(title, tags));
+}
+
 /** The slot a library sound most likely plays (its hit point and mix level follow): the title decides first, then the tags; an impact when nothing says. */
 export function guessSlot(title: string, tags: readonly string[] = []): KitSlot {
   for (const text of [title.toLowerCase(), tags.join(" ").toLowerCase()]) {

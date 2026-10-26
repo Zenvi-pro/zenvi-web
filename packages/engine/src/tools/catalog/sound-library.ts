@@ -14,7 +14,7 @@
 
 import { z } from "zod";
 import type { Transaction } from "../../history/document.js";
-import { KIT_SLOTS, KIT_SLOT_SPECS, KIT_SOURCES, KIT_TONES, SOUND_KIT_KEY, kitFileIds, librarySlots, proceduralKit, readSoundKit, slotRecipe, type KitSlot, type SoundKit } from "../../sfx/kit.js";
+import { KIT_SLOTS, KIT_SLOT_SPECS, KIT_SOURCES, KIT_TONES, SOUND_KIT_KEY, fitsSlot, kitFileIds, librarySlots, proceduralKit, readSoundKit, slotRecipe, type KitSlot, type SoundKit } from "../../sfx/kit.js";
 import { SFX_LICENSE_FILTERS, searchRecipes, type SfxCredit, type SfxLibraryResult, type SfxLicenseFilter, type SfxSearchFilters } from "../../sfx/library.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused, unchanged } from "../receipt.js";
@@ -101,17 +101,29 @@ const PENDING = "pending:";
 export async function fillLibrarySlots(call: ToolCall, kit: SoundKit, slots: readonly KitSlot[], options: { license: SfxLicenseFilter; variants: number; style: string }): Promise<FilledSlots> {
   const pending = new Map<string, PreparedSfx>();
   const warnings: string[] = [];
-  for (const slot of slots) {
+  const queries = slots.map((slot) => `${options.style} ${KIT_SLOT_SPECS[slot].query}`.trim());
+  // The searches at once (a kit is at most ten, under Openverse's 20 a minute): an uncached one can take most of a minute.
+  const searches = await Promise.all(
+    slots.map((slot, i) => {
+      const spec = KIT_SLOT_SPECS[slot];
+      // Silence is trimmed, so a file may run a little longer than the role.
+      const filters: SfxSearchFilters = { license: options.license, noncommercial: false, minSeconds: spec.seconds[0], maxSeconds: spec.seconds[1] + 1 };
+      return searchLibraries(call, queries[i]!, filters, 8);
+    }),
+  );
+  for (const [i, slot] of slots.entries()) {
     const spec = KIT_SLOT_SPECS[slot];
-    const query = `${options.style} ${spec.query}`.trim();
-    // Silence is trimmed, so a file may run a little longer than the role.
-    const filters: SfxSearchFilters = { license: options.license, noncommercial: false, minSeconds: spec.seconds[0], maxSeconds: spec.seconds[1] + 1 };
-    const found = await searchLibraries(call, query, filters, 8);
+    const query = queries[i]!;
+    const found = searches[i]!;
     if ("error" in found) {
       warnings.push(`No library ${slot}: ${found.error} It is synthesised.`);
       continue;
     }
-    const ranked = found.results.map((r, i) => ({ r, i })).sort((a, b) => Number(a.r.attribution_required) - Number(b.r.attribution_required) || a.i - b.i);
+    for (const note of found.notes) if (!warnings.includes(note)) warnings.push(note);
+    const ranked = found.results
+      .filter((r) => fitsSlot(slot, r.title, r.tags))
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => Number(a.r.attribution_required) - Number(b.r.attribution_required) || a.i - b.i);
     const made: { result: LibraryResult; sound: PreparedSfx }[] = [];
     for (const { r } of ranked.slice(0, options.variants + 2)) {
       if (made.length >= options.variants) break;
@@ -122,7 +134,7 @@ export async function fillLibrarySlots(call: ToolCall, kit: SoundKit, slots: rea
       }
     }
     if (made.length === 0) {
-      warnings.push(`No usable library ${slot} for '${query}' (${found.results.length} found): it is synthesised.`);
+      warnings.push(`No usable library ${slot} for '${query}' (${found.results.length} found, ${ranked.length} named like one): it is synthesised.`);
       continue;
     }
     kit.slots[slot] = {

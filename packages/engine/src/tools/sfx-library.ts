@@ -38,8 +38,8 @@ export const SOUND_LIBRARY_ORIGINS: readonly string[] = [/^https:\/\/[^/]+/.exec
 
 /** Largest library file downloaded, bytes (effects are small; this stops a whole album). */
 export const MAX_LIBRARY_BYTES = 25 * 1024 * 1024;
-/** Longest a library request may take, ms. */
-const LIBRARY_TIMEOUT_MS = 20_000;
+/** Longest a library request may take, ms: Openverse checks every result's link before answering a search it has not cached, which can take most of a minute. */
+const LIBRARY_TIMEOUT_MS = 60_000;
 /** Most audio decoded from one library file, seconds. */
 const MAX_DECODE_SECONDS = 30;
 
@@ -82,6 +82,7 @@ export function fetchLibraryHost(options: { fetch: LibraryFetch; openverseToken?
         throw new Error(`Openverse's rate limit is reached (20 searches a minute, 200 a day without a key)${wait ? `; try again in ${wait} s` : ""}.`);
       }
       if (response.status === 404) throw new Error("no such sound in the library (404).");
+      if (response.status >= 500) throw new Error(`the library is having trouble (${response.status}); try again in a minute.`);
       if (!response.ok) throw new Error(`the library answered ${response.status}.`);
       return response.json();
     },
@@ -95,7 +96,8 @@ export async function searchOpenverse(call: ToolCall, query: string, filters: Sf
   const library = call.host.library;
   if (!library) return { error: "this surface cannot reach Openverse." };
   try {
-    const page = readOpenverseSearch(await library.getJson(openverseSearchUrl(query, filters), { signal: call.signal }));
+    // A few more than asked, for the length filter; small pages answer sooner (Openverse checks each result's link).
+    const page = readOpenverseSearch(await library.getJson(openverseSearchUrl(query, filters, limit + 4), { signal: call.signal }));
     return { results: filterResults(page.results, filters).slice(0, limit) as LibraryResult[], total: page.total };
   } catch (error) {
     return { error: errorText(error) };
