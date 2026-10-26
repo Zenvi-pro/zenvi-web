@@ -145,10 +145,20 @@ test("make it snappy runs as separate undo steps with one summary toast", async 
   await page.waitForTimeout(600);
   await shot(page, "18-snappy-done");
 
-  // Play the result for the recording.
-  await page.keyboard.press("Home");
+  // Step across the first cut (4 s) frame by frame, then play over it, for the recording.
+  const dir = process.env.ZENVI_E2E_VIDEO_DIR;
+  const ruler = (await page.getByRole("slider", { name: /Timeline ruler/ }).boundingBox())!;
+  const first = (await clips(page).filter({ hasText: "pattern.webm" }).first().boundingBox())!;
+  const at = (seconds: number) => page.mouse.click(first.x + (first.width / 4) * seconds, ruler.y + ruler.height / 2);
+  await at(3.8);
+  for (let i = 0; i < 10; i += 1) {
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(350);
+    if (dir) await page.getByLabel("Video preview").screenshot({ path: join(dir, "whip-frames", `${String(i).padStart(2, "0")}.png`) });
+  }
+  await at(2.8);
   await page.keyboard.press("Space");
-  await page.waitForTimeout(4000);
+  await page.waitForTimeout(2500);
   await page.keyboard.press("Space");
 
   // Each step is its own undo step, newest first.
@@ -165,7 +175,6 @@ test("make it snappy runs as separate undo steps with one summary toast", async 
   await page.waitForTimeout(500);
 
   expect(errors).toEqual([]);
-  const dir = process.env.ZENVI_E2E_VIDEO_DIR;
   const video = page.video();
   await page.close();
   if (dir && video) await video.saveAs(join(dir, "make-it-snappy.webm"));
