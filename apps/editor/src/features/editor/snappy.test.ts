@@ -2,7 +2,7 @@ import { addClip, addFile, createProject, findProfile, setClipProperty, type Rea
 import { describe, expect, it, vi } from "vitest";
 import { MemoryMediaStore } from "@/lib/storage/media";
 import { MemoryProjectRepository } from "@/lib/storage/projects";
-import { editorToolRunner } from "./editorTools";
+import { editorToolRunner, type ToolRunner } from "./editorTools";
 import { EditorSession } from "./session/EditorSession";
 import { MediaLibrary } from "./session/media";
 import { mainSequence } from "./cuts";
@@ -39,6 +39,18 @@ function sessionWithCuts(count: number, gap = 0) {
   return session;
 }
 
+/**
+ * The editor's tools, with master_audio_tool answered as a mastered mix would be: the
+ * test session's media never loads, so the browser has nothing to mix (mastering itself is
+ * tested in the engine and by the editor e2e export).
+ */
+function withMastering(run: ToolRunner): ToolRunner {
+  return async (name, args) =>
+    name === "master_audio_tool"
+      ? { ok: true, status: "applied", summary: "Mastered to -14 LUFS.", data: { after: { integratedLufs: -14 } }, warnings: [], undoSteps: 0 }
+      : run(name, args);
+}
+
 describe("make it snappy", () => {
   it("finds the sequence with the most cuts", () => {
     const session = sessionWithCuts(3);
@@ -49,7 +61,7 @@ describe("make it snappy", () => {
   it("runs transitions and sound design as separate undo steps through the agents' tools", async () => {
     const session = sessionWithCuts(3);
     const calls: string[] = [];
-    const real = editorToolRunner(session);
+    const real = withMastering(editorToolRunner(session));
     const before = session.doc.undoLabels.length;
     const outcomes = await makeItSnappy(() => session.project, (name, args) => (calls.push(name), real(name, args)));
     expect(calls.slice(0, 2)).toEqual(["apply_motion_transitions_tool", "auto_sound_design_tool"]);
@@ -121,7 +133,7 @@ describe("make it snappy", () => {
 
   it("leads its summary with one line of what changed, from the receipts", async () => {
     const session = sessionWithCuts(3);
-    const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
+    const outcomes = await makeItSnappy(() => session.project, withMastering(editorToolRunner(session)));
     const summary = snappySummary(outcomes);
     const [headline] = summary.description.split("\n");
     expect(headline).toMatch(/^2 transitions · \d+ sounds?( · mastered to −\d+ LUFS)?$/);
