@@ -152,6 +152,42 @@ describe("subject mattes", () => {
     expect(host.calls.filter((c) => c.startsWith("matte"))).toHaveLength(1);
   });
 
+  it("a same re-run records nothing after other edits, and keeps its tracks under a composite built later", async () => {
+    const d = doc();
+    const host = matting(fakeHost());
+    await run(d, host, "text_behind_subject_tool", { clip_id: "TALKCLIP01", text: "TIME" });
+    d.transaction("other clip", (tx) => addClip(tx, { fileId: "BEACHFILE1", position: 20, layer: L1, start: 0, end: 3, id: "OTHERCLIP1" }));
+    await run(d, host, "pop_out_tool", { clip_id: "TALKCLIP01" });
+    const layers = d.project.clips.map((c) => [c.id, c.layer]);
+    const steps = d.undoLabels.length;
+    const same = await run(d, host, "text_behind_subject_tool", { clip_id: "TALKCLIP01", text: "TIME" });
+    expect(same.status).toBe("unchanged");
+    expect(d.undoLabels.length).toBe(steps);
+    expect(d.project.clips.map((c) => [c.id, c.layer])).toEqual(layers);
+  });
+
+  it("refuses to rebuild a stack with a piece on a locked track, recording nothing", async () => {
+    const d = doc();
+    const host = matting(fakeHost());
+    await run(d, host, "text_behind_subject_tool", { clip_id: "TALKCLIP01", text: "TIME" });
+    const text = piece(d.project, "text");
+    d.transaction("lock", (tx) => tx.update(["layers", { number: text.layer }], { lock: true }));
+    const steps = d.undoLabels.length;
+    const receipt = await run(d, host, "text_behind_subject_tool", { clip_id: "TALKCLIP01", text: "IDEA" });
+    expect(receipt.summary).toMatch(/^Error: .*locked track/);
+    expect(d.undoLabels.length).toBe(steps);
+    expect(piece(d.project, "text").id).toBe(text.id);
+  });
+
+  it("refuses to matte a file longer than mattes cover, by file_id too", async () => {
+    const d = doc();
+    d.transaction("long", (tx) => addFile(tx, media("/media/long.mp4", videoInfo("/media/long.mp4", 900)), { id: "LONGFILE01" }));
+    const host = matting(fakeHost());
+    const receipt = await run(d, host, "generate_subject_matte_tool", { file_id: "LONGFILE01" });
+    expect(receipt.summary).toMatch(/^Error: long\.mp4 is 900 s long/);
+    expect(host.calls.filter((c) => c.startsWith("matte"))).toEqual([]);
+  });
+
   it("slips an existing title between the footage and the cut-out", async () => {
     const d = doc();
     d.transaction("title", (tx) => addClip(tx, { fileId: "BEACHFILE1", position: 2, layer: L1 * 3, start: 0, end: 3, id: "TITLECLIP1" }));

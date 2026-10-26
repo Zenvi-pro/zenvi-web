@@ -20,6 +20,7 @@ import { directTool, unavailableMessage, type CatalogTool, type ToolCall, type T
 import {
   addMatteFile,
   buildStack,
+  compositePieces,
   cutoutMask,
   fileLabel,
   findMatte,
@@ -27,6 +28,7 @@ import {
   generatedSvg,
   isTimeRemapped,
   matteableClipProblem,
+  matteLengthProblem,
   matteRecord,
   type CompositeTool,
   type PieceSpec,
@@ -99,6 +101,11 @@ function isGenerated(matte: ProjectFile | GeneratedMatte): matte is GeneratedMat
 
 class NoChange extends Error {}
 
+/** The project with clips in id order: a rebuild re-inserts its pieces at the end of `clips`, which changes nothing anyone sees. */
+function timelineState(project: Project): string {
+  return JSON.stringify({ ...project, clips: [...project.clips].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) });
+}
+
 function stackData(subj: Subject, matteFile: ProjectFile, stack: StackResult): Record<string, unknown> {
   const record = matteRecord(matteFile)!;
   return {
@@ -127,14 +134,16 @@ function stackData(subj: Subject, matteFile: ProjectFile, stack: StackResult): R
  */
 function commitStack(call: ToolCall, tool: CompositeTool, subj: Subject, specs: (matte: ProjectFile) => PieceSpec[], summary: (stack: StackResult) => string): ToolOutcome {
   const name = `${tool}_tool`;
-  const before = JSON.stringify(call.doc.project);
+  const locked = compositePieces(call.doc.project, tool, subj.source.id).find((c) => isLocked(call.doc.project, c.layer));
+  if (locked) toolError(`the ${tool.replaceAll("_", " ")} stack on clip ${subj.source.id} has clip ${locked.id} on locked track ${uiTrackNumber(call.doc.project, locked.layer)}; unlock it first`);
+  const before = timelineState(call.doc.project);
   let out: { matteFile: ProjectFile; stack: StackResult };
   try {
     out = call.commit((tx) => {
       const matteFile = isGenerated(subj.matte) ? addMatteFile(tx, subj.file, subj.matte, subj.subject, subj.scale) : subj.matte;
       const source = tx.project.clips.find((c) => c.id === subj.source.id)!;
       const stack = buildStack(tx, tool, source, specs(matteFile));
-      if (JSON.stringify(tx.project) === before) throw new NoChange();
+      if (timelineState(tx.project) === before) throw new NoChange();
       return { matteFile, stack };
     });
   } catch (error) {
@@ -213,6 +222,8 @@ export const matteTools: CatalogTool[] = [
         }
         if (file.media_type !== "video" || file.has_video === false || file.has_single_image) toolError(`${fileLabel(file)} is not video`);
         if (matteRecord(file)) toolError(`${file.id} is itself a matte`);
+        const tooLong = matteLengthProblem(file);
+        if (tooLong) toolError(tooLong);
         const scale = input.size === "full" ? 1 : input.size === "half" ? 0.5 : autoScale(file);
         let matte: GeneratedMatte;
         try {

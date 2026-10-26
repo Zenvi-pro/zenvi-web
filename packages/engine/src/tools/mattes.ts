@@ -25,7 +25,7 @@ import { addFile, removeFile, updateFile } from "../ops/files.js";
 import { patchClip } from "../ops/internal.js";
 import { ensureTrack } from "../ops/overlays.js";
 import type { ToolCall } from "./define.js";
-import { clipExtent, constantKeyframe, planOverlayTrack, toolError } from "./titles-text.js";
+import { clipExtent, clipsInWindow, constantKeyframe, isLocked, planOverlayTrack, toolError } from "./titles-text.js";
 import type { GeneratedMatte, ImportedMedia, MatteSubject } from "./types.js";
 
 export const MATTE_KEY = "zenvi_matte";
@@ -106,6 +106,11 @@ export function matteableClipProblem(project: Project, clip: Clip): string | nul
   }
   if (matteRecord(file)) return `clip ${clip.id} plays a matte; pick the footage clip`;
   if (compositeTag(clip)) return `clip ${clip.id} is part of a ${compositeTag(clip)!.tool} stack; pick the footage clip it was built on (${compositeTag(clip)!.source_clip_id})`;
+  return matteLengthProblem(file);
+}
+
+/** Mattes cover the whole file: why `file` is too long for one, or null. */
+export function matteLengthProblem(file: ProjectFile): string | null {
   const duration = Number(file.duration) || 0;
   if (duration > MAX_MATTE_SECONDS) {
     return `${fileLabel(file)} is ${duration.toFixed(0)} s long; mattes cover the whole file, at most ${MAX_MATTE_SECONDS} s (export the part you need and import it)`;
@@ -242,6 +247,7 @@ const SCALE_CROP = 0;
 export function buildStack(tx: Transaction, tool: CompositeTool, source: Clip, specs: readonly PieceSpec[]): StackResult {
   const old = compositePieces(tx.project, tool, source.id);
   const oldIds = new Map(old.map((c) => [compositeTag(c)!.role, c.id]));
+  const oldLayers = new Map(old.map((c) => [c.id, c.layer]));
   const oldEffectIds = new Map(old.map((c) => [c.id, (c.effects ?? []).map((e) => e.id)]));
   // A rebuilt piece keeps its effects' ids, in order, so a re-run that changes nothing is a no-op.
   const keepIds = (clipId: string, effects: Effect[]): Effect[] => {
@@ -260,14 +266,22 @@ export function buildStack(tx: Transaction, tool: CompositeTool, source: Clip, s
     ensureTrack(tx, layer, "Subject");
     return layer;
   };
+  // A rebuilt piece stays on its track while that still stacks it above the piece under it, so
+  // re-running a composite under another one built later does not reshuffle the tracks.
+  const below = (): number => (result.pieces.length > 0 ? result.pieces[result.pieces.length - 1]!.layer : source.layer);
+  const keptLayer = (clipId: string | undefined): number | undefined => {
+    const layer = clipId === undefined ? undefined : oldLayers.get(clipId);
+    if (layer === undefined || layer <= below() || isLocked(tx.project, layer)) return undefined;
+    if (!tx.project.layers.some((l) => Math.trunc(Number(l.number)) === layer)) return undefined;
+    return clipsInWindow(tx.project, layer, start, end).length === 0 ? layer : undefined;
+  };
 
   for (const spec of specs) {
     if (spec.kind === "existing") {
       const clip = tx.project.clips.find((c) => c.id === spec.clipId);
       if (!clip) toolError(`no timeline clip with id='${spec.clipId}'`);
       const [s, e] = clipExtent(clip);
-      const below = result.pieces.length > 0 ? result.pieces[result.pieces.length - 1]!.layer : source.layer;
-      if (clip.layer <= below) {
+      if (clip.layer <= below()) {
         const layer = window(new Set([clip.id]), Math.min(s, start), Math.max(e, end));
         patchClip(tx, clip.id, { layer });
         result.movedIds.push(clip.id);
@@ -278,7 +292,7 @@ export function buildStack(tx: Transaction, tool: CompositeTool, source: Clip, s
     }
     const reuse = oldIds.get(spec.role);
     const id = reuse ?? nextId();
-    const layer = window(new Set());
+    const layer = keptLayer(reuse) ?? window(new Set());
     let clip: Clip;
     if (spec.kind === "copy") {
       const copy = structuredClone(source) as Record<string, unknown>;
