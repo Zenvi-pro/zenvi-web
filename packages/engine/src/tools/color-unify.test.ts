@@ -17,7 +17,7 @@ describe("unifyTarget", () => {
   it("takes each key's median and pulls it into the neutral band", () => {
     const target = unifyTarget([profile(0.1, 0.2), profile(0.15, 0.15), profile(0.8, 0.1), { present: false }]);
     // Median luma 0.15 is too dark for a shared plate: the band's floor. Median warmth 0.15 is clamped to 0.06.
-    expect(target).toMatchObject({ present: true, avg_luma: 0.38, warm_cool: 0.06, contrast_span: 0.45 });
+    expect(target).toMatchObject({ present: true, avg_luma: 0.32, warm_cool: 0.06, contrast_span: 0.45 });
   });
 
   it("never aims for clipping", () => {
@@ -64,14 +64,17 @@ describe("solveUnifyKnobs", () => {
     // Twice as bright is one stop; the span doubles with it (0.6), so contrast comes down to 0.45 / 0.6.
     expect(next.exposure).toBeCloseTo(1);
     expect(next.contrast).toBeCloseTo(-0.25);
-    // -0.05 of warmth at 0.125 per channel, scaled by the gain (2) and contrast (0.75).
-    expect(next.temperature).toBeCloseTo(-0.05 / (0.25 * 1.5));
+    // The plate's 0.05 of warmth goes before the gain: temperature cancels it at 0.125 per channel.
+    expect(next.temperature).toBeCloseTo(-0.2);
     expect(next.tint).toBe(0);
   });
 
   it("steps from the knobs the clip has, damped, and within each knob's per-pass limit and range", () => {
-    const next = solveUnifyKnobs(profile(0.05), profile(0.5), { ...neutral, exposure: 1.5 }, 1);
-    expect(next.exposure).toBe(2);
+    // A night plate is lifted 1.5 stops at most, and a flatter curve does the rest of the way.
+    const night = solveUnifyKnobs(profile(0.1, 0, { contrast_span: 0.2 }), profile(0.4, 0, { contrast_span: 0.45 }), { ...neutral, exposure: 1 }, 1);
+    expect(night.exposure).toBe(1.5);
+    expect(night.contrast).toBeLessThan(0);
+    expect(night.contrast).toBeGreaterThanOrEqual(-0.3);
     const damped = solveUnifyKnobs(profile(0.25), profile(0.5), neutral, 0.5);
     expect(damped.exposure).toBeCloseTo(0.5);
     const tinted = solveUnifyKnobs(profile(0.5, 0, { green_magenta: 0.1 }), profile(0.5), neutral, 1);

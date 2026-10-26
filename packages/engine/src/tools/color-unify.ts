@@ -41,7 +41,7 @@ export const UNIFY_TOLERANCE: Readonly<Record<UnifyKey, number>> = {
  * has a clean plate to work on.
  */
 export const NEUTRAL_BAND: Readonly<Record<UnifyKey, readonly [number, number]>> = {
-  avg_luma: [0.38, 0.58],
+  avg_luma: [0.32, 0.58],
   warm_cool: [-0.04, 0.06],
   green_magenta: [-0.02, 0.02],
   contrast_span: [0.3, 0.62],
@@ -56,57 +56,86 @@ export interface UnifyKnobs {
 }
 
 /** Largest change one pass makes to each knob: a wrong measurement cannot swing the picture. */
-const KNOB_STEP: Readonly<UnifyKnobs> = { exposure: 1.25, contrast: 0.3, temperature: 0.45, tint: 0.35 };
-/** Where unify leaves each knob, inside ColorGrade's own ranges. */
+const KNOB_STEP: Readonly<UnifyKnobs> = { exposure: 1, contrast: 0.3, temperature: 0.45, tint: 0.35 };
+/**
+ * Where unify leaves each knob, inside ColorGrade's own ranges. Exposure
+ * stops at ±1.5: a night shot lifted further turns to noise and stops being
+ * night; it comes closer, it does not become day.
+ */
 const KNOB_RANGE: Readonly<Record<keyof UnifyKnobs, readonly [number, number]>> = {
-  exposure: [-2, 2],
+  exposure: [-1.5, 1.5],
   contrast: [-0.6, 0.8],
   temperature: [-0.8, 0.8],
   tint: [-0.6, 0.6],
 };
+
+const clampTo = (lo: number, hi: number, x: number): number => Math.max(lo, Math.min(hi, x));
 
 /**
  * The knobs that move a clip from `current` onto `target`, from ColorGrade's
  * own pixel math (render/kernels/color-grade.ts, libopenshot
  * src/effects/ColorGrade.cpp:311-324): white balance adds ±0.125 ×
  * temperature to red/blue and tint moves green by 0.1 against red/blue's
- * 0.05, then exposure multiplies by 2^stops and contrast scales around mid
- * grey by (1 + contrast). So average luma follows the gain, the contrast span
- * follows gain × (1 + contrast), and a cast is scaled by both. Clipping makes
- * every response weaker than this, which the next measured pass corrects;
- * `damping` (0-1) takes part of the step.
+ * 0.05, then exposure multiplies by a gain G = 2^stops and contrast scales
+ * around mid grey by C = 1 + contrast. So with the plate's mean m and span s
+ * (the clip without this grade), the graded mean is (m·G − ½)·C + ½ and the
+ * span s·G·C; a cast is scaled by G·C. The plate is backed out of `current`
+ * and the grade it already has, G·C comes from the span, C from the mean,
+ * and the casts from both. Clipping makes every response weaker than this,
+ * which the next measured pass corrects; `damping` (0-1) takes part of each
+ * step. When exposure hits its range, the mean wins over the span.
  */
 export function solveUnifyKnobs(current: Json, target: Json, knobs: UnifyKnobs, damping = 0.85): UnifyKnobs {
   const next: UnifyKnobs = { ...knobs };
   const stat = (p: Json, key: UnifyKey): number | null => finite(p[key]);
   const step = (key: keyof UnifyKnobs, value: number): void => {
-    const delta = Math.max(-KNOB_STEP[key], Math.min(KNOB_STEP[key], (value - knobs[key]) * damping));
+    const delta = clampTo(-KNOB_STEP[key], KNOB_STEP[key], (value - knobs[key]) * damping);
     const [lo, hi] = KNOB_RANGE[key];
-    next[key] = roundTo(Math.max(lo, Math.min(hi, knobs[key] + delta)), 4);
+    next[key] = roundTo(clampTo(lo, hi, knobs[key] + delta), 4);
   };
+  const g0 = 2 ** knobs.exposure;
+  const c0 = Math.max(0.05, 1 + knobs.contrast);
   const luma = stat(current, "avg_luma");
   const lumaGoal = stat(target, "avg_luma");
-  if (luma !== null && lumaGoal !== null && luma > 1e-3 && lumaGoal > 1e-3 && Math.abs(lumaGoal - luma) > UNIFY_TOLERANCE.avg_luma / 2) {
-    step("exposure", knobs.exposure + Math.log2(lumaGoal / luma));
-  }
-  const gainChange = 2 ** (next.exposure - knobs.exposure);
   const span = stat(current, "contrast_span");
   const spanGoal = stat(target, "contrast_span");
-  if (span !== null && spanGoal !== null && span > 1e-3) {
-    const after = span * gainChange;
-    if (Math.abs(spanGoal - after) > UNIFY_TOLERANCE.contrast_span / 2) step("contrast", (1 + knobs.contrast) * (spanGoal / after) - 1);
+  const mean = luma === null ? null : ((luma - 0.5) / c0 + 0.5) / g0;
+  if (luma !== null && lumaGoal !== null && mean !== null && mean > 1e-4 && Math.abs(lumaGoal - luma) > UNIFY_TOLERANCE.avg_luma / 2) {
+    let gain: number;
+    let factor = c0;
+    if (span !== null && spanGoal !== null && span > 1e-3) {
+      const product = (spanGoal / span) * g0 * c0;
+      factor = clampTo(0.5, 1.8, 2 * (mean * product + 0.5 - lumaGoal));
+      gain = product / factor;
+    } else {
+      gain = ((lumaGoal - 0.5) / c0 + 0.5) / mean;
+    }
+    const limited = clampTo(2 ** KNOB_RANGE.exposure[0], 2 ** KNOB_RANGE.exposure[1], gain);
+    if (limited !== gain) {
+      // At the exposure limit the mean wins: the contrast that lands it (a flatter curve lifts a dark
+      // plate), no flatter than 0.7 so the blacks do not turn milky.
+      gain = limited;
+      const off = mean * gain - 0.5;
+      const forMean = Math.abs(off) > 1e-3 ? (lumaGoal - 0.5) / off : 0;
+      factor = forMean > 0 ? clampTo(0.7, 1.4, forMean) : c0;
+    }
+    step("exposure", Math.log2(gain));
+    step("contrast", factor - 1);
+  } else if (span !== null && spanGoal !== null && span > 1e-3 && Math.abs(spanGoal - span) > UNIFY_TOLERANCE.contrast_span / 2) {
+    step("contrast", c0 * (spanGoal / span) - 1);
   }
   // A cast added before the gain and contrast is scaled by both.
-  const scale = Math.max(0.25, 2 ** next.exposure * (1 + next.contrast));
+  const before = g0 * c0;
+  const after = Math.max(0.25, 2 ** next.exposure * (1 + next.contrast));
   const warm = stat(current, "warm_cool");
   const warmGoal = stat(target, "warm_cool");
-  if (warm !== null && warmGoal !== null && Math.abs(warmGoal - warm) > UNIFY_TOLERANCE.warm_cool / 2) {
-    step("temperature", knobs.temperature + (warmGoal - warm) / (0.25 * scale));
+  if (warm !== null && warmGoal !== null && Math.abs(warmGoal - warm * (after / before)) > UNIFY_TOLERANCE.warm_cool / 2) {
+    step("temperature", (warmGoal / after - (warm / before - 0.25 * knobs.temperature)) / 0.25);
   }
   const gm = stat(current, "green_magenta");
   const gmGoal = stat(target, "green_magenta");
-  if (gm !== null && gmGoal !== null && Math.abs(gmGoal - gm) > UNIFY_TOLERANCE.green_magenta / 2) {
-    step("tint", knobs.tint - (gmGoal - gm) / (0.15 * scale));
+  if (gm !== null && gmGoal !== null && Math.abs(gmGoal - gm * (after / before)) > UNIFY_TOLERANCE.green_magenta / 2) {
+    step("tint", (gm / before + 0.15 * knobs.tint - gmGoal / after) / 0.15);
   }
   return next;
 }
