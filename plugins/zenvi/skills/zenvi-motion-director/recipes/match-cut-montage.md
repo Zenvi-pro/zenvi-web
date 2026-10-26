@@ -27,9 +27,12 @@ other (dark round → dark round, warm → warm); end on the most iconic one
    and drop it unless one clear shape fills the middle: an ear, a label or
    two circles break the chain. Each shape once or twice, never the same
    file cycled five times.
-2. Subjects: for circles, `detect_subject_tool` (`file_id`, `time`) per file
-   and keep the best box; for poses read the box off
-   `inspect_media_tool` (`fileId`, `start`, `end`, `maxFrames: 3`) frames.
+2. Subjects: give **every** file a box in `subjects`. Circles:
+   `detect_subject_tool` (`file_id`, `time`) and keep the candidate that is
+   the subject. Poses and heads: read the person's box off
+   `inspect_media_tool` (`fileId`, `start`, `end`, `maxFrames: 3`) frames. A
+   file without a box gets circle detection, which on a pose shot finds a
+   random round thing and zooms 10x into it.
 3. Cut it in one call:
 
 ```json
@@ -57,6 +60,9 @@ match_cut_montage_tool {
    Serif"`, `font_style: "italic"`), 2-3 words, never over the subject.
 
 ## Checks
+
+Read the receipt: a shot scaled above about 2.5x is soft and was aligned on
+the wrong thing; fix its box (or drop the file) and rerun with `replace: true`.
 
 `inspect_timeline_tool overview: true`, then `preview_frame` on 5 consecutive
 chain cuts (`grid: true`): the circle's centre within ±0.03 and its size
