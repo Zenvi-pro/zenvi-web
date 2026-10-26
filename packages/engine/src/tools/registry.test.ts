@@ -22,6 +22,10 @@ const DIRECT_TOOLS = [
   "probe_media_tool",
   "build_reel_tool",
   "add_motion_template_tool",
+  "list_motion_transitions_tool",
+  "apply_motion_transition_tool",
+  "apply_motion_transitions_tool",
+  "remove_motion_transition_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
 ];
