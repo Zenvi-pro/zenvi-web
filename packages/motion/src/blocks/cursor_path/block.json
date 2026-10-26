@@ -1,0 +1,99 @@
+{
+  "id": "cursor_path",
+  "version": 1,
+  "title": "Cursor path",
+  "description": "An oversized pointer travels a curved path over a screenshot or screen recording, hovering each target (an accent outline lands around it), clicking with a ripple and showing a short label, while the camera pushes in toward each stop. Give `background` (a bin file id) and `points` on the targets; without a background it plays over a drawn editor screen. For product walkthroughs and UI demos.",
+  "tags": [
+    "ui",
+    "cursor",
+    "demo",
+    "walkthrough",
+    "screen",
+    "saas",
+    "click"
+  ],
+  "duration": {
+    "default": 6,
+    "min": 3,
+    "max": 16
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "light",
+    "radius": 18
+  },
+  "params": {
+    "background": {
+      "type": "media",
+      "accept": [
+        "image",
+        "video"
+      ],
+      "optional": true,
+      "description": "Screenshot or screen recording to point at (file id); without one a drawn editor screen is used."
+    },
+    "points": {
+      "type": "points",
+      "minItems": 1,
+      "maxItems": 6,
+      "default": [
+        {
+          "x": 0.11,
+          "y": 0.23
+        },
+        {
+          "x": 0.56,
+          "y": 0.81
+        },
+        {
+          "x": 0.86,
+          "y": 0.085
+        }
+      ],
+      "description": "Where the pointer stops, in order, as fractions of the frame (x 0-1 from the left, y 0-1 from the top); without a background, fractions of the drawn screen."
+    },
+    "labels": {
+      "type": "strings",
+      "maxItems": 6,
+      "maxLength": 32,
+      "default": [
+        "Drop in your footage",
+        "Trim to the beat",
+        "Export in one click"
+      ],
+      "description": "Short label shown at each stop (empty item: none)."
+    },
+    "zoom": {
+      "type": "number",
+      "min": 1,
+      "max": 1.8,
+      "default": 1.25,
+      "description": "How far the camera pushes in toward each stop (1: no camera move)."
+    },
+    "cursor_size": {
+      "type": "number",
+      "min": 0.6,
+      "max": 2,
+      "default": 1,
+      "description": "Pointer size (1 = 88 px on a 1080 frame: big enough to follow on a phone)."
+    },
+    "clicks": {
+      "type": "boolean",
+      "default": true,
+      "description": "Click at each stop (false: hover only)."
+    },
+    "target": {
+      "type": "number",
+      "min": 40,
+      "max": 600,
+      "default": 170,
+      "description": "Width of the hover outline around each stop, px at 1080."
+    }
+  }
+}
