@@ -21,3 +21,7 @@ body { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; 
 .cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* The pointer used by UI blocks: an arrow drawn in CSS-free SVG (see cursorSvg). */
 .cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3)); z-index: 50; }
+/* Over video (alpha) type gets a soft halo of the palette's paper: TASTE.md §4, never bare text over busy footage. */
+.is-alpha .kh-text, .is-alpha .wr, .is-alpha .ct-number, .is-alpha .ts-line, .is-alpha .hud-label, .is-alpha .hud-title {
+  text-shadow: 0 0 28px color-mix(in srgb, var(--paper) 55%, transparent), 0 1px 4px color-mix(in srgb, var(--paper) 45%, transparent);
+}

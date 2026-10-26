@@ -70,7 +70,7 @@ export function createContext(doc: Document, config: BlockConfig): BlockContext 
   const palette = withAccent(PALETTES[(p.palette as PaletteName) ?? "light"] ?? PALETTES.light, typeof p.accent === "string" ? p.accent : undefined);
   const root = doc.createElement("div");
   root.id = "block";
-  root.className = `block block-${config.block}${palette.dark ? " is-dark" : ""}${config.height > config.width * 1.2 ? " is-portrait" : ""}`;
+  root.className = `block block-${config.block}${palette.dark ? " is-dark" : ""}${config.height > config.width * 1.2 ? " is-portrait" : ""}${config.alpha ? " is-alpha" : ""}`;
   const display = ((p.display_font as FontRole) ?? "sans") as FontRole;
   const radius = typeof p.radius === "number" ? p.radius : 28;
   const vars: Record<string, string> = {
