@@ -82,6 +82,8 @@ describe("emphasis", () => {
     for (const g of groups) expect([...auto].filter((i) => i >= g.first && i < g.end).length).toBeLessThanOrEqual(1);
     expect([...pickEmphasis(words, groups, ["SECRET", "scroll"], 1)].map((i) => words[i]!.text)).toEqual(["secret", "scroll."]);
     expect(pickEmphasis(words, groups, "none", 1).size).toBe(0);
+    // A phrase in the list emphasises each of its words.
+    expect([...pickEmphasis(words, groups, ["secret is"], 1)].map((i) => words[i]!.text)).toEqual(["secret", "is"]);
   });
 });
 

@@ -169,7 +169,7 @@ export const EMPHASIS_FLOOR = 1.5;
 /**
  * Indices of the emphasised words: `auto` takes up to `perGroup` of each
  * group's best words scoring at least `floor`; a list takes the words
- * it names, wherever they are.
+ * it names (each word of a phrase), wherever they are.
  */
 export function pickEmphasis(
   words: readonly CaptionWord[],
@@ -181,7 +181,8 @@ export function pickEmphasis(
   const out = new Set<number>();
   if (mode === "none") return out;
   if (mode !== "auto") {
-    const wanted = new Set(mode.map(bareWord).filter(Boolean));
+    // A phrase in the list ("big idea") emphasises each of its words.
+    const wanted = new Set(mode.flatMap((m) => m.split(/\s+/)).map(bareWord).filter(Boolean));
     words.forEach((w, i) => {
       if (wanted.has(bareWord(w.text))) out.add(i);
     });

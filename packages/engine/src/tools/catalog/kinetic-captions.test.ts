@@ -101,6 +101,21 @@ describe("kinetic_captions_tool", () => {
     expect(kineticTag(cut)!.source_clip_ids).toEqual([clipId]);
   });
 
+  it("cuts out the footage as it plays: its effects (fresh ids) and alpha, the Mask last", async () => {
+    const { doc, clipId } = talking(true);
+    const grade = { id: "GRADE00001", type: "Saturation", class_name: "Saturation" };
+    const fade = { Points: [{ co: { X: 1, Y: 0 }, interpolation: 1 }, { co: { X: 15, Y: 1 }, interpolation: 1 }] };
+    doc.transaction("grade", (tx) => tx.update(["clips", { id: clipId }], { effects: [grade], alpha: fade }));
+    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: true, timeline_clip_ids: [clipId, clipId] });
+    expect(r.ok, r.text).toBe(true);
+    const cut = doc.project.clips.find((c) => kineticTag(c)?.role === "cutout")!;
+    expect(doc.project.clips.filter((c) => kineticTag(c)?.role === "cutout")).toHaveLength(1);
+    expect(cut.effects?.map((e) => e.type)).toEqual(["Saturation", "Mask"]);
+    expect(cut.effects?.[0]?.id).not.toBe("GRADE00001");
+    expect((cut as Record<string, unknown>).alpha).toEqual(fade);
+    expect(cut.title).toContain("Captions cut-out");
+  });
+
   it("refuses what it cannot do, leaving the project as it was", async () => {
     const { doc } = talking();
     const before = snapshotOf(doc.project);

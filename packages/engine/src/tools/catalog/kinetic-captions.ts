@@ -25,7 +25,7 @@ import { defaultEffectJson } from "../../effects/registry.js";
 import type { Transaction } from "../../history/document.js";
 import { idFactory } from "../../model/ids.js";
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
-import { addClip, deleteClips } from "../../ops/clips.js";
+import { deleteClips, duplicateClip } from "../../ops/clips.js";
 import { removeFile, updateFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
 import { ensureTrack } from "../../ops/overlays.js";
@@ -146,14 +146,10 @@ async function wordsOf(call: ToolCall, clips: readonly Clip[], args: Input, warn
 }
 
 function cutoutOf(tx: Transaction, source: Clip, matte: ProjectFile, layer: number, tag: KineticTag): Clip {
-  const placed = addClip(tx, { fileId: source.file_id, position: Number(source.position), layer, start: Number(source.start), end: Number(source.end), title: `Captions cut-out ${source.title ?? source.id}` });
-  // The same picture as the footage (transform keys and speed), keyed by the matte; silent.
-  const keep: Record<string, unknown> = {};
-  for (const key of ["scale", "scale_x", "scale_y", "location_x", "location_y", "rotation", "gravity", "time", "origin_x", "origin_y", "shear_x", "shear_y", "crop_x", "crop_y", "crop_width", "crop_height"]) {
-    if (key in source) keep[key] = structuredClone((source as Record<string, unknown>)[key]);
-  }
+  // The same picture as the footage (its keys, effects and speed: a copy), keyed by the matte last; silent.
+  const copy = duplicateClip(tx, source.id, { position: Number(source.position), layer });
   const mask = { ...defaultEffectJson("Mask", idFactory(tx.project)()), mask_reader: structuredClone(matte), mask_invert: true };
-  return patchClip(tx, placed.id, { ...keep, effects: [mask], volume: constantKeyframe(0), has_audio: constantKeyframe(0), [KINETIC_KEY]: { ...tag, role: "cutout" } });
+  return patchClip(tx, copy.id, { title: `Captions cut-out ${source.title ?? source.id}`, effects: [...(copy.effects ?? []), mask], volume: constantKeyframe(0), has_audio: constantKeyframe(0), [KINETIC_KEY]: { ...tag, role: "cutout" } });
 }
 
 export const kineticCaptionTools: CatalogTool[] = [
@@ -181,7 +177,7 @@ export const kineticCaptionTools: CatalogTool[] = [
           const clip = project.clips.find((c) => c.id === id);
           if (!clip) return refused(TOOL, `Error: unknown timeline clip ${id}.`);
           if (kineticTag(clip)) return refused(TOOL, `Error: clip ${id} is one of the kinetic captions; pass the footage clip (${kineticTag(clip)!.source_clip_ids.join(", ")}).`);
-          clips.push(clip);
+          if (!clips.includes(clip)) clips.push(clip);
         }
       } else {
         clips = project.clips.filter((c) => {
