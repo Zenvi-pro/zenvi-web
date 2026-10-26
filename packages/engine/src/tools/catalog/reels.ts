@@ -78,7 +78,7 @@ const input = z.strictObject({
     .min(1)
     .max(60)
     .optional()
-    .describe("Media-bin videos and images to use, in story order; the last one closes the reel. Default: every video and image in the bin, in bin order."),
+    .describe("Media-bin videos and images to use, in story order; the last one closes the reel. Default: every video and image in the bin (not SVG titles), in bin order."),
   music_file_id: z.string().optional().describe("Music in the media bin to cut to. Default: the longest audio file in the bin. Without music the cuts follow the style's own tempo."),
   duration_seconds: z.number().min(4).max(120).optional().describe("Target length, seconds (default per style, 12-20). The reel ends on a bar line: the first at or after it (at most a bar longer), else the nearest; the summary says the final length and why."),
   hook: z.string().max(80).optional().describe("Opening title over the first shots: 2-6 punchy words."),
@@ -287,7 +287,8 @@ export const reelTools: CatalogTool[] = [
       const names = new Map([...files].map(([id, f]) => [id, displayName(f)]));
 
       // Validate everything before any work (a refused call leaves history untouched).
-      const ids = args.file_ids ?? project.files.filter((f) => visualKind(f) !== null).map((f) => String(f.id));
+      // By default every video and image, but not SVGs: those are titles and cards (an earlier build's own, when rebuilding).
+      const ids = args.file_ids ?? project.files.filter((f) => visualKind(f) !== null && !/\.svgz?$/i.test(String(f.path ?? f.name ?? ""))).map((f) => String(f.id));
       const unknown = ids.filter((id) => !files.has(id));
       if (unknown.length > 0) return refused(TOOL, `Error: unknown file id(s): ${unknown.join(", ")}.`);
       const notVisual = ids.filter((id) => visualKind(files.get(id)!) === null);

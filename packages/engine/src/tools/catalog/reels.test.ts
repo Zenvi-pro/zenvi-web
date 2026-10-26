@@ -197,6 +197,19 @@ describe("build_reel_tool", () => {
     expect(doc.project.clips).toHaveLength(clips);
   });
 
+  it("does not cut an earlier build's titles and flash into the rebuild", async () => {
+    const doc = reelProject();
+    const host = withAudio(fakeHost());
+    const args = { style: "hype", hook: "Match day", end_card: "Full game Sunday", duration_seconds: "12" };
+    expect((await runTool({ doc, host }, "build_reel_tool", args)).ok).toBe(true);
+    const rebuilt = await runTool({ doc, host }, "build_reel_tool", { ...args, replace: true });
+    expect(rebuilt.ok, rebuilt.text).toBe(true);
+    const shots = ((rebuilt.data as { data: Record<string, unknown> }).data as { shots: { file_id: string }[] }).shots;
+    const svgs = new Set(doc.project.files.filter((f) => String(f.path).endsWith(".svg")).map((f) => String(f.id)));
+    expect(svgs.size).toBeGreaterThan(0);
+    for (const shot of shots) expect(svgs.has(shot.file_id)).toBe(false);
+  }, 30_000);
+
   it("cuts to the style's tempo, and says so, where audio cannot be decoded", async () => {
     const doc = reelProject();
     const result = await runTool({ doc, host: withAudio(fakeHost(), false) }, "build_reel_tool", { style: "match_cut", duration_seconds: 8 });
