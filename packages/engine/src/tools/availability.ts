@@ -194,6 +194,11 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote:
       "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
   },
+  match_cut_montage_tool: {
+    optional: ["audio.decodePcm", "media.writeGenerated", "frames"],
+    partialNote:
+      "without audio decoding the cuts follow 120 BPM, not the music; without generated media there are no flash frames; without frame rendering files need subjects boxes (no circle search)",
+  },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],

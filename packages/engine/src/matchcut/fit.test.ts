@@ -12,7 +12,7 @@ function setup(opts: { scale: number; gravity: number; srcW: number; srcH: numbe
   project.width = 1280;
   project.height = 720;
   const file = videoFile("VID", { width: opts.srcW, height: opts.srcH });
-  const clip: Clip = { ...createClip({ id: "C1", file, position: 0, layer: project.layers[0]!.number, fps: project.fps }), scale: opts.scale, gravity: opts.gravity };
+  const clip: Clip = { ...createClip({ id: "C1", file, position: 0, layer: project.layers[0]!.number, fps: project.fps }), scale: opts.scale as ScaleMode, gravity: opts.gravity as Gravity };
   if (opts.originX !== undefined) clip.origin_x = constant(opts.originX);
   if (opts.margin !== undefined) clip.margin = constant(opts.margin);
   project.files = [file];
