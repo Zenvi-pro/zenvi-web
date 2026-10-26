@@ -14,6 +14,7 @@ import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { SCENE3D_IDS, SCENE3D_INFO, parseScene3dParams, type Scene3dId, type Scene3dMediaInput, type Scene3dQuality } from "@zenvi/engine";
+import { resolveTitleFont } from "@zenvi/render-node";
 import { createScene3dRenderer, findBlender } from "../src/index.js";
 
 const { values } = parseArgs({
@@ -68,7 +69,7 @@ for (const [i, color] of STILLS.entries()) {
 function setup(scene: Scene3dId, background: string, vertical: boolean): { params: Record<string, unknown>; slots: Record<string, string> } {
   switch (scene) {
     case "title_3d":
-      return { params: { text: vertical ? "ZENVI" : "ZENVI 3D", style: background === "dark" ? "chrome" : "iridescent", background }, slots: {} };
+      return { params: { text: vertical ? "ZENVI" : "ZENVI 3D", style: background === "dark" ? "chrome" : "gradient", background }, slots: {} };
     case "device_mockup":
       return vertical ? { params: { device: "phone", move: "hero", file_id: "tall", background }, slots: { screen: "tall" } } : { params: { device: "laptop", move: "orbit", file_id: "wide", background }, slots: { screen: "wide" } };
     case "floating_cards":
@@ -84,7 +85,7 @@ function setup(scene: Scene3dId, background: string, vertical: boolean): { param
   }
 }
 
-const renderer = createScene3dRenderer({ blender, cacheDir: path.join(out, ".cache"), resolveMedia: (p) => p, log: (m) => console.log(m) });
+const renderer = createScene3dRenderer({ blender, cacheDir: path.join(out, ".cache"), resolveMedia: (p) => p, resolveFont: resolveTitleFont, log: (m) => console.log(m) });
 const timings: string[] = [];
 const sheet: string[] = [];
 for (const scene of values.scenes!.split(",") as Scene3dId[]) {
