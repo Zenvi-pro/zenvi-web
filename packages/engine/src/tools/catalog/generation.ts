@@ -23,12 +23,13 @@ import { generateId } from "../../model/ids.js";
 import type { ProjectFile } from "../../model/types.js";
 import { addClip, moveClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
+import { ensureTrack } from "../../ops/overlays.js";
 import { generateImage, generateTts, generateVideo } from "../backend.js";
 import { contractTool, unavailable, type CatalogTool } from "../define.js";
 import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFloat, pyG, pySlice } from "../pyfmt.js";
 import { applied } from "../receipt.js";
-import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, lockedTrackError, normalizeTrackOrLayerArg } from "../tracks.js";
+import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, lockedTrackError, newTracksNote, resolvePlacementTrack } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { applyPlacement, planPlacement, provisionalFile, placementText, type PlacementArgs } from "./clips.js";
 import { playheadSeconds, record, text } from "./common.js";
@@ -159,7 +160,7 @@ export const generationTools: CatalogTool[] = [
       const hasPos = text(input.position_seconds) !== "" && Number.isFinite(posArg);
       let rippleLayer: number | null = null;
       if (hasPos && text(input.track)) {
-        const r = normalizeTrackOrLayerArg(text(input.track), project.layers);
+        const r = resolvePlacementTrack(text(input.track), project.layers);
         if (!r.error && r.layer !== undefined) rippleLayer = r.layer;
       }
       if (hasPos && rippleLayer === null) {
@@ -288,10 +289,12 @@ export const generationTools: CatalogTool[] = [
       const position = Math.max(0, asked ?? older ?? playheadSeconds(call));
       const project = call.doc.project;
       let layer = defaultUnderlayLayerNumber(project.layers);
+      let newTracks = 0;
       if (input.track !== undefined && String(input.track).trim() !== "") {
-        const r = normalizeTrackOrLayerArg(String(input.track), project.layers);
+        const r = resolvePlacementTrack(String(input.track), project.layers);
         if (r.error) return r.error;
         if (r.layer !== undefined) layer = r.layer;
+        newTracks = r.newTracks ?? 0;
       }
       const res = await generateTts(call, {
         text: narration,
@@ -307,10 +310,11 @@ export const generationTools: CatalogTool[] = [
       const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: text(input.name) || narrationName(narration) };
       const clip = call.commit((tx) => {
         const file = addFile(tx, media, { dedupe: false, mediaType: "audio" });
+        if (newTracks > 0) ensureTrack(tx, layer);
         return addClip(tx, { fileId: String(file.id), position, layer });
       });
       return (
-        `Added TTS audio to timeline at position ${pyFloat(position)}s on track ${formatTrackLabelForLlm(layer, project.layers)}` +
+        `Added TTS audio to timeline at position ${pyFloat(position)}s on track ${formatTrackLabelForLlm(layer, call.doc.project.layers)}${newTracksNote(newTracks)}` +
         ` timeline_clip_id=${clip.id}.`
       );
     },

@@ -140,7 +140,10 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   const lines = (input.lines ?? []).map(String);
   const body = String(input.text ?? "");
   const subtitle = String(input.subtitle ?? "");
-  const template = await loadTemplate(call, String(input.template ?? ""));
+  const given = Boolean(body.trim() || subtitle.trim() || lines.some((v) => v.trim()));
+  const colourCard = !given && Boolean(String(input.background_color ?? "").trim());
+  // A blank title with a background colour is a colour card (agents cut white flash frames this way).
+  const template = await loadTemplate(call, String(input.template ?? "").trim() || (colourCard ? "Solid_Color" : ""));
   const name = template.name;
   let doc: TitleDoc;
   try {
@@ -149,9 +152,8 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
     return toolError(`cannot read title SVG ${template.file}: ${errorMessage(error)}`);
   }
   const slots = titleFields(doc);
-  const given = Boolean(body.trim() || subtitle.trim() || lines.some((v) => v.trim()));
   if (slots.length === 0 && given) toolError(`${name} has no text; it is a background card (set background_color), or pick a template with text`);
-  if (slots.length > 0 && !given) toolError("add_title_tool needs text (or subtitle / lines)");
+  if (slots.length > 0 && !given && !colourCard) toolError("add_title_tool needs text (or subtitle / lines), or a background_color for a blank colour card");
   const style = new TitleStyle(input);
   const values = assignTexts(slots, body, subtitle, lines, name, true);
 
