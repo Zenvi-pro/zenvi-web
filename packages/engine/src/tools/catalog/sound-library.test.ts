@@ -134,7 +134,7 @@ describe("add_sfx_tool with a library sound", () => {
     const doc = edit();
     const host = libraryHost();
     const result = await runTool({ doc, host }, "add_sfx_tool", { provider: "openverse", sound_id: HIT_ID, at_seconds: 4 });
-    expect(summary(result)).toMatch(/^Added 'Glass impact hit' with its transient on 4\.00 s \(clip \w+, -8 dB\)\. CC BY 4\.0: credit it \(list_credits_tool\)\.$/);
+    expect(summary(result)).toMatch(/^Added 'Glass impact hit' with its transient on 4\.00 s \(-8 dB\)\. CC BY 4\.0: credit it \(list_credits_tool\)\.$/);
     expect(host.calls).toContain(`library https://api.openverse.org/v1/audio/${HIT_ID}/`);
     expect(host.calls.some((c) => c.startsWith("importUrl https://cdn.freesound.test/"))).toBe(true);
     expect(host.calls.some((c) => /^decodePcm \S+ 2$/.test(c))).toBe(true);
@@ -161,7 +161,7 @@ describe("add_sfx_tool with a library sound", () => {
   it("plays a whoosh with its peak on the moment and takes the role it is given", async () => {
     const doc = edit();
     const result = await runTool({ doc, host: libraryHost() }, "add_sfx_tool", { provider: "openverse", sound_id: WHOOSH_ID, clip_id: "CUT0000002" });
-    expect(summary(result)).toMatch(/^Added 'Deep Whoosh #1' with its peak on the start of clip CUT0000002 .* CC0 1\.0, no credit needed\.$/);
+    expect(summary(result)).toMatch(/^Added 'Deep Whoosh #1' with its peak on the start of cc\.mp4 \(-?\d+ dB\)\. CC0 1\.0, no credit needed\.$/);
     expect(data<{ role: string; recipe: string }>(result)).toMatchObject({ role: "whoosh", recipe: "whoosh_medium" });
     const asRiser = await runTool({ doc, host: libraryHost() }, "add_sfx_tool", { provider: "openverse", sound_id: WHOOSH_ID, at_seconds: 6, role: "riser" });
     expect(summary(asRiser)).toMatch(/with its end on 6\.00 s/);

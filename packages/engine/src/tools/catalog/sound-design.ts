@@ -419,7 +419,7 @@ export const soundDesignTools: CatalogTool[] = [
       const sources: SfxSources = args.sources ?? (projectKit ? "kit" : "procedural");
       if (sources === "kit" && !projectKit) return refused(AUTO, "Error: the project has no sound kit: make one with create_sound_kit_tool, or pass sources=procedural.");
       const pickNow = (sources === "library" || sources === "mixed") && projectKit?.source !== sources;
-      if (pickNow && (!call.host.media.importUrl || !call.host.audio?.decodePcm || (!call.host.library && !call.host.backend))) {
+      if (pickNow && (!call.host.media.importUrl || !call.host.audio?.decodePcm || (!call.host.library && !call.host.stock))) {
         return refused(AUTO, `Error: sources=${sources} is not available in this Zenvi surface: it cannot search, download and decode library sounds. Use sources=procedural.`);
       }
       const previous = project.clips.filter(isAutoSfxClip);

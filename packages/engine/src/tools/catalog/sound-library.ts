@@ -78,7 +78,7 @@ function resultLine(r: SfxLibraryResult): string {
 async function searchLibraries(call: ToolCall, query: string, filters: SfxSearchFilters, limit: number): Promise<SearchOutcome & { notes: string[] }> {
   const notes: string[] = [];
   const openverse = await searchOpenverse(call, query, filters, limit);
-  if (!("error" in openverse) || !call.host.backend) return { ...openverse, notes };
+  if (!("error" in openverse) || !call.host.stock) return { ...openverse, notes };
   notes.push(`Openverse: ${openverse.error} Searched Freesound instead.`);
   return { ...(await searchFreesoundSfx(call, query, filters, limit)), notes };
 }
@@ -267,7 +267,7 @@ export const soundLibraryTools: CatalogTool[] = [
       const libraryOnly = (["style", "license", "variants"] as const).filter((k) => args[k] !== undefined);
       if (procedural && libraryOnly.length > 0) return refused(KIT, `Error: ${libraryOnly.join(", ")} ${libraryOnly.length === 1 ? "goes" : "go"} with source=library or mixed.`);
       const media = call.host.media;
-      if (!procedural && (!media?.importUrl || !media.writeGenerated || !call.host.audio?.decodePcm || (!call.host.library && !call.host.backend))) {
+      if (!procedural && (!media?.importUrl || !media.writeGenerated || !call.host.audio?.decodePcm || (!call.host.library && !call.host.stock))) {
         return refused(KIT, `Error: source=${source} is not available in this Zenvi surface: it cannot search, download and decode library sounds. Use source=procedural.`);
       }
       const settings = call.doc.project.settings;

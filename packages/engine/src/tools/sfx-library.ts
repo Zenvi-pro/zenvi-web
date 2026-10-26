@@ -27,7 +27,7 @@ import {
 } from "../sfx/library.js";
 import { sfxRecipe } from "../sfx/recipes.js";
 import { framePad, padSfx } from "../sfx/render.js";
-import { searchFreesound } from "./backend.js";
+import type { FreesoundSound } from "../stock/stock.js";
 import { fpsFloatOf } from "./catalog/common.js";
 import type { ToolCall } from "./define.js";
 import { markOf, type PreparedSfx } from "./sfx-media.js";
@@ -104,9 +104,13 @@ export async function searchOpenverse(call: ToolCall, query: string, filters: Sf
   }
 }
 
-/** Search Freesound through the Zenvi backend; results filtered by licence and length, at most `limit`. */
+function searchFreesound(call: ToolCall, query: string, pageSize: number, minSeconds: number): Promise<{ sounds: FreesoundSound[]; total: number } | { error: string }> {
+  return call.host.stock!.searchFreesound(query, { pageSize, minSeconds, signal: call.signal }).catch((error: unknown) => ({ error: errorText(error) }));
+}
+
+/** Search Freesound through stock search (the Zenvi backend, or the server's own key); results filtered by licence and length, at most `limit`. */
 export async function searchFreesoundSfx(call: ToolCall, query: string, filters: SfxSearchFilters, limit: number): Promise<SearchOutcome> {
-  if (!call.host.backend) return { error: "Freesound is searched through the Zenvi backend: sign in to Zenvi." };
+  if (!call.host.stock) return { error: "Freesound is searched through the Zenvi backend: sign in to Zenvi." };
   const found = await searchFreesound(call, query, 40, filters.minSeconds);
   if ("error" in found) return { error: found.error };
   const results = found.sounds.map(readFreesoundSound).filter((r): r is SfxLibraryResult => r !== null);
@@ -131,7 +135,7 @@ export async function lookupLibrarySound(call: ToolCall, provider: SfxLibraryPro
   }
   if (!/^\d+$/.test(id)) return `Error: ${id} is not a Freesound id (a number from search_sfx_tool).`;
   if (!title?.trim()) return "Error: a Freesound sound is found again by its title: pass title (from search_sfx_tool).";
-  if (!call.host.backend) return "Error: Freesound is reached through the Zenvi backend: sign in to Zenvi.";
+  if (!call.host.stock) return "Error: Freesound is reached through the Zenvi backend: sign in to Zenvi.";
   const found = await searchFreesound(call, title.trim(), 40, 0);
   if ("error" in found) return `Error: Freesound search failed: ${found.error}`;
   const sound = found.sounds.map(readFreesoundSound).find((r) => r?.id === id);

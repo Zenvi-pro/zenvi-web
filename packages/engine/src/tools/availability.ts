@@ -214,10 +214,10 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote:
       "without audio decoding cuts are weighed by `beats` (when given) instead of the music, the climax comes only from `climax_seconds`, and sources=library / mixed are refused; without Openverse library sounds come from Freesound (signed in)",
   },
-  search_sfx_tool: { optional: ["library", "backend"], partialNote: "without Openverse only procedural recipes and (signed in) Freesound are searched" },
+  search_sfx_tool: { optional: ["library", "stock"], partialNote: "without Openverse only procedural recipes and Freesound (with stock search) are searched" },
   create_sound_kit_tool: {
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
-    partialNote: "without Openverse (or the Zenvi backend), downloads and audio decoding only procedural kits are made",
+    partialNote: "without Openverse (or stock search), downloads and audio decoding only procedural kits are made",
   },
   match_cut_montage_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated", "frames"],
