@@ -1,0 +1,19 @@
+.lg-stage { position: absolute; inset: 0; }
+.lg-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lg-glass { position: absolute; overflow: hidden; color: var(--ink); filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.28)); }
+.lg-lens { position: absolute; left: 0; top: 0; }
+/* The lit edge: a hairline that is brighter where it faces the light (top left). */
+.lg-rim { position: absolute; inset: 0; border-radius: inherit; padding: 2px; background: linear-gradient(150deg, rgba(255,255,255,0.85), rgba(255,255,255,0.12) 38%, rgba(255,255,255,0.05) 62%, rgba(255,255,255,0.45)); -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.lg-sweep { position: absolute; inset: 0; border-radius: inherit; padding: 3px; -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); overflow: hidden; }
+.lg-sweep i { position: absolute; top: -50%; bottom: -50%; width: 30%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent); transform-origin: center; }
+.lg-row { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 26px; padding: 0 28px 0 34px; }
+.lg-icon { width: 46px; height: 46px; flex: none; color: var(--ink); opacity: 0.9; }
+.lg-icon .icon, .lg-send .icon, .lg-check .icon { display: block; width: 100%; height: 100%; }
+.lg-text { flex: 1; min-width: 0; font-size: 42px; font-weight: 480; letter-spacing: -0.015em; white-space: nowrap; overflow: hidden; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25); }
+.lg-caret { display: inline-block; width: 3px; height: 1.1em; margin-left: 3px; vertical-align: -0.16em; background: var(--ink); border-radius: 2px; }
+.lg-send { width: 88px; height: 88px; flex: none; border-radius: 50%; background: var(--ink); color: var(--paper); padding: 24px; }
+.lg-results { position: absolute; left: 34px; right: 34px; display: flex; flex-direction: column; gap: 26px; }
+.lg-result { display: flex; align-items: center; gap: 22px; font-size: 36px; font-weight: 500; letter-spacing: -0.01em; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.25); }
+.lg-check { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--accent); color: #fff; padding: 10px; }
+.lg-divider { position: absolute; left: 34px; right: 34px; height: 1.5px; background: rgba(255,255,255,0.22); }
+.lg-icon svg, .lg-send svg, .lg-check svg { display: block; width: 100%; height: 100%; }
