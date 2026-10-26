@@ -425,8 +425,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
       backend: "the server is set up to call the Zenvi backend",
-      mattes: "onnxruntime-node is in the image (the matting model downloads on first use); up to 10 s of video per call",
-      motion: "the image has chrome-headless-shell; one block renders at a time",
+      mattes: "onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)",
+      motion: "the image has chrome-headless-shell (one block renders at a time)",
     },
     hidden: [
       "new_project_tool",
@@ -446,6 +446,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "set_preference_tool",
       // Slower than a ChatGPT tool call. The cloud server starts generate_video instead.
       "generate_video_and_add_to_timeline_tool",
+      // Zenvi 3D renders with Blender, which the cloud has not: its scenes cannot be added there.
+      "list_3d_scenes_tool",
     ],
   },
 };

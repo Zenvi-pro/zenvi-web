@@ -12,14 +12,14 @@ Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, c
 | --- | --- | --- | --- | --- |
 | Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 127 | 41 | 30 |
 | CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 142 | 27 | 29 |
-| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 123 | 33 | 42 |
+| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 122 | 33 | 43 |
 | Zenvi desktop | zenvi-core | 163 | 0 | 35 (direct tools are web-only) |
 
 Availability follows each tool's required host capabilities and the host methods it calls at run time; the hosts are described in `SURFACE_PROFILES` (packages/engine/src/tools/availability.ts). Capabilities a session may lack (signed out of Zenvi, no WebCodecs export) are noted per tool.
 
 - **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage, assets, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, ui.openExportDialog, audio.decodePcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode, ui.layout, ui.preferences, ui.clearPlaybackCache, exporter.supports; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, assets, mattes, motion, scenes3d; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, media.missing, media.fetchWebVideo, storage.open, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, storage.recoveryCopies, storage.customProfiles, media.collect, audio.decodePcm, audio.transcribe, exporter.supports, frames.fontFamilies; only sometimes: backend (signed in with zenvi login), media.fetchWebVideo (yt-dlp is installed; zenvi doctor checks), mattes (onnxruntime-node is installed; the matting model downloads on first use), motion (headless Chrome is installed: zenvi motion setup), scenes3d (Blender 4.2+ is installed (or ZENVI_BLENDER points to it)).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, exporter, mattes, motion; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend), mattes (onnxruntime-node is in the image (the matting model downloads on first use); up to 10 s of video per call), motion (the image has chrome-headless-shell; one block renders at a time); hides 16 local-app tools.
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, exporter, mattes, motion; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), backend (the server is set up to call the Zenvi backend), mattes (onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)), motion (the image has chrome-headless-shell (one block renders at a time)); hides 17 local-app tools.
 
 ## Matrix
 
@@ -213,7 +213,7 @@ Availability follows each tool's required host capabilities and the host methods
 | [`list_motion_blocks_tool`](#list_motion_blocks_tool) | mcp, cli, editor | — | yes | yes | — |
 | [`add_motion_block_tool`](#add_motion_block_tool) | mcp, cli, editor | — | yes | yes | — |
 | [`update_motion_block_tool`](#update_motion_block_tool) | mcp, cli, editor | — | yes | yes | — |
-| [`list_3d_scenes_tool`](#list_3d_scenes_tool) | mcp, cli, editor | yes | yes | yes | — |
+| [`list_3d_scenes_tool`](#list_3d_scenes_tool) | mcp, cli, editor | yes | yes | — | — |
 | [`add_3d_scene_tool`](#add_3d_scene_tool) | mcp, cli, editor | — | yes | — | — |
 | [`rerender_3d_scene_tool`](#rerender_3d_scene_tool) | mcp, cli, editor | — | yes | — | — |
 | [`search_pexels_videos_tool`](#search_pexels_videos_tool) | mcp, cli, editor | yes | yes | yes | — |
@@ -3443,7 +3443,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 Surfaces: mcp, cli, editor. read-only. Needs: motion.
 
-Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)); cli yes (only when headless Chrome is installed: zenvi motion setup); cloud yes (only when the image has chrome-headless-shell; one block renders at a time); desktop — (web-only direct tool).
+Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)); cli yes (only when headless Chrome is installed: zenvi motion setup); cloud yes (only when the image has chrome-headless-shell (one block renders at a time)); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3456,7 +3456,7 @@ Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: t
 
 Surfaces: mcp, cli, editor. edits. Needs: motion, media.
 
-Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)); cli yes (only when headless Chrome is installed: zenvi motion setup); cloud yes (only when the image has chrome-headless-shell; one block renders at a time and ffprobe is available); desktop — (web-only direct tool).
+Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)); cli yes (only when headless Chrome is installed: zenvi motion setup); cloud yes (only when the image has chrome-headless-shell (one block renders at a time) and ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3475,7 +3475,7 @@ Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: t
 
 Surfaces: mcp, cli, editor. edits. Needs: motion, media.
 
-Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)); cli yes (only when headless Chrome is installed: zenvi motion setup); cloud yes (only when the image has chrome-headless-shell; one block renders at a time and ffprobe is available); desktop — (web-only direct tool).
+Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)); cli yes (only when headless Chrome is installed: zenvi motion setup); cloud yes (only when the image has chrome-headless-shell (one block renders at a time) and ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3492,7 +3492,7 @@ Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: t
 
 Surfaces: mcp, cli, editor. read-only.
 
-Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool).
+Availability: editor yes; cli yes; cloud — (hidden: belongs to a local app); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3565,7 +3565,7 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 
 Surfaces: mcp, cli, editor. edits. Needs: mattes.
 
-Availability: editor — (needs subject matting (onnxruntime-node: the zenvi CLI and Zenvi Cloud)); cli yes (only when onnxruntime-node is installed; the matting model downloads on first use); cloud yes (only when onnxruntime-node is in the image (the matting model downloads on first use); up to 10 s of video per call); desktop — (web-only direct tool).
+Availability: editor — (needs subject matting (onnxruntime-node: the zenvi CLI and Zenvi Cloud)); cli yes (only when onnxruntime-node is installed; the matting model downloads on first use); cloud yes (only when onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |

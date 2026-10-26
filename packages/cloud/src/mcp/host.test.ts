@@ -497,6 +497,7 @@ describe("Zenvi Motion and subject mattes in the cloud", () => {
     const names = (await client.listTools()).tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(["list_motion_blocks_tool", "add_motion_block_tool", "update_motion_block_tool"]));
     expect(names).not.toContain("add_3d_scene_tool");
+    expect(names).not.toContain("list_3d_scenes_tool");
     // Not listed, but a client that calls it anyway learns why.
     const scene = await call(client, "add_3d_scene_tool", { scene: "title_3d" });
     expect(scene.isError).toBe(true);
