@@ -56,7 +56,7 @@ export const FX_PARAMS = {
     center_y: unit(0.5, "Lens centre, 0 top to 1 bottom."),
   }),
   bloom: z.strictObject({
-    threshold: unit(0.55, "Brightness above which light blooms (0-1)."),
+    threshold: unit(0.68, "Brightness above which light blooms (0-1)."),
     radius: unit(0.5, "Glow size, 0 tight to 1 wide."),
   }),
   glitch: z.strictObject({
@@ -90,7 +90,7 @@ export const FX_PARAMS = {
     method: z
       .enum(["flow", "blend"])
       .default("flow")
-      .describe("flow: motion-compensated new frames (minterpolate, slow); blend: cross-faded frames (fast, softer)."),
+      .describe("flow: motion-compensated new frames (minterpolate; slow, about 30 s of rendering per second of 1080p); blend: cross-faded frames (fast, softer)."),
   }),
   vignette: z.strictObject({
     softness: unit(0.6, "Edge falloff, 0 hard to 1 soft."),

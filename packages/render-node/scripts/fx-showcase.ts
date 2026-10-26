@@ -12,7 +12,8 @@
  */
 
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { FX_IDS, FX_INFO, parseFxStack, type FxId } from "@zenvi/engine";
@@ -62,7 +63,9 @@ async function main(): Promise<void> {
   }
   const only = (process.env.FX_ONLY ?? "").split(",").filter(Boolean) as FxId[];
   const ids = only.length > 0 ? only : [...FX_IDS];
-  const fx = createFxRenderer({ ffmpeg, ffprobe, outputDir: () => path.join(out, "renders"), resolveMedia: (p) => p, hwaccel: process.env.ZENVI_FX_HWACCEL !== "0" });
+  // The ProRes renders are large: they live in a temp folder until the reels are cut.
+  const renders = await mkdtemp(path.join(tmpdir(), "zenvi-fx-showcase-"));
+  const fx = createFxRenderer({ ffmpeg, ffprobe, outputDir: () => renders, resolveMedia: (p) => p, hwaccel: process.env.ZENVI_FX_HWACCEL !== "0" });
   const timings: Record<string, Record<string, number>> = {};
 
   for (const src of sources) {
@@ -90,7 +93,12 @@ async function main(): Promise<void> {
     const chain = reel.map((_, i) => `[${i}:v]scale=1280:-2,setsar=1,fps=30,format=yuv420p[r${i}]`).join(";");
     const concat = `${reel.map((_, i) => `[r${i}]`).join("")}concat=n=${reel.length}:v=1:a=0[v]`;
     await run([...inputs, "-filter_complex", `${chain};${concat}`, "-map", "[v]", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", path.join(dir, `${src.name}-fx-reel.mp4`)]);
+    // Every strip in one tall sheet, then drop the pieces.
+    if (ids.length > 1) await run([...ids.flatMap((id) => ["-i", path.join(dir, `${id}.png`)]), "-filter_complex", `vstack=inputs=${ids.length},scale=1400:-2`, path.join(dir, "overview.png")]);
+    for (const id of ids) await rm(path.join(dir, `_${id}.png`), { force: true }).then(() => rm(path.join(dir, `_${id}-label.png`), { force: true }));
+    await rm(before, { force: true });
   }
+  await rm(renders, { recursive: true, force: true });
 
   const names = sources.map((s) => s.name);
   const lines = [

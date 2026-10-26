@@ -253,7 +253,7 @@ function bloom(g: Graph, input: string, e: FxEffect<"bloom">): string {
   g.add(`[${near}]gblur=sigma=${num(sigma)}[${n}]`);
   g.add(`[${far}]gblur=sigma=${num(sigma * 3.5)}[${f}]`);
   const glow = g.label();
-  const gain = num(1 + 1.5 * e.amount);
+  const gain = num(1 + 1.2 * e.amount);
   g.add(`[${n}][${f}]blend=all_mode=addition,colorchannelmixer=rr=${gain}:gg=${gain}:bb=${gain},scale=${w}:${h}:flags=bicubic${g.ctx.alpha ? ",format=gbrap" : ""}[${glow}]`);
   return g.blend(base!, glow, "screen", 0.5 + 0.5 * e.amount);
 }
