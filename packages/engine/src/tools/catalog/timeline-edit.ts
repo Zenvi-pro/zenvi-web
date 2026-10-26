@@ -10,6 +10,7 @@
  * summary line with its receipt object as `data`.
  */
 
+import type { Transaction } from "../../history/document.js";
 import type { Clip, Project, ProjectFile, Transition } from "../../model/types.js";
 import { DEFAULT_IMAGE_LENGTH, DEFAULT_TRANSITION_LENGTH, basename } from "../../model/defaults.js";
 import { findTransition } from "../../model/query.js";
@@ -278,15 +279,27 @@ function isClip(project: Project, item: Item): item is Clip {
   return project.clips.some((c) => c.id === item.id);
 }
 
-function layerMapFor(project: Project, sources: Set<number>, destTrack: string): Map<number, number> {
-  const dest = resolveLayer(project, destTrack);
-  const map = remapLayers(project, sources, dest);
+/**
+ * Where each source track goes for a destination track; `newTracks` is how
+ * many tracks the caller must add on top first (the destination named one to
+ * three past the top, as placement tools allow).
+ */
+function layerMapFor(project: Project, sources: Set<number>, destTrack: string): { map: Map<number, number>; newTracks: number } {
+  const { layer: dest, newTracks } = resolvePlacementLayer(project, destTrack);
+  const map = remapLayers(project, sources, dest, newTracks);
   if (!map) {
     throw new ToolError(
       `moving these clips' ${sources.size} tracks onto ${trackName(project, dest)} needs a track that does not exist; add one first (add_track_tool)`,
     );
   }
-  return map;
+  return { map, newTracks };
+}
+
+/** Add the tracks a remapped selection lands on, up to the highest one (ensureTrack adds the empty ones between). */
+function ensureMappedTracks(tx: Transaction, project: Project, layerMap: ReadonlyMap<number, number>): void {
+  const top = Math.max(0, ...project.layers.map((l) => l.number));
+  const highest = Math.max(...layerMap.values());
+  if (highest > top) ensureTrack(tx, highest);
 }
 
 async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">) {
@@ -318,11 +331,12 @@ async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">
   }
 
   const srcLayers = new Set(clips.map((c) => c.layer));
-  const layerMap = anchor
+  const mapped = anchor
     ? layerMapFor(project, srcLayers, String(uiTrack(project, anchor.layer)))
     : toTrack
       ? layerMapFor(project, srcLayers, toTrack)
-      : new Map([...srcLayers].map((n) => [n, n]));
+      : { map: new Map([...srcLayers].map((n) => [n, n])), newTracks: 0 };
+  const { map: layerMap, newTracks } = mapped;
   requireUnlockedTracks(project, [...srcLayers, ...layerMap.values()]);
 
   const g = gridOf(project);
@@ -428,6 +442,7 @@ async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">
   }
 
   call.commit((tx) => {
+    ensureMappedTracks(tx, project, layerMap);
     for (const [id, [item, newPos, newLayer]] of movedItems) {
       const to = { position: g.snap(newPos), ...(item.layer !== newLayer ? { layer: newLayer } : {}) };
       if (isClip(project, item)) moveClip(tx, id, to);
@@ -453,11 +468,11 @@ async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">
   }
   const first = (moved[0]?.to ?? {}) as { position?: number };
   const summary =
-    `Moved ${moved.length} clip(s) to ${trackName(after, layerMap.get(clips[0]!.layer)!)} at ${f2(first.position ?? 0)} s` +
+    `Moved ${moved.length} clip(s) to ${trackName(after, layerMap.get(clips[0]!.layer)!)}${newTracksNote(newTracks)} at ${f2(first.position ?? 0)} s` +
     (shifted.length > 0 ? `; ${shifted.length} later clip(s) shifted` : "") +
     (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") +
     ".";
-  return ok(call, summary, { moved, shifted: shifted.sort(), overlaps: hits, ripple });
+  return ok(call, summary, { moved, shifted: shifted.sort(), overlaps: hits, ripple, ...(newTracks > 0 ? { new_tracks: newTracks } : {}) });
 }
 
 // ---------------------------------------------------------------------------
@@ -731,7 +746,7 @@ async function duplicateClips(call: ToolCall, input: ContractInput<"duplicate_cl
   const clips = await targetClips(call, input);
   const srcLayers = new Set(clips.map((c) => c.layer));
   const toTrack = (input.to_track ?? "").trim();
-  const layerMap = toTrack ? layerMapFor(project, srcLayers, toTrack) : new Map([...srcLayers].map((n) => [n, n]));
+  const { map: layerMap, newTracks } = toTrack ? layerMapFor(project, srcLayers, toTrack) : { map: new Map([...srcLayers].map((n) => [n, n])), newTracks: 0 };
   const destLayers = new Set(layerMap.values());
   requireUnlockedTracks(project, destLayers, "the copies' destination");
 
@@ -773,6 +788,7 @@ async function duplicateClips(call: ToolCall, input: ContractInput<"duplicate_cl
   }
 
   const { created, transitionIds, shifted } = call.commit((tx) => {
+    ensureMappedTracks(tx, project, layerMap);
     const pushed: string[] = [];
     if (ripple) for (const layer of destLayers) pushed.push(...shiftAfter(tx, layer, base, copies * length));
     const batches: Record<string, unknown>[][] = [];
@@ -800,11 +816,17 @@ async function duplicateClips(call: ToolCall, input: ContractInput<"duplicate_cl
   const first = created[0]![0]! as { position: number; track: number | null };
   const pushedClips = shifted.filter((id) => project.clips.some((c) => c.id === id)).length;
   const summary =
-    `Made ${copies} cop${copies === 1 ? "y" : "ies"} of ${clips.length} clip(s); the first starts at ${f2(first.position)} s on track ${first.track}` +
+    `Made ${copies} cop${copies === 1 ? "y" : "ies"} of ${clips.length} clip(s); the first starts at ${f2(first.position)} s on track ${first.track}${newTracksNote(newTracks)}` +
     (shifted.length > 0 ? `; ${pushedClips} later clip(s) pushed` : "") +
     (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") +
     ".";
-  return ok(call, summary, { copies: created, transition_ids: transitionIds, shifted: [...new Set(shifted)].sort(), overlaps: hits });
+  return ok(call, summary, {
+    copies: created,
+    transition_ids: transitionIds,
+    shifted: [...new Set(shifted)].sort(),
+    overlaps: hits,
+    ...(newTracks > 0 ? { new_tracks: newTracks } : {}),
+  });
 }
 
 // ---------------------------------------------------------------------------

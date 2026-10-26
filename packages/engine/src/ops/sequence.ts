@@ -19,6 +19,7 @@ import type { Clip, Project, Transition } from "../model/types.js";
 import { findLayer, findTransition } from "../model/query.js";
 import { itemsOnLayer, sortedLayers } from "../timeline/queries.js";
 import { duplicateClip } from "./clips.js";
+import { TRACK_STRIDE } from "./tracks.js";
 import { OpError, invalid, requireClip, requireFinite, requireUnlocked } from "./errors.js";
 import { ids, patchClip, patchTransition, snapSeconds } from "./internal.js";
 
@@ -192,15 +193,19 @@ export function transitionsBetween(project: Project, clipIds: readonly string[],
  * Map a selection's tracks onto `destLayer`, keeping their stacking: the
  * top-most source track lands on the destination and the others keep their
  * offsets below/above it, like paste (timeline_edit_common.remap_layers).
+ * `newOnTop` counts tracks the caller will add above the stack (each one
+ * TRACK_STRIDE above the last), so a destination past the top maps too.
  * Null when a mapped track does not exist. Pure.
  */
-export function remapLayers(project: Project, sourceLayers: Iterable<number>, destLayer: number): Map<number, number> | null {
+export function remapLayers(project: Project, sourceLayers: Iterable<number>, destLayer: number, newOnTop = 0): Map<number, number> | null {
   const order = sortedLayers(project).map((l) => l.number);
+  const top = order.length > 0 ? order[order.length - 1]! : 0;
+  for (let k = 1; k <= newOnTop; k += 1) order.push(top + k * TRACK_STRIDE);
   const sources = [...new Set(sourceLayers)].sort((a, b) => a - b);
   const destIndex = order.indexOf(destLayer);
   if (sources.length === 0 || destIndex < 0) return null;
-  const top = sources.reduce((best, n) => (order.indexOf(n) > order.indexOf(best) ? n : best), sources[0]!);
-  const offset = destIndex - order.indexOf(top);
+  const highest = sources.reduce((best, n) => (order.indexOf(n) > order.indexOf(best) ? n : best), sources[0]!);
+  const offset = destIndex - order.indexOf(highest);
   const out = new Map<number, number>();
   for (const n of sources) {
     const at = order.indexOf(n);
