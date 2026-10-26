@@ -4,11 +4,18 @@
  * project's size and frame rate filled in.
  */
 
-import type { ContainerFormat, ExportOptions, Project } from "@zenvi/engine";
+import { audioCutNote, defaultExportEnd, type ContainerFormat, type ExportOptions, type Project } from "@zenvi/engine";
 import { z } from "zod";
+import { ApiError } from "../http/errors.js";
 
 export const RENDER_FORMATS = ["mp4", "webm", "mov", "mkv", "gif", "mp3", "wav", "flac", "m4a"] as const satisfies readonly ContainerFormat[];
 export type RenderFormat = (typeof RENDER_FORMATS)[number];
+const AUDIO_FORMATS: ReadonlySet<ContainerFormat> = new Set(["mp3", "wav", "flac", "m4a"]);
+
+/** Whether a render format has no picture. */
+export function isAudioRenderFormat(format: ContainerFormat): boolean {
+  return AUDIO_FORMATS.has(format);
+}
 
 export const PRESETS = {
   mp4: { format: "mp4", quality: "high" },
@@ -63,13 +70,37 @@ export const renderOptionsSchema = z
 
 export type RenderOverrides = z.infer<typeof renderOptionsSchema>;
 
-/** Merge preset + overrides into full ExportOptions for `project`. */
+const MAX_WIDTH = 7680;
+const MAX_HEIGHT = 4320;
+
+/**
+ * A preset's resolution class ("1080p") is the short side of the frame, as
+ * people mean it: 1920×1080 for a landscape project, 1080×1920 for a vertical
+ * one, 1080×1080 for a square one (never a 608×1080 vertical).
+ */
+function presetSize(project: Project, preset: string, shortSide: number): { width: number; height: number } {
+  const aspect = project.width / project.height;
+  const size = aspect >= 1 ? { width: even(shortSide * aspect), height: shortSide } : { width: shortSide, height: even(shortSide / aspect) };
+  if (size.width > MAX_WIDTH || size.height > MAX_HEIGHT) {
+    throw new ApiError(
+      400,
+      "invalid_request",
+      
+      `The ${preset} preset makes the short side ${shortSide} px, which on this ${project.width}×${project.height} project is ` +
+        `${size.width}×${size.height}, larger than Zenvi Cloud renders (${MAX_WIDTH}×${MAX_HEIGHT}). Pick a smaller preset or pass height.`,
+    );
+  }
+  return size;
+}
+
+/** Merge preset + overrides into full ExportOptions for `project`; refuses (400) a preset size that cannot fit. */
 export function resolveRenderOptions(project: Project, preset: PresetName | undefined, overrides: RenderOverrides = {}): ExportOptions {
   const base: { format: RenderFormat; height?: number; quality?: ExportOptions["quality"] } = PRESETS[preset ?? "mp4"];
   const format = overrides.format ?? base.format;
   const aspect = project.width / project.height;
   let width = overrides.width;
-  let height = overrides.height ?? (overrides.width === undefined ? base.height : undefined);
+  let height = overrides.height;
+  if (width === undefined && height === undefined && base.height !== undefined) ({ width, height } = presetSize(project, preset ?? "mp4", base.height));
   if (width === undefined && height === undefined) {
     width = project.width;
     height = project.height;
@@ -92,4 +123,14 @@ export function resolveRenderOptions(project: Project, preset: PresetName | unde
   if (overrides.channels) options.channels = overrides.channels;
   if (overrides.range) options.range = overrides.range;
   return options;
+}
+
+/**
+ * What a render with these options leaves out that the person should hear
+ * about: with no range, video ends with the last picture (`defaultExportEnd`).
+ */
+export function renderNotes(project: Project, options: ExportOptions): string[] {
+  if (options.range) return [];
+  const note = audioCutNote(defaultExportEnd(project, !isAudioRenderFormat(options.format)), "end_seconds");
+  return note ? [`${note[0]!.toUpperCase()}${note.slice(1)}.`] : [];
 }
