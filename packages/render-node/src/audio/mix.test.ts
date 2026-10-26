@@ -151,9 +151,9 @@ describe("export loudness normalisation", () => {
 
   it("builds the second pass from the first pass's readings", () => {
     const pass2 = loudnormPass2({ inputI: -27.6, inputTp: -9.1, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
-    expect(pass2).toContain("I=-14:TP=-1.5");
+    expect(pass2).toContain("I=-14:TP=-2");
     expect(pass2).toContain("measured_I=-27.6:measured_TP=-9.1:measured_LRA=3.2:measured_thresh=-38:offset=0.3:linear=true");
     expect(pass2).toContain("aresample=44100");
-    expect(pass2).toContain("alimiter=limit=0.8414:level=disabled");
+    expect(pass2).toContain("alimiter=limit=0.79433:level=disabled");
   });
 });
