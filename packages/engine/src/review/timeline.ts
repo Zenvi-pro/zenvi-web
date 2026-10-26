@@ -33,9 +33,13 @@ function moves(clip: Clip): boolean {
   });
 }
 
+/** Muted for its whole length: volume at 0, or audio switched off (`has_audio` 0; -1 is auto). */
 function silent(clip: Clip): boolean {
-  const points = pointsOf(clip.volume);
-  return points.length > 0 && points.every((p) => p.y === 0);
+  const off = (keyframe: unknown): boolean => {
+    const points = pointsOf(keyframe);
+    return points.length > 0 && points.every((p) => p.y === 0);
+  };
+  return off(clip.volume) || off(clip.has_audio);
 }
 
 function pathOf(clip: Clip): string {

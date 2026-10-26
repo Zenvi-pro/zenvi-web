@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ProjectDocument } from "../history/document.js";
 import { createProject } from "../model/defaults.js";
 import type { Project } from "../model/types.js";
-import { addClip } from "../ops/clips.js";
+import { addClip, setClipProperty } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
 import { audioInfo, imageInfo, media, videoInfo } from "../tools/test-support/fixture.js";
 import { alignCuts, findProblems, flashAndBlack, PACE_LIMITS, safeInsets, type ProblemInput } from "./problems.js";
@@ -97,6 +97,14 @@ describe("reviewTimeline", () => {
     const review = reviewTimeline(build([...montage(4, 1, "mute"), { path: "/m/song.mp3", at: 0, length: 1.5, layer: 2_000_000 }]));
     expect(review.audioClips).toBe(1);
     expect(review.silentGaps).toEqual([{ start: 1.5, end: 4 }]);
+  });
+
+  it("counts a clip with its audio switched off as silent", () => {
+    const doc = new ProjectDocument(build([{ path: "/m/a.mp4", at: 0, length: 2 }, { path: "/m/b.mp4", at: 2, length: 2 }]));
+    doc.transaction("audio off", (tx) => setClipProperty(tx, String(tx.project.clips[1]!.id), "has_audio", 0));
+    const review = reviewTimeline(doc.project);
+    expect(review.audioClips).toBe(1);
+    expect(review.silentGaps).toEqual([{ start: 2, end: 4 }]);
   });
 });
 
