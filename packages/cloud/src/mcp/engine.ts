@@ -49,6 +49,8 @@ export const HIDDEN_ENGINE_TOOLS = new Set([
   "set_preference_tool",
   // Kling is slower than ChatGPT's tool budget. generate_video starts a job instead.
   "generate_video_and_add_to_timeline_tool",
+  // Zenvi 3D renders with Blender, which this server has not: listing scenes it cannot add misleads.
+  "list_3d_scenes_tool",
 ]);
 
 const PROJECT_ID_PROPERTY = {
