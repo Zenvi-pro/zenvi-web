@@ -7,5 +7,6 @@ export * from "./time.js";
 export * from "./windows.js";
 export * from "./queries.js";
 export * from "./duration.js";
+export * from "./export-end.js";
 export * from "./snap.js";
 export * from "./navigation.js";
