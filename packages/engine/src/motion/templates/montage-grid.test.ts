@@ -340,6 +340,12 @@ describe("grid fitted to a short duration", () => {
     expect(plan.warnings!.join(" ")).toMatch(/zoom_into 9 is past the \d tiles shown; zooming into tile \d/);
   });
 
+  it("fits a repeat's and a kaleidoscope's tiles that arrive together at their own length", () => {
+    const one = { fileIds: [FILES[0]!] };
+    expect(build(frame, { layout: "repeat", steps: [4, 16] }, one, { seconds: 2 }).plan.warnings).toBeUndefined();
+    expect(build(frame, { layout: "kaleidoscope", tiles: 8 }, one, { seconds: 1.2 }).plan.warnings).toBeUndefined();
+  });
+
   it("warns about nothing when the asked tiles fit at a beat or half beat", () => {
     expect(build(frame, { tiles: 4 }).plan.warnings).toBeUndefined();
     expect(tiles(build(frame, { tiles: 4 }).plan)).toBeGreaterThan(0);
