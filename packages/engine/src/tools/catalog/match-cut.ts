@@ -29,7 +29,7 @@ import { boxAt, subjectOnCanvas, type CanvasSubject, type FitMode, type SubjectB
 import { planMontage, type MontageMusic, type MontagePlan } from "../../matchcut/montage.js";
 import { flashSvg } from "../../reels/typography.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
-import { directTool, type CatalogTool, type ToolCall } from "../define.js";
+import { directTool, type CatalogTool } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
 import { detectSubjects, SUBJECT_KINDS, type DetectedSubject } from "../subjects.js";
 import type { ImportedMedia } from "../types.js";
