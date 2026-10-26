@@ -131,7 +131,7 @@ export interface BeatAlignment {
 export interface MixReview {
   /** Integrated loudness, LUFS (EBU R128), null when the host cannot measure. */
   lufs: number | null;
-  /** Sample peak, dBFS. */
+  /** True peak (EBU R128), dBFS. */
   peakDb: number | null;
   silences: { start: number; end: number }[];
 }

@@ -37,6 +37,8 @@ export interface SampledFrame {
   /** Brightness 99 % of the pixels are at or below. */
   peak: number;
   shot: number;
+  /** The shot's clip is fading (opacity below 1) here: a dark frame is the fade, not a fault. */
+  fading?: boolean;
 }
 
 export interface ProblemInput {
@@ -77,15 +79,26 @@ export function safeInsets(width: number, height: number): { left: number; right
   return width / height < 0.7 ? { left: 0.1, right: 0.1, top: 0.12, bottom: 0.2 } : { left: 0.1, right: 0.1, top: 0.1, bottom: 0.1 };
 }
 
+/**
+ * What a sampled frame can be marked as: a frame of a short shot is a flash
+ * when bright (a white or black flash cut is deliberate), a frame of a longer
+ * shot that is not fading is a black frame when dark (a white product shot or
+ * a fade from black is not).
+ */
+export function tileMark(frame: Pick<SampledFrame, "shot" | "fading">, review: TimelineReview): "flash" | "black" | undefined {
+  const shot = review.shots.find((s) => s.index === frame.shot);
+  if (shot !== undefined && shot.duration <= FLASH_MAX_SECONDS) return "flash";
+  return frame.fading ? undefined : "black";
+}
+
 /** The sampled frames that are white flashes (short shots) and the ones that are black. */
 export function flashAndBlack(frames: readonly SampledFrame[], review: TimelineReview): { flashes: number[]; black: number[] } {
   const flashes: number[] = [];
   const black: number[] = [];
   for (const frame of frames) {
-    const shot = review.shots.find((s) => s.index === frame.shot);
-    const short = shot !== undefined && shot.duration <= FLASH_MAX_SECONDS;
-    if (frame.luma >= FLASH_LUMA && short) flashes.push(frame.seconds);
-    else if (frame.luma <= BLACK_LUMA && frame.peak <= BLACK_PEAK && !short) black.push(frame.seconds);
+    const mark = tileMark(frame, review);
+    if (mark === "flash" && frame.luma >= FLASH_LUMA) flashes.push(frame.seconds);
+    else if (mark === "black" && frame.luma <= BLACK_LUMA && frame.peak <= BLACK_PEAK) black.push(frame.seconds);
   }
   const unique = (xs: number[]): number[] => [...new Set(xs.map((x) => Math.round(x * 100) / 100))].sort((a, b) => a - b);
   return { flashes: unique(flashes), black: unique(black) };

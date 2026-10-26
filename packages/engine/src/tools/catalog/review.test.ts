@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BEAT_SAMPLE_RATE } from "../../analysis/beats.js";
 import { ProjectDocument } from "../../history/document.js";
 import { createProject } from "../../model/defaults.js";
-import { addClip } from "../../ops/clips.js";
+import { addClip, fadeClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
 import { addTitleClip } from "../../ops/titles.js";
 import type { MixMeasurement, SheetResult, ToolHost } from "../types.js";
@@ -168,6 +168,21 @@ describe("review_edit_tool", () => {
     });
     const data = dataOf(await review(r));
     expect(data.problems.find((p: { code: string }) => p.code === "black-frame")).toMatchObject({ severity: "high", at: expect.closeTo(2, 1) });
+  });
+
+  it("takes the first frame of a fade from black for the fade, not a black frame", async () => {
+    const r = rig(6, 1);
+    r.doc.transaction("fade in", (tx) => fadeClip(tx, String(tx.project.clips.find((c) => c.file_id === "SHOT0XXXXX")!.id), { fadeIn: 0.5 }));
+    const marks: (string | undefined)[] = [];
+    r.host.frames!.renderSheet = async (_p, tiles) => {
+      marks.push(...tiles.map((t) => t.mark));
+      return { image: { mimeType: "image/jpeg", data: "AAAA" }, width: 100, height: 100, luma: tiles.map((t) => (t.seconds < 0.1 ? 0 : 0.4)), peak: tiles.map((t) => (t.seconds < 0.1 ? 0 : 0.8)) };
+    };
+    const data = dataOf(await review(r));
+    expect(data.problems.map((p: { code: string }) => p.code)).not.toContain("black-frame");
+    // The host borders only what the data would flag: the fading first tile gets no mark, the others may be black.
+    expect(marks[0]).toBeUndefined();
+    expect(marks.slice(1).every((m) => m === "black")).toBe(true);
   });
 
   it("estimates title text outside the safe area from the title's SVG", async () => {

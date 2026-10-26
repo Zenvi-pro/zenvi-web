@@ -353,6 +353,8 @@ export interface SheetTileRequest {
   seconds: number;
   /** Printed on the tile. */
   label: string;
+  /** The border it may get: "flash" when bright, "black" when dark (`SheetLayoutRequest.mark` levels); none without. */
+  mark?: "flash" | "black";
 }
 
 export interface SheetLayoutRequest {
@@ -360,7 +362,7 @@ export interface SheetLayoutRequest {
   tileWidth: number;
   tileHeight: number;
   gap: number;
-  /** A tile whose mean luma is at or above `bright` gets a marked border (a flash); one at or below `dark` whose brightest 1 % of pixels is at or below `darkPeak` gets another (a black frame). */
+  /** A "flash" tile whose mean luma is at or above `bright` gets a marked border; a "black" one at or below `dark` whose brightest 1 % of pixels is at or below `darkPeak` gets another. */
   mark?: { bright: number; dark: number; darkPeak: number };
 }
 
@@ -448,7 +450,7 @@ export interface AudioHost {
 export interface MixMeasurement {
   /** EBU R128 integrated loudness, LUFS; null for silence. */
   lufs: number | null;
-  /** Sample peak, dBFS; null for silence. */
+  /** True peak (EBU R128), dBFS; null for silence. */
   peakDb: number | null;
   /** Stretches quieter than the threshold, timeline seconds. */
   silences: { start: number; end: number }[];

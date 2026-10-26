@@ -69,6 +69,15 @@ describe("renderContactSheet", () => {
     expect(result.image.data.length).toBeLessThan(100_000);
   }, 60_000);
 
+  it("borders a tile only with the mark it was given", async () => {
+    const sheet = async (marks: ("flash" | "black" | undefined)[]): Promise<string> =>
+      (await renderContactSheet(project, tiles.slice(1, 3).map((t, i) => ({ ...t, mark: marks[i] })), { ...layout, columns: 2 }, { resolveMedia: (p) => p })).image.data;
+    const plain = await sheet([undefined, undefined]);
+    expect(await sheet(["flash", "black"])).not.toBe(plain);
+    // A white tile that may only be black, and a black one that may only be a flash, stay plain.
+    expect(await sheet(["black", "flash"])).toBe(plain);
+  }, 60_000);
+
   it("reports a null brightness for a tile that cannot be rendered, and still returns the sheet", async () => {
     const broken = structuredClone(project);
     for (const item of [...broken.files, ...broken.clips.map((c) => c.reader)]) item.path = path.join(dir, "missing.mp4");

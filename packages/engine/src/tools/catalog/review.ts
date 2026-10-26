@@ -12,12 +12,16 @@
 
 import { z } from "zod";
 import { BEAT_SAMPLE_RATE, detectBeats } from "../../analysis/beats.js";
+import { evaluate, getCount } from "../../keyframe/evaluate.js";
+import type { Keyframe, Project } from "../../model/types.js";
 import { timelineEnd } from "../../timeline/queries.js";
-import { alignCuts, findProblems, flashAndBlack, BLACK_LUMA, BLACK_PEAK, FLASH_LUMA, type SampledFrame } from "../../review/problems.js";
+import { frameContaining } from "../../timeline/time.js";
+import { frameWindow, localFrame, windowContains } from "../../timeline/windows.js";
+import { alignCuts, findProblems, flashAndBlack, tileMark, BLACK_LUMA, BLACK_PEAK, FLASH_LUMA, type SampledFrame } from "../../review/problems.js";
 import { DEFAULT_SHEET_PIXELS, MAX_SHEET_PIXELS, planSheet, sheetLayout } from "../../review/sheet.js";
 import { titleTextBoxes } from "../../review/text-boxes.js";
 import { reviewTimeline } from "../../review/timeline.js";
-import type { BeatAlignment, MixReview, ReviewProblem, TextBox } from "../../review/types.js";
+import type { BeatAlignment, MixReview, ReviewProblem, ReviewShot, TextBox } from "../../review/types.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused } from "../receipt.js";
 import type { ToolImage } from "../types.js";
@@ -66,6 +70,20 @@ function rhythmOf(call: ToolCall, mix: MixReview & { pcm: { sampleRate: number; 
     call.host.log?.(`beat tracking of the mix failed: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
+}
+
+/** The shot's clip fades at `seconds`: its opacity is animated and below 1 there (a fade from or to black). */
+function fadingAt(project: Project, shot: ReviewShot | undefined, seconds: number): boolean {
+  if (!shot) return false;
+  const frame = frameContaining(seconds, project.fps);
+  // A split shot is several clips of one file; the one on top under the playhead is the one fading.
+  let top: { alpha: Keyframe | undefined; local: number; layer: number } | undefined;
+  for (const clip of project.clips) {
+    if (String(clip.file_id) !== shot.fileId) continue;
+    const window = frameWindow(clip, project.fps);
+    if (windowContains(window, frame) && (!top || clip.layer > top.layer)) top = { alpha: clip.alpha, local: localFrame(window, frame), layer: clip.layer };
+  }
+  return top !== undefined && getCount(top.alpha) >= 2 && evaluate(top.alpha, top.local, 1) < 1;
 }
 
 /** Text boxes of the titles whose SVG the host can read. */
@@ -159,6 +177,8 @@ export const reviewTools: CatalogTool[] = [
       let flashTimes: number[] = [];
       if (args.image !== false) {
         const plan = planSheet(review, args.max_tiles ?? 24);
+        const shots = new Map(review.shots.map((shot) => [shot.index, shot]));
+        const fading = plan.tiles.map((t) => fadingAt(project, shots.get(t.shot), t.seconds));
         const renderSheet = call.host.frames?.renderSheet;
         if (!renderSheet) {
           warnings.push("This surface cannot compose a contact sheet: use preview_frame at the cut times instead.");
@@ -169,12 +189,12 @@ export const reviewTools: CatalogTool[] = [
             const result = await renderSheet.call(
               call.host.frames,
               project,
-              plan.tiles.map((t) => ({ seconds: t.seconds, label: t.label })),
+              plan.tiles.map((t, i) => ({ seconds: t.seconds, label: t.label, mark: tileMark({ shot: t.shot, fading: fading[i] }, review) })),
               { columns: layout.columns, tileWidth: layout.tileWidth, tileHeight: layout.tileHeight, gap: layout.gap, mark: { bright: FLASH_LUMA, dark: BLACK_LUMA, darkPeak: BLACK_PEAK } },
               call.signal,
             );
             image = result.image;
-            frames = plan.tiles.flatMap((t, i) => (result.luma[i] == null ? [] : [{ seconds: t.seconds, luma: result.luma[i]!, peak: result.peak[i] ?? result.luma[i]!, shot: t.shot }]));
+            frames = plan.tiles.flatMap((t, i) => (result.luma[i] == null ? [] : [{ seconds: t.seconds, luma: result.luma[i]!, peak: result.peak[i] ?? result.luma[i]!, shot: t.shot, fading: fading[i] }]));
             flashTimes = flashAndBlack(frames, review).flashes;
             sheet = {
               tiles: plan.tiles.length,

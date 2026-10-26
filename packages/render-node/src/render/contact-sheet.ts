@@ -139,8 +139,8 @@ export async function renderContactSheet(project: Project, tiles: readonly Sheet
         const stats = lumaStats(image);
         luma.push(stats.mean);
         peak.push(stats.peak);
-        const bright = layout.mark !== undefined && stats.mean >= layout.mark.bright;
-        const dark = layout.mark !== undefined && !bright && stats.mean <= layout.mark.dark && stats.peak <= layout.mark.darkPeak;
+        const bright = layout.mark !== undefined && tile.mark === "flash" && stats.mean >= layout.mark.bright;
+        const dark = layout.mark !== undefined && tile.mark === "black" && stats.mean <= layout.mark.dark && stats.peak <= layout.mark.darkPeak;
         if (bright) border(sheet, x, y, tileWidth, tileHeight, BRIGHT_BORDER);
         else if (dark) border(sheet, x, y, tileWidth, tileHeight, DARK_BORDER);
         if (bright || dark) chips.push({ text: bright ? "FLASH" : "BLACK", x: x + BORDER, y: y + tileHeight - Math.ceil(fontSize * 1.2) - BORDER - 3, fill: bright ? "#b36b00" : "#a4161a" });

@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { ProjectDocument } from "../history/document.js";
 import { createProject } from "../model/defaults.js";
 import type { Project } from "../model/types.js";
-import { addClip, setClipProperty } from "../ops/clips.js";
+import { addClip, fadeClip, setClipProperty } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
 import { audioInfo, imageInfo, media, videoInfo } from "../tools/test-support/fixture.js";
-import { alignCuts, findProblems, flashAndBlack, PACE_LIMITS, safeInsets, type ProblemInput } from "./problems.js";
+import { alignCuts, findProblems, flashAndBlack, PACE_LIMITS, safeInsets, tileMark, type ProblemInput } from "./problems.js";
 import { DEFAULT_SHEET_PIXELS, planSheet, sheetLayout } from "./sheet.js";
 import { titleTextBoxes } from "./text-boxes.js";
 import { reviewTimeline } from "./timeline.js";
@@ -179,6 +179,21 @@ describe("findProblems", () => {
     expect(flashAndBlack(frames, review)).toEqual({ flashes: [1.05], black: [1.5] });
     const problem = problemsFor(project, { frames }).find((p) => p.code === "black-frame");
     expect(problem).toMatchObject({ severity: "high", at: 1.5 });
+  });
+
+  it("marks a bright long shot no flash and a fade from black no black frame", () => {
+    const doc = new ProjectDocument(build([{ path: "/m/a.mp4", at: 0, length: 2 }, { path: "/m/b.mp4", at: 2, length: 0.12 }, { path: "/m/c.mp4", at: 2.12, length: 2 }]));
+    doc.transaction("fade in", (tx) => fadeClip(tx, String(tx.project.clips[0]!.id), { fadeIn: 0.5 }));
+    const review = reviewTimeline(doc.project);
+    // A white product shot, the fade's first frame, and a black flash cut.
+    const frames = [
+      { seconds: 1, luma: 0.95, peak: 1, shot: 0 },
+      { seconds: 0.02, luma: 0, peak: 0, shot: 0, fading: true },
+      { seconds: 2.05, luma: 0, peak: 0, shot: 1 },
+    ];
+    expect(frames.map((f) => tileMark(f, review))).toEqual(["black", undefined, "flash"]);
+    expect(flashAndBlack(frames, review)).toEqual({ flashes: [], black: [] });
+    expect(problemsFor(doc.project, { frames }).map((p) => p.code)).not.toContain("black-frame");
   });
 
   it("ranks high severity first and caps the list", () => {
