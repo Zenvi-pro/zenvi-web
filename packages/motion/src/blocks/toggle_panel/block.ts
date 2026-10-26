@@ -74,7 +74,9 @@ export function build(ctx: BlockContext): void {
   const start = 1.0;
   const doneBeat = 0.45;
   const room = S - start - doneBeat - 0.8 - (p.exit === false ? 0.6 : 1.0);
-  const interval = offs.length > 0 ? Math.min(1.0, Math.max(0.45, room / offs.length)) : 0;
+  // Past the 0.45 s floor, many rows click faster rather than push the done state into the exit.
+  const fit = offs.length > 1 ? (S - (p.exit === false ? 0 : 0.4) - 0.5 - doneBeat - (start + 0.55)) / (offs.length - 1) : Infinity;
+  const interval = offs.length > 0 ? Math.max(0.2, Math.min(1.0, Math.max(0.45, room / offs.length), fit)) : 0;
   const clicks = offs.map((_, i) => start + 0.55 + i * interval);
 
   // The count in the header follows the clicks.

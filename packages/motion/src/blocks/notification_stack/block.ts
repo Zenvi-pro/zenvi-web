@@ -74,7 +74,9 @@ export function build(ctx: BlockContext): void {
   const first = 0.15;
   const last = Math.max(first, ctx.seconds - (p.exit === false ? 1.2 : 1.6));
   const pause = hot ? 0.35 : 0;
-  const interval = n > 1 ? Math.min(1.4, Math.max(0.4, (last - first - pause) / (n - 1))) : 0;
+  // Past the 0.4 s floor, many cards arrive faster rather than land the punchline in the exit.
+  const fit = n > 1 ? (ctx.seconds - (p.exit === false ? 0 : 0.4) - 0.6 - first - pause) / (n - 1) : 0;
+  const interval = n > 1 ? Math.max(0.15, Math.min(1.4, Math.max(0.4, (last - first - pause) / (n - 1)), fit)) : 0;
   const arrive = items.map((_, i) => first + i * interval + (hot && i === n - 1 ? pause : 0));
 
   cards.forEach((card, i) => {

@@ -99,13 +99,19 @@ export function build(ctx: BlockContext): void {
 
   // Path timing: moves take longer the further they go; the dwell fills the rest.
   const start: Pt = { x: W * 0.92, y: H * 0.96 };
-  const moves = stops.map((s, i) => {
+  const paced = stops.map((s, i) => {
     const from = i === 0 ? start : stops[i - 1]!;
     return Math.min(0.95, Math.max(0.5, 0.45 + Math.hypot(s.x - from.x, s.y - from.y) / 2600));
   });
   const enter = 0.3;
   const tail = 0.9 + (p.exit === false ? 0 : 0.4);
-  const dwell = Math.min(1.6, Math.max(0.55, (S - enter - moves.reduce((a, b) => a + b, 0) - tail) / stops.length));
+  const room = Math.max(0.3, S - enter - tail);
+  const travel = paced.reduce((a, b) => a + b, 0);
+  const paceDwell = Math.min(1.6, Math.max(0.55, (room - travel) / stops.length));
+  // More stops than the length holds at that pace: moves and dwells shrink together, so the last stop still lands before the tail.
+  const squeeze = Math.min(1, room / (travel + paceDwell * stops.length));
+  const moves = paced.map((m) => m * squeeze);
+  const dwell = paceDwell * squeeze;
   const moveAt: number[] = [];
   let t0 = enter;
   stops.forEach((_, i) => {
