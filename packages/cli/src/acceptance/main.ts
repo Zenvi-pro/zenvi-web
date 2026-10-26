@@ -49,7 +49,12 @@ async function runOn(kind: RunnerKind, scenario: Scenario, scratch: string, medi
   if (kind === "desktop") {
     const desktop = await findDesktop();
     if ("reason" in desktop) return skipped(desktop.reason);
-    target = await connectDesktop(desktop.found, work);
+    try {
+      target = await connectDesktop(desktop.found, work);
+    } catch (error) {
+      // A stale advertisement (crashed app, reused pid) is "no desktop", not a reason to lose the portable results.
+      return skipped(`headless desktop at ${desktop.found.url} did not answer: ${(error as Error).message}`);
+    }
   } else {
     target = await startPortable({ work, home: path.join(work, "home"), bundle: values.bundle });
   }
@@ -73,6 +78,7 @@ async function scenarios(): Promise<number> {
   const wanted = values.scenario?.split(",").map((s) => s.trim());
   const all = (await loadScenarios()).filter((s) => !wanted || wanted.includes(s.id));
   if (all.length === 0) throw new Error(`no scenario matches ${values.scenario}`);
+  if (!["portable", "desktop", "all"].includes(values.runner!)) throw new Error(`--runner must be portable, desktop or all (got ${values.runner})`);
   const runners: RunnerKind[] = values.runner === "all" ? ["portable", "desktop"] : [values.runner as RunnerKind];
   const out = values.out ?? (await mkdtemp(path.join(os.tmpdir(), "zenvi-acceptance-")));
   const scratch = await mkdtemp(path.join(os.tmpdir(), "zenvi-acceptance-work-"));
@@ -93,7 +99,8 @@ async function scenarios(): Promise<number> {
   else log(`work folders kept in ${scratch}`);
   const t = report.totals.toolCalls;
   log(`tool calls ${t.ok}/${t.ok + t.failed} ok (${t.skipped} skipped); report: ${path.join(out, "report.md")}`);
-  return report.totals.steps.fail > 0 ? 1 : 0;
+  // A scenario can fail before any step runs (a fixture ffmpeg could not make).
+  return report.totals.scenarios.fail > 0 || report.totals.steps.fail > 0 ? 1 : 0;
 }
 
 async function replay(): Promise<number> {
