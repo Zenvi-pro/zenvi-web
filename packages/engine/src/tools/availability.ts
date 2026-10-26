@@ -398,7 +398,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       media: "ffprobe is available",
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
-      "audio.mixPcm": "ffmpeg and ffprobe are available",
+      "audio.mixPcm": "ffprobe is available",
       backend: "the server is set up to call the Zenvi backend",
     },
     hidden: [

@@ -19,7 +19,7 @@ Availability follows each tool's required host capabilities and the host methods
 
 - **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, storage, assets, audio; methods media.importUrl, media.pickFiles, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, ui.openExportDialog, audio.decodePcm, audio.mixPcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode, ui.layout, ui.preferences, ui.clearPlaybackCache, exporter.supports; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, assets; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, media.missing, media.fetchWebVideo, storage.open, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, storage.recoveryCopies, storage.customProfiles, media.collect, audio.decodePcm, audio.mixPcm, audio.transcribe, exporter.supports, frames.fontFamilies; only sometimes: backend (signed in with zenvi login), media.fetchWebVideo (yt-dlp is installed; zenvi doctor checks).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, exporter; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.mixPcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), audio.mixPcm (ffmpeg and ffprobe are available), backend (the server is set up to call the Zenvi backend); hides 16 local-app tools.
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, exporter; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.mixPcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), audio.mixPcm (ffprobe is available), backend (the server is set up to call the Zenvi backend); hides 16 local-app tools.
 
 ## Matrix
 
@@ -3162,7 +3162,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: audio.
 
-Availability: editor yes; cli yes; cloud yes (only when ffmpeg is available and ffmpeg and ffprobe are available); desktop — (web-only direct tool).
+Availability: editor yes; cli yes; cloud yes (only when ffmpeg is available and ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
