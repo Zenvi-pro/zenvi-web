@@ -4,6 +4,7 @@ import { findClip } from "../model/query.js";
 import { planFrame } from "../render/plan/frame-plan.js";
 import type { Clip } from "../model/types.js";
 import { addClip, setClipSpeed } from "./clips.js";
+import { applyClipPreset } from "./presets.js";
 import { applySpeedRamp, planSpeedRamp, type RampRequest } from "./speed-ramp.js";
 import { expectRefused, expectUndoRedo, makeDoc } from "./testkit.js";
 
@@ -244,6 +245,16 @@ describe("planSpeedRamp / applySpeedRamp", () => {
         }),
       );
       expect(refuse(custom, { preset: "hero" }).message).toMatch(/custom time curve/);
+
+      // A freeze added after a ramp (or after resetting one) is not the ramp any more.
+      for (const reset of [false, true]) {
+        const frozen = docWithClip();
+        ramp(frozen, { preset: "velocity" });
+        if (reset) frozen.transaction("reset", (tx) => applyClipPreset(tx, "CLIP000001", "time.none"));
+        frozen.transaction("freeze", (tx) => applyClipPreset(tx, "CLIP000001", "time.freeze", { seconds: 1, playhead: 2 }));
+        expect(clipOf(frozen)).not.toHaveProperty("zenvi_speed_ramp");
+        expect(refuse(frozen, { preset: "hero" }).message).toMatch(/custom time curve/);
+      }
 
       const image = makeDoc();
       image.transaction("add", (tx) => addClip(tx, { fileId: "IMAGE00001", position: 0, layer: V1, id: "CLIP000001" }));
