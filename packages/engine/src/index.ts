@@ -21,6 +21,7 @@ export * from "./titles/svg.js";
 export { titleLook } from "./titles/title-svg.js";
 export * from "./history/keypath.js";
 export * from "./history/document.js";
+export * from "./history/desktop.js";
 export * from "./ops/index.js";
 export * from "./io/index.js";
 export * from "./transitions/index.js";
