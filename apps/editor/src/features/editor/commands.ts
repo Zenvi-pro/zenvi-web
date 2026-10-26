@@ -29,6 +29,7 @@ import {
 import { downloadBlob, projectFileBlob, safeFileName } from "@/lib/projectFactory";
 import { secondsToTimecode } from "@/lib/timecode";
 import { renderFrame } from "./render";
+import { runSoundDesign } from "./soundDesign";
 import { buildKeymap, primaryShortcut, type Keymap } from "@/lib/keyboard/keymap";
 import type { ShortcutCommand } from "@/lib/keyboard/dispatcher";
 import { toast } from "@/ui/Toast";
@@ -332,6 +333,9 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
     { id: "actionProfile", label: "Project format…", group: "File", run: () => openDialog("profile") },
     { id: "actionTitle", label: "New title…", group: "File", run: () => session.ui.setState({ dialog: "title", editingTitleFileId: null }) },
     { id: "actionMakeReel", label: "Make a reel…", group: "Timeline", run: () => session.ui.setState({ dialog: "reel" }) },
+    { id: "actionSoundDesign", label: "Sound design: whooshes, hits and risers", group: "Timeline", run: () => void runSoundDesign(session, "normal") },
+    { id: "actionSoundDesignSubtle", label: "Sound design: subtle", group: "Timeline", run: () => void runSoundDesign(session, "subtle") },
+    { id: "actionSoundDesignHype", label: "Sound design: hype", group: "Timeline", run: () => void runSoundDesign(session, "hype") },
 
     // View
     { id: "actionProperties", label: "Properties", group: "View", run: () => showTab(undefined, "properties") },

@@ -194,6 +194,12 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote:
       "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
   },
+  add_sfx_tool: { methods: ["media.writeGenerated"] },
+  auto_sound_design_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm"],
+    partialNote: "without audio decoding cuts are weighed by `beats` (when given) instead of the music, and the climax comes only from `climax_seconds`",
+  },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],

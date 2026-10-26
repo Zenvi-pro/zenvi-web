@@ -23,6 +23,9 @@ const DIRECT_TOOLS = [
   "build_reel_tool",
   "add_motion_template_tool",
   "kinetic_captions_tool",
+  "list_sfx_tool",
+  "add_sfx_tool",
+  "auto_sound_design_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
 ];
