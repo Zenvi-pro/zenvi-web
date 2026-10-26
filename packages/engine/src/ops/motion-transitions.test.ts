@@ -8,7 +8,7 @@ import { planFrame } from "../render/plan/frame-plan.js";
 import { frameWindow } from "../timeline/windows.js";
 import { MOTION_TRANSITION_IDS } from "../transitions/motion/presets.js";
 import { addClip } from "./clips.js";
-import { MOTION_TRANSITIONS_KEY, applyMotionTransition, motionRecords, removeMotionTransition, trackCuts } from "./motion-transitions.js";
+import { MOTION_TRANSITIONS_KEY, applyMotionTransition, boxSafeScale, motionRecords, removeMotionTransition, trackCuts } from "./motion-transitions.js";
 import { baseProject, expectRefused, expectUndoRedo, makeDoc } from "./testkit.js";
 
 /** Clips of 2 s each on track 1, cut back to back. */
@@ -184,30 +184,68 @@ function paint(width: number, height: number, hue: number): { width: number; hei
   return { width, height, data };
 }
 
+/** Border pixels (of a W×H render) that are near black, on frames `from`-`to`. */
+function blackEdges(project: Project, from: number, to: number): string[] {
+  const W = Number(project.width);
+  const H = Number(project.height);
+  const bad: string[] = [];
+  for (let frame = from; frame <= to; frame += 1) {
+    const plan = planFrame(project, frame);
+    const layers = plan.layers.map((layer) => (layer.source.kind === "color" ? null : paint(layer.drawWidth, layer.drawHeight, layer.source.kind === "video" ? Math.round(layer.source.time * 30) : 0)));
+    const image = compositeFrame(plan, { layers });
+    for (let i = 0; i < W * H; i += 1) {
+      const x = i % W;
+      const y = Math.floor(i / W);
+      if (x !== 0 && x !== W - 1 && y !== 0 && y !== H - 1) continue;
+      const d = image.data;
+      if (d[i * 4]! + d[i * 4 + 1]! + d[i * 4 + 2]! < 60) bad.push(`frame ${frame} (${x},${y})`);
+    }
+  }
+  return bad;
+}
+
 describe("motion transitions cover the canvas", () => {
   // flash_black dims the picture on purpose; every other preset must keep every border pixel lit.
   const presets = MOTION_TRANSITION_IDS.filter((p) => p !== "flash_black");
   it.each(presets)("%s leaves no black edge on any frame", (preset) => {
     // Small canvas, rendered at its own size: the clip's picture covers it exactly at rest.
-    const W = 160;
-    const H = 90;
-    const doc = cutsDoc(2, { ...baseProject(), width: W, height: H });
+    const doc = cutsDoc(2, { ...baseProject(), width: 160, height: 90 });
     const r = doc.transaction(preset, (tx) => applyMotionTransition(tx, { outClipId: "CLIP0", inClipId: "CLIP1", preset, intensity: 2, direction: preset === "whip" ? "up" : undefined }));
-    const project = doc.project;
     const cutFrame = Math.round(r.cut * 30) + 1;
-    const bad: string[] = [];
-    for (let frame = cutFrame - 8; frame <= cutFrame + 9; frame += 1) {
-      const plan = planFrame(project, frame);
-      const layers = plan.layers.map((layer) => (layer.source.kind === "color" ? null : paint(layer.drawWidth, layer.drawHeight, layer.source.kind === "video" ? Math.round(layer.source.time * 30) : 0)));
-      const image = compositeFrame(plan, { layers });
-      for (let i = 0; i < W * H; i += 1) {
-        const x = i % W;
-        const y = Math.floor(i / W);
-        if (x !== 0 && x !== W - 1 && y !== 0 && y !== H - 1) continue;
-        const d = image.data;
-        if (d[i * 4]! + d[i * 4 + 1]! + d[i * 4 + 2]! < 60) bad.push(`frame ${frame} (${x},${y})`);
+    expect(blackEdges(doc.project, cutFrame - 8, cutFrame + 9).slice(0, 5)).toEqual([]);
+  });
+
+  it("squash leaves no hairline on a clip that already scales one axis", () => {
+    // The incoming clip zooms its width only, so squash's taller peak is the axis that limits the reader's
+    // decode box: snapped whole on its own axis alone, the picture decoded a pixel narrower than the canvas.
+    const doc = cutsDoc(2, { ...baseProject(), width: 480, height: 270 });
+    doc.transaction("width zoom", (tx) => {
+      const first = frameWindow(tx.project.clips.find((c) => c.id === "CLIP1")!, tx.project.fps).localStartFrame;
+      tx.update(["clips", { id: "CLIP1" }], { scale_x: { Points: [makeKeyframePoint(first, 1), makeKeyframePoint(first + 40, 1.3)] } });
+    });
+    const r = doc.transaction("squash", (tx) => applyMotionTransition(tx, { outClipId: "CLIP0", inClipId: "CLIP1", preset: "squash" }));
+    const cutFrame = Math.round(r.cut * 30) + 1;
+    expect(blackEdges(doc.project, cutFrame, cutFrame + 3).slice(0, 5)).toEqual([]);
+  });
+});
+
+describe("boxSafeScale", () => {
+  it("raises a peak to a box that is whole on both axes", () => {
+    for (const [w, h] of [[1920, 1080], [1280, 720], [1080, 1920]] as const) {
+      for (const s of [1.04, 1.35, 1.6, 2.13]) {
+        const v = boxSafeScale(s, w, h);
+        expect(v).toBeGreaterThanOrEqual(s);
+        expect(Number.isInteger(Math.round(w * v * 1e6) / 1e6) && Number.isInteger(Math.round(h * v * 1e6) / 1e6), `${w}x${h} ${s} -> ${v}`).toBe(true);
       }
     }
-    expect(bad.slice(0, 5)).toEqual([]);
+  });
+
+  it("keeps the planned scale on canvases with no whole box nearby", () => {
+    // 854x480 (gcd 2): the next whole box above 1.04 is 1.5, which would turn a 4% push into a 50% punch.
+    for (const s of [1.04, 1.35, 1.6, 2.13]) {
+      expect(boxSafeScale(s, 854, 480)).toBe(s);
+      expect(boxSafeScale(s, 427, 240)).toBe(s);
+    }
+    expect(boxSafeScale(1.04, 1920, 1080) - 1.04).toBeLessThanOrEqual(0.1);
   });
 });

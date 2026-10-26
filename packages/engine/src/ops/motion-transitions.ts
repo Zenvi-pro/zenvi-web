@@ -250,23 +250,28 @@ function gcd(a: number, b: number): number {
   return b === 0 ? a : gcd(b, a % b);
 }
 
+/** How far a peak may be raised to make its box whole: on canvases whose sides share a small factor (854x480: 1.04 -> 1.5) the next whole box is a different move, and there a hairline (1 px) is the lesser fault. */
+const MAX_BOX_SNAP = 0.1;
+
 /**
- * The smallest scale >= `s` at which the reader's max box (W·s × H·s,
- * truncated per axis in float: QtImageReader/FFmpegReader calculate_max_size)
- * is whole pixels on both axes. Any other peak can lose a pixel of aspect, and
- * the clip then fits the canvas a pixel short for its whole length (a dark
- * hairline at the edges). `axis` snaps one extent only (squash scales the axes apart).
+ * The smallest scale >= `s` (by at most MAX_BOX_SNAP) at which the reader's
+ * max box (W·s × H·s, truncated per axis in float: QtImageReader/FFmpegReader
+ * calculate_max_size) is whole pixels on both axes, else `s`. Any other peak
+ * can lose a pixel of aspect, and the clip then fits the canvas a pixel short
+ * for its whole length (a dark hairline at the edges). Both axes even when the
+ * scales differ (squash, a one-axis Ken Burns): the box is limited by the
+ * axis with the smaller peak, and the picture is fitted to it at the source aspect.
  */
-export function boxSafeScale(s: number, width: number, height: number, axis?: "x" | "y"): number {
+export function boxSafeScale(s: number, width: number, height: number): number {
   const f32 = Math.fround;
   const whole = (extent: number, v: number): boolean => {
     const exact = Math.round(extent * v);
     return Math.abs(extent * v - exact) < 1e-9 && Math.trunc(f32(extent * f32(v))) === exact;
   };
-  const step = axis === "x" ? width : axis === "y" ? height : gcd(width, height);
-  for (let n = Math.ceil(s * step - 1e-9); n <= Math.ceil(s * step) + 4 * step; n += 1) {
+  const step = gcd(width, height);
+  for (let n = Math.ceil(s * step - 1e-9); n / step <= s + MAX_BOX_SNAP; n += 1) {
     const v = n / step;
-    if ((axis === "y" || whole(width, v)) && (axis === "x" || whole(height, v))) return v;
+    if (whole(width, v) && whole(height, v)) return v;
   }
   return s;
 }
@@ -299,15 +304,12 @@ function writeSide(side: SidePlan, record: Omit<MotionTransitionRecord, "role" |
     );
   }
   // A peak above the clip's own largest scale sets the reader's decode box: keep that box whole pixels.
-  const sx = scaled.get("scale_x");
-  const sy = scaled.get("scale_y");
-  const same = sx && sy && sx.every((v, i) => v === sy[i]);
-  for (const [ch, axis] of [["scale_x", "x"], ["scale_y", "y"]] as const) {
+  for (const ch of ["scale_x", "scale_y"] as const) {
     const values = scaled.get(ch);
     if (!values) continue;
     const peak = Math.max(...values);
     if (peak <= curveMax((side.clip as Record<string, unknown>)[ch] as Keyframe | undefined)) continue;
-    values[values.indexOf(peak)] = boxSafeScale(peak, width, height, same ? undefined : axis);
+    values[values.indexOf(peak)] = boxSafeScale(peak, width, height);
   }
   for (const [ch, values] of scaled) {
     const before = (side.clip as Record<string, unknown>)[ch] as Keyframe | undefined;
