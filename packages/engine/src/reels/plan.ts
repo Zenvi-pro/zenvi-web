@@ -72,6 +72,8 @@ export interface PlanInput {
   music: MusicBeats | null;
   /** Target length, seconds (default: the style's). The reel ends on the last downbeat before it. */
   seconds?: number;
+  /** Tempo of the grid when there is no music (default: the style's). */
+  fallbackBpm?: number;
   /**
    * The project's frame rate: the music's in-point snaps to its frame grid
    * (as the clip will), so the beats stay where the cuts are.
@@ -220,7 +222,7 @@ export function planReel(input: PlanInput): ReelPlan {
   const { style, media } = input;
   if (media.length === 0) throw new Error("A reel needs at least one video or image.");
   const target = Math.max(2, input.seconds ?? style.defaultSeconds);
-  const grid = planReelGrid({ music: input.music, seconds: target, fallbackBpm: style.defaultBpm, frameRate: input.frameRate });
+  const grid = planReelGrid({ music: input.music, seconds: target, fallbackBpm: input.fallbackBpm ?? style.defaultBpm, frameRate: input.frameRate });
   const { duration, beatsInReel } = grid;
 
   // Cuts sit on the frame grid, so one shot ends exactly where the next begins

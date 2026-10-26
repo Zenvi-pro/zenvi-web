@@ -27,6 +27,7 @@ import { PALETTES, withAccent } from "../../motion/palettes.js";
 import { MOTION_TEMPLATE_IDS, MotionInputError, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
 import { TEMPLATES } from "../../motion/templates/index.js";
 import { PALETTE_IDS, type BeatGrid, type MotionLayer, type MotionMedia, type MotionPlan, type PaletteId } from "../../motion/types.js";
+import { beatOverrideProblem } from "../beat-override.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
@@ -58,7 +59,8 @@ const input = z.strictObject({
   duration_seconds: z.number().min(0.5).max(120).optional().describe("Length, seconds (default: the template's natural length in beats)."),
   palette: z.enum(PALETTE_IDS).optional().describe("Colours: ui_light, ui_dark, editorial (paper, ink, red, one blue), callout (dark, hot accent), tutorial (grid paper, ink, highlighter). Default per template."),
   accent: z.string().max(40).optional().describe("Replace the palette's accent colour (a brand colour): #rrggbb, #rgb, rgb(r,g,b) or a colour name."),
-  bpm: z.number().min(40).max(240).optional().describe("Tempo of the beat grid, beats from the timeline's start (when there is no `beats`)."),
+  bpm: z.number().min(40).max(400).optional().describe("Tempo of the beat grid, beats from the timeline's start or from offset_seconds (when there is no `beats`)."),
+  offset_seconds: z.number().min(0).max(3600).optional().describe("With bpm: timeline seconds of the first beat (default 0)."),
   beats: z.array(z.number().min(0)).min(2).max(4000).optional().describe("Beat times on the timeline, seconds (build_reel_tool's data.beats, detect_beats_tool's beats moved to the music clip's position)."),
   text: z.string().max(200).optional().describe("Main text: the typed phrase (type_search), the headline (kinetic_type; * stands for an image tile), the title (end_card), the caption (step_card), the product name (callout)."),
   subtitle: z.string().max(120).optional().describe("A second line: end_card's subtitle, the text cards' line (ui_cards), the prompt above the search (type_search), a still header at the top (step_card)."),
@@ -255,20 +257,22 @@ export const motionTemplateTools: CatalogTool[] = [
       const palette = withAccent(PALETTES[args.palette ?? DEFAULT_PALETTE[args.template]], accent);
 
       const warnings: string[] = [];
+      const problem = beatOverrideProblem(args);
+      if (problem) return refused(TOOL, problem);
       let grid: BeatGrid | null = null;
       let gridSource: string;
       if (args.beats) {
         grid = gridFromBeats(args.beats);
         gridSource = "the given beats";
       } else if (args.bpm) {
-        gridSource = `${args.bpm} BPM`;
+        gridSource = args.offset_seconds ? `${args.bpm} BPM from ${args.offset_seconds} s` : `${args.bpm} BPM`;
       } else {
         grid = await timelineMusicGrid(call, project, warnings);
         gridSource = grid ? "the music on the timeline" : "120 BPM";
       }
 
       // A steady grid from the timeline's start, long enough for any template.
-      grid ??= tempoGrid(args.bpm ?? 120, start + (args.duration_seconds ?? 0) + 130, 0);
+      grid ??= tempoGrid(args.bpm ?? 120, start + (args.duration_seconds ?? 0) + 130, args.offset_seconds ?? 0);
       let plan: MotionPlan;
       try {
         plan = buildMotionTemplate({ template: args.template, frame, start, seconds: args.duration_seconds, grid, palette, media, content });

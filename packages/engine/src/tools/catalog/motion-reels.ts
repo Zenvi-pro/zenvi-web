@@ -32,6 +32,10 @@ export interface MotionReelInput {
   ids: readonly string[];
   music: ProjectFile | null;
   beats: MusicBeats | null;
+  /** Tempo of the grid when there is no music (default: the style's). */
+  fallbackBpm?: number;
+  /** Receipt fields about where the beat grid came from. */
+  beatInfo?: Record<string, unknown>;
   names: ReadonlyMap<string, string>;
   warnings: string[];
   args: {
@@ -87,7 +91,7 @@ export async function buildMotionReel(call: ToolCall, input: MotionReelInput): P
 
   // The grid, the length and the bars, exactly as a footage reel plans them.
   const target = Math.max(2, args.duration_seconds ?? style.defaultSeconds);
-  const grid = planReelGrid({ music: input.beats, seconds: target, fallbackBpm: style.defaultBpm, frameRate: fps });
+  const grid = planReelGrid({ music: input.beats, seconds: target, fallbackBpm: input.fallbackBpm ?? style.defaultBpm, frameRate: fps });
   const duration = onFrameGrid(grid.duration, fps);
   const downs = grid.downbeats.filter((t) => t < duration - 0.05);
   if (downs.length === 0 || downs[0]! > 0.05) downs.unshift(0);
@@ -169,6 +173,7 @@ export async function buildMotionReel(call: ToolCall, input: MotionReelInput): P
       style: style.id,
       duration,
       bpm: grid.bpm,
+      ...input.beatInfo,
       music_file_id: music ? String(music.id) : null,
       music_start: grid.musicStart,
       beats: grid.beats.filter((t) => t <= duration + 1e-6),

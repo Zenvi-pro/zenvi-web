@@ -426,7 +426,13 @@
       }
     },
     "detect_beats_tool": {
-      "description": "Detect music beats (times, frames, BPM) in a media-bin file or timeline clip (hosts with on-device beat tracking)."
+      "description": "Detect music beats (times, frames, BPM) in a media-bin file or timeline clip (hosts with on-device beat tracking). The tempo is moved into 80-180 BPM when the pulse is really there; the receipt gives a confidence, the half/double-time readings (alternatives) and the bar length. If the grid is at the wrong octave or off, run it again with bpm.",
+      "web_extra_props": {
+        "bpm": {"type": "number", "minimum": 40, "maximum": 400}
+      },
+      "props": {
+        "bpm": {"description": "Track the beats at this tempo instead of estimating it (e.g. the 160 of a loop read as 80): the grid still snaps to where the audio hits."}
+      }
     },
     "diarize_media_tool": {
       "description": "Label speakers on a file's or clip's transcript words (hosts with on-device diarization).",
