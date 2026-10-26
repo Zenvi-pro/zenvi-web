@@ -1,20 +1,20 @@
 {
   "id": "particle_burst",
-  "version": 1,
+  "version": 2,
   "title": "Particle burst",
-  "description": "A pop that punctuates a beat: an optional word or badge scales in with overshoot, ripple rings spread, and seeded particles (dots, confetti squares, streaks or sparkle lines) burst out and fall away. Transparent, to drop on a cut or a click.",
-  "tags": ["particles", "burst", "confetti", "pop", "transition", "accent"],
+  "description": "A seeded burst from one point that punctuates a beat, a cut or a click: white-hot sparks cooling to the accent, tumbling confetti strips, glass shards, ripple rings, or hand-drawn burst lines. The point draws in for a beat, then ignites with a flare. An optional word pops at the point first. Transparent, to drop over video.",
+  "tags": ["particles", "burst", "sparks", "confetti", "shards", "rings", "pop", "transition", "accent"],
   "duration": { "default": 2, "min": 0.8, "max": 6 },
   "aspects": ["9:16", "16:9", "1:1", "4:5"],
   "alpha": true,
-  "tokens": { "palette": "light" },
+  "tokens": { "palette": "ember", "display": "sans", "radius": 80 },
   "params": {
-    "label": { "type": "string", "maxLength": 24, "default": "", "description": "A short word or emoji in a pill that pops in at the centre (empty: none)." },
-    "shape": { "type": "enum", "options": ["mixed", "dot", "square", "streak", "sparkle"], "default": "mixed", "description": "Particle shape: dots, confetti squares, motion streaks, sparkle lines (a ring of short rays), or a mix." },
-    "count": { "type": "integer", "min": 8, "max": 400, "default": 90, "description": "How many particles." },
+    "shape": { "type": "enum", "options": ["sparks", "confetti", "shards", "rings", "lines", "dots"], "default": "sparks", "description": "What bursts: sparks (white-hot streaks with a fall of embers), confetti (paper strips that flip as they fall), shards (splinters turning in the light), rings (ripples with a dust of dots), lines (short strokes shot evenly round, the drawn sparkle accent), dots." },
+    "count": { "type": "integer", "min": 8, "max": 400, "default": 110, "description": "How many particles (lines: one stroke per 6, 6 to 24)." },
     "origin": { "type": "points", "maxItems": 1, "default": [{ "x": 0.5, "y": 0.5 }], "description": "Where it bursts, {x, y} from 0 to 1." },
-    "colors": { "type": "strings", "maxItems": 5, "maxLength": 9, "default": [], "description": "Particle colours as #rrggbb (empty: accent, secondary and ink)." },
-    "rings": { "type": "boolean", "default": true, "description": "Ripple rings spreading from the origin." },
-    "gravity": { "type": "number", "min": 0, "max": 4000, "default": 900, "description": "How fast particles fall, px/s² at 1080." }
+    "colors": { "type": "strings", "maxItems": 5, "maxLength": 9, "default": [], "description": "Particle colours as #rrggbb (empty: the accent and secondary; confetti adds the ink)." },
+    "rings": { "type": "boolean", "default": true, "description": "Two ripple rings spreading from the point with any shape." },
+    "gravity": { "type": "number", "min": 0, "max": 4000, "default": 900, "description": "How fast particles fall, px/s² at 1080." },
+    "label": { "type": "string", "maxLength": 24, "default": "", "description": "A short word in a pill that pops at the point before the burst (empty: none)." }
   }
 }

@@ -1,0 +1,3 @@
+.dg-stage { position: absolute; inset: 0; }
+.dg-canvas, .dg-photo { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dg-photo { object-fit: cover; }
