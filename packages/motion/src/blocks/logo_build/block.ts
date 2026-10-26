@@ -169,8 +169,10 @@ export function build(ctx: BlockContext): void {
       Object.assign(word.style, { left: `${markX + R + gap}px`, top: `${cy - box.height / 2}px` });
     }
     tl.to(stage, { x: markX - cx, y: markY - cy, scale: 1 }, { at: revealAt, duration: 0.8, ease: "in-out" });
-    tl.fromTo(chars, { yPercent: 115, rotate: 6 }, { yPercent: 0, rotate: 0 }, { at: revealAt + 0.3, duration: 0.7, ease: "out", stagger: 0.035 });
-    if (tag) tl.fromTo(tag, { opacity: 0, y: 14 }, { opacity: 1, y: 0 }, { at: revealAt + 0.55 + chars.length * 0.035, duration: 0.6, ease: "out" });
+    // The letters rise once the mark has slid (and shrunk) clear of them; earlier, the first ones cross it.
+    const rise = revealAt + 0.5;
+    tl.fromTo(chars, { yPercent: 115, rotate: 6 }, { yPercent: 0, rotate: 0 }, { at: rise, duration: 0.7, ease: "out", stagger: 0.035 });
+    if (tag) tl.fromTo(tag, { opacity: 0, y: 14 }, { opacity: 1, y: 0 }, { at: rise + 0.25 + chars.length * 0.035, duration: 0.6, ease: "out" });
   }
 
   const out = EASES.out;
