@@ -87,6 +87,86 @@ describe("kinetic_captions_tool", () => {
     expect(captionClips(doc).map((c) => c.id).sort()).toEqual([...first].sort());
   });
 
+  it("re-run on one of two clips replaces only that clip's captions", async () => {
+    const { doc, clipId } = talking();
+    const other = doc.transaction("second take", (tx) => addClip(tx, { fileId: "TALKXXXXXX", position: 20, layer: L1, start: 0, end: 10, id: "TALKCLIP02" }).id);
+    const h = host();
+    await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator", timeline_clip_ids: [clipId, other] });
+    const ofOther = captionClips(doc).filter((c) => kineticTag(c)!.source_clip_ids.includes(other)).map((c) => c.id).sort();
+    expect(ofOther.length).toBe(SPOKEN_WORDS.length);
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "documentary", timeline_clip_ids: [clipId] });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).replaced_clips).toBe(SPOKEN_WORDS.length);
+    const after = captionClips(doc);
+    expect(after.filter((c) => kineticTag(c)!.source_clip_ids.includes(other)).map((c) => c.id).sort()).toEqual(ofOther);
+    expect(after.filter((c) => kineticTag(c)!.source_clip_ids.includes(clipId)).every((c) => kineticTag(c)!.style === "documentary")).toBe(true);
+    // The kept clips' drawings stay in the bin.
+    for (const c of after) expect(doc.project.files.some((f) => f.id === c.file_id)).toBe(true);
+  });
+
+  it("re-run on a range replaces only the captions said inside it", async () => {
+    const { doc } = talking();
+    const h = host();
+    await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "documentary" });
+    const before = captionClips(doc);
+    const saidAt = (c: Clip) => kineticTag(c)!.said!;
+    const early = before.filter((c) => saidAt(c)[0] < 4.5).map((c) => c.id).sort();
+    expect(early.length).toBeGreaterThan(0);
+    expect(early.length).toBeLessThan(before.length);
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "documentary", start_seconds: 4.5 });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).replaced_clips).toBe(before.length - early.length);
+    const after = captionClips(doc);
+    expect(after.filter((c) => before.some((b) => b.id === c.id)).map((c) => c.id).sort()).toEqual(early);
+    expect(after.filter((c) => !early.includes(c.id)).every((c) => saidAt(c)[0] >= 4.5)).toBe(true);
+  });
+
+  it("keeps earlier captions that also show another clip's words, and says so", async () => {
+    const { doc, clipId } = talking();
+    const h = host();
+    await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator" });
+    // As tagged before captions knew their own words: the whole run's clips, no times.
+    doc.transaction("old tags", (tx) => {
+      for (const c of captionClips(doc)) tx.update(["clips", { id: c.id }], { [KINETIC_KEY]: { source_clip_ids: [clipId, "GONECLIP01"], style: "creator", role: "caption" } });
+    });
+    const kept = captionClips(doc).map((c) => c.id).sort();
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator", timeline_clip_ids: [clipId] });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).replaced_clips).toBe(0);
+    expect((dataOf(r).kept_clip_ids as string[]).sort()).toEqual(kept);
+    expect(r.text).toContain(`kept ${kept.length} earlier caption clip(s)`);
+    expect(captionClips(doc).filter((c) => kept.includes(c.id))).toHaveLength(kept.length);
+  });
+
+  it("deletes the drawings it wrote when it fails after writing them", async () => {
+    const { doc } = talking();
+    const h = host();
+    const transaction = doc.transaction.bind(doc);
+    doc.transaction = () => {
+      throw new Error("history is full");
+    };
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator" });
+    doc.transaction = transaction;
+    expect(r.ok).toBe(false);
+    expect(h.calls.some((c) => c.startsWith("writeGenerated captions-creator"))).toBe(true);
+    expect([...h.written.keys()].filter((p) => p.includes("captions-"))).toEqual([]);
+
+    // A drawing that cannot be written: the ones before it go too.
+    const h2 = host();
+    const write = h2.media!.writeGenerated!;
+    let n = 0;
+    h2.media!.writeGenerated = async (name, bytes, type) => {
+      n += 1;
+      if (n === 3) throw new Error("disk full");
+      return write(name, bytes, type);
+    };
+    const r2 = await runTool({ doc, host: h2 }, "kinetic_captions_tool", { style: "creator" });
+    expect(r2.text).toContain("disk full");
+    expect([...h2.written.keys()].filter((p) => p.includes("captions-"))).toEqual([]);
+    expect(h2.calls.filter((c) => c.startsWith("discardGenerated"))).toHaveLength(1);
+    expect(captionClips(doc)).toHaveLength(0);
+  });
+
   it("puts a matte cut-out of the speaker above the captions for behind_subject", async () => {
     const { doc, clipId } = talking(true);
     const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: true });

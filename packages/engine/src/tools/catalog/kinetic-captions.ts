@@ -7,8 +7,10 @@
  * Words come from where the speech tools read them (../transcripts.ts: a
  * kept transcription, the media index's cues, or a new transcription). The
  * clips and drawing files it makes are tagged `zenvi_kinetic_captions` with
- * the footage clips they caption; running it again on any of those clips
- * removes them first, in the same undo step.
+ * the footage clips whose words they show and when those words start.
+ * Running it again replaces, in the same undo step, the earlier captions
+ * wholly inside the new run (all their words from the clips and range
+ * given); captions only partly inside are kept, and the receipt says so.
  *
  * behind_subject: the footage's subject matte (a bin file whose
  * `zenvi_matte.source_file_id` is the footage's file, made by the subject
@@ -35,7 +37,7 @@ import { applied, failed, refused } from "../receipt.js";
 import { colorHexAlpha, constantKeyframe, isLocked, projectSize, trackInfo } from "../titles-text.js";
 import { clipTarget, isTalkingFootage, isWordSource, wordsFor, wordsForClip } from "../transcripts.js";
 import { projectFps } from "../frame-time.js";
-import { placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
+import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
 
 const TOOL = "kinetic_captions_tool";
 const TRACK_LABEL = "Captions";
@@ -45,9 +47,20 @@ export const KINETIC_KEY = "zenvi_kinetic_captions";
 const MATTE_KEY = "zenvi_matte";
 
 export interface KineticTag {
+  /** The footage clips whose words it shows (a cut-out: the clip it copies). */
   source_clip_ids: string[];
   style: CaptionStyleId;
   role: "caption" | "cutout";
+  /** A caption: timeline seconds its first and last words start. */
+  said?: [number, number];
+}
+
+/** What a new run covers: its footage clips, its range, and whether it remakes their cut-outs. */
+interface Scope {
+  ids: ReadonlySet<string>;
+  from: number;
+  to: number;
+  cutouts: boolean;
 }
 
 const STYLE_LINES = CAPTION_STYLE_IDS.map((id) => `${id}: ${CAPTION_STYLES[id].summary}.`).join(" ");
@@ -102,10 +115,32 @@ function matteOf(project: Project, clip: Clip): ProjectFile | undefined {
   }).pop();
 }
 
-/** Earlier kinetic captions of any of `ids`: their clips and drawing files. */
-function previous(project: Project, ids: ReadonlySet<string>): { clips: Clip[]; files: ProjectFile[] } {
-  const hits = (t: KineticTag | undefined) => t !== undefined && t.source_clip_ids.some((id) => ids.has(id));
-  return { clips: project.clips.filter((c) => hits(kineticTag(c))), files: project.files.filter((f) => hits(kineticTag(f))) };
+/**
+ * How an earlier caption stands to a new run: inside it (every word it
+ * shows is captioned again: replace it), partly inside, or apart. Words are
+ * in a range by their start, as `wordsOf` takes them.
+ */
+function standing(tag: KineticTag, scope: Scope): "inside" | "partly" | "apart" {
+  const mine = tag.source_clip_ids.filter((id) => scope.ids.has(id)).length;
+  if (mine === 0) return "apart";
+  if (tag.role === "cutout") return scope.cutouts ? "inside" : "apart";
+  // Tags from before `said` give no times: inside only a run over all time.
+  const [first, last] = tag.said ?? [-Infinity, Infinity];
+  if (last < scope.from - 1e-6 || first >= scope.to) return "apart";
+  return mine === tag.source_clip_ids.length && first >= scope.from - 1e-6 && last < scope.to ? "inside" : "partly";
+}
+
+/** Earlier kinetic captions inside `scope` (clips and drawing files), and the caption clips partly inside it. */
+function previous(project: Project, scope: Scope): { clips: Clip[]; files: ProjectFile[]; partly: Clip[] } {
+  const is = (item: Clip | ProjectFile, want: "inside" | "partly") => {
+    const tag = kineticTag(item);
+    return tag !== undefined && standing(tag, scope) === want;
+  };
+  const clips = project.clips.filter((c) => is(c, "inside"));
+  const gone = new Set(clips.map((c) => c.id));
+  // A drawing goes only when no clip that stays still shows it.
+  const files = project.files.filter((f) => is(f, "inside") && !project.clips.some((c) => c.file_id === f.id && !gone.has(c.id)));
+  return { clips, files, partly: project.clips.filter((c) => is(c, "partly")) };
 }
 
 function withoutPrevious(project: Project, old: { clips: Clip[]; files: ProjectFile[] }): Project {
@@ -137,7 +172,7 @@ async function wordsOf(call: ToolCall, clips: readonly Clip[], args: Input, warn
       const end = Number(w.timelineEndSec);
       if (args.start_seconds !== undefined && start < args.start_seconds - 1e-6) continue;
       if (args.end_seconds !== undefined && start >= args.end_seconds) continue;
-      out.push({ text: String(w.text), start, end });
+      out.push({ text: String(w.text), start, end, source: clip.id });
     }
   }
   if (out.length === 0) return `Error: no words to caption${problems.length > 0 ? `: ${problems.join("; ")}` : " in the clips and range given"}.`;
@@ -149,7 +184,7 @@ function cutoutOf(tx: Transaction, source: Clip, matte: ProjectFile, layer: numb
   // The same picture as the footage (its keys, effects and speed: a copy), keyed by the matte last; silent.
   const copy = duplicateClip(tx, source.id, { position: Number(source.position), layer });
   const mask = { ...defaultEffectJson("Mask", idFactory(tx.project)()), mask_reader: structuredClone(matte), mask_invert: true };
-  return patchClip(tx, copy.id, { title: `Captions cut-out ${source.title ?? source.id}`, effects: [...(copy.effects ?? []), mask], volume: constantKeyframe(0), has_audio: constantKeyframe(0), [KINETIC_KEY]: { ...tag, role: "cutout" } });
+  return patchClip(tx, copy.id, { title: `Captions cut-out ${source.title ?? source.id}`, effects: [...(copy.effects ?? []), mask], volume: constantKeyframe(0), has_audio: constantKeyframe(0), [KINETIC_KEY]: tag });
 }
 
 export const kineticCaptionTools: CatalogTool[] = [
@@ -159,7 +194,7 @@ export const kineticCaptionTools: CatalogTool[] = [
     description:
       "Animated word-by-word captions from the speech in footage clips, timed to each word, styled after creator and editorial reels: emphasis words picked automatically (numbers, stressed words) " +
       "or given, laid out in the safe area for 9:16 or 16:9 and kept off the boxes you give (the speaker's face). Each word is an outlined SVG title clip with keyframes on Captions tracks: " +
-      "native, editable and the same on every Zenvi surface. Running it again on the same clips replaces its captions. One undo step. For plain subtitles use add_captions_tool.",
+      "native, editable and the same on every Zenvi surface. Running it again on the same clips (and range) replaces its captions there. One undo step. For plain subtitles use add_captions_tool.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     requires: ["media"],
@@ -204,7 +239,8 @@ export const kineticCaptionTools: CatalogTool[] = [
         }
       }
       const ids = new Set(clips.map((c) => c.id));
-      const old = previous(project, ids);
+      const ranged = args.start_seconds !== undefined || args.end_seconds !== undefined;
+      const old = previous(project, { ids, from: args.start_seconds ?? -Infinity, to: args.end_seconds ?? Infinity, cutouts: !ranged || (args.behind_subject ?? false) });
       const locked = old.clips.filter((c) => isLocked(project, c.layer));
       if (locked.length > 0) return refused(TOOL, `Error: earlier captions of these clips are on a locked track (${locked.map((c) => c.id).join(", ")}); unlock it first.`);
 
@@ -225,21 +261,27 @@ export const kineticCaptionTools: CatalogTool[] = [
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
       if (built.missing.length > 0) warnings.push(`no bundled font draws ${built.missing.join(" ")}; those characters are left out`);
+      if (old.partly.length > 0) {
+        const shown = old.partly.slice(0, 8).map((c) => c.id).join(", ");
+        warnings.push(`kept ${old.partly.length} earlier caption clip(s) that also show words outside the clips or range given (${shown}${old.partly.length > 8 ? ", …" : ""}); delete them if the new captions double them`);
+      }
       const plan = built.plan;
       const end = built.start + plan.frames / fps;
       const clean = withoutPrevious(project, old);
       const stack = planOverlayStack(clean, built.start, end, plan.tracks + (args.behind_subject ? 1 : 0));
       const written = await writeDrawings(call, plan, `captions-${style}`);
       if (typeof written === "string") return failed(TOOL, written);
-      const tag: KineticTag = { source_clip_ids: [...ids], style, role: "caption" };
+      const groupOf = (name: string) => built.groups[Number(/^g(\d+)/.exec(name)?.[1])]!;
 
-      const result = call.commit((tx) => {
+      const result = await commitDrawn(call, written, (tx) => {
         for (const f of old.files) removeFile(tx, f.id);
         const leftover = old.clips.filter((c) => tx.project.clips.some((x) => x.id === c.id)).map((c) => c.id);
         if (leftover.length > 0) deleteClips(tx, leftover);
         const placed = placeMotionPlan(tx, plan, written, built.start, fps, stack.layers.slice(0, plan.tracks), `Captions ${style}`, TRACK_LABEL);
         const files = new Set<string>();
         for (const p of placed) {
+          const group = groupOf(p.layer.name);
+          const tag: KineticTag = { source_clip_ids: group.sources, style, role: "caption", said: group.said };
           patchClip(tx, p.clip.id, { [KINETIC_KEY]: tag });
           if (!files.has(p.fileId)) updateFile(tx, p.fileId, { [KINETIC_KEY]: tag } as Partial<ProjectFile>);
           files.add(p.fileId);
@@ -250,7 +292,7 @@ export const kineticCaptionTools: CatalogTool[] = [
           const layer = tx.project.layers.find((l) => Number(l.number) === number);
           if (layer && !String(layer.label ?? "").trim()) tx.update(["layers", { id: layer.id }], { label: TRACK_LABEL });
         }
-        const cutouts = args.behind_subject ? clips.map((c) => cutoutOf(tx, c, mattes.get(c.id)!, stack.layers[plan.tracks]!, tag)) : [];
+        const cutouts = args.behind_subject ? clips.map((c) => cutoutOf(tx, c, mattes.get(c.id)!, stack.layers[plan.tracks]!, { source_clip_ids: [c.id], style, role: "cutout" })) : [];
         return { placed, cutouts, replaced: old.clips.length };
       }, `Add kinetic captions (${style})`);
 
@@ -272,6 +314,7 @@ export const kineticCaptionTools: CatalogTool[] = [
             words: words.length,
             emphasis: emphasised,
             replaced_clips: result.replaced,
+            kept_clip_ids: old.partly.map((c) => c.id),
             tracks: stack.layers.map((layer) => trackInfo(doc, layer)),
             created_clip_ids: [...result.placed.map((p) => p.clip.id), ...result.cutouts.map((c) => c.id)],
             cutout_clip_ids: result.cutouts.map((c) => c.id),

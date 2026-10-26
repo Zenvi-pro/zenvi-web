@@ -70,6 +70,10 @@ export interface PlacedGroup {
   words: PlacedWord[];
   /** Px² of the block inside avoid boxes (0: clear). */
   overlap: number;
+  /** Timeline seconds its first and last words start, as given (off the frame grid). */
+  said: [number, number];
+  /** The distinct `source`s of its words, in order. */
+  sources: string[];
 }
 
 export interface KineticCaptionPlan {
@@ -411,6 +415,8 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
       stop: (f0 + to) / fps,
       box: groupBox.box,
       overlap: where!.overlap,
+      said: [words[g.first]!.start, words[g.end - 1]!.start],
+      sources: [...new Set(words.slice(g.first, g.end).flatMap((w) => (w.source === undefined ? [] : [w.source])))],
       words: b.words.map((w, j) => ({
         text: w.text,
         emphasis: w.emphasis,

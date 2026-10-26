@@ -28,6 +28,8 @@ export interface CaptionWord {
   /** Timeline seconds. */
   start: number;
   end: number;
+  /** Where it was said (the kinetic captions tool: the footage clip's id). */
+  source?: string;
 }
 
 export interface CaptionGroup {
