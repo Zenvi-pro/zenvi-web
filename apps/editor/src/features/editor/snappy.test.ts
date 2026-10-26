@@ -5,7 +5,8 @@ import { MemoryProjectRepository } from "@/lib/storage/projects";
 import { editorToolRunner } from "./editorTools";
 import { EditorSession } from "./session/EditorSession";
 import { MediaLibrary } from "./session/media";
-import { makeItSnappy, snappyTrack, snappyUndoSteps } from "./snappy";
+import { mainSequence } from "./cuts";
+import { makeItSnappy, snappyUndoSteps } from "./snappy";
 
 const reader: ReaderInfo = {
   type: "FFmpegReader",
@@ -41,8 +42,8 @@ function sessionWithCuts(count: number, gap = 0) {
 describe("make it snappy", () => {
   it("finds the sequence with the most cuts", () => {
     const session = sessionWithCuts(3);
-    expect(snappyTrack(session.project)).toEqual({ layer: session.project.layers[0]!.number, cuts: 2 });
-    expect(snappyTrack(sessionWithCuts(1).project)).toBeNull();
+    expect(mainSequence(session.project)).toEqual({ layer: session.project.layers[0]!.number, cuts: 2 });
+    expect(mainSequence(sessionWithCuts(1).project)).toBeNull();
   });
 
   it("runs transitions and sound design as separate undo steps through the agents' tools", async () => {
@@ -66,7 +67,7 @@ describe("make it snappy", () => {
 
   it("closes one-frame gaps (double-click placement) first, as its own undo step", async () => {
     const session = sessionWithCuts(3, 1 / 30);
-    expect(snappyTrack(session.project)).toBeNull();
+    expect(mainSequence(session.project)).toBeNull();
     const before = session.doc.undoLabels.length;
     const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
     expect(outcomes.slice(0, 2).map((o) => [o.step, o.status])).toEqual([
