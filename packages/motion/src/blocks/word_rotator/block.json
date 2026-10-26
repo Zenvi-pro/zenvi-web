@@ -1,6 +1,6 @@
 {
   "id": "word_rotator",
-  "version": 1,
+  "version": 2,
   "title": "Word rotator",
   "description": "A line of text where one word cycles through a list: a slot column that scrolls with the neighbours fading above and below, or words that flip in and out. The line re-centres as the word's width changes; on vertical frames prefix, word and suffix stack. For taglines and end cards (\"Made for *storytellers*\").",
   "tags": [
@@ -39,8 +39,8 @@
       "maxItems": 10,
       "maxLength": 24,
       "default": [
-        "editors",
-        "storytellers",
+        "makers",
+        "builders",
         "small teams",
         "you"
       ],

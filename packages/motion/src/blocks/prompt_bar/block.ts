@@ -27,9 +27,12 @@ export function build(ctx: BlockContext): void {
   const row = ctx.el("div", "pb-row", card);
   const tools = ctx.el("div", "pb-tools", row);
   icon(ctx, "plus", "", ctx.el("div", "pb-tool", tools));
-  const chip = ctx.el("div", "pb-chip", tools);
-  icon(ctx, "sparkle", "", chip);
-  ctx.el("span", "", chip, ctx.portrait ? "Agent" : "Agent mode");
+  // No label of ours: the chip is the caller's, or absent.
+  if (p.chip) {
+    const chip = ctx.el("div", "pb-chip", tools);
+    icon(ctx, "sparkle", "", chip);
+    ctx.el("span", "", chip, String(p.chip));
+  }
   const send = ctx.el("div", "pb-send", row);
   icon(ctx, "arrowUp", "", send);
   const pill = status ? ctx.el("div", "pb-status card", wrap) : null;
