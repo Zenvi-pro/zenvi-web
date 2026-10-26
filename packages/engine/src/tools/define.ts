@@ -89,6 +89,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   exporter: "video rendering",
   frames: "frame rendering",
   backend: "the Zenvi backend (sign in to Zenvi)",
+  stock: "stock search (sign in to Zenvi)",
   storage: "project storage",
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",

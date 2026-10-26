@@ -2,15 +2,15 @@
  * Stock search on every web surface: the tools the desktop Assistant has in
  * the Zenvi backend (core/tools/stock_media_tools.py), with the same names,
  * arguments and result lines. Find Pexels videos or Freesound music through
- * the host's backend; import_stock_media_tool then downloads one into the
- * project. The web adds what a chat needs to choose and credit: a rendition
- * sized for this project's frame, the orientation, the music's licence.
+ * the host's stock search (the backend, or a deployment's own provider keys);
+ * import_stock_media_tool then downloads one into the project. The web adds
+ * what a chat needs to choose and credit: a rendition sized for this
+ * project's frame, the orientation, the music's licence.
  */
 
 import { z } from "zod";
 import { clockTime, licenceName, licenceRank, pickStockFile, previewOf } from "../../stock/stock.js";
-import { searchFreesound, searchPexelsVideos } from "../backend.js";
-import { directTool, type CatalogTool } from "../define.js";
+import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused } from "../receipt.js";
 
 const SEARCH = { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: true } as const;
@@ -19,6 +19,18 @@ const count = z
   .union([z.int(), z.string().regex(/^\d+$/)])
   .optional()
   .describe("How many results (1-16, default 8).");
+
+function failure(error: unknown): { error: string } {
+  return { error: error instanceof Error ? error.message : String(error) };
+}
+
+function searchPexelsVideos(call: ToolCall, query: string, perPage: number) {
+  return call.host.stock!.searchPexelsVideos(query, { perPage, signal: call.signal }).catch(failure);
+}
+
+function searchFreesound(call: ToolCall, query: string, pageSize: number, minSeconds: number) {
+  return call.host.stock!.searchFreesound(query, { pageSize, minSeconds, signal: call.signal }).catch(failure);
+}
 
 function resultCount(raw: number | string | undefined): number {
   const n = Math.trunc(Number(raw ?? 8));
@@ -38,7 +50,7 @@ export const stockTools: CatalogTool[] = [
       orientation: z.enum(["any", "portrait", "landscape"]).optional().describe("Orientation to put first (default: the project's)."),
     }),
     annotations: SEARCH,
-    requires: ["backend"],
+    requires: ["stock"],
     run: async (call, args) => {
       const tool = "search_pexels_videos_tool";
       const n = resultCount(args.count);
@@ -92,7 +104,7 @@ export const stockTools: CatalogTool[] = [
         .describe("Shortest track wanted, seconds (e.g. the video's length for a music bed)."),
     }),
     annotations: SEARCH,
-    requires: ["backend"],
+    requires: ["stock"],
     run: async (call, args) => {
       const tool = "search_freesound_music_tool";
       const n = resultCount(args.count);
