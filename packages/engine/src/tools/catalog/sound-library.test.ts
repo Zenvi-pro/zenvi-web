@@ -87,6 +87,13 @@ describe("search_sfx_tool", () => {
     expect(summary(await runTool({ doc, host: fakeHost() }, "search_sfx_tool", { query: "hit", include_noncommercial: true }))).toBe("Error: include_noncommercial goes with license=any.");
   });
 
+  it("leaves room for a library result in auto however small count is", async () => {
+    const result = await runTool({ doc: edit(), host: fakeHost() }, "search_sfx_tool", { query: "whoosh", count: 3 });
+    const results = data<{ results: { provider: string }[] }>(result).results;
+    expect(results).toHaveLength(3);
+    expect(results.at(-1)!.provider).toBe("openverse");
+  });
+
   it("falls back to Freesound through the backend when Openverse cannot answer", async () => {
     const host = fakeHost({
       library: {
@@ -207,6 +214,18 @@ describe("list_credits_tool", () => {
     expect(found.required).toBe(1);
     expect(found.credits[0]!.clip_ids).toHaveLength(2);
     expect(doc.undoLabels).toHaveLength(3);
+  });
+
+  it("credits a sound once when it plays in two roles (two files)", async () => {
+    const doc = edit();
+    const host = libraryHost();
+    await runTool({ doc, host }, "add_sfx_tool", { provider: "openverse", sound_id: HIT_ID, at_seconds: 4 });
+    await runTool({ doc, host }, "add_sfx_tool", { provider: "openverse", sound_id: HIT_ID, at_seconds: 6, role: "boom" });
+    expect(credited(doc)).toHaveLength(2);
+    const found = data<{ required: number; lines: string[]; credits: { file_ids: string[]; clip_ids: string[] }[] }>(await runTool({ doc, host }, "list_credits_tool", {}));
+    expect(found.lines).toHaveLength(1);
+    expect(found.credits[0]!.file_ids).toHaveLength(2);
+    expect(found.credits[0]!.clip_ids).toHaveLength(2);
   });
 });
 

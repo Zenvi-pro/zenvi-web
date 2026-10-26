@@ -187,7 +187,8 @@ export const soundLibraryTools: CatalogTool[] = [
       const results: SfxLibraryResult[] = [];
       const notes: string[] = [];
       let total: number | undefined;
-      if (provider === "procedural" || provider === "auto") results.push(...searchRecipes(args.query, filters, provider === "auto" ? Math.min(3, count) : count));
+      // auto leaves at least one place for the libraries: a full page of recipes would spend an Openverse request on nothing.
+      if (provider === "procedural" || provider === "auto") results.push(...searchRecipes(args.query, filters, provider === "auto" ? Math.min(3, count - 1) : count));
       if (provider !== "procedural") {
         const room = count - results.length;
         let found: SearchOutcome & { notes?: string[] };
@@ -224,12 +225,20 @@ export const soundLibraryTools: CatalogTool[] = [
       const project = call.doc.project;
       const clipsOf = new Map<string, string[]>();
       for (const clip of project.clips) clipsOf.set(String(clip.file_id), [...(clipsOf.get(String(clip.file_id)) ?? []), clip.id]);
-      const credits = project.files
-        .filter((f) => typeof f.zenvi_credit === "object" && f.zenvi_credit !== null)
-        .map((f) => ({ file_id: String(f.id), clip_ids: clipsOf.get(String(f.id)) ?? [], ...(f.zenvi_credit as SfxCredit) }))
+      // One line per sound, however many clips play it: one sound is a file per role and length it was made for.
+      const bySound = new Map<string, SfxCredit & { file_ids: string[]; clip_ids: string[] }>();
+      for (const f of project.files) {
+        if (typeof f.zenvi_credit !== "object" || f.zenvi_credit === null) continue;
+        const credit = f.zenvi_credit as SfxCredit;
+        const key = `${credit.provider}:${credit.id}`;
+        const entry = bySound.get(key) ?? { ...credit, file_ids: [], clip_ids: [] };
+        entry.file_ids.push(String(f.id));
+        entry.clip_ids.push(...(clipsOf.get(String(f.id)) ?? []));
+        bySound.set(key, entry);
+      }
+      const credits = [...bySound.values()]
         .filter((c) => args.include_unused || c.clip_ids.length > 0)
         .sort((a, b) => Number(b.attribution_required) - Number(a.attribution_required));
-      // One line per sound, however many clips play it.
       const required = credits.filter((c) => c.attribution_required);
       const optional = credits.filter((c) => !c.attribution_required);
       const data = { credits, required: required.length, lines: required.map((c) => c.attribution) };
