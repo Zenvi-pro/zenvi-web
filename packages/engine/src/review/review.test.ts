@@ -144,6 +144,11 @@ describe("findProblems", () => {
     expect(problemsFor(build(close), { pace: "slow" }).map((p) => p.code)).not.toContain("clip-back-soon");
     const rested = Array.from({ length: 8 }, (_, i) => ({ path: `/m/c${i}.mp4`, at: i * 0.5, length: 0.5, from: 0 }));
     expect(problemsFor(build(rested)).map((p) => p.code)).not.toContain("clip-back-soon");
+    // One take split into pieces that play on is not a clip coming back; the same clip jumping to another moment is.
+    const take = Array.from({ length: 6 }, (_, i) => ({ path: "/m/take.mp4", at: i * 0.5, length: 0.5, from: i * 0.5 }));
+    expect(problemsFor(build(take)).map((p) => p.code)).not.toContain("clip-back-soon");
+    const jumps = Array.from({ length: 6 }, (_, i) => ({ path: "/m/take.mp4", at: i * 0.5, length: 0.5, from: i * 2 }));
+    expect(problemsFor(build(jumps)).map((p) => p.code)).toContain("clip-back-soon");
   });
 
   it("measures cuts against the beat grid and the hits", () => {

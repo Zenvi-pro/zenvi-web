@@ -197,11 +197,15 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
   if (pace === "fast") {
     const lastEnd = new Map<string, number>();
     const soon: typeof review.shots = [];
-    for (const shot of review.shots) {
+    const frame = 1.5 / (review.fps || 30);
+    review.shots.forEach((shot, i) => {
       const seen = lastEnd.get(shot.fileId);
-      if (seen !== undefined && shot.start - seen < REUSE_GAP_SECONDS - 1e-6) soon.push(shot);
+      // A clip split where it plays on (same file, source continuing across the cut) is one take, not a return.
+      const prev = review.shots[i - 1];
+      const continues = prev?.fileId === shot.fileId && Math.abs(shot.start - prev.end) < frame && Math.abs(shot.sourceStart - prev.sourceEnd) < frame;
+      if (seen !== undefined && !continues && shot.start - seen < REUSE_GAP_SECONDS - 1e-6) soon.push(shot);
       lastEnd.set(shot.fileId, Math.max(seen ?? -Infinity, shot.end));
-    }
+    });
     if (soon.length >= 2) {
       const names = [...new Set(soon.map((s) => s.name))];
       add({
