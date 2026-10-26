@@ -17,6 +17,7 @@ import { alignedPositions, closeAllGaps } from "../../ops/arrange.js";
 import { closeGap, moveClip, splitClip, splitTransition, trimClip } from "../../ops/clips.js";
 import { fitLengths, placeFiles, type PlaceFileEntry } from "../../ops/add-to-timeline.js";
 import { duplicateItems, remapLayers, shiftAfter, trackEnd, transitionsBetween, type PlannedItem, type PlannedSpan } from "../../ops/sequence.js";
+import { ensureTrack } from "../../ops/overlays.js";
 import { moveTransition } from "../../ops/transitions.js";
 import { clipTimeBounds } from "../../model/timing.js";
 import { listGaps, itemsOnLayer } from "../../timeline/queries.js";
@@ -25,7 +26,7 @@ import { contractTool, type CatalogTool, type ToolCall } from "../define.js";
 import { sourceWindowForFile } from "../placement.js";
 import { pyFixed, pyG, pyReprString } from "../pyfmt.js";
 import type { ContractInput } from "../schemas.gen.js";
-import { defaultUnderlayLayerNumber } from "../tracks.js";
+import { defaultUnderlayLayerNumber, newTracksNote } from "../tracks.js";
 import { fileById, playheadSeconds, selectedTrack } from "./common.js";
 import {
   ToolError,
@@ -44,6 +45,7 @@ import {
   r3,
   requireUnlockedTracks,
   resolveLayer,
+  resolvePlacementLayer,
   spanOf,
   targetClips,
   trackName,
@@ -206,7 +208,9 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
     fitNote = `, already within ${pyG(fitTotal)} s so nothing was trimmed`;
   }
 
-  const layer = input.track?.trim() ? resolveLayer(project, input.track) : (selectedTrack(call)?.number ?? defaultUnderlayLayerNumber(project.layers));
+  const { layer, newTracks } = input.track?.trim()
+    ? resolvePlacementLayer(project, input.track)
+    : { layer: selectedTrack(call)?.number ?? defaultUnderlayLayerNumber(project.layers), newTracks: 0 };
   requireUnlockedTracks(project, [layer]);
   const startSeconds = input.start_seconds ?? -1;
   const start = startSeconds >= 0 ? g.snap(startSeconds) : g.snap(trackEnd(project, layer));
@@ -223,8 +227,9 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
   const placement: PlaceFileEntry[] = entries.map((entry) =>
     entry.image ? { fileId: entry.file.id, end: entry.length } : { fileId: entry.file.id, start: entry.start!, end: entry.start! + entry.length },
   );
-  const result = call.commit((tx) =>
-    placeFiles(tx, placement, start, layer, {
+  const result = call.commit((tx) => {
+    if (newTracks > 0) ensureTrack(tx, layer);
+    return placeFiles(tx, placement, start, layer, {
       ...(fade !== "none" ? { fade } : {}),
       fadeLength: fadeSeconds,
       ...(choice.mask ? { transition: choice.mask } : {}),
@@ -233,8 +238,8 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
       imageLength,
       ...(input.zoom && input.zoom !== "none" ? { zoom: input.zoom } : {}),
       transitionFirstClip: false,
-    }),
-  );
+    });
+  });
 
   const after = call.doc.project;
   const placed = result.clipIds.map((id) => clipById(after, id)).filter((c): c is Clip => c !== undefined).map((c) => describeClip(after, c));
@@ -248,7 +253,7 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
         : "";
   return ok(
     call,
-    `Placed ${placed.length} clip(s) on ${trackName(after, layer)} from ${f2(start)} s to ${f2(end)} s (${pyFixed(end - start, 1)} s${how}${fitNote}).`,
+    `Placed ${placed.length} clip(s) on ${trackName(after, layer)}${newTracksNote(newTracks)} from ${f2(start)} s to ${f2(end)} s (${pyFixed(end - start, 1)} s${how}${fitNote}).`,
     {
       track: uiTrack(after, layer),
       start: r3(start),
@@ -258,6 +263,7 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
       transition_ids: result.transitionIds,
       trimmed_file_ids: trimmedIds,
       overlap_seconds: r3(overlap),
+      ...(newTracks > 0 ? { new_tracks: newTracks } : {}),
     },
   );
 }
