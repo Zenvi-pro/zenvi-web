@@ -47,6 +47,8 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   add_sfx_tool: { recipe: "pop", at_seconds: "1" },
   add_motion_block_tool: { block: "kinetic_headline" },
   update_motion_block_tool: { file_id: "MOTIONFILE" },
+  add_3d_scene_tool: { scene: "glass_hero" },
+  rerender_3d_scene_tool: { file_id: IDS.broll },
 };
 
 async function expectNotAvailable(name: string, args: Record<string, unknown>, host: FakeHostOptions): Promise<void> {

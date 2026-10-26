@@ -248,6 +248,9 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     methods: ["storage.recoveryCopies", "storage.currentPath"],
     webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none",
   },
+  // Zenvi 3D renders with Blender on the person's computer (the host offers scenes3d only when it is installed).
+  add_3d_scene_tool: { methods: ["media.importPath"] },
+  rerender_3d_scene_tool: { methods: ["media.importPath"] },
   import_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
   export_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
   consolidate_project_media_tool: { methods: ["media.collect", "storage.currentPath"] },
@@ -365,7 +368,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets", "mattes", "motion", "scenes3d"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -393,6 +396,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
       motion: "headless Chrome is installed: zenvi motion setup",
+      scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
     },
   },
   cloud: {

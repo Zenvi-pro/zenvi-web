@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
 import { inspectHosts } from "@zenvi/adobe-link";
-import { binaryVersion, encoderNames, findYtDlp, FontIndex, initResvg, resolveBinary, runBinary } from "@zenvi/render-node";
+import { binaryVersion, encoderNames, findBlender, findYtDlp, FontIndex, initResvg, MIN_BLENDER, resolveBinary, runBinary, versionAtLeast } from "@zenvi/render-node";
 import { AGENT_TARGETS, claudeDesktopConfigPath, codexConfigPath, mcpConfig, type AgentTarget } from "../agents/mcp-config.js";
 import { selfMcpCommand } from "../agents/self-command.js";
 import { pushProject } from "../cloud/sync.js";
@@ -162,6 +162,16 @@ export async function runDoctor(ctx: CommandContext): Promise<DoctorCheck[]> {
     level: ytDlpVersion ? "ok" : "warn",
     detail: ytDlpVersion ? `${ytDlpVersion} (${ytDlp})` : ytDlp ? `${ytDlp} does not run` : "not found",
     hint: "Optional: ingest_web_video_tool fetches YouTube and other web page videos with it (brew install yt-dlp, winget install yt-dlp, or pip install -U yt-dlp; ZENVI_YT_DLP sets its path).",
+  });
+  const blender = findBlender(ctx.env);
+  const blenderVersion = blender
+    ? await runBinary(blender, ["--factory-startup", "-b", "-v"], { timeoutMs: 60_000, env: ctx.env }).then((r) => /Blender (\d+\.\d+(?:\.\d+)?)/.exec(r.stdout.toString("utf8"))?.[1], () => undefined)
+    : undefined;
+  checks.push({
+    name: "blender",
+    level: blenderVersion && versionAtLeast(blenderVersion, MIN_BLENDER) ? "ok" : "warn",
+    detail: blenderVersion ? `${blenderVersion} (${blender})${versionAtLeast(blenderVersion, MIN_BLENDER) ? "" : `: Zenvi 3D needs ${MIN_BLENDER}+`}` : blender ? `${blender} does not run` : "not found",
+    hint: `Optional: the 3D tools (add_3d_scene_tool) render with Blender ${MIN_BLENDER}+ (blender.org, brew install --cask blender; ZENVI_BLENDER sets its path).`,
   });
   const toolCount = ctx.registry.tools.length;
   checks.push({ name: "tools", level: toolCount > 0 ? "ok" : "fail", detail: `${toolCount} editing tools in this build` });

@@ -94,6 +94,8 @@ await build({
 // Runtime resources next to the bundle (paths: render-node src/resources.ts).
 await cp(require.resolve("@resvg/resvg-wasm/index_bg.wasm"), path.join(dist, "resvg.wasm"));
 await cp(path.join(repoRoot, "packages", "render-node", "fonts"), path.join(dist, "fonts"), { recursive: true });
+// Zenvi 3D's bpy scripts, run by the person's Blender (packages/scenes3d/src/paths.ts).
+await cp(path.join(repoRoot, "packages", "scenes3d", "blender"), path.join(dist, "scenes3d"), { recursive: true, filter: (src) => !src.includes("__pycache__") });
 const engineAssets = path.join(repoRoot, "packages", "engine", "assets");
 const copiedAssets = [];
 for (const folder of ENGINE_ASSETS) {
@@ -130,6 +132,7 @@ await writeFile(
     "- assets/emojis: OpenMoji emoji graphics (https://openmoji.org), CC BY-SA 4.0, as the Zenvi desktop app ships them.",
     "- assets/fonts (Inter, Anton, Bebas Neue, Archivo Black, Instrument Serif, Space Mono, Varela Round, Caveat Brush, Silkscreen): SIL Open Font License 1.1, each with its OFL.txt.",
     "- assets/colors (colour LUTs): from the Zenvi desktop app, by the freshluts.com community, CC0; see assets/colors/AUTHORS.md.",
+    "- scenes3d/: Zenvi 3D's Blender scene scripts (bpy), GPL-3.0-or-later; they run in the person's own Blender, a separate program.",
     "- composite-worker.mjs: the engine's compositor for worker threads (same terms as zenvi.mjs).",
     "- adobe/pro.zenvi.link: Zenvi Link, the After Effects / Premiere Pro extension, GPL-3.0-or-later; host/*.jsx include Douglas Crockford's json2.js (public domain).",
     "- JavaScript dependencies: license comments at the end of zenvi.mjs.",

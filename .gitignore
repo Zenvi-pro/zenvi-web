@@ -15,3 +15,5 @@ test-results/
 .npm-install.lock/
 # The Claude Code plugin bundle is committed (marketplace installs do not build)
 !plugins/zenvi/dist/
+__pycache__/
+*.pyc

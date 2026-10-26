@@ -25,6 +25,7 @@ import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.j
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
 import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
+import { createNodeScenes3d } from "./scenes3d.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
 
 export interface NodeHostOptions {
@@ -52,6 +53,8 @@ export interface NodeHostOptions {
    * Video Matting when onnxruntime-node is installed.
    */
   mattes?: MatteModel | false;
+  /** Zenvi 3D (Blender scenes) when Blender is installed (default true). */
+  scenes3d?: boolean;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -220,6 +223,10 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   if (assets) host.assets = createAssetHost(assets);
   const matteModel = options.mattes ?? (onnxRuntimeAvailable() ? rvmModel({ env: options.env, signal: options.signal, log: options.log }) : false);
   if (matteModel) host.mattes = createNodeMatteHost({ projectFile: current, resolveMedia, model: matteModel, signal: options.signal, log: options.log });
+  if (options.scenes3d !== false) {
+    const scenes3d = createNodeScenes3d({ env: options.env, resolveMedia, log: options.log });
+    if (scenes3d) host.scenes3d = scenes3d;
+  }
   const desktopDir = options.desktopDir;
   if (desktopDir) {
     Object.assign(host.storage!, {

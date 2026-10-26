@@ -1169,6 +1169,34 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_id: IDS.broll }, status: "refused", summary: /is not a Zenvi Motion block/ },
   },
 
+  // --- Zenvi 3D (scenes3d.test.ts covers placement, media, cube_cut, re-rendering) ----------
+  list_3d_scenes_tool: { happy: { summary: /^7 3D scene\(s\); this surface cannot render them/ }, failure: null },
+  add_3d_scene_tool: {
+    happy: {
+      setup: (_doc, host) => {
+        host.scenes3d = { render: async (r) => ({ path: "/cache/scenes3d/t.mov", codec: "prores4444", width: r.width, height: r.height, fps: r.fps, frames: r.frames, fingerprint: "a".repeat(64), cached: true, seconds: 0, renderedAt: "2026-10-26T00:00:00Z", blender: "5.2.3" }) };
+      },
+      args: { scene: "title_3d", params: { text: "Zenvi" }, position_seconds: "1" },
+      summary: /^Added title_3d \(final, from the render cache\) at 1\.00-4\.00s\.$/,
+    },
+    failure: { setup: (_doc, host) => void (host.scenes3d = { render: async () => ({}) as never }), args: { scene: "title_3d", params: {} }, status: "refused", summary: /^Error: title_3d params: text: / },
+  },
+  rerender_3d_scene_tool: {
+    happy: {
+      setup: async (doc, host) => {
+        host.scenes3d = { render: async (r) => ({ path: `/cache/scenes3d/${r.params.background}.mp4`, codec: "h264", width: r.width, height: r.height, fps: r.fps, frames: r.frames, fingerprint: "b".repeat(64), cached: false, seconds: 2, renderedAt: "2026-10-26T00:00:00Z", blender: "5.2.3" }) };
+        doc.transaction("fixture", (tx) => {
+          addFile(tx, media("/cache/scenes3d/dark.mp4"), { id: "SCENE3D001" });
+          tx.update(["files", { id: "SCENE3D001" }], { zenvi_link: { kind: "blender", version: 1, source: { composition: "glass_hero" }, props: { background: "dark" }, render: { duration_frames: 120 } } });
+        });
+      },
+      args: { file_id: "SCENE3D001", params: { background: "light" } },
+      summary: /^Re-rendered glass_hero \(final, 2\.0s\); 0 clip\(s\) updated\.$/,
+      check: ({ doc }) => expect(doc.project.files.find((f) => f.id === "SCENE3D001")?.path).toBe("/cache/scenes3d/light.mp4"),
+    },
+    failure: { args: { file_id: IDS.broll }, status: "refused", summary: /^Error: tool rerender_3d_scene_tool needs|^Error: rerender_3d_scene_tool is not available/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {
