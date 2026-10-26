@@ -102,6 +102,20 @@ Named easings every tool understands (cubic-bezier control points):
   white text over busy footage. Check WCAG-like contrast ≥ 4.5:1 against the
   average of the area behind it.
 
+### Captions
+
+- Model (after HyperFrames' captions-overlay): every spoken phrase is
+  *dropped* (fillers), on the *rail* (the default: small, verbatim, in front)
+  or *embedded* (a scarce peak word, huge, beside or behind the subject). At
+  most one embed per sentence, never two on screen at once.
+- Kinetic captions: one word at a time (`maxWords: 1`), each word on screen
+  from its spoken start until the next word, at least 0.25 s. Rail words
+  0.045–0.055 of the short side; emphasis words 3–6× that, condensed display
+  face, the accent colour, 3–6 per 20 s.
+- Place words in the shot's negative space, never over eyes or mouth; a
+  slight rotation (±6°) follows a tilted shot. Captions are an overlay: do not
+  shift the composition up to make room for them.
+
 ## 5. Colour
 
 - One accent colour + neutrals. Default palette when the brand gives none:
@@ -125,6 +139,26 @@ Named easings every tool understands (cubic-bezier control points):
 - Audio: dialogue −12 to −6 dBFS peaks (≈ −16 LUFS integrated for social,
   −23 LUFS broadcast); music under dialogue −18 to −24 dB below; duck 6–10 dB
   with 0.3 s attack / 0.6 s release.
+
+
+- Loudness: the references sit at about −13…−16 dB RMS with peaks −2…−9
+  dBFS. Without speech the music plays at full level; effects go on top.
+
+### Motion transitions
+
+Defaults at 30 fps (`apply_motion_transition_tool`, scaled to the frame
+rate): whip 8 frames, squash 8, shake 8, zoom punch in/out 7, zoom-through
+10, blur dissolve 10, slide 12, spin 12, glitch 5, white/black/invert flash 3.
+
+- Seam rules (after HyperFrames' motion-doctrine): cut mid-motion on both
+  sides (never settle, then transition); one dominant direction per piece
+  (left by default), never alternate directions; up, zoom-through (deeper)
+  and pull-back (arrival) are reserved for meaning.
+- Two or three presets per piece, repeated. Hard cuts with a sound stay the
+  default between shots that match.
+- A whoosh peaks on the cut and lasts about as long as the move; a flash or
+  shake gets a hit; a glitch gets a glitch burst.
+- Hold 0.3–0.75 s of stillness before the climax so the hit lands.
 
 ## 7. Review checklist (agents run this before reporting success)
 
