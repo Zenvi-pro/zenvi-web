@@ -23,3 +23,34 @@ export {
   type SplitText,
 } from "./text.js";
 export { composeTransform, Timeline, type Props, type Target, type Targets, type Track, type TweenOptions } from "./timeline.js";
+export {
+  alignRing,
+  blob,
+  bounds,
+  centroid,
+  chaikin,
+  circle,
+  morphRings,
+  outlinePath,
+  perimeter,
+  plus,
+  prepareMorph,
+  regularPolygon,
+  resampleRing,
+  ringsPath,
+  roundRect,
+  sector,
+  signedArea,
+  star,
+  toOutline,
+  transformOutline,
+  transformRing,
+  type Morph,
+  type MorphFrame,
+  type MorphOptions,
+  type Outline,
+  type Point,
+  type Ring,
+} from "./morph.js";
+export { textOutline, traceContours, type TextOutline } from "./outline.js";
+export { drawTrail, measure, pointAlong, sampleCurve, slice, type Curve, type PathLine, type TrailStyle } from "./trails.js";
