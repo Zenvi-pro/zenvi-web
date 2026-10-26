@@ -91,6 +91,7 @@ src/transitions/ transition registry (mask catalog from zenvi-core `src/transiti
 src/titles/      title templates (SVG) + text substitution
 src/render/      frame planner (Project × frame → FramePlan), audio planner, effect kernels (RGBA),
                  CPU compositor (reference implementation, used by render-node)
+src/fx/          Zenvi FX: footage effect catalog, ffmpeg filtergraphs, zenvi-fx links (docs/FX.md)
 src/tools/       tool catalog (zod schemas + handlers + host capability interfaces)
 src/io/          parse/validate/migrate project JSON, path/media resolution, export presets
 ```
