@@ -58,6 +58,7 @@ function rig(shots: number, length: number, options: { sheet?: boolean; mix?: bo
         width: layout.columns * layout.tileWidth + (layout.columns + 1) * layout.gap,
         height: rows * layout.tileHeight + (rows + 1) * layout.gap,
         luma: tiles.map(() => 0.4),
+        peak: tiles.map(() => 0.8),
       };
     };
   }
@@ -163,6 +164,7 @@ describe("review_edit_tool", () => {
       width: 100,
       height: 100,
       luma: tiles.map((t) => (t.label === "2.00 in" ? 0.0 : 0.4)),
+      peak: tiles.map((t) => (t.label === "2.00 in" ? 0.0 : 0.8)),
     });
     const data = dataOf(await review(r));
     expect(data.problems.find((p: { code: string }) => p.code === "black-frame")).toMatchObject({ severity: "high", at: expect.closeTo(2, 1) });

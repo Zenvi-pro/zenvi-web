@@ -16,7 +16,9 @@ export const PACE_LIMITS: Readonly<Record<PaceProfile, PaceLimits>> = {
 
 /** Mean luma of a tile at or above this is a white flash frame; at or below the next, black. */
 export const FLASH_LUMA = 0.85;
-export const BLACK_LUMA = 0.03;
+export const BLACK_LUMA = 0.02;
+/** A black frame has nothing lit either: dark footage with a bright subject has a higher peak. */
+export const BLACK_PEAK = 0.12;
 /** A flash frame is shorter than this, seconds. */
 export const FLASH_MAX_SECONDS = 0.5;
 
@@ -32,6 +34,8 @@ const SEVERITY_ORDER: Record<Severity, number> = { high: 0, medium: 1, low: 2 };
 export interface SampledFrame {
   seconds: number;
   luma: number;
+  /** Brightness 99 % of the pixels are at or below. */
+  peak: number;
   shot: number;
 }
 
@@ -81,7 +85,7 @@ export function flashAndBlack(frames: readonly SampledFrame[], review: TimelineR
     const shot = review.shots.find((s) => s.index === frame.shot);
     const short = shot !== undefined && shot.duration <= FLASH_MAX_SECONDS;
     if (frame.luma >= FLASH_LUMA && short) flashes.push(frame.seconds);
-    else if (frame.luma <= BLACK_LUMA && !short) black.push(frame.seconds);
+    else if (frame.luma <= BLACK_LUMA && frame.peak <= BLACK_PEAK && !short) black.push(frame.seconds);
   }
   const unique = (xs: number[]): number[] => [...new Set(xs.map((x) => Math.round(x * 100) / 100))].sort((a, b) => a - b);
   return { flashes: unique(flashes), black: unique(black) };
@@ -99,9 +103,11 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
   // Holes in the picture.
   for (const gap of review.empty) {
     if (gap.title && gap.end - gap.start <= 4) continue;
+    // A sliver at the very end is a trimming slip, not a black flash in the middle of the cut.
+    const tail = gap.end >= review.range.end - 1e-6 && gap.end - gap.start < 0.5;
     add({
       code: "empty-frames",
-      severity: "high",
+      severity: tail ? "low" : "high",
       at: gap.start,
       until: gap.end,
       message: `Nothing is on screen from ${t(gap.start)} to ${t(gap.end)}${gap.title ? " except a title on black" : ""}.`,
@@ -121,7 +127,7 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
       at: worst.start,
       until: worst.end,
       times: times.slice(0, 8),
-      message: `${long.length} shot${long.length === 1 ? "" : "s"} hold longer than ${limits.maxHold} s (longest ${worst.duration.toFixed(2)} s at ${t(worst.start)}, ${worst.name}).`,
+      message: `${long.length} shot${long.length === 1 ? " holds" : "s hold"} longer than ${limits.maxHold} s (longest ${worst.duration.toFixed(2)} s at ${t(worst.start)}, ${worst.name}).`,
       fix: `Cut ${worst.name} shorter (trim_clip_tool or split_clip_tool), or cut to another shot partway through; keep shots under ${limits.maxHold} s for this pace.`,
     });
   }

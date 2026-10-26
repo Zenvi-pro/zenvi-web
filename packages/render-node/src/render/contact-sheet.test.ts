@@ -5,7 +5,7 @@ import { measureMix, parseMixLog } from "../audio/mix.js";
 import { liveChildCount } from "../ffmpeg/process.js";
 import { probe } from "../probe/probe.js";
 import { ffprobeJson, makeAudio, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
-import { meanLuma, renderContactSheet } from "./contact-sheet.js";
+import { lumaStats, renderContactSheet } from "./contact-sheet.js";
 
 let dir: string;
 let project: Project;
@@ -38,7 +38,7 @@ beforeAll(async () => {
 afterAll(() => removeDir(dir));
 
 describe("renderContactSheet", () => {
-  const layout = { columns: 3, tileWidth: 128, tileHeight: 72, gap: 3, mark: { bright: 0.85, dark: 0.03 } };
+  const layout = { columns: 3, tileWidth: 128, tileHeight: 72, gap: 3, mark: { bright: 0.85, dark: 0.02, darkPeak: 0.12 } };
   const tiles = [
     { seconds: 0.5, label: "0.50" },
     { seconds: 1.05, label: "1.00 in" },
@@ -56,6 +56,8 @@ describe("renderContactSheet", () => {
     expect(result.luma[0]!).toBeLessThan(0.85);
     expect(result.luma[1]!).toBeGreaterThan(0.95);
     expect(result.luma[2]!).toBeLessThan(0.02);
+    expect(result.peak[2]!).toBeLessThan(0.12);
+    expect(result.peak[1]!).toBeGreaterThan(0.95);
     expect(liveChildCount()).toBe(0);
 
     const file = path.join(dir, "sheet.jpg");
@@ -72,15 +74,28 @@ describe("renderContactSheet", () => {
     for (const item of [...broken.files, ...broken.clips.map((c) => c.reader)]) item.path = path.join(dir, "missing.mp4");
     const result = await renderContactSheet(broken, tiles.slice(0, 1), { ...layout, columns: 1 }, { resolveMedia: (p) => p });
     expect(result.luma).toEqual([null]);
+    expect(result.peak).toEqual([null]);
     expect(result.width).toBe(128 + 6);
   }, 60_000);
 });
 
-describe("meanLuma", () => {
+describe("lumaStats", () => {
   it("weights channels like Rec. 709 and ignores transparent pixels", () => {
     const green = { width: 1, height: 1, data: new Uint8ClampedArray([0, 255, 0, 255]) };
-    expect(meanLuma(green)).toBeCloseTo(0.7152, 3);
-    expect(meanLuma({ width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 0]) })).toBe(0);
+    expect(lumaStats(green).mean).toBeCloseTo(0.7152, 3);
+    expect(lumaStats({ width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 0]) }).mean).toBe(0);
+  });
+
+  it("tells a black frame from dark footage with a lit subject by the 99th percentile", () => {
+    const dark = new Uint8ClampedArray(100 * 4).fill(0);
+    for (let i = 3; i < dark.length; i += 4) dark[i] = 255;
+    for (let p = 0; p < 5; p += 1) dark.set([255, 255, 255, 255], p * 4);
+    const lit = lumaStats({ width: 10, height: 10, data: dark });
+    expect(lit.mean).toBeLessThan(0.06);
+    expect(lit.peak).toBeGreaterThan(0.9);
+    const black = new Uint8ClampedArray(100 * 4).fill(0);
+    for (let i = 3; i < black.length; i += 4) black[i] = 255;
+    expect(lumaStats({ width: 10, height: 10, data: black })).toEqual({ mean: 0, peak: 0 });
   });
 });
 

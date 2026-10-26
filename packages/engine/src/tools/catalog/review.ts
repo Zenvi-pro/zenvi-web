@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { BEAT_SAMPLE_RATE, detectBeats } from "../../analysis/beats.js";
 import { timelineEnd } from "../../timeline/queries.js";
-import { alignCuts, findProblems, flashAndBlack, FLASH_LUMA, BLACK_LUMA, type SampledFrame } from "../../review/problems.js";
+import { alignCuts, findProblems, flashAndBlack, BLACK_LUMA, BLACK_PEAK, FLASH_LUMA, type SampledFrame } from "../../review/problems.js";
 import { DEFAULT_SHEET_PIXELS, MAX_SHEET_PIXELS, planSheet, sheetLayout } from "../../review/sheet.js";
 import { titleTextBoxes } from "../../review/text-boxes.js";
 import { reviewTimeline } from "../../review/timeline.js";
@@ -170,11 +170,11 @@ export const reviewTools: CatalogTool[] = [
               call.host.frames,
               project,
               plan.tiles.map((t) => ({ seconds: t.seconds, label: t.label })),
-              { columns: layout.columns, tileWidth: layout.tileWidth, tileHeight: layout.tileHeight, gap: layout.gap, mark: { bright: FLASH_LUMA, dark: BLACK_LUMA } },
+              { columns: layout.columns, tileWidth: layout.tileWidth, tileHeight: layout.tileHeight, gap: layout.gap, mark: { bright: FLASH_LUMA, dark: BLACK_LUMA, darkPeak: BLACK_PEAK } },
               call.signal,
             );
             image = result.image;
-            frames = plan.tiles.flatMap((t, i) => (result.luma[i] == null ? [] : [{ seconds: t.seconds, luma: result.luma[i]!, shot: t.shot }]));
+            frames = plan.tiles.flatMap((t, i) => (result.luma[i] == null ? [] : [{ seconds: t.seconds, luma: result.luma[i]!, peak: result.peak[i] ?? result.luma[i]!, shot: t.shot }]));
             flashTimes = flashAndBlack(frames, review).flashes;
             sheet = {
               tiles: plan.tiles.length,

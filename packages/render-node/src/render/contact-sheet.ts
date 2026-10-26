@@ -28,12 +28,29 @@ const BRIGHT_BORDER: [number, number, number] = [255, 176, 0];
 const DARK_BORDER: [number, number, number] = [230, 57, 70];
 const BORDER = 3;
 
-/** Rec. 709 luma of an opaque-over-black image, 0-1. */
-export function meanLuma(image: RgbaImage): number {
+/** Mean Rec. 709 luma of an image over black, and the level 99 % of its pixels are at or below, both 0-1. */
+export function lumaStats(image: RgbaImage): { mean: number; peak: number } {
   const d = image.data;
+  const histogram = new Uint32Array(256);
   let sum = 0;
-  for (let i = 0; i < d.length; i += 4) sum += (0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!) * (d[i + 3]! / 255);
-  return d.length ? sum / (d.length / 4) / 255 : 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const luma = (0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!) * (d[i + 3]! / 255);
+    sum += luma;
+    const bin = Math.min(255, Math.round(luma));
+    histogram[bin] = histogram[bin]! + 1;
+  }
+  const pixels = d.length / 4;
+  if (pixels === 0) return { mean: 0, peak: 0 };
+  let seen = 0;
+  let level = 255;
+  for (let v = 0; v < 256; v += 1) {
+    seen += histogram[v]!;
+    if (seen >= pixels * 0.99) {
+      level = v;
+      break;
+    }
+  }
+  return { mean: sum / pixels / 255, peak: level / 255 };
 }
 
 function paste(sheet: RgbaImage, tile: RgbaImage, x: number, y: number): void {
@@ -95,6 +112,7 @@ export async function renderContactSheet(project: Project, tiles: readonly Sheet
   }
 
   const luma: (number | null)[] = [];
+  const peak: (number | null)[] = [];
   const chips: Chip[] = [];
   const fontSize = Math.max(9, Math.min(15, Math.round(tileWidth / 11)));
   const sources = new SourceManager(project, { resolveMedia: options.resolveMedia, quality: "preview", signal: options.signal });
@@ -118,14 +136,17 @@ export async function renderContactSheet(project: Project, tiles: readonly Sheet
       const image = rendered.get(i) ?? null;
       if (image) {
         paste(sheet, image, x, y);
-        const l = meanLuma(image);
-        luma.push(l);
-        if (layout.mark && l >= layout.mark.bright) border(sheet, x, y, tileWidth, tileHeight, BRIGHT_BORDER);
-        else if (layout.mark && l <= layout.mark.dark) border(sheet, x, y, tileWidth, tileHeight, DARK_BORDER);
-        const marked = layout.mark ? (l >= layout.mark.bright ? "FLASH" : l <= layout.mark.dark ? "BLACK" : "") : "";
-        if (marked) chips.push({ text: marked, x: x + BORDER, y: y + tileHeight - Math.ceil(fontSize * 1.2) - BORDER - 3, fill: l >= (layout.mark?.bright ?? 1) ? "#b36b00" : "#a4161a" });
+        const stats = lumaStats(image);
+        luma.push(stats.mean);
+        peak.push(stats.peak);
+        const bright = layout.mark !== undefined && stats.mean >= layout.mark.bright;
+        const dark = layout.mark !== undefined && !bright && stats.mean <= layout.mark.dark && stats.peak <= layout.mark.darkPeak;
+        if (bright) border(sheet, x, y, tileWidth, tileHeight, BRIGHT_BORDER);
+        else if (dark) border(sheet, x, y, tileWidth, tileHeight, DARK_BORDER);
+        if (bright || dark) chips.push({ text: bright ? "FLASH" : "BLACK", x: x + BORDER, y: y + tileHeight - Math.ceil(fontSize * 1.2) - BORDER - 3, fill: bright ? "#b36b00" : "#a4161a" });
       } else {
         luma.push(null);
+        peak.push(null);
       }
       chips.push({ text: tile.label, x: x + BORDER, y: y + BORDER, fill: "#000" });
     });
@@ -136,5 +157,5 @@ export async function renderContactSheet(project: Project, tiles: readonly Sheet
   const layer = await rasterizeSvg(labelsSvg(width, height, fontSize, chips), { width, height });
   blendOver(sheet, layer);
   const jpeg = await encodeJpeg(sheet, options.jpegQuality ?? 72, options.signal);
-  return { image: { mimeType: "image/jpeg", data: jpeg.toString("base64") }, width, height, luma };
+  return { image: { mimeType: "image/jpeg", data: jpeg.toString("base64") }, width, height, luma, peak };
 }

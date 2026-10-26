@@ -162,9 +162,11 @@ describe("findProblems", () => {
     const project = build([{ path: "/m/a.mp4", at: 0, length: 1 }, { path: "/m/b.mp4", at: 1, length: 0.12 }, { path: "/m/c.mp4", at: 1.12, length: 1 }]);
     const review = reviewTimeline(project);
     const frames = [
-      { seconds: 0.5, luma: 0.4, shot: 0 },
-      { seconds: 1.05, luma: 0.96, shot: 1 },
-      { seconds: 1.5, luma: 0.01, shot: 2 },
+      { seconds: 0.5, luma: 0.4, peak: 0.9, shot: 0 },
+      { seconds: 1.05, luma: 0.96, peak: 1, shot: 1 },
+      { seconds: 1.5, luma: 0.01, peak: 0.02, shot: 2 },
+      // Dark footage with a lit subject (a record on a black table) is not a black frame.
+      { seconds: 1.9, luma: 0.015, peak: 0.4, shot: 2 },
     ];
     expect(flashAndBlack(frames, review)).toEqual({ flashes: [1.05], black: [1.5] });
     const problem = problemsFor(project, { frames }).find((p) => p.code === "black-frame");

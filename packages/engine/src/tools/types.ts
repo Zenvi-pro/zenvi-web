@@ -360,8 +360,8 @@ export interface SheetLayoutRequest {
   tileWidth: number;
   tileHeight: number;
   gap: number;
-  /** Tiles whose mean luma is at or above `bright` / at or below `dark` get a marked border (a flash, a black frame). */
-  mark?: { bright: number; dark: number };
+  /** A tile whose mean luma is at or above `bright` gets a marked border (a flash); one at or below `dark` whose brightest 1 % of pixels is at or below `darkPeak` gets another (a black frame). */
+  mark?: { bright: number; dark: number; darkPeak: number };
 }
 
 export interface SheetResult {
@@ -370,6 +370,8 @@ export interface SheetResult {
   height: number;
   /** Mean brightness 0-1 of each tile, in request order (a frame that could not be rendered: null). */
   luma: (number | null)[];
+  /** Brightness 0-1 that 99 % of each tile's pixels are at or below: tells a black frame from dark footage with a lit subject. */
+  peak: (number | null)[];
 }
 
 export interface FrameHost {
