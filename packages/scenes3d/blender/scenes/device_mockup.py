@@ -109,9 +109,10 @@ def build(job):
     # Subtle depth of field on the device (stronger on the push-in; finals only).
     fstop = (0.5 if move == "push" else 1.0) if p.get("dof", True) and job["quality"] == "final" else None
     cam, aim = camera.camera(lens=50, target=target, dof=fstop)
-    aspect = camera.frame_aspect()
-    fill = 1.45 if aspect < 1 else 1.45
-    dist = camera.fit_distance(cam, w * fill, h * fill)
+    # `size` of the safe width on the optical centre; 0.9 of the safe height
+    # leaves room for the push-in's last 8 % (the laptop's nominal height
+    # leaves out its base, which the orbit's perspective adds back).
+    dist = camera.compose(cam, w, h, float(p.get("size", 0.65)), max_height=0.72 if kind == "laptop" else 0.9)
     end = frames
     enter = int(round(1.0 * fps))  # TASTE: big moves 1.0 s
 

@@ -98,14 +98,17 @@ def build(job):
         parts = [blob(mat, frames, fps)]
     for obj in parts:
         obj.parent = root
-    aspect = camera.frame_aspect()
+    base = (math.radians(58), math.radians(-14), 0.0) if shape in ("torus", "rings") else (0.0, 0.0, 0.0)
+    root.rotation_euler = base
+    bpy.context.view_layer.update()
     cam, aim = camera.camera(lens=60, location=(0, -6, 0.4))
-    dist = camera.fit_distance(cam, 1.9 * (1.35 if aspect < 1 else 1.0), 2.3 if shape == "rings" else 1.95)
+    # Measured as posed; 0.9 of the safe height leaves room for the 6 % push.
+    w, h = camera.extent(parts)
+    dist = camera.compose(cam, w, h, float(p.get("size", 0.66)), max_height=0.9)
     cam.location = (0, -dist, dist * 0.06)
     # Entrance (TASTE out, 0.8 s) then a steady turn (loops may be linear).
     enter = int(round(0.8 * fps))
     motion.animate(root, "scale", [(1, (0.82, 0.82, 0.82)), (1 + enter, (1, 1, 1))], "out")
     turn = math.radians(float(p.get("turn_degrees", 120)))
-    base = (math.radians(58), math.radians(-14), 0.0) if shape in ("torus", "rings") else (0.0, 0.0, 0.0)
     motion.animate(root, "rotation_euler", [(1, (base[0], base[1], -turn / 2)), (frames, (base[0] + 0.25, base[1], turn / 2))], "linear")
     motion.animate(cam, "location", [(1, tuple(cam.location)), (frames, (cam.location.x, cam.location.y * 0.94, cam.location.z))], "in-out")

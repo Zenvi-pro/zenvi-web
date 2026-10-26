@@ -3,7 +3,7 @@
  * ffmpeg. Skipped when Blender is not installed (CI has none).
  */
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -42,6 +42,31 @@ describe.skipIf(!blender || !hasFfmpeg)("Blender smoke", () => {
       expect(probe(first.path)).toMatchObject({ pix_fmt: expect.stringMatching(/^yuva444p1[02]le$/), width: 64, height: 112 });
       const again = await renderer.render(request);
       expect(again).toMatchObject({ path: first.path, cached: true, fingerprint: first.fingerprint });
+    } finally {
+      renderer.close();
+    }
+  });
+
+  it("frames a vertical title at ~2/3 of the safe width, a little above the middle of the safe area", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "zenvi-scenes3d-smoke-"));
+    const renderer = createScene3dRenderer({ blender: blender!, cacheDir: root, tempDir: root, resolveMedia: (p) => p });
+    try {
+      const parsed = parseScene3dParams("title_3d", { text: "ZENVI", shadow: false });
+      if (!parsed.ok) throw new Error(parsed.error);
+      // 40 frames: the letters have landed (tumble ends ~frame 32) before the last one.
+      const r = await renderer.render({ scene: "title_3d", params: parsed.params, width: 216, height: 384, fps: { num: 30, den: 1 }, frames: 40, quality: "draft", media: {} });
+      const { stderr } = spawnSync("ffmpeg", ["-hide_banner", "-i", r.path, "-vf", "select=eq(n\\,39),alphaextract,bbox=min_val=100", "-f", "null", "-"], { encoding: "utf8" });
+      const box = /x1:(\d+) x2:(\d+) y1:(\d+) y2:(\d+)/.exec(stderr);
+      expect(box).not.toBeNull();
+      const [x1, x2, y1, y2] = box!.slice(1).map(Number) as [number, number, number, number];
+      // Safe width on 9:16: 88 % of the frame (camera.safe_area); default size 0.66.
+      const share = (x2 - x1 + 1) / (0.88 * r.width);
+      expect(share).toBeGreaterThan(0.63);
+      expect(share).toBeLessThan(0.74);
+      const cy = (y1 + y2) / 2 / r.height;
+      expect(cy).toBeGreaterThan(0.38);
+      expect(cy).toBeLessThan(0.46);
+      expect(y1 / r.height).toBeGreaterThan(0.12);
     } finally {
       renderer.close();
     }
