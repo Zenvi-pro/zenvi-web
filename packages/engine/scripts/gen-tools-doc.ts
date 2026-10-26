@@ -26,6 +26,10 @@ const OUT = path.join(ROOT, "docs", "TOOLS.md");
  */
 const DIVERGENCES: [string, string][] = [
   [
+    "mcp_health_tool",
+    "There is no Qt main thread to ask, so `main_thread_timeout_seconds` is accepted and unused; the call answering is the health check. The receipt adds whether Zenvi Motion blocks can render here (`data.motion.runtime`, with a warning when headless Chrome is missing; `setup_motion_runtime_tool` installs it).",
+  ],
+  [
     "add_clip_to_timeline_tool",
     "Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2726), leaving a one-frame black/silent gap.",
   ],

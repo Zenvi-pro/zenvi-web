@@ -17,7 +17,7 @@ function fakeBrowser(): Browser & { connected: boolean } {
 }
 
 const launcher = (...results: (Browser | Error)[]) => {
-  const launch = vi.fn(async () => {
+  const launch = vi.fn(async (_options?: unknown) => {
     const next = results.shift() ?? fakeBrowser();
     if (next instanceof Error) throw next;
     return next;
