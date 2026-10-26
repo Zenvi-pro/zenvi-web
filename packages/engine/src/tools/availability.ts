@@ -450,7 +450,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       audio: "ffmpeg is available",
       "audio.mixPcm": "ffprobe is available",
       backend: "the server is set up to call the Zenvi backend",
-      mattes: "onnxruntime-node and the matting model are in the image; up to 60 s of video per call",
+      mattes: "onnxruntime-node is in the image (the matting model downloads on first use); up to 10 s of video per call",
       motion: "the image has chrome-headless-shell; one block renders at a time",
     },
     hidden: [

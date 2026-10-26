@@ -56,8 +56,12 @@ const BYTES_MAX_BYTES = 64 * 1024 * 1024;
 const EXPORT_URL_SECONDS = 24 * 3600;
 /** File > Recent Projects holds the last 10 (project_data.add_to_recent_files). */
 const RECENT_PROJECTS = 10;
-/** Longest video one call mattes (60 s at 30 fps): matting runs at a few frames per second on the service's CPUs. */
-const MATTE_MAX_FRAMES = 1800;
+/**
+ * Longest video one call mattes (10 s at 30 fps): matting runs at 2-4 frames
+ * per second on the service's CPUs, and a call must end well inside the
+ * ingress's 240 s request limit.
+ */
+const MATTE_MAX_FRAMES = 300;
 
 /** One Chrome capture or matting run at a time in this process: each takes the container's CPUs. */
 let heavyRun: Promise<unknown> = Promise.resolve();
