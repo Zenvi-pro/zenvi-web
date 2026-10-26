@@ -48,7 +48,8 @@ export { fitViewport } from "./player/layout.js";
 export { AudioRenderer, type PreparedPiece } from "./audio/renderer.js";
 export { KernelAudioSource } from "./audio/kernel-audio.js";
 export { AudioPlayback, type AudioPlaybackOptions } from "./audio/playback.js";
-export { mixWindow } from "./audio/mixdown.js";
+export { mixRange, mixWindow } from "./audio/mixdown.js";
+export { renderMixPcm, DEFAULT_MIX_SECONDS, type MixPcmOptions } from "./audio/mix-pcm.js";
 
 // Export
 export {

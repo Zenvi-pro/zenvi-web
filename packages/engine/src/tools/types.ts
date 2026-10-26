@@ -295,6 +295,18 @@ export interface ExportOptions {
   channels?: number;
   /** Timeline range in seconds; defaults to the whole project. */
   range?: { start: number; end: number };
+  /**
+   * Normalize the exported mix to this loudness (two-pass EBU R128 loudnorm
+   * with a true-peak limiter): the safety net after `master_audio_tool`.
+   * Absent: the mix is exported as the timeline plays.
+   */
+  loudness?: { targetLufs: number; truePeakDbtp: number };
+  /**
+   * Hold the exported mix under -1 dBTP with a true-peak limiter (2 dB under
+   * for lossy codecs, which overshoot): on unless `false`, which exports the
+   * mix exactly as the timeline plays (clipping included).
+   */
+  truePeakLimit?: boolean;
   /** Output location (CLI path). Hosts choose one when omitted. */
   output?: string;
 }
@@ -383,7 +395,20 @@ export interface AudioEnvelope {
   rms: ArrayLike<number>;
 }
 
+/** The timeline's mixed audio, planar float PCM at the project's rate and channel count. */
+export interface MixPcm {
+  sampleRate: number;
+  channels: Float32Array[];
+}
+
 export interface AudioHost {
+  /**
+   * Render the project's timeline audio the way an export mixes it (clip
+   * volume curves, fades, speed, audio effects), from time 0 to the end of
+   * the last clip, or only the clips in `clipIds` (a stem). Rejects past
+   * `maxSeconds` (default 900).
+   */
+  mixPcm?(project: Project, options?: { clipIds?: readonly string[]; maxSeconds?: number; signal?: AbortSignal }): Promise<MixPcm>;
   /**
    * Decode `path`'s audio to mono (default 16 kHz, 480-sample frames) and
    * return its RMS envelope. Rejects when the file has no audio stream.

@@ -89,3 +89,34 @@ export class FakeAudioContext {
     return g;
   }
 }
+
+/**
+ * An `OfflineAudioContext` that renders what `scheduleVoice` schedules at
+ * rate 1: each source's buffer added at its start time, times the first
+ * value set on the gain it goes through (no ramps).
+ */
+export class FakeOfflineAudioContext extends FakeAudioContext {
+  readonly numberOfChannels: number;
+  readonly length: number;
+  readonly sampleRate: number;
+  constructor(options: { numberOfChannels: number; length: number; sampleRate: number }) {
+    super();
+    ({ numberOfChannels: this.numberOfChannels, length: this.length, sampleRate: this.sampleRate } = options);
+  }
+  async startRendering() {
+    const out = Array.from({ length: this.numberOfChannels }, () => new Float32Array(this.length));
+    for (const source of this.sources) {
+      if (!source.started || !source.buffer) continue;
+      const via = source.connections[0];
+      const gain = via instanceof FakeGain ? (via.gain.events[0]?.value ?? via.gain.value) : 1;
+      const at = Math.round(source.started.when * this.sampleRate);
+      const from = Math.round(source.started.offset * source.buffer.sampleRate);
+      const count = Math.round(source.started.duration * source.buffer.sampleRate);
+      out.forEach((channel, c) => {
+        const data = source.buffer!.data[Math.min(c, source.buffer!.data.length - 1)]!;
+        for (let i = 0; i < count && at + i < channel.length; i += 1) channel[at + i]! += gain * (data[from + i] ?? 0);
+      });
+    }
+    return { numberOfChannels: this.numberOfChannels, length: this.length, sampleRate: this.sampleRate, getChannelData: (c: number) => out[c]! };
+  }
+}

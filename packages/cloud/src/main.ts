@@ -13,7 +13,7 @@ import { createServices } from "./container.js";
 import { createLogger, errorMessage } from "./http/log.js";
 import { loadEngineRegistry } from "./mcp/engine.js";
 import { queueDispatch, type RenderDispatch, renderQueue } from "./render/dispatch.js";
-import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeFontFamilies, nodeProber, nodeRenderer, nodeTranscribeMedia } from "./render/node.js";
+import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeFontFamilies, nodeMixPcm, nodeProber, nodeRenderer, nodeTranscribeMedia } from "./render/node.js";
 import { unavailableProber } from "./render/renderer.js";
 import { AzureBlobStore, AzureTableStore } from "./storage/azure.js";
 import { MemoryBlobStore, MemoryTableStore } from "./storage/memory.js";
@@ -74,6 +74,7 @@ async function main(): Promise<void> {
     assets,
     analyzeAudio: haveFfmpeg ? nodeAnalyzeAudio : undefined,
     decodePcm: haveFfmpeg ? nodeDecodePcm : undefined,
+    mixPcm: haveFfmpeg && haveFfprobe ? nodeMixPcm : undefined,
     transcribeMedia: haveFfmpeg && haveFfprobe ? nodeTranscribeMedia : undefined,
     fontFamilies: nodeFontFamilies,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl, log: (message) => log.warn(message) }),

@@ -29,7 +29,7 @@ import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
 import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
 import { isRenderFormat } from "../render/options.js";
-import { filesByPath } from "../render/resolve.js";
+import { filesByPath, projectPathResolver } from "../render/resolve.js";
 import { attachmentDisposition, cleanFileName, normalizeContentType } from "../services/media.js";
 import { exportPath, mediaPath } from "../services/paths.js";
 import { sha256Hex } from "../util/crypto.js";
@@ -183,6 +183,15 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     host.audio = {
       analyzeAudio: async (path, options) => analyze(await localCopy(path), { ...options, signal: options?.signal ?? ctx.signal }),
       ...(decode ? { decodePcm: async (path: string, options?: Parameters<typeof decode>[1]) => decode(await localCopy(path), { ...options, signal: options?.signal ?? ctx.signal }) } : {}),
+    };
+  }
+  const mix = services.mixPcm;
+  if (host.audio && mix) {
+    // The project's media as a render reads it: what this call generated, the bin, the renderer's bundled assets.
+    host.audio.mixPcm = (current, options) => {
+      const bin = projectPathResolver(current, { fetchFile: (file) => services.mediaCache.get(userId, file), resolveAsset: services.resolveAsset ?? undefined });
+      const resolveMedia = async (path: string) => generated.get(path)?.file ?? bin(path);
+      return mix(current, { ...options, resolveMedia, signal: options?.signal ?? ctx.signal });
     };
   }
 

@@ -15,17 +15,17 @@ import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/pr
 import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { frameContaining, isSequenceFormat, maxFrame, projectAtFrameRate, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
+import { exportCeilingDb, frameContaining, isSequenceFormat, maxFrame, projectAtFrameRate, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
-import { binaryVersion } from "../ffmpeg/capabilities.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
 import { SourceManager, type MediaResolver } from "../decode/sources.js";
 import type { ScaleQuality } from "../decode/video.js";
 import { streamStarts } from "../probe/starts.js";
+import { appendToOutput, normalizeLoudness, truePeakLimiterFilter } from "../audio/mix.js";
 import { buildAudioGraph } from "./audio-graph.js";
 import { processLimits } from "../limits.js";
 import { CompositePool, compositeThreads } from "./composite-pool.js";
-import { encoderCommand, ffmpegMajorVersion, FORMATS, type NodeExportOptions } from "./encoder.js";
+import { encoderCommand, ffmpegMajor, FORMATS, isLossyAudio, type NodeExportOptions } from "./encoder.js";
 import { nodeTextRasterizer } from "../svg/text.js";
 import { defaultRenderEngine, projectNeedsText, type RenderEngine } from "./engine.js";
 
@@ -106,14 +106,6 @@ function sequencePattern(output: string, extension: string): string {
   return `${stem}_%05d.${extension}`;
 }
 
-let versionPromise: Promise<number> | undefined;
-function ffmpegMajor(): Promise<number> {
-  versionPromise ??= binaryVersion("ffmpeg")
-    .then((v) => ffmpegMajorVersion(v.version))
-    .catch(() => 99);
-  return versionPromise;
-}
-
 export async function renderProject(source: Project, opts: RenderProjectOptions): Promise<RenderResult> {
   const { options } = opts;
   const format = options.format;
@@ -181,6 +173,15 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
         })
       : undefined;
     if (audio) warnings.push(...audio.warnings);
+    if (audio && options.loudness) {
+      const skipped = await normalizeLoudness(audio, options.loudness, sampleRate, effectsDir!, info.video ? 1 : 0, signal);
+      if (skipped) warnings.push(skipped);
+    }
+    // Last on the mix, after any normalisation: nothing that reaches the file passes the ceiling.
+    if (audio && options.truePeakLimit !== false) {
+      const ceiling = exportCeilingDb(isLossyAudio(format, options.audioCodec));
+      audio.filter = appendToOutput(audio.filter, truePeakLimiterFilter(sampleRate, ceiling, await ffmpegMajor()));
+    }
 
     const command = encoderCommand({
       format,

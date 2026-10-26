@@ -34,6 +34,7 @@ export type HostMethod =
   | "storage.writeText"
   | "ui.openExportDialog"
   | "audio.decodePcm"
+  | "audio.mixPcm"
   | "audio.transcribe"
   | "ui.selection"
   | "ui.setSelection"
@@ -189,6 +190,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
+  master_audio_tool: { methods: ["audio.mixPcm"] },
   build_reel_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated"],
     partialNote:
@@ -359,6 +361,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.recentProjects",
       "ui.openExportDialog",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
       "ui.selection",
       "ui.setSelection",
@@ -394,6 +397,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.customProfiles",
       "media.collect",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
       "exporter.supports",
       "frames.fontFamilies",
@@ -422,6 +426,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.currentPath",
       "storage.recentProjects",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
       "frames.fontFamilies",
       "exporter.supports",
@@ -432,6 +437,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       media: "ffprobe is available",
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
+      "audio.mixPcm": "ffprobe is available",
       backend: "the server is set up to call the Zenvi backend",
     },
     hidden: [
@@ -484,6 +490,7 @@ function needName(need: HostCapability | HostMethod): string {
     "storage.writeText": "writing files",
     "ui.openExportDialog": "an export dialog",
     "audio.decodePcm": "audio decoding",
+    "audio.mixPcm": "rendering the timeline mix to measure its loudness",
     "audio.transcribe": "speech recognition",
     "ui.selection": "reading the editor's selection",
     "ui.setSelection": "selecting in the editor",

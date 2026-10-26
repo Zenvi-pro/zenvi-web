@@ -6,6 +6,7 @@
 
 import {
   AudioBufferSource,
+  type AudioCodec,
   BufferTarget,
   CanvasSource,
   MkvOutputFormat,
@@ -22,11 +23,10 @@ import {
   type StreamTargetChunk,
   type Target,
 } from "mediabunny";
-import { projectAtFrameRate, type Project } from "@zenvi/engine";
+import { exportCeilingDb, projectAtFrameRate, TruePeakLimiter, type Project } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
 import type { ContainerFormat, ExportOptions } from "@zenvi/engine/tools";
-import { windowEnd } from "../audio/channels.js";
-import { mixWindow, planHasSound } from "../audio/mixdown.js";
+import { mixRange, planHasSound } from "../audio/mixdown.js";
 import { AudioRenderer } from "../audio/renderer.js";
 import type { LayerError } from "../compositor/compositor.js";
 import { defaultEngine, type RenderEngine } from "../engine.js";
@@ -185,6 +185,17 @@ export function exportAudio(project: Project, engine: RenderEngine, options: Pic
   return { plan, sampleRate, channels, hasAudio: options.format === "wav" || planHasSound(plan) };
 }
 
+/** Whether an export's audio codec loses detail (and overshoots a limited mix). */
+function isLossy(codec: AudioCodec): boolean {
+  return !codec.startsWith("pcm-") && codec !== "flac";
+}
+
+function audioBufferOf(pcm: readonly Float32Array[], sampleRate: number): AudioBuffer {
+  const buffer = new AudioBuffer({ numberOfChannels: pcm.length, length: pcm[0]!.length, sampleRate });
+  pcm.forEach((channel, c) => buffer.copyToChannel(channel as Float32Array<ArrayBuffer>, c));
+  return buffer;
+}
+
 /** The export pipeline, writing to any Mediabunny target. */
 async function encode(source: Project, media: MediaRegistry, options: ExportOptions, run: ExportRunOptions, target: Target): Promise<{ mimeType: string }> {
   const engine = run.engine ?? defaultEngine;
@@ -244,17 +255,22 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
   const report = (frame: number, stage: ExportProgress["stage"]) =>
     run.onProgress?.({ fraction: stage === "finalizing" ? 1 : Math.min(0.999, frame / frameCount), frame, frames: frameCount, stage });
 
+  // Last on the mix: nothing that reaches the file passes the ceiling (ExportOptions.truePeakLimit).
+  const limiter =
+    choice.audioCodec && options.truePeakLimit !== false
+      ? new TruePeakLimiter({ sampleRate, channels, ceilingDb: exportCeilingDb(isLossy(choice.audioCodec)) })
+      : null;
+  const addPcm = async (pcm: Float32Array[]) => {
+    if (audioSource && (pcm[0]?.length ?? 0) > 0) await audioSource.add(audioBufferOf(pcm, sampleRate));
+  };
   let audioAt = start;
   const mixUntil = async (until: number) => {
     if (!audio || !audioSource) return;
-    while (audioAt < until - 1e-9) {
-      if (signal?.aborted) throw abortReason(signal);
-      const to = windowEnd(audioAt, AUDIO_WINDOW, end, sampleRate, fps, channels);
-      const buffer = await mixWindow(audio, audioPlan, audioAt, to, sampleRate, channels, fps);
-      await audioSource.add(buffer);
-      await audio.releaseEnded(audioPlan, to);
-      audioAt = to;
-    }
+    if (signal?.aborted) throw abortReason(signal);
+    audioAt = await mixRange(audio, audioPlan, { from: audioAt, to: end, until }, { sampleRate, channels, fps, window: AUDIO_WINDOW, signal }, async (buffer) => {
+      if (!limiter) return audioSource!.add(buffer);
+      await addPcm(limiter.process(Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))));
+    });
   };
 
   try {
@@ -274,6 +290,7 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
       report(i + 1, "video");
     }
     await mixUntil(end);
+    if (limiter) await addPcm(limiter.flush());
     report(frameCount, "finalizing");
     videoSource?.close();
     audioSource?.close();

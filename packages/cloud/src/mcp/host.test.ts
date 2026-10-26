@@ -6,7 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { FILLER_PROMPT, isTranscriptionError, parseTranscription, type AudioEnvelope, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
-import type { AssetSource, MediaProber, RenderInput, SpeechTranscriber } from "../render/renderer.js";
+import type { AssetSource, MediaProber, MixRenderer, RenderInput, SpeechTranscriber } from "../render/renderer.js";
 import { fakeRenderer } from "../testing/fakes.js";
 import { type Harness, harness, sampleProject, USER_A } from "../testing/helpers.js";
 import { loadEngineRegistry } from "./engine.js";
@@ -238,6 +238,27 @@ describe("the cloud ToolHost", () => {
     expect((await host.audio!.analyzeAudio("/Users/me/voice.wav")).rms).toEqual([0.1, 0.2]);
     expect(seen).toEqual(["pcm bytes"]);
     await dispose();
+  });
+
+  it("renders the timeline mix for master_audio_tool from local copies of the bin's media", async () => {
+    const seen: string[] = [];
+    const mixPcm: MixRenderer = async (current, options) => {
+      for (const file of current.files) seen.push(await readFile(await options.resolveMedia(String(file.path)), "utf8"));
+      return { sampleRate: 48000, channels: [new Float32Array(4), new Float32Array(4)] };
+    };
+    const analyzeAudio = async (): Promise<AudioEnvelope> => ({ sampleRate: 16000, frameSize: 480, rms: [] });
+    const h = await harness({ prober, analyzeAudio, mixPcm });
+    const { projectId, project } = await projectWithMedia(h, "voice.wav", Buffer.from("pcm bytes"), "audio/wav");
+    const { host, dispose } = createCloudHost(context(h), projectId, () => project);
+    expect((await host.audio!.mixPcm!(project, { clipIds: ["C1"] })).channels).toHaveLength(2);
+    expect(seen).toEqual(["pcm bytes"]);
+    await dispose();
+
+    const without = await harness({ prober, analyzeAudio });
+    const bare = await projectWithMedia(without, "voice.wav", Buffer.from("pcm bytes"), "audio/wav");
+    const plain = createCloudHost(context(without), bare.projectId, () => bare.project);
+    expect(plain.host.audio!.mixPcm).toBeUndefined();
+    await plain.dispose();
   });
 
   it("tells which project files are not in Zenvi Cloud (missing media)", async () => {
