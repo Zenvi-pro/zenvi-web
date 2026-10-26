@@ -120,11 +120,13 @@ interface ManifestCase {
 /**
  * Motion transitions on the base project's cut at 1 s (timeline frame 31 is
  * the incoming clip's first): the frames either side of the cut, where every
- * keyframe and effect of the preset is at work.
+ * keyframe and effect of the preset is at work. Whip and zoom also check a
+ * frame outside the window (15, 50), where their effects sit at neutral
+ * values and the decode box is the peak's.
  */
 const MOTION_PARITY: { name: string; input: Pick<MotionTransitionInput, "preset" | "direction" | "intensity">; frames: number[] }[] = [
-  { name: "motion-whip-left", input: { preset: "whip", direction: "left" }, frames: [28, 29, 30, 31, 33, 35] },
-  { name: "motion-zoom-in", input: { preset: "zoom_in" }, frames: [28, 30, 31, 33] },
+  { name: "motion-whip-left", input: { preset: "whip", direction: "left" }, frames: [15, 28, 29, 30, 31, 33, 35, 50] },
+  { name: "motion-zoom-in", input: { preset: "zoom_in" }, frames: [15, 28, 30, 31, 33] },
   { name: "motion-spin-cw", input: { preset: "spin", direction: "cw" }, frames: [27, 30, 31, 34] },
   { name: "motion-glitch", input: { preset: "glitch", intensity: 1.5 }, frames: [29, 30, 31, 32] },
   { name: "motion-flash-invert", input: { preset: "flash_invert" }, frames: [30, 31, 32] },
