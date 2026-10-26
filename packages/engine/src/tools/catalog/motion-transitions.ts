@@ -40,6 +40,7 @@ import {
 import { directTool, type CatalogTool } from "../define.js";
 import { applied, refused, unchanged } from "../receipt.js";
 import { ToolError, clipById, clipTitle, resolveLayer, trackName } from "./timeline-edit-common.js";
+import { buildTrackStack } from "../tracks.js";
 
 const READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false } as const;
 const WRITE = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
@@ -136,6 +137,20 @@ const APPLY = "apply_motion_transition_tool";
 const APPLY_ALL = "apply_motion_transitions_tool";
 const REMOVE = "remove_motion_transition_tool";
 
+
+/**
+ * Where the cuts are when the named track has none: agents guess "1" after
+ * build_reel_tool, which puts the music on track 1 and the shots above it.
+ */
+function cutsElsewhere(project: Project, layer: number): string {
+  const tracks = buildTrackStack(project.layers)
+    .filter((t) => t.layer_number !== layer)
+    .map((t) => ({ ui: t.ui_track, cuts: trackCuts(project, t.layer_number).length }))
+    .filter((t) => t.cuts > 0);
+  if (tracks.length === 0) return "";
+  return ` Cuts are on ${tracks.map((t) => `track ${t.ui} (${t.cuts} cut${t.cuts === 1 ? "" : "s"})`).join(", ")}: pass track="${tracks[0]!.ui}".`;
+}
+
 export const motionTransitionTools: CatalogTool[] = [
   directTool({
     name: LIST,
@@ -224,7 +239,7 @@ export const motionTransitionTools: CatalogTool[] = [
         throw error;
       }
       const cuts = trackCuts(project, layer);
-      if (cuts.length === 0) return unchanged(APPLY_ALL, `No cuts on ${trackName(project, layer)}: no clips play back to back there.`);
+      if (cuts.length === 0) return unchanged(APPLY_ALL, `No cuts on ${trackName(project, layer)}: no clips play back to back there.${cutsElsewhere(project, layer)}`);
       const frames = framesOf(project, args.duration);
       const inputs = cuts.map((cut, index): MotionTransitionInput => {
         const step = args.style ? styleStep(args.style, index, cuts.length) : { preset: args.preset as MotionTransitionId };
