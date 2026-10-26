@@ -12,8 +12,20 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ExportOptions, Project } from "@zenvi/engine";
+import { createMotionHost, findChrome } from "@zenvi/motion/node";
 import * as renderNode from "@zenvi/render-node";
-import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, PathResolver, PcmDecoder, Renderer, SpeechTranscriber } from "./renderer.js";
+import type {
+  AssetSource,
+  AudioAnalyzer,
+  FontLister,
+  MatteHostFactory,
+  MediaProber,
+  MotionHostFactory,
+  PathResolver,
+  PcmDecoder,
+  Renderer,
+  SpeechTranscriber,
+} from "./renderer.js";
 import { RendererUnavailableError, unavailableRenderer } from "./renderer.js";
 
 type RenderProjectFn = (
@@ -142,3 +154,41 @@ export const nodeAnalyzeAudio: AudioAnalyzer = (filePath, options) => renderNode
 export const nodeDecodePcm: PcmDecoder = (filePath, options) => renderNode.decodePcm(filePath, options);
 export const nodeTranscribeMedia: SpeechTranscriber = (filePath, options) => renderNode.transcribeMediaFile(filePath, options);
 export const nodeFontFamilies: FontLister = () => renderNode.installedFontFamilies();
+
+/** Capture tabs per motion block render: the service container has 2 vCPUs, and requests still need answering. */
+const MOTION_WORKERS = 2;
+
+/**
+ * Zenvi Motion with the image's chrome-headless-shell (`ZENVI_CHROME`, or the
+ * one `zenvi motion setup` installs), or why there is none. A call's renders
+ * and render cache live in its scratch folder: the result is kept as
+ * content-addressed media (mcp/host.ts), so nothing needs to outlive the call.
+ */
+export async function nodeMotionHosts(env: NodeJS.ProcessEnv = process.env): Promise<{ factory?: MotionHostFactory; reason?: string }> {
+  if (env.ZENVI_MOTION?.trim() === "0") return { reason: "turned off (ZENVI_MOTION=0)" };
+  const chrome = await findChrome(env);
+  if (!chrome) return { reason: "no headless Chrome (ZENVI_CHROME)" };
+  return {
+    factory: ({ workDir, resolveMedia }) =>
+      createMotionHost({
+        projectFile: () => path.join(workDir, "cloud.zvn"),
+        resolveMedia,
+        env: { ...env, ZENVI_CHROME: chrome, ZENVI_CACHE_DIR: workDir },
+        workers: MOTION_WORKERS,
+      }),
+  };
+}
+
+/**
+ * Subject mattes with Robust Video Matting when onnxruntime-node is
+ * installed, or why not. The weights come from Zenvi's cache folder (the
+ * image downloads them at build time; elsewhere on first use).
+ */
+export function nodeMatteHosts(env: NodeJS.ProcessEnv = process.env): { factory?: MatteHostFactory; reason?: string } {
+  if (env.ZENVI_MATTES?.trim() === "0") return { reason: "turned off (ZENVI_MATTES=0)" };
+  if (!renderNode.onnxRuntimeAvailable()) return { reason: "onnxruntime-node is not installed" };
+  const model = renderNode.rvmModel({ env });
+  return {
+    factory: ({ workDir, resolveMedia }) => renderNode.createNodeMatteHost({ projectFile: () => undefined, resolveMedia, model, scratchDir: workDir }),
+  };
+}

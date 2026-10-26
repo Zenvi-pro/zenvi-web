@@ -52,6 +52,12 @@ function extensionOf(name: string): string | undefined {
   return /\.([a-z0-9]{2,5})$/i.exec(name)?.[1]?.toLowerCase();
 }
 
+/** The media type a file name's extension stands for, or null. */
+export function contentTypeForName(name: string): string | null {
+  const ext = extensionOf(name);
+  return ext ? (EXTENSION_TYPES[ext] ?? null) : null;
+}
+
 function nameFromDisposition(header: string | undefined): string | undefined {
   if (!header) return undefined;
   const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(header);
