@@ -160,6 +160,12 @@ and build again with other arguments), then look again.
 
 ## 6. Render and hand off
 
-`render_video` (mp4, the project's size). Then offer `launch_editor` (the
+Before rendering: `unify_grade_tool` if the shots come from different
+sources (it matches exposure and white balance across the cut; pass a LUT
+as `look` to keep one look on top), then `master_audio_tool` (`preset:
+"social"`) as the last audio step. `render_video` (mp4, the project's size),
+then `review_render_tool` on the file: fix every `PROBLEM` line (an end on
+black, clipping, a shot repeated within 3 s) and render again. Then offer
+`launch_editor` (the
 desktop app) or `push_to_cloud` (a zenvi.pro link) so the person can tweak
 it, and list the music and footage credits.

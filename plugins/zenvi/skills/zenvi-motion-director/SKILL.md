@@ -49,7 +49,11 @@ and borrow single techniques from the others.
    `orientation`, `import_stock_media_tool`), one music track
    (`search_freesound_music_tool` with `min_seconds` above the length), AI
    stills only for what stock cannot show. Too few assets is the commonest
-   cause of a slideshow: get 1.5x the shots the plan needs.
+   cause of a slideshow: get 1.5x the shots the plan needs. Count before
+   cutting: a hype or montage edit needs **one distinct source clip per
+   ~1.5 s of runtime** (15 s → 10+ clips), and no clip may come back within
+   3 s. Short? Search again with other words, or generate AI shots, before
+   you cut; never loop five clips to fill the length.
 5. **Cut.** The genre tool first (`match_cut_montage_tool`, `build_reel_tool`,
    `add_motion_template_tool template=grid`), otherwise
    `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
@@ -64,14 +68,24 @@ and borrow single techniques from the others.
 8. **Captions and type.** `add_captions_tool` (word-by-word: `maxWords: 1`)
    for speech; `add_title_tool` with a bundled family (`font: "Anton"`,
    `"Instrument Serif"`, `"Space Mono"`...) for emphasis words and labels.
-9. **Colour.** One look for the whole piece: `apply_look_tool`
-   (`look_id`, `all_clips: true`, `lut_intensity` 0.5-0.7; ids from
-   `list_looks_tool`), grain only on cinematic pieces.
+9. **Colour: match first, then the look.** `unify_grade_tool` (no
+   arguments: every footage clip toward the cut's median look; or
+   `reference_clip_id` = the hero shot) so daylight and night shots stop
+   jumping on the cut. Then one look for the whole piece: pass a LUT as
+   `look` with `look_intensity` 0.5-0.7 in the same call, or `apply_look_tool`
+   with a LUT id (ids from `list_looks_tool`). Soft presets (`sunny`,
+   `warm_up`...) replace the corrective grade: not after unifying. Grain
+   only on cinematic pieces.
 10. **Sound, last.** When the picture is locked: `auto_sound_design_tool`
     (`intensity`, `beats`, `climax_seconds`), then `add_sfx_tool` for what it
     cannot know (typing, a click, the landing). Music at full level unless
     there is speech (`duck_under_speech_tool`).
-11. **Verify** (below), fix, verify again. Then `render_video`.
+11. **Master, always last.** `master_audio_tool` (`preset: "social"`, -14
+    LUFS / -1 dBTP) after the last audio change; any later audio edit means
+    mastering again. An unmastered edit clips on the platforms.
+12. **Verify** (below), fix, verify again. Then `render_video` and
+    **review the file**: `review_render_tool` with the path it wrote. Fix
+    every `PROBLEM` line, render again, review again.
 
 Order matters: speed ramps change clip lengths (`ripple: true`), transitions
 read the cuts, sound design reads cuts, transitions and titles. Anything that
@@ -104,7 +118,18 @@ that track (`remove_motion_transition_tool track=...`) and re-running sound.
 - **Type: two families at most.** One condensed display (Anton, Bebas Neue)
   or serif (Instrument Serif), one neutral sans (Inter). Emphasis words 3-6x
   connector size. Text in title-safe; on 9:16 out of the bottom fifth.
-- **One look, one accent colour.** Grade every clip the same way.
+- **One look, one accent colour, on matched plates.** `unify_grade_tool`
+  before the look; a bright shot next to a near-black one reads as two
+  videos, whatever LUT is on top.
+- **Variety.** No source clip within 3 s of itself; at least one distinct
+  clip per ~1.5 s for hype and montage. The same five shots every second is
+  the slideshow tell viewers notice first.
+- **A clean end.** End on a hold, an end card or a settled final shot of 1 s
+  or more, never on black and never cut off mid-motion. Sound effects and
+  music end with the picture (trim what runs past the last frame), or the
+  render pads it with black.
+- **Never clip.** Master last; the delivered file's true peak stays at or
+  under -1 dBTP.
 - **One bold moment.** Spend boldness once (the 3D landing, the merge, the
   word behind the head); keep the rest disciplined.
 - **No AI tells:** no generic "Welcome to…" hooks, no stock tagline copy, no
@@ -142,7 +167,23 @@ says which): lower a hot mastered track (`set_clip_volume_tool`
 above 0 dB.
 
 Fix what fails with the tool that made it (or `undo_tool` and redo with other
-arguments), then look at that frame again. Report what you checked.
+arguments), then look at that frame again.
+
+**Review the render, not just the timeline.** After `render_video`, call
+`review_render_tool` on the file. It reads the MP4 and reports black and
+frozen frames, the end (hold or black), true peak and loudness, and shots
+repeated too soon, with a contact sheet of every shot and the last frame
+(problems framed red). Fix every `PROBLEM`: ends on black → trim what runs
+past the last picture and render again; true peak → `master_audio_tool`;
+repeated shot → swap in another clip. Report the final review's numbers.
+
+The finishing calls, in order (after the picture and the sound are locked):
+
+```json
+unify_grade_tool {"look": "teal_punch", "look_intensity": 0.6}
+master_audio_tool {"preset": "social"}
+review_render_tool {"path": "reel.mp4"}
+```
 
 ## When a tool is missing
 

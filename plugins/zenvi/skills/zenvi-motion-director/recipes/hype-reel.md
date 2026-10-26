@@ -17,8 +17,9 @@ hero shot, a hit on every cut, loud. Cars, bikes, sport, launches, events.
 
 ## Tools
 
-1. Assets: 10-16 clips, close and wide, all with motion. Music: aggressive
-   trap/house 150-160 bpm.
+1. Assets: 10-16 clips, close and wide, all with motion: at least one
+   distinct clip per 1.5 s of runtime, none back within 3 s. Music:
+   aggressive trap/house 150-160 bpm.
 2. Cut: `build_reel_tool` `style: "hype"`, `file_ids` in story order,
    `music_file_id`, `duration_seconds`, `hook` (2-4 words), `end_card`.
 3. Hero ramp: `speed_ramp_tool` `clip_id`, `preset: "velocity"`, `hit_at` =
@@ -34,16 +35,21 @@ hero shot, a hit on every cut, loud. Cars, bikes, sport, launches, events.
 6. Treated hero shot (CLI): `subject_glow_tool` `look: "thermal"` or
    `replace_background_tool` `background: "color"`; else a contrasty LUT on
    that clip only (`apply_look_tool` `look_id: "noir_era"`).
-7. Look: `teal_punch` or `heroic_cinema` at 0.6 on everything else.
+7. Look: `unify_grade_tool` first (daylight and night shots meet in the
+   middle), with `look: "teal_punch"` or `"heroic_cinema"`, `look_intensity`
+   0.6, leaving out the treated hero shot (`timeline_clip_ids`).
 8. Sound last: `auto_sound_design_tool` `intensity: "hype"`, `beats`,
    `climax_seconds` = the drop. Check every cut has a transient;
-   `add_sfx_tool` `whip` on whips it missed.
+   `add_sfx_tool` `whip` on whips it missed. Then `master_audio_tool`
+   `preset: "social"`.
 
 ## Checks
 
 Contact sheet: no shot repeats back to back, no black frames at whip peaks
 (`preview_frame` 1 frame before and after a whip). Ramp: frame at `hit_at`
-is the peak of the action. Loudness: music not lowered.
+is the peak of the action. Loudness: music not lowered. After rendering,
+`review_render_tool` on the file: no repeated shot within 3 s, ends on the
+end word (not black), true peak at or under -1 dBTP.
 
 ## Pitfalls
 
