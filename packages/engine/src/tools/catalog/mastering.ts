@@ -202,7 +202,8 @@ export function applyEdits(tx: Transaction, edits: Edits): Map<string, ClipGainR
       const [start, end] = clipTimelineExtent(clip);
       const windows = clampWindows(duck.windows, start, end);
       if (windows.length === 0) continue;
-      const points = buildDuckPoints(clip, tx.project.fps, windows, dbToFactor(duck.db));
+      // The windows are already padded (duckedWindows), so the envelope must not pad them again.
+      const points = buildDuckPoints(clip, tx.project.fps, windows, dbToFactor(duck.db), { padBefore: 0, padAfter: 0 });
       if (points.length === 0) continue;
       setClipKeyframes(tx, id, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
     }

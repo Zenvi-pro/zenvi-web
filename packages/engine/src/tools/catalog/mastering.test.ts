@@ -172,6 +172,18 @@ describe("master_audio_tool", { timeout: 60_000 }, () => {
     expect(curvePoints(doc.project.clips.find((c) => c.id === speech)!).length).toBeLessThanOrEqual(1);
   });
 
+  it("ducks the music on the same frames as duck_under_speech_tool", async () => {
+    const frames = async (tool: string, args: Record<string, unknown>): Promise<number[]> => {
+      const { doc, host } = setup();
+      add(doc, "speech.mp4", { ai: SPEECH_AI, video: true, layer: L1 });
+      const music = add(doc, "music.mp3", { ai: indexed, layer: L2 });
+      expect((await runTool({ doc, host }, tool, args)).data!.status).toBe("applied");
+      return curvePoints(doc.project.clips.find((c) => c.id === music)!).map((p) => p.co.X);
+    };
+    const mastered = await frames("master_audio_tool", {});
+    expect(mastered).toEqual(await frames("duck_under_speech_tool", {}));
+  });
+
   it("is idempotent: the second run changes nothing and records no undo step", async () => {
     const { doc, host } = setup();
     add(doc, "speech.mp4", { ai: SPEECH_AI, video: true, layer: L1 });
