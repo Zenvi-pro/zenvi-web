@@ -116,8 +116,17 @@ function whooshFor(seconds: number, intensity: SfxIntensity, recent: string[], r
   return { recipe: "whoosh_long", duration };
 }
 
+/** What planSoundDesign decided. */
+export interface SoundDesignPlan {
+  cues: SfxCue[];
+  /** The climax an impact lands on (null when there is none or it is too early to land). */
+  climax: number | null;
+  /** Whether a riser builds into it. */
+  riser: boolean;
+}
+
 /** Plan the cues for an edit. Deterministic for the same input. */
-export function planSoundDesign(input: SoundDesignInput): SfxCue[] {
+export function planSoundDesign(input: SoundDesignInput): SoundDesignPlan {
   const d = DENSITY[input.intensity];
   const rng = new Rng(Math.imul(input.seed | 0, 2654435761) ^ 0x5fd);
   const cues: SfxCue[] = [];
@@ -127,7 +136,9 @@ export function planSoundDesign(input: SoundDesignInput): SfxCue[] {
 
   // The climax first: everything else fits around it.
   let riserFrom = Infinity;
+  let climax: number | null = null;
   if (input.climax !== null && input.climax > 0.5 && input.climax < input.duration + 0.01) {
+    climax = input.climax;
     const at = input.climax;
     const length = Math.min(d.riser, at - 0.1);
     if (length >= 1) {
@@ -147,19 +158,27 @@ export function planSoundDesign(input: SoundDesignInput): SfxCue[] {
     .map((m) => ({ m, priority: clamp01(m.strength) + KIND_BONUS[m.kind] }))
     .filter(({ m }) => m.kind !== "cut" || m.strength >= d.cutFloor)
     .sort((a, b) => b.priority - a.priority || a.m.time - b.m.time);
-  const accepted: { m: SoundMoment; priority: number }[] = [];
+  const accepted: { m: SoundMoment; priority: number; impact: "hit" | "accent" | null }[] = [];
   const taken: number[] = [...hits];
   for (const entry of ranked) {
     const t = entry.m.time;
     if (!free(t)) continue;
+    // Impacts go to the strongest moments first; a flash frame is a hit by nature and may come twice as close.
+    const hitGap = entry.m.kind === "flash" ? d.hitGap / 2 : d.hitGap;
+    const hitAllowed = impacts.every((x) => Math.abs(x - t) >= hitGap);
+    const wantsHit = entry.m.kind === "flash" || (entry.m.kind === "cut" && entry.m.strength >= d.hitFloor);
+    const impact = wantsHit && hitAllowed ? "hit" : entry.m.kind === "flash" ? "accent" : null;
+    // The riser carries its stretch: only impacts land inside it (hype keeps everything).
+    if (impact !== "hit" && t >= riserFrom && t < (climax ?? Infinity) && input.intensity !== "hype") continue;
     const speech = inSpeech(input.speech, t);
     // Clicks and pops under someone speaking compete with the words.
     if (speech && entry.m.kind === "title" && input.intensity !== "hype") continue;
     const gap = speech ? d.gap * 1.5 : d.gap;
     if (entry.priority < MUST_PRIORITY && taken.some((x) => Math.abs(x - t) < gap)) continue;
-    accepted.push(entry);
+    accepted.push({ ...entry, impact });
     taken.push(t);
     hits.push(t);
+    if (impact === "hit") impacts.push(t);
   }
 
   // Assign effects in time order, so the variation runs along the edit.
@@ -168,30 +187,25 @@ export function planSoundDesign(input: SoundDesignInput): SfxCue[] {
   let titleTurn = 0;
   const recentWhooshes: string[] = [];
   const recentHits: string[] = [];
-  for (const { m, priority } of accepted) {
+  for (const { m, priority, impact } of accepted) {
     const t = m.time;
     const seed = Math.floor(rng.next() * 1e6);
     const pitch = Math.round(rng.range(-1.5, 1.5) * 10) / 10;
     const brightness = Math.round(rng.range(0.4, 0.65) * 100) / 100;
     const base = { seed, pitch, brightness, intensity: d.drive };
-    const duringRiser = t >= riserFrom && t < (input.climax ?? Infinity);
-    // A flash frame is a hit by nature: it may come twice as close to the last one.
-    const hitGap = m.kind === "flash" ? d.hitGap / 2 : d.hitGap;
-    const hitAllowed = impacts.every((x) => Math.abs(x - t) >= hitGap);
-    if (m.kind === "flash" || (m.kind === "cut" && m.strength >= d.hitFloor && hitAllowed)) {
-      if (!hitAllowed && m.kind === "flash") {
-        // A flash too close to another hit still gets a bright accent, not a second boom.
-        cues.push({ recipe: "whip", at: t, params: { ...base, pan: (side = -side) * 0.6 }, gainDb: 0, reason: "flash (accent: a hit just played)" });
-        continue;
-      }
+    const duringRiser = t >= riserFrom && t < (climax ?? Infinity);
+    if (impact === "accent") {
+      // A flash too close to another hit still gets a bright accent, not a second boom.
+      cues.push({ recipe: "whip", at: t, params: { ...base, pan: (side = -side) * 0.6 }, gainDb: 0, reason: "flash (accent: a hit just played)" });
+      continue;
+    }
+    if (impact === "hit") {
       const lead = m.before ?? 0;
       const combo = input.intensity !== "subtle" && m.kind === "cut" && lead >= 1 && priority >= 0.9 && !duringRiser;
       const recipe = combo ? "swoosh_hit" : input.intensity === "subtle" ? "impact_thud" : vary(["impact_punch", "impact_punch", "impact_thud"], recentHits, rng);
       cues.push({ recipe, at: t, params: { ...base, pitch: Math.min(pitch, 0.5), pan: combo ? (side = -side) * 0.5 : 0 }, gainDb: 0, reason: m.kind === "flash" ? "flash frame" : "strong cut" });
-      impacts.push(t);
       continue;
     }
-    if (duringRiser && input.intensity !== "hype") continue; // the riser carries this stretch
     if (m.kind === "title") {
       const recipe = (["swish_airy", "ui_tap", "pop"] as const)[titleTurn % 3]!;
       titleTurn += 1;
@@ -211,7 +225,8 @@ export function planSoundDesign(input: SoundDesignInput): SfxCue[] {
     cue.gainDb = Math.round((recipe.mixDb + d.gain + cue.gainDb + speech) * 10) / 10;
     if (cue.params.seed !== undefined) cue.params.seed = Math.floor(cue.params.seed);
   }
-  return cues.sort((a, b) => a.at - b.at || a.recipe.localeCompare(b.recipe));
+  cues.sort((a, b) => a.at - b.at || a.recipe.localeCompare(b.recipe));
+  return { cues, climax, riser: Number.isFinite(riserFrom) };
 }
 
 /** One analysed beat of the music bed on the timeline. */

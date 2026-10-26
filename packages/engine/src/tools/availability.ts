@@ -198,7 +198,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   auto_sound_design_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],
-    partialNote: "without audio decoding cuts are weighed without the music's beats and the climax comes only from `beats` / `climax_seconds`",
+    partialNote: "without audio decoding cuts are weighed by `beats` (when given) instead of the music, and the climax comes only from `climax_seconds`",
   },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],

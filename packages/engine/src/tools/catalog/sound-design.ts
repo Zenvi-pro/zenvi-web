@@ -25,7 +25,7 @@ import { getEffectiveAiMetadata } from "../ai-metadata.js";
 import { MUSIC_MIN_DURATION, classifyClipAudioRole, speechWindowsFromCues } from "../audio-mix.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
-import { applied, failed, refused, type ReceiptClip } from "../receipt.js";
+import { applied, failed, refused, unchanged, type ReceiptClip } from "../receipt.js";
 import { placeSfx, prepareSfx, removeUnusedSfxFiles, snapToFrame, type PreparedSfx } from "../sfx-media.js";
 import { fileById } from "./common.js";
 
@@ -139,11 +139,17 @@ interface MusicAnalysis {
   note?: string;
 }
 
+/** The music's beats on the timeline and its climax: given beats win for the grid; the bed still gives the climax when it can be analysed. */
 async function analyseMusic(call: ToolCall, bed: Clip | undefined, args: AutoInput, duration: number): Promise<MusicAnalysis> {
+  const tracked = await trackBed(call, bed, duration);
   if (args.beats && args.beats.length >= 2) {
     const beats = [...args.beats].sort((a, b) => a - b);
-    return { grid: { beats, downbeats: beats.filter((_, i) => i % 4 === 0) }, climax: null };
+    return { ...tracked, grid: { beats, downbeats: beats.filter((_, i) => i % 4 === 0) }, note: undefined };
   }
+  return tracked;
+}
+
+async function trackBed(call: ToolCall, bed: Clip | undefined, duration: number): Promise<MusicAnalysis> {
   if (!bed) return { grid: null, climax: null };
   if (!canTrackBeats(call)) return { grid: null, climax: null, note: "This surface cannot analyse audio: cuts are weighed without the music's beats and no climax was found (pass beats / climax_seconds)." };
   const file = fileById(call.doc.project, String(bed.file_id))!;
@@ -245,13 +251,14 @@ export const soundDesignTools: CatalogTool[] = [
       const gainDb = args.gain_db ?? recipe.mixDb;
       const align = args.align ?? "peak";
 
+      // A riser ends on its moment: at the very start of the timeline nothing of it would play.
+      if (align === "peak" && recipe.hit === "end" && at < 0.05) return refused(ADD, "Error: a riser ends on its moment, so at 0 s nothing of it would play; pick a later moment or align=start.");
       let sound: PreparedSfx;
       try {
         [sound] = (await prepareSfx(call, [{ recipe: recipe.id, params: paramsOf(args) }])) as [PreparedSfx];
       } catch (error) {
         return failed(ADD, `Error: failed to store the sound effect: ${errorText(error)}`);
       }
-      if (align === "peak" && at - sound.hit < -(sound.duration - 0.01)) return refused(ADD, "Error: the sound would end before the timeline starts; pick a later moment or align=start.");
       const cached = sound.fileId !== undefined;
       const clip = call.commit((tx) => placeSfx(tx, sound, { at, align, gainDb, auto: false }), `Add ${recipe.title.toLowerCase()}`);
       if (!clip) return refused(ADD, "Error: nothing of the sound is left on the timeline at that moment.");
@@ -280,8 +287,13 @@ export const soundDesignTools: CatalogTool[] = [
       const locked = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
       if (previous.some((c) => locked.has(c.layer))) return refused(AUTO, "Error: the previous automatic sound effects are on a locked track; unlock it to replace them.");
 
+      // The edit lasts as long as its picture: a long untrimmed music bed does not stretch it.
       const content = project.clips.filter((c) => !isSfxClip(c));
-      const duration = content.reduce((end, c) => Math.max(end, c.position + (c.end - c.start)), 0);
+      const visual = content.filter((c) => {
+        const file = fileById(project, String(c.file_id));
+        return file ? !isAudioOnlyMedia(file) : true;
+      });
+      const duration = (visual.length > 0 ? visual : content).reduce((end, c) => Math.max(end, c.position + (c.end - c.start)), 0);
       if (duration <= 0) return refused(AUTO, "Error: the timeline is empty: there is nothing to sound-design.");
       const intensity = args.intensity ?? "normal";
       const warnings: string[] = [];
@@ -296,10 +308,11 @@ export const soundDesignTools: CatalogTool[] = [
       if (moments.length === 0 && climax === null) {
         return refused(AUTO, "Error: nothing to sound-design: the timeline has no cuts, transitions, titles or flashes, and no climax (pass climax_seconds).");
       }
-      const cues = planSoundDesign({ moments, duration, climax, music: bed !== undefined, speech: speechWindows(project), intensity, seed: args.seed ?? 1 }).map((cue) => ({
-        ...cue,
-        at: snapToFrame(project, cue.at),
-      }));
+      const plan = planSoundDesign({ moments, duration, climax, music: bed !== undefined, speech: speechWindows(project), intensity, seed: args.seed ?? 1 });
+      const cues = plan.cues.map((cue) => ({ ...cue, at: snapToFrame(project, cue.at) }));
+      if (cues.length === 0 && previous.length === 0) {
+        return unchanged(AUTO, `No sound effects at ${intensity} intensity: no moment of this edit is strong enough. Try intensity=hype.`, { warnings });
+      }
 
       let sounds: PreparedSfx[];
       try {
@@ -311,13 +324,13 @@ export const soundDesignTools: CatalogTool[] = [
 
       const placed = call.commit((tx) => {
         if (previous.length > 0) deleteClips(tx, previous.map((c) => c.id), { ripple: false });
-        const rows: { clip: Clip; cue: SfxCue }[] = [];
+        const rows: { clip: Clip; cue: SfxCue; hit: number }[] = [];
         cues.forEach((cue, i) => {
           // A moment too close to the start for the sound's lead-in starts the sound instead of cutting into it.
           const sound = sounds[i]!;
           const align = cue.at >= sound.hit ? "peak" : "start";
           const clip = placeSfx(tx, sound, { at: cue.at, align, gainDb: cue.gainDb, auto: true, reason: cue.reason });
-          if (clip) rows.push({ clip, cue });
+          if (clip) rows.push({ clip, cue, hit: align === "peak" ? cue.at : cue.at + sound.hit });
         });
         const removedFiles = removeUnusedSfxFiles(tx);
         return { rows, removedFiles };
@@ -326,18 +339,20 @@ export const soundDesignTools: CatalogTool[] = [
       const after = call.doc.project;
       const summary =
         `Sound-designed the edit (${intensity}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
-        (climax !== null ? `, a build into the climax at ${climax.toFixed(2)} s` : "") +
+        (plan.climax !== null ? `, ${plan.riser ? "a build into the climax and an impact on it" : "an impact on the climax"} at ${plan.climax.toFixed(2)} s` : "") +
         (previous.length > 0 ? `; replaced ${previous.length} from the last run` : "") +
         ".";
       return applied(AUTO, summary, {
         warnings,
-        clips: placed.rows.slice(0, 30).map(({ clip, cue }) => clipRow(after, clip, { recipe: cue.recipe, hit_seconds: cue.at, gain_db: cue.gainDb, reason: cue.reason })),
+        clips: placed.rows.slice(0, 30).map(({ clip, cue, hit }) => clipRow(after, clip, { recipe: cue.recipe, hit_seconds: hit, gain_db: cue.gainDb, reason: cue.reason })),
         ...(placed.rows.length > 30 ? { clipsNote: `${placed.rows.length - 30} more in data.cues` } : {}),
         data: {
           intensity,
-          cues: placed.rows.map(({ clip, cue }) => ({ clip_id: clip.id, recipe: cue.recipe, at: cue.at, gain_db: cue.gainDb, reason: cue.reason })),
+          // `at` is the moment; `hit_seconds` where the sound's hit plays (later when the moment is too early for its lead-in).
+          cues: placed.rows.map(({ clip, cue, hit }) => ({ clip_id: clip.id, recipe: cue.recipe, at: cue.at, hit_seconds: hit, gain_db: cue.gainDb, reason: cue.reason })),
           music: bed ? { clip_id: bed.id, bpm: music.bpm ?? null, beats_analysed: music.grid !== null } : null,
-          climax,
+          climax: plan.climax,
+          riser: plan.riser,
           moments: moments.length,
           replaced_clip_ids: previous.map((c) => c.id),
           removed_file_ids: placed.removedFiles,

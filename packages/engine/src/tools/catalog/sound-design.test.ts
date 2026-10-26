@@ -5,6 +5,7 @@ import { createProject } from "../../model/defaults.js";
 import type { Clip, Project } from "../../model/types.js";
 import { addClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
+import { addTrack } from "../../ops/tracks.js";
 import { addMarker } from "../../ops/markers.js";
 import { isAutoSfxClip, isSfxClip } from "../../sfx/moments.js";
 import { MIN_TRANSIENT_GAP } from "../../sfx/plan.js";
@@ -137,6 +138,17 @@ describe("add_sfx_tool", () => {
     expect(whoosh.start).toBeCloseTo(hitOf(doc, whoosh) - 0.1, 6);
   });
 
+  it("numbers a new lane after the highest one", async () => {
+    const doc = editProject();
+    doc.transaction("lanes", (tx) => {
+      addTrack(tx, { label: "SFX" });
+      addTrack(tx, { label: "SFX 3" });
+    });
+    const host = fakeHost();
+    for (let i = 0; i < 3; i += 1) expect((await runTool({ doc, host }, "add_sfx_tool", { recipe: "pop", at_seconds: 4 })).ok).toBe(true);
+    expect(doc.project.layers.map((l) => l.label).filter((l) => /^SFX/.test(String(l))).sort()).toEqual(["SFX", "SFX 3", "SFX 4"]);
+  });
+
   it("refuses bad targets without touching history or writing media", async () => {
     for (const args of [
       { recipe: "pop" },
@@ -145,6 +157,7 @@ describe("add_sfx_tool", () => {
       { recipe: "pop", marker_id: "NOPE" },
       { recipe: "pop", at_seconds: 1, edge: "end" },
       { recipe: "nope", at_seconds: 1 },
+      { recipe: "riser_noise", at_seconds: 0 },
     ]) {
       const doc = editProject();
       const host = fakeHost();
@@ -242,6 +255,47 @@ describe("auto_sound_design_tool", () => {
     const d = data<{ climax: number; cues: { recipe: string; at: number }[] }>(given);
     expect(d.climax).toBe(16);
     expect(d.cues.some((c) => c.recipe === "impact_boom" && c.at === 16)).toBe(true);
+  });
+
+  it("keeps the climax from the music when beats are given, and measures the edit by its picture", async () => {
+    const doc = editProject();
+    // Stretch the music bed far past the picture: the climax must still land inside the 20 s edit.
+    doc.transaction("longer bed", (tx) => tx.update(["clips", { id: "MUSICCLIP1" }], { end: 30 }));
+    const result = await runTool({ doc, host: withAudio(fakeHost()) }, "auto_sound_design_tool", { beats: Array.from({ length: 40 }, (_, i) => i * 0.5) });
+    expect(result.ok, result.text).toBe(true);
+    const d = data<{ climax: number; riser: boolean }>(result);
+    expect(d.climax).toBeCloseTo(12, 1);
+    expect(d.riser).toBe(true);
+    const sfxEnd = Math.max(...sfxClips(doc).filter((c) => c.title === "Impact, boom").map((c) => c.position));
+    expect(sfxEnd).toBeLessThan(20);
+  });
+
+  it("reports where each hit really plays, and does not claim a build it did not place", async () => {
+    const doc = editProject();
+    const result = await runTool({ doc, host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { climax_seconds: "0.3", intensity: "hype" });
+    expect(result.ok, result.text).toBe(true);
+    expect((result.data as { summary: string }).summary).not.toMatch(/climax/);
+    expect(data<{ climax: number | null }>(result).climax).toBeNull();
+    for (const c of data<{ cues: { clip_id: string; hit_seconds: number }[] }>(result).cues) {
+      const clip = doc.project.clips.find((x) => x.id === c.clip_id)!;
+      expect(clip.position - clip.start + hitOf(doc, clip)).toBeCloseTo(c.hit_seconds, 6);
+    }
+  });
+
+  it("changes nothing when no moment is strong enough", async () => {
+    const doc = new ProjectDocument(createProject({ id: "QUIETPROJ1" }));
+    doc.transaction("one shot", (tx) => {
+      addFile(tx, media("/media/aa.mp4", videoInfo("/media/aa.mp4", 30)), { id: "SHOTAAXXXX" });
+      addClip(tx, { fileId: "SHOTAAXXXX", position: 0, layer: tx.project.layers[0]!.number, start: 0, end: 10 });
+      addClip(tx, { fileId: "SHOTAAXXXX", position: 10, layer: tx.project.layers[0]!.number, start: 10, end: 20 });
+    });
+    const host = fakeHost();
+    const before = doc.undoLabels.length;
+    const result = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "subtle" });
+    expect(result.ok, result.text).toBe(true);
+    expect((result.data as { status: string }).status).toBe("unchanged");
+    expect(doc.undoLabels).toHaveLength(before);
+    expect(host.written.size).toBe(0);
   });
 
   it("refuses an empty timeline and a climax past the end, leaving history untouched", async () => {

@@ -398,11 +398,11 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
       kick(v, { at: 0.002, from: 160, to: 70, pitchTau: 0.03, decay: 0.06, level: 0.25, drive: 1.5 });
       modal(v, { at: 0.002, freqs: [220, 440 * 1.01, 660, 1320], decays: [0.4, 0.25, 0.15, 0.08], amps: [0.3, 0.2, 0.15, 0.1], level: 0.4 * v.intensity });
       addReverb(v.out, { room: 0.95, damp: 0.35, wet: 3.5 });
-      // Keep mostly the tail: it is what swells once reversed.
+      // The tail is what swells once reversed; a sliver of the dry hit stays so the swell ends with a snap on the cut.
       const s = sr(v);
       for (let i = 0; i < v.out.length; i += 1) {
         const t = i / s;
-        const g = clamp01((t - 0.01) / 0.08) * clamp01((d - t) / (0.3 * d));
+        const g = clamp01((t - 0.002) / 0.012) * clamp01((d - t) / (0.3 * d));
         v.out.left[i] = v.out.left[i]! * g;
         v.out.right[i] = v.out.right[i]! * g;
       }

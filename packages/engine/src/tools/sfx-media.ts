@@ -131,7 +131,9 @@ function laneFor(tx: Transaction, from: number, to: number): number {
   const free = lanes.find((l) => !l.lock && !overlaps(tx.project, l.number, from, to));
   if (free) return free.number;
   const top = lanes[lanes.length - 1];
-  const label = lanes.length === 0 ? SFX_TRACK_LABEL : `${SFX_TRACK_LABEL} ${lanes.length + 1}`;
+  // Next number after the highest lane ("SFX" counts as 1), so a gap never repeats a label.
+  const highest = Math.max(0, ...lanes.map((l) => Number(LANE.exec(String(l.label ?? "").trim())?.[1] ?? 1)));
+  const label = lanes.length === 0 ? SFX_TRACK_LABEL : `${SFX_TRACK_LABEL} ${highest + 1}`;
   return addTrack(tx, top ? { above: top.number, label } : { label }).number;
 }
 
