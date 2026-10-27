@@ -114,6 +114,11 @@ describe.skipIf(!blender || !hasFfmpeg)("Blender smoke", () => {
       const bad = parseScene3dParams("model_showcase", { model: broken });
       if (!bad.ok) throw new Error(bad.error);
       await expect(renderer.render({ scene: "model_showcase", params: bad.params, files: { model: broken }, width: 64, height: 64, fps: { num: 30, den: 1 }, frames: 2, quality: "draft", media: {} })).rejects.toThrow(/Blender could not import broken\.fbx/);
+      // No file: the generic product renders, standing on its floor.
+      const product = parseScene3dParams("model_showcase", { product: "speaker", background: "light" });
+      if (!product.ok) throw new Error(product.error);
+      const p = await renderer.render({ scene: "model_showcase", params: product.params, width: 96, height: 96, fps: { num: 30, den: 1 }, frames: 2, quality: "draft", media: {} });
+      expect(p.codec).toBe("h264");
       await expect(renderer.render({ scene: "model_showcase", params: bad.params, files: { model: path.join(root, "gone.glb") }, width: 64, height: 64, fps: { num: 30, den: 1 }, frames: 2, quality: "draft", media: {} })).rejects.toThrow(/does not exist/);
     } finally {
       renderer.close();
