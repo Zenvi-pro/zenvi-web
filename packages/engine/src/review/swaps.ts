@@ -10,7 +10,8 @@
  * timeline review in, suggestions out.
  */
 
-import type { Project, ProjectFile } from "../model/types.js";
+import type { Clip, Project, ProjectFile } from "../model/types.js";
+import { fpsFloat } from "../timeline/time.js";
 import { getMediaType } from "../model/media.js";
 import type { TimelineReview } from "./types.js";
 
@@ -71,9 +72,35 @@ export function freeInPoint(duration: number, used: readonly [number, number][],
 }
 
 /**
+ * The clips a shot plays: its clip, and the clips of the same file on the
+ * same track it runs on into (a clip split where it plays on is one shot in
+ * the review, timeline.ts), in timeline order.
+ */
+function piecesOf(project: Project, clipId: string, shotEnd: number): Clip[] {
+  const clips = project.clips ?? [];
+  const first = clips.find((c) => String(c.id) === clipId);
+  if (!first) return [];
+  const fps = fpsFloat(project.fps) || 30;
+  const pieces = [first];
+  for (;;) {
+    const last = pieces[pieces.length - 1]!;
+    const lastEnd = Number(last.position) + Number(last.end) - Number(last.start);
+    if (lastEnd >= shotEnd - 1.5 / fps) break;
+    const next = clips.find(
+      (c) => c.layer === last.layer && c.file_id === last.file_id && Math.abs(Number(c.position) - lastEnd) <= 1.5 / fps && Math.abs(Number(c.start) - Number(last.end)) <= 1.5 / fps,
+    );
+    if (!next || pieces.includes(next)) break;
+    pieces.push(next);
+  }
+  return pieces;
+}
+
+/**
  * One swap per shot in `toFix` (`ReviewShot.index`es), in time order,
  * each with a different replacement; a clip seen in two shots (around an
- * overlay) gets one. Shots with nothing left to swap in are left out.
+ * overlay) gets one. A shot played by a clip split in two gets one swap per
+ * half, the second half's in-point following on from the first's, so the
+ * shot still plays on. Shots with nothing left to swap in are left out.
  */
 export function swapSuggestions(project: Project, review: TimelineReview, toFix: readonly number[]): ShotSwap[] {
   const files = new Map((project.files ?? []).map((f) => [String(f.id), f]));
@@ -89,8 +116,8 @@ export function swapSuggestions(project: Project, review: TimelineReview, toFix:
   for (const shot of shots) {
     // The swap changes the whole clip, which may run on under other shots: one swap per clip.
     if (out.some((s) => s.clip_id === shot.clipId)) continue;
-    const clip = (project.clips ?? []).find((c) => String(c.id) === shot.clipId);
-    const length = clip ? Number(clip.end) - Number(clip.start) : shot.sourceEnd - shot.sourceStart;
+    const pieces = piecesOf(project, shot.clipId, shot.end);
+    const length = pieces.length > 0 ? pieces.reduce((n, c) => n + Number(c.end) - Number(c.start), 0) : shot.sourceEnd - shot.sourceStart;
     let swap: Pick<ShotSwap, "to_file_id" | "to_name" | "start_seconds" | "why"> | null = null;
     const fresh = unused.findIndex((f) => isStill(f) || (Number(f.duration) || 0) >= length);
     if (fresh >= 0) {
@@ -104,7 +131,11 @@ export function swapSuggestions(project: Project, review: TimelineReview, toFix:
     }
     if (!swap) continue;
     shown.set(swap.to_file_id, [...(shown.get(swap.to_file_id) ?? []), [swap.start_seconds, swap.start_seconds + length]]);
-    out.push({ clip_id: shot.clipId, at: shot.start, file_id: shot.fileId, name: shot.name, ...swap });
+    const from = Number(pieces[0]?.start ?? 0);
+    for (const piece of pieces.length > 0 ? pieces : [{ id: shot.clipId, start: from }]) {
+      const offset = isStill(files.get(swap.to_file_id)!) ? 0 : Number(piece.start) - from;
+      out.push({ clip_id: String(piece.id), at: shot.start, file_id: shot.fileId, name: shot.name, ...swap, start_seconds: round3(swap.start_seconds + offset) });
+    }
   }
   return out;
 }

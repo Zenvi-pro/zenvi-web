@@ -42,6 +42,27 @@ describe("swap suggestions", () => {
     expect(swapSuggestions(doc.project, review, repeats).map((s) => s.clip_id)).toEqual(["CLIPA00002"]);
   });
 
+  it("swaps both halves of a clip split where it plays on, the second following on from the first", async () => {
+    const doc = new ProjectDocument(repeatedCut(["video"]));
+    // A's repeat split at 5 s: one shot in the review (CLIPA00002 then CLIPA00003), played as one take.
+    doc.transaction("split", (tx) => {
+      tx.update(["clips", { id: "CLIPA00002" }], { end: 2 });
+      addClip(tx, { fileId: "FILEAAAAAA", position: 5, layer: L1, start: 2, end: 3, id: "CLIPA00003" });
+    });
+    const review = reviewTimeline(doc.project);
+    const shot = review.shots.find((s) => s.clipId === "CLIPA00002")!;
+    expect(shot.end).toBe(6);
+    const swaps = swapSuggestions(doc.project, review, [shot.index]);
+    // The 2 s take gets one fresh stretch of the unused clip (1.2-3.2), split where the clip is.
+    expect(swaps.map((s) => [s.clip_id, s.to_file_id, s.start_seconds])).toEqual([
+      ["CLIPA00002", "FILEXTRA00", 1.2],
+      ["CLIPA00003", "FILEXTRA00", 2.2],
+    ]);
+    for (const s of swaps) expect((await runTool({ doc, host: fakeHost() }, "swap_shot_tool", { clip_id: s.clip_id, file_id: s.to_file_id, start_seconds: s.start_seconds })).ok).toBe(true);
+    const after = reviewTimeline(doc.project).shots.find((s) => s.start === 4)!;
+    expect(after).toMatchObject({ fileId: "FILEXTRA00", end: 6, sourceStart: 1.2, sourceEnd: 3.2 });
+  });
+
   it("the suggested call fixes the repeat in one undo step, keeping the cut", async () => {
     const doc = new ProjectDocument(repeatedCut(["video"]));
     const [swap] = swapSuggestions(doc.project, reviewTimeline(doc.project), [2]);
