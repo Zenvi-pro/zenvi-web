@@ -168,3 +168,22 @@ describe.skipIf(!blender || !hasFfmpeg)("Blender smoke: terrain_glide", () => {
     }
   });
 });
+
+describe.skipIf(!blender || !hasFfmpeg)("Blender smoke: counters and card stacks", () => {
+  it.each([
+    ["numerals_3d", { values: [0, 9.5, 1234.25], decimals: 2, prefix: "$", suffix: "km/h" }],
+    ["card_stack", { kind: "paper", animation: "fan", count: 4 }],
+  ] as const)("%s renders", async (scene, params) => {
+    const root = await mkdtemp(path.join(tmpdir(), "zenvi-scenes3d-smoke-"));
+    const renderer = createScene3dRenderer({ blender: blender!, cacheDir: root, tempDir: root, resolveMedia: (p) => p });
+    try {
+      const parsed = parseScene3dParams(scene, params);
+      if (!parsed.ok) throw new Error(parsed.error);
+      const r = await renderer.render({ scene, params: parsed.params, width: 96, height: 96, fps: { num: 30, den: 1 }, frames: 2, quality: "draft", media: {} });
+      expect(r).toMatchObject({ codec: "prores4444", frames: 2 });
+      expect(probe(r.path).pix_fmt).toMatch(/^yuva444p1[02]le$/);
+    } finally {
+      renderer.close();
+    }
+  });
+});

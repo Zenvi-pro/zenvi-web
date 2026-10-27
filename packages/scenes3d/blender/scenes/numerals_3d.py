@@ -151,7 +151,8 @@ def build(job):
     enter = 2
     stagger = int(round(STAGGER * fps))
     last_hold = int(round(0.3 * frames))
-    step = max(3, (frames - enter - last_hold) / len(values))
+    # The drums start one after another: the last one's lag comes out of the steps, not the hold.
+    step = max(3, (frames - enter - last_hold - stagger * (len(drums) - 1)) / len(values))
     roll = max(2, min(int(round(ROLL * fps)), int(step * 0.8) - stagger * (len(drums) - 1)))
     changes = [enter + int(round(i * step)) for i in range(len(values))]
     # Every drum starts on its blank and rolls in to the first value.
