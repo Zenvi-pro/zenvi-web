@@ -14,7 +14,8 @@ this skill is for edits that must hold up next to a professional one.
 
 Pick the genre, then **read its recipe now with the Read tool**:
 `<this skill's base directory>/recipes/<file>.md` (the recipes are part of this
-skill, not the user's files). The recipe has the structure in seconds, the
+skill, not the user's files; an MCP client without the plugin reads the same
+recipe as the resource `zenvi://director/<genre>`). The recipe has the structure in seconds, the
 shot lengths, the sound plan and the exact tool calls; the rest of this file
 is the rules every genre shares. Do not plan before you have read it.
 

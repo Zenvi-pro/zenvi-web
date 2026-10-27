@@ -75,7 +75,8 @@ kinetic_captions_tool {"timeline_clip_ids": ["<head clip>"], "style": "creator",
    "animation": "slam", "position_seconds": 0, "duration_seconds": 1.2}`.
    Without `kinetic_captions_tool` (it refuses
    when the host cannot store drawings): `add_captions_tool` (`cues`,
-   `maxWords: 1`, `text_size: 0.065`) for the connectors and `add_title_tool`
+   `maxWords: 1`, `text_size: 0.065`: above TASTE's 0.045-0.055 rail size on purpose, at 0.05
+   the bench frames read too small in Arial Black on 9:16) for the connectors and `add_title_tool`
    (`font: "Anton"`, red, `font_scale` 3-4) per emphasis word.
 5. Card: real words, never grey placeholder lines: `add_motion_block_tool`
    `block: "glass_cards"`, `placement: "full_frame"`, the talking head as
