@@ -189,12 +189,15 @@ function mediaLayer(el: Element, source: MediaSource, keys: Key[], frame: Motion
     const aspect = croppedAspect(source);
     const fit = fittedSize(aspect, 1, frame);
     const rest = source.width / fit.width;
+    // A negative scale mirrors a centred clip in place (libopenshot draws it leftward / upward from the centre anchor).
+    const fx = source.flip?.x ? -1 : 1;
+    const fy = source.flip?.y ? -1 : 1;
     props = {
       scale: ScaleMode.FIT,
       gravity: Gravity.CENTER,
       ...keyframeProps(frames, eases, {
-        scale_x: pose((p) => rest * sOf(p) * sxOf(p)),
-        scale_y: pose((p) => rest * sOf(p)),
+        scale_x: pose((p) => fx * rest * sOf(p) * sxOf(p)),
+        scale_y: pose((p) => fy * rest * sOf(p)),
         location_x: pose((p) => (p.x - frame.width / 2) / frame.width),
         location_y: pose((p) => (p.y - frame.height / 2) / frame.height),
         alpha: pose((p) => p.alpha),

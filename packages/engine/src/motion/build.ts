@@ -80,7 +80,14 @@
  *              tile is a media element (Crop to its shape, corner_radius, keyed pose);
  *              a wipe is a second Crop that does not resize; a tile growing to the
  *              frame keys corner_radius to 0 (Pose.radius). No tile has a short side
- *              under 13 % of the frame's short side.
+ *              under 13 % of the frame's short side. repeat and kaleidoscope tile one
+ *              clip: each copy's in-point is the field's clock at its reveal (in-point +
+ *              template time × speed + index × phase), so copies stay in step; mirrored
+ *              tiles are negative scale_x / scale_y (centred gravity mirrors in place);
+ *              a kaleidoscope's segments share one Crop window whose mirror lines meet
+ *              at the shot's centre; gapless fields grow each tile 1u under its
+ *              neighbours. drift keys every tile through one linear camera (still
+ *              stretches linear, a key on the last frame).
  *   tracks     `MotionPlan.tracks` stacked on the lowest free tracks above the
  *              video (add_motion_template_tool); a reel puts its music bed
  *              lowest and the scenes above it (build_reel_tool).

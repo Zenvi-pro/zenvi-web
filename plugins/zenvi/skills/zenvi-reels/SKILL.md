@@ -127,6 +127,21 @@ with the last tile growing to the full frame, `zoom_into=N` with the camera
 pushing into tile N. Tiles stay at least 13 % of the frame's short side; the
 tool refuses layouts that would be smaller.
 
+For the multiplicity look (one shot repeated into a field, brutalist facades
+into infinity) use `layout=repeat` with one clip in `file_ids`: `tiles` 2-16
+copies arrive one per beat on one clock (`phase=0.15` puts each copy 0.15 s
+ahead so they move out of phase), `mirror=true` mirrors alternate copies so
+edges meet, `steps=[4,16]` multiplies the field on a beat. `layout=kaleidoscope`
+folds the shot into 2/4/6/8 mirrored segments meeting at its centre (or
+`points=[{x,y}]`), all on the beat; `steps=[2,4,8]` re-folds it. `drift=in`
+(or out, left, right, up, down) moves a slow camera over the whole field.
+Shots looking up at towers or straight at a facade fold best. The trend's
+teal is a dark, near-monochrome teal, not teal-orange: grade every clip with
+`color_grade_clip_tool scope=all lut=dark_&_moody/teal_horror lut_intensity=1
+exposure=-0.6 contrast=0.3 saturation=0.6 wheels={"global":{"color":"#1f8a80","amount":0.45},"shadows":{"color":"#0a4a46","amount":0.6}}`.
+The LUT alone, or `look=moody` with wheels under 0.4, stays nearly neutral,
+and saturation below 0.4 washes the wheels' teal out again.
+
 The receipt has `data.brief`, `data.beats` (the timeline's beat grid: put
 anything else that should land on the beat there) and `data.shots`.
 
