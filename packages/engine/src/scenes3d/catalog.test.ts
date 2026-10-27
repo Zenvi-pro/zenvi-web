@@ -18,7 +18,7 @@ describe("parseScene3dParams", () => {
     const logo = parseScene3dParams("logo_extrude", {});
     const counter = parseScene3dParams("numerals_3d", { suffix: "kt" });
     const terrain = parseScene3dParams("terrain_glide", {});
-    expect(logo).toMatchObject({ ok: true, params: { size: 0.6, style: "chrome", animation: "tumble" } });
+    expect(logo).toMatchObject({ ok: true, params: { size: 0.7, style: "chrome", animation: "tumble" } });
     expect(counter).toMatchObject({ ok: true, params: { size: 0.8, values: [0, 100], decimals: 0, suffix: "kt" } });
     expect(terrain).toMatchObject({ ok: true, params: { background: "light", surface: "grass" } });
   });
@@ -31,5 +31,11 @@ describe("parseScene3dParams", () => {
     if (!title.ok) throw new Error(title.error);
     expect(scene3dFiles("title_3d", title.params)).toEqual({});
     expect(parseScene3dParams("logo_extrude", { svg: "logo.png" })).toMatchObject({ ok: false, error: expect.stringContaining("svg: give a .svg file") });
+  });
+
+  it("suggests the key a guessed one means", () => {
+    expect(parseScene3dParams("model_showcase", { staging: "table" })).toMatchObject({ ok: false, error: expect.stringContaining('(did you mean stage?)') });
+    expect(parseScene3dParams("card_stack", { colour: "#FF0000" })).toMatchObject({ ok: false, error: expect.stringContaining("(did you mean colors?)") });
+    expect(parseScene3dParams("title_3d", { text: "Hi", zzz: 1 })).toMatchObject({ ok: false, error: expect.not.stringContaining("did you mean") });
   });
 });

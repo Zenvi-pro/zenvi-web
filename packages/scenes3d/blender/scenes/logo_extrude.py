@@ -157,7 +157,7 @@ def build(job):
     lights.studio(scale=max(1.0, width / 2), rim_color=p.get("rim") or "#CFE0FF", energy=0.35 if style in ("chrome", "iridescent") else 1.0)
     core.studio_world(job, strength=1.8 if style == "chrome" else 1.0, spin_degrees=150 if style in ("chrome", "iridescent", "glass") else 60)
     cam, aim = camera.camera(lens=55, location=(0, -10, 0), dof=0.5 if p.get("dof", True) and job["quality"] == "final" else None)
-    dist = camera.compose(cam, width, height, float(p.get("size", 0.6)), max_height=0.62)
+    dist = camera.compose(cam, width, height, float(p.get("size", 0.7)), max_height=0.62)
     if p.get("shadow", True):
         blob = shapes.shadow_blob("Shadow", width * 1.05, max(0.6, width * 0.35), strength=0.5, location=(0, 0.1, -0.5 * height - 0.18 * min(width, height)))
         motion.animate(blob, "scale", [(1, (0.001, max(0.6, width * 0.35), 1)), (1 + int(round(1.0 * fps)), (width * 1.05, max(0.6, width * 0.35), 1))], "out")

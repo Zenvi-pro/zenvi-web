@@ -100,6 +100,13 @@ function planMedia(project: Project, scene: Scene3dId, params: Scene3dParams, du
     return null;
   };
   const p = params as Record<string, unknown>;
+  if (scene === "numerals_3d") {
+    const fps = fpsOf(project);
+    const need = counterMinFrames(p, fps);
+    if (Math.round((duration * fps.num) / fps.den) < need) {
+      return `numerals_3d needs at least ${((need * fps.den) / fps.num).toFixed(2)}s to show all ${((p.values as unknown[] | undefined) ?? [0, 100]).length} values: give a longer duration_seconds or fewer values`;
+    }
+  }
   if (scene === "device_mockup" && typeof p.file_id === "string") {
     const error = add("screen", p.file_id, Number(p.media_start_seconds) || 0);
     if (error) return error;
@@ -173,6 +180,26 @@ function needsHost(call: ToolCall, tool: string): ReturnType<typeof unavailable>
   return null;
 }
 
+/** `"%.*f" % (decimals, value)` as numerals_3d.py prints it: an exact tie rounds to even there, up in `toFixed` (1.25 → "1.2", not "1.3"). */
+function printfFixed(value: number, decimals: number): string {
+  const exact = Math.abs(value).toFixed(100);
+  const cut = exact.indexOf(".") + 1 + decimals;
+  if (!/^50*$/.test(exact.slice(cut))) return Math.abs(value).toFixed(decimals);
+  const kept = exact.slice(0, cut).replace(/\.$/, "");
+  return Number(kept[kept.length - 1]) % 2 === 0 ? kept : Math.abs(value).toFixed(decimals);
+}
+
+/**
+ * Frames numerals_3d needs to land its last value: a 2-frame entry, at least 3 frames per change, one stagger per drum
+ * and a 2-frame roll (numerals_3d.py `build`, STAGGER 0.05 s). Shorter renders would end before the last value shows.
+ */
+function counterMinFrames(params: Record<string, unknown>, fps: { num: number; den: number }): number {
+  const values = (params.values as number[] | undefined) ?? [0, 100];
+  const decimals = Number(params.decimals) || 0;
+  const drums = Math.max(...values.map((v) => printfFixed(v, decimals).split(".")[0]!.length)) + decimals;
+  return 2 + 3 * (values.length - 1) + Math.round((0.05 * fps.num) / fps.den) * (drums - 1) + 2 + 1;
+}
+
 function clipTitle(scene: Scene3dId, params: Scene3dParams): string {
   const p = params as Record<string, unknown>;
   if (typeof p.text === "string") return `3D ${p.text}`;
@@ -180,7 +207,7 @@ function clipTitle(scene: Scene3dId, params: Scene3dParams): string {
   if (file) return `3D ${file.split(/[\\/]/).pop()}`;
   if (Array.isArray(p.values) && p.values.length > 0) {
     // As the counter shows it (numerals_3d.py formats every value with the same decimals).
-    const last = Number(p.values[p.values.length - 1]).toFixed(Number(p.decimals) || 0);
+    const last = printfFixed(Number(p.values[p.values.length - 1]), Number(p.decimals) || 0);
     return `3D ${typeof p.prefix === "string" ? p.prefix : ""}${last}${typeof p.suffix === "string" ? p.suffix : ""}`;
   }
   return SCENE3D_INFO[scene].title;
@@ -208,7 +235,7 @@ export const scenes3dTools: CatalogTool[] = [
     description:
       "Render a Zenvi 3D scene with Blender and place it on the timeline in one undo step: an extruded chrome/glass title tumbling in, a phone/tablet/laptop playing a bin video while the camera glides, " +
       "cards floating in depth with depth of field, an icon cube that spins and explodes, a 3D cube turn between two clips (cube_cut, placed over their cut), a glass/chrome hero object, a confetti/sparks/shards burst, " +
-      "the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model or a generic music player / speaker on a turntable, landing on a table, or in x-ray (model_showcase), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack). " +
+      "the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model or a generic music player / speaker, on a turntable, in x-ray, or spinning in and landing for a product reveal (model_showcase move=hero, the default without a model file), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack). " +
       "Transparent scenes render with alpha (ProRes 4444) and go on the lowest free track above the video; with background dark/light/#rrggbb they are opaque full-frame. " +
       "Use quality=draft (seconds) to check the look with preview_frame, then rerender_3d_scene_tool quality=final. list_3d_scenes_tool lists every param.",
     input: addInput,

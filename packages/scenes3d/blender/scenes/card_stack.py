@@ -6,6 +6,7 @@ import math
 import random
 
 import bpy
+from mathutils import Vector
 
 from zenvi3d import camera, core, lights, materials, motion, palette, shapes
 
@@ -44,9 +45,86 @@ def face_material(i, item, aspect, color, kind):
         return materials.card(item, aspect, name="Face%d" % i, gloss=0.35 if kind == "card" else 0.6, lift=0.15)
     if kind == "paper":
         return paper_material("Paper%d" % i, lines=i % 3 != 2)
-    # Satin card stock: seen from above the faces mirror the studio's top light, so keep the sheen low.
+    return designed_face(i, color)
+
+
+def blend(a, b, t):
+    """#rrggbb part way (t) from a to b."""
+    ca = [int(a[k:k + 2], 16) for k in (1, 3, 5)]
+    cb = [int(b[k:k + 2], 16) for k in (1, 3, 5)]
+    return "#%02X%02X%02X" % tuple(round(x + (y - x) * t) for x, y in zip(ca, cb))
+
+
+def rounded_rect(tree, uv, centre, half, radius):
+    """1 inside a rounded rectangle of UV space, 0 outside, a soft pixel edge."""
+    rel = tree.nodes.new("ShaderNodeVectorMath")
+    rel.operation = "SUBTRACT"
+    tree.links.new(uv, rel.inputs[0])
+    rel.inputs[1].default_value = (centre[0], centre[1], 0.0)
+    q = tree.nodes.new("ShaderNodeVectorMath")
+    q.operation = "ABSOLUTE"
+    tree.links.new(rel.outputs[0], q.inputs[0])
+    inset = tree.nodes.new("ShaderNodeVectorMath")
+    inset.operation = "SUBTRACT"
+    tree.links.new(q.outputs[0], inset.inputs[0])
+    inset.inputs[1].default_value = (half[0] - radius, half[1] - radius, 0.0)
+    outside = tree.nodes.new("ShaderNodeVectorMath")
+    outside.operation = "MAXIMUM"
+    tree.links.new(inset.outputs[0], outside.inputs[0])
+    outside.inputs[1].default_value = (0.0, 0.0, 0.0)
+    length = tree.nodes.new("ShaderNodeVectorMath")
+    length.operation = "LENGTH"
+    tree.links.new(outside.outputs[0], length.inputs[0])
+    return core.map_range(tree, length.outputs["Value"], radius + 0.003, radius - 0.003)
+
+
+def designed_face(i, color):
+    """A designed card, not a blank: a soft tint of the colour, a picture
+    block (a gradient of the colour), a title line and two text lines in a
+    deep shade of it. Satin stock: seen from above the faces mirror the
+    studio's top light, so the sheen stays low."""
     mat = materials.plastic(color, roughness=0.55, coat=0.0, name="Face%d" % i)
-    mat.node_tree.nodes["Principled BSDF"].inputs["Specular IOR Level"].default_value = 0.25
+    tree = mat.node_tree
+    b = tree.nodes["Principled BSDF"]
+    b.inputs["Specular IOR Level"].default_value = 0.25
+    coord = tree.nodes.new("ShaderNodeTexCoord")
+    uv = coord.outputs["UV"]
+    paper, ink = blend(color, "#FFFFFF", 0.72), blend(color, "#11151A", 0.72)
+    sep = tree.nodes.new("ShaderNodeSeparateXYZ")
+    tree.links.new(uv, sep.inputs["Vector"])
+    # The picture: the colour deepening down and across, with a pale sun.
+    shade = tree.nodes.new("ShaderNodeMix")
+    shade.data_type = "RGBA"
+    tree.links.new(core.math_node(tree, "MULTIPLY", core.math_node(tree, "ADD", sep.outputs["Y"], sep.outputs["X"]), 0.6), shade.inputs["Factor"])
+    shade.inputs[6].default_value = core.rgb(blend(color, "#11151A", 0.4), 1.0)
+    shade.inputs[7].default_value = core.rgb(color, 1.0)
+    sun = rounded_rect(tree, uv, (0.7, 0.74), (0.07, 0.07), 0.07)
+    picture = tree.nodes.new("ShaderNodeMix")
+    picture.data_type = "RGBA"
+    tree.links.new(sun, picture.inputs["Factor"])
+    tree.links.new(shade.outputs[2], picture.inputs[6])
+    picture.inputs[7].default_value = core.rgb(blend(color, "#FFFFFF", 0.7), 1.0)
+    layers = [
+        (rounded_rect(tree, uv, (0.5, 0.65), (0.4, 0.25), 0.035), picture.outputs[2]),
+        (rounded_rect(tree, uv, (0.37, 0.31), (0.27, 0.035), 0.03), ink),
+        (rounded_rect(tree, uv, (0.43, 0.21), (0.33, 0.017), 0.017), blend(ink, paper, 0.55)),
+        (rounded_rect(tree, uv, (0.33, 0.145), (0.23, 0.017), 0.017), blend(ink, paper, 0.55)),
+    ]
+    out = None
+    for mask, fill in layers:
+        mix = tree.nodes.new("ShaderNodeMix")
+        mix.data_type = "RGBA"
+        tree.links.new(mask, mix.inputs["Factor"])
+        if out is None:
+            mix.inputs[6].default_value = core.rgb(paper, 1.0)
+        else:
+            tree.links.new(out, mix.inputs[6])
+        if isinstance(fill, str):
+            mix.inputs[7].default_value = core.rgb(fill, 1.0)
+        else:
+            tree.links.new(fill, mix.inputs[7])
+        out = mix.outputs[2]
+    tree.links.new(out, b.inputs["Base Color"])
     return mat
 
 
@@ -158,10 +236,16 @@ def build(job):
         ground = shapes.shadow_blob("Contact", footprint_w * 1.25, h * 1.3, strength=0.35, location=(0, 0.12 * h if fan else 0, 0.0002))
         ground.rotation_euler = (0, 0, rest[0][1])
 
+    # Frame the stack as it ends (landed, fanned), as the camera sees it from above.
+    scene = bpy.context.scene
+    scene.frame_set(frames)
+    corners = [c.matrix_world @ Vector(b) for c in cards for b in c.bound_box]
+    scene.frame_set(1)
+    lo = Vector([min(v[i] for v in corners) for i in range(3)])
+    hi = Vector([max(v[i] for v in corners) for i in range(3)])
+    target = tuple((lo + hi) / 2)
     elevation = float(p.get("elevation", 52))
-    target = (0, -0.05 * h if not fan else 0.12 * h, 0.0)
     cam, aim = camera.camera(lens=50, target=target, dof=2.0 if p.get("dof", True) and job["quality"] == "final" else None)
-    # The near end of the stack looms larger in perspective: leave room for it.
-    depth_seen = h * (1.6 if fan else 1.35) * math.sin(math.radians(elevation)) + count * thick
-    dist = camera.compose(cam, footprint_w * 1.05, depth_seen, float(p.get("size", 0.75)), max_height=0.8)
-    motion.animate(cam, "location", [(1, lights.orbit_point(dist * 1.04, -22, elevation + 3, target)), (frames, lights.orbit_point(dist * 0.97, -10, elevation, target))], "in-out")
+    end_dir = Vector(lights.orbit_point(1.0, -10, elevation))
+    dist = camera.fit_points(cam, target, end_dir, corners, float(p.get("size", 0.66)), max_height=0.95)
+    motion.animate(cam, "location", [(1, lights.orbit_point(dist * 1.06, -22, elevation + 3, target)), (frames, lights.orbit_point(dist, -10, elevation, target))], "in-out")

@@ -142,7 +142,7 @@ describe.skipIf(!blender || !hasFfmpeg)("Blender smoke", () => {
     }
   });
 
-  it("extrudes an SVG logo that settles at 50-70 % of the safe width", async () => {
+  it("extrudes an SVG logo that settles at about 70 % of the safe width", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "zenvi-scenes3d-smoke-"));
     const svg = path.join(root, "mark.svg");
     await writeFile(svg, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100"><circle cx="50" cy="50" r="45" fill="#FF5A36"/><rect x="110" y="5" width="85" height="90" rx="12" fill="#2F6BFF"/></svg>`);
@@ -153,8 +153,8 @@ describe.skipIf(!blender || !hasFfmpeg)("Blender smoke", () => {
       // 45 frames: landed (1 s) and settled (0.25 s) before the last one.
       const r = await renderer.render({ scene: "logo_extrude", params: parsed.params, files: { svg }, width: 216, height: 384, fps: { num: 30, den: 1 }, frames: 45, quality: "draft", media: {} });
       const { share, cy } = inkBox(r.path, 44, r.width, r.height);
-      expect(share).toBeGreaterThan(0.5);
-      expect(share).toBeLessThan(0.7);
+      expect(share).toBeGreaterThan(0.6);
+      expect(share).toBeLessThan(0.8);
       expect(cy).toBeGreaterThan(0.36);
       expect(cy).toBeLessThan(0.48);
     } finally {

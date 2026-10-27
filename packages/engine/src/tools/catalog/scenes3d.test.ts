@@ -153,7 +153,7 @@ describe("add_3d_scene_tool", () => {
     expect(requests[1]!.files).toEqual({ svg: "/brand/mark.svg" });
     const word = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "logo_extrude", params: { text: "Zenvi", animation: "assemble" } });
     expect(requests[2]!.files).toEqual({});
-    expect((dataOf(word) as { params: { size: number } }).params.size).toBe(0.6);
+    expect((dataOf(word) as { params: { size: number } }).params.size).toBe(0.7);
     const cards = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "card_stack", params: { file_ids: [IDS.logo, IDS.broll] } });
     expect(cards.ok, cards.text).toBe(true);
     expect(Object.keys(requests[3]!.media)).toEqual(["card0", "card1"]);
@@ -167,6 +167,9 @@ describe("add_3d_scene_tool", () => {
     const counter = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "numerals_3d", params: { values: [0, 5], decimals: 1, prefix: "$", suffix: "M" } });
     const titles = [model, logo, word, counter].map((r) => doc.project.clips.find((c) => c.id === (dataOf(r) as { timeline_clip_id: string }).timeline_clip_id)!.title);
     expect(titles).toEqual(["3D engine.glb", "3D mark.svg", "3D Zenvi", "3D $5.0M"]);
+    // An exact tie rounds to even, as Python's "%.*f" draws it.
+    const tie = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "numerals_3d", params: { values: [1.25], decimals: 1 } });
+    expect(doc.project.clips.find((c) => c.id === (dataOf(tie) as { timeline_clip_id: string }).timeline_clip_id)!.title).toBe("3D 1.2");
   });
 
   it("refuses model formats Blender cannot import and a transparent terrain before rendering", async () => {
@@ -180,6 +183,9 @@ describe("add_3d_scene_tool", () => {
     expect(sky.text).toContain("background:");
     const counter = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "numerals_3d", params: { values: [-3] } });
     expect(counter.text).toContain("values.0:");
+    // Eight values cannot all land in 0.2 s; the render would end before the last one shows.
+    const rushed = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "numerals_3d", params: { values: [1, 2, 3, 4, 5, 6, 7, 8] }, duration_seconds: 0.2 });
+    expect(rushed.text).toContain("numerals_3d needs at least");
     expect(requests).toHaveLength(0);
     expect(doc.undoLabels).toEqual([]);
   });
