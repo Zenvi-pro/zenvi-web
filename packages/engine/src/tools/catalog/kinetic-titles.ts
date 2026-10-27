@@ -5,7 +5,9 @@
  * apart, so a title takes any caption animation (pop, slam, tilt,
  * typewriter, scramble, letters...) and stays native outlined-SVG clips
  * with keyframes. Scramble and letters move every word of a title, not only
- * the emphasis words. The clips and drawing files are tagged
+ * the emphasis words. `background` puts a full-frame colour card under it
+ * (the video essay's red chapter card); on a light card the words default
+ * to near-black. The clips and drawing files are tagged
  * `zenvi_kinetic_title`.
  */
 
@@ -25,6 +27,12 @@ import { emphasisArg, kineticTag, matteOf } from "./kinetic-captions.js";
 import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
 
 const TOOL = "add_kinetic_title_tool";
+
+/** Relative luminance of #rrggbb, 0-1. */
+function luminance(hex: string): number {
+  const c = (i: number) => Number.parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16) / 255;
+  return 0.2126 * c(0) + 0.7152 * c(1) + 0.0722 * c(2);
+}
 const TRACK_LABEL = "Titles";
 /** Tag on the clips and drawing files this tool makes. */
 export const KINETIC_TITLE_KEY = "zenvi_kinetic_title";
@@ -59,7 +67,8 @@ const input = z.strictObject({
     .optional()
     .describe("Words set in the emphasis face and accent: auto (default: the strongest word), none, or a list."),
   accent: z.string().max(40).optional().describe("Emphasis colour (#rrggbb or a name; default per style)."),
-  ink: z.string().max(40).optional().describe("Colour of the other words (default white)."),
+  ink: z.string().max(40).optional().describe("Colour of the other words (default white; near-black on a light background)."),
+  background: z.string().max(40).optional().describe("A full-frame colour card under the title for its length (#rrggbb or a name): a chapter card, e.g. #d4141c red with one huge word. Default none: the title sits over the picture."),
   text_size: z.number().min(0.015).max(0.3).optional().describe(`Size of the plain words, share of the frame's short side (style default: ${TITLE_STYLE_IDS.map((id) => `${id} ${share(id)}`).join(", ")}); emphasis words keep their ratio.`),
   y: unit.optional().describe("Vertical centre, 0 top - 1 bottom (default: the style's spots, in the shot's calmest area). Kept inside the title-safe area."),
   avoid: z
@@ -77,7 +86,7 @@ export const kineticTitleTools: CatalogTool[] = [
     title: "Add kinetic title",
     description:
       "A title card whose words move like reference reels' type instead of fading: each word (or letter) its own outlined SVG title clip with keyframes, native and editable on every Zenvi surface. " +
-      "Pick an animation (pop, slam, slide_up, rise, fade, tilt, typewriter, scramble, letters) and a style; words enter stagger_seconds apart, the emphasis word in the display face. Placed in the safe area over the shot's calm negative space. " +
+      "Pick an animation (pop, slam, slide_up, rise, fade, tilt, typewriter, scramble, letters) and a style; words enter stagger_seconds apart, the emphasis word in the display face. Placed in the safe area over the shot's calm negative space, or on a full-frame colour card (background: a red chapter card, a light end card). " +
       "One undo step. For speech use kinetic_captions_tool; for a word behind a person text_behind_subject_tool.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -90,8 +99,8 @@ export const kineticTitleTools: CatalogTool[] = [
       const animation = args.animation ?? OWN_ANIMATION[style];
       const parts = args.text.split(/\s+/).filter(Boolean);
       if (parts.length > 12) return refused(TOOL, `Error: a title has at most 12 words (got ${parts.length}); split it into two titles.`);
-      const colours: { ink?: string; accent?: string } = {};
-      for (const key of ["ink", "accent"] as const) {
+      const colours: { ink?: string; accent?: string; background?: string } = {};
+      for (const key of ["ink", "accent", "background"] as const) {
         if (args[key] === undefined) continue;
         try {
           colours[key] = colorHexAlpha(args[key], key)[0];
@@ -111,7 +120,12 @@ export const kineticTitleTools: CatalogTool[] = [
       const [width, height] = projectSize(project);
       const fpsFraction = projectFps(project);
       const fps = fpsFraction.num / fpsFraction.den;
-      const scenes = await captionScenes(call, project, start, start + duration, (c) => kineticTag(c) !== undefined, (c) => matteOf(project, c));
+      // A card hides the picture: nothing to place around.
+      const scenes = colours.background ? [] : await captionScenes(call, project, start, start + duration, (c) => kineticTag(c) !== undefined, (c) => matteOf(project, c));
+      const { background, ...type } = colours;
+      if (background && type.ink === undefined && luminance(background) > 0.6) type.ink = "#111111";
+      // On a card the emphasis word is the card's ink: an accent on a coloured field fights it.
+      if (background && type.accent === undefined) type.accent = type.ink ?? "#ffffff";
       let built: KineticCaptionPlan;
       try {
         built = buildKineticCaptions({
@@ -120,7 +134,8 @@ export const kineticTitleTools: CatalogTool[] = [
           style,
           emphasis: emphasisArg(args.emphasis),
           avoid: (args.avoid ?? []) as AvoidBox[],
-          ...colours,
+          ...type,
+          ...(background ? { backdrop: background } : {}),
           size: (args.text_size ?? baseShare(style)) / (CAPTION_STYLES[style].base.size / 1080),
           ...(args.y !== undefined ? { y: args.y } : {}),
           motion: CAPTION_ANIMATIONS[animation].motion,

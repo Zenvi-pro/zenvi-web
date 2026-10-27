@@ -35,6 +35,24 @@ describe("add_kinetic_title_tool", () => {
     expect(h!).toBeGreaterThan(0.05);
   });
 
+  it("sets a chapter card: the colour full frame under the word, the word in the card's ink", async () => {
+    const d = doc();
+    const h = fakeHost();
+    const r = await runTool({ doc: d, host: h }, "add_kinetic_title_tool", { text: "DOUBT", style: "stack", animation: "slam", background: "#d4141c", duration_seconds: 1.2 });
+    expect(r.ok, r.text).toBe(true);
+    const svgs = [...h.written.values()].map((v) => (typeof v === "string" ? v : new TextDecoder().decode(v)));
+    expect(svgs.some((svg) => svg.includes("#d4141c") && svg.includes('width="1920"'))).toBe(true);
+    // The emphasis word takes the ink (white), not the red accent, on a red card; no frame reading behind a card.
+    expect(svgs.some((svg) => svg.includes("#ff2d2d"))).toBe(false);
+    expect(h.calls.some((c) => c.startsWith("renderFrame"))).toBe(false);
+    const card = d.project.clips.reduce((a, b) => (Number(b.layer) < Number(a.layer) ? b : a));
+    expect(Number(card.end) - Number(card.start)).toBeCloseTo(1.2, 1);
+    // A light card: near-black words.
+    const light = fakeHost();
+    await runTool({ doc: doc(), host: light }, "add_kinetic_title_tool", { text: "The bet was right.", style: "editorial", background: "#f4f2ee" });
+    expect([...light.written.values()].map((v) => (typeof v === "string" ? v : new TextDecoder().decode(v))).some((svg) => svg.includes("#111111"))).toBe(true);
+  });
+
   it("refuses a long text or a bad colour without touching the project", async () => {
     const d = doc();
     const before = snapshotOf(d.project);

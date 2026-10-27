@@ -3469,7 +3469,8 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `stagger_seconds` | number |  | Seconds between one word's entrance and the next (default 0.12; 0: all at once). (min 0, max 1) |
 | `emphasis` | string \| string[] |  | Words set in the emphasis face and accent: auto (default: the strongest word), none, or a list. |
 | `accent` | string |  | Emphasis colour (#rrggbb or a name; default per style). |
-| `ink` | string |  | Colour of the other words (default white). |
+| `ink` | string |  | Colour of the other words (default white; near-black on a light background). |
+| `background` | string |  | A full-frame colour card under the title for its length (#rrggbb or a name): a chapter card, e.g. #d4141c red with one huge word. Default none: the title sits over the picture. |
 | `text_size` | number |  | Size of the plain words, share of the frame's short side (style default: stack 0.167, creator 0.074, editorial 0.111, documentary 0.064); emphasis words keep their ratio. (min 0.015, max 0.3) |
 | `y` | number |  | Vertical centre, 0 top - 1 bottom (default: the style's spots, in the shot's calmest area). Kept inside the title-safe area. (min 0, max 1) |
 | `avoid` | object[] |  | Boxes to keep the title off, 0-1 of the frame (centre x, y and size w, h): a face, a product. |

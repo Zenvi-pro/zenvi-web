@@ -24,7 +24,10 @@
  *
  * placement auto reads the shots first (../caption-scenes.ts): the head
  * from the matte when no avoid box is given, and the calmest of the
- * style's spots.
+ * style's spots. Without avoid boxes it first makes the footage's subject
+ * matte where the host can (the matte tools' generate, added to the bin in
+ * the captions' undo step): without a head to keep off, calm and dark
+ * often means the speaker's shirt.
  */
 
 import { z } from "zod";
@@ -37,6 +40,7 @@ import { idFactory } from "../../model/ids.js";
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
 import { deleteClips, duplicateClip } from "../../ops/clips.js";
 import { removeFile, updateFile } from "../../ops/files.js";
+import { ProjectDocument } from "../../history/document.js";
 import { patchClip } from "../../ops/internal.js";
 import { ensureTrack } from "../../ops/overlays.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
@@ -46,6 +50,9 @@ import { colorHexAlpha, constantKeyframe, isLocked, projectSize, trackInfo } fro
 import { clipTarget, isTalkingFootage, isWordSource, wordsFor, wordsForClip } from "../transcripts.js";
 import { projectFps } from "../frame-time.js";
 import { captionScenes } from "../caption-scenes.js";
+import { addMatteFile, matteableClipProblem } from "../mattes.js";
+import type { GeneratedMatte } from "../types.js";
+import { autoScale } from "./mattes.js";
 import { isFootage } from "./color-unify.js";
 import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
 
@@ -174,6 +181,15 @@ function previous(project: Project, scope: Scope): { clips: Clip[]; files: Proje
   return { clips, files, partly: project.clips.filter((c) => is(c, "partly")) };
 }
 
+/** `project` with `made` mattes in its bin (a scratch copy: what the commit will add). */
+function withMattes(project: Project, made: readonly { source: ProjectFile; matte: GeneratedMatte; scale: 1 | 0.5 }[]): Project {
+  const scratch = new ProjectDocument(structuredClone(project), { historyLimit: 0 });
+  scratch.transaction("mattes", (tx) => {
+    for (const m of made) addMatteFile(tx, m.source, m.matte, "person", m.scale);
+  });
+  return scratch.project;
+}
+
 function withoutPrevious(project: Project, old: { clips: Clip[]; files: ProjectFile[] }): Project {
   const clipIds = new Set(old.clips.map((c) => c.id));
   const fileIds = new Set(old.files.map((f) => f.id));
@@ -296,11 +312,29 @@ export const kineticCaptionTools: CatalogTool[] = [
           return refused(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}.`);
         }
       }
+      // Mattes the host makes now for placement (auto, no avoid boxes): footage with none yet.
+      const warnings: string[] = [];
+      const made: { source: ProjectFile; matte: GeneratedMatte; scale: 1 | 0.5 }[] = [];
+      const host = call.host.mattes;
+      if ((args.placement ?? "auto") === "auto" && (args.avoid ?? []).length === 0 && host?.subjects.includes("person")) {
+        for (const clip of clips) {
+          const source = project.files.find((f) => f.id === clip.file_id);
+          if (!source || matteOf(project, clip) || matteableClipProblem(project, clip) || made.some((m) => m.source.id === source.id)) continue;
+          const scale = autoScale(source);
+          try {
+            made.push({ source, matte: await host.generate(source.path, { subject: "person", scale, signal: call.signal }), scale });
+          } catch (error) {
+            warnings.push(`no subject matte of ${source.name ?? source.id} (${error instanceof Error ? error.message : String(error)}): captions placed without the head`);
+          }
+        }
+      }
+      // The bin as it will be, with those mattes, for reading the shots and finding mattes below.
+      const binned = made.length === 0 ? project : withMattes(project, made);
       const mattes = new Map<string, ProjectFile>();
       const behindArg = args.behind_subject ?? (DISPLAY_EMPHASIS.has(style) ? "auto" : "none");
       if (behindArg !== "none") {
         for (const clip of clips) {
-          const matte = matteOf(project, clip);
+          const matte = matteOf(binned, clip);
           if (matte) mattes.set(clip.id, matte);
           else if (behindArg !== "auto") return refused(TOOL, `Error: behind_subject needs a subject matte of clip ${clip.id}'s footage, and the bin has none; make one with generate_subject_matte_tool, or drop behind_subject.`);
         }
@@ -313,7 +347,6 @@ export const kineticCaptionTools: CatalogTool[] = [
       const locked = old.clips.filter((c) => isLocked(project, c.layer));
       if (locked.length > 0) return refused(TOOL, `Error: earlier captions of these clips are on a locked track (${locked.map((c) => c.id).join(", ")}); unlock it first.`);
 
-      const warnings: string[] = [];
       const words = args.cues ? cueWords(args.cues, clips, args) : await wordsOf(call, clips, args, warnings);
       if (typeof words === "string") return refused(TOOL, words);
       if (words.length === 0) return refused(TOOL, "Error: no cue starts in the range given.");
@@ -327,7 +360,7 @@ export const kineticCaptionTools: CatalogTool[] = [
       const oldIds = new Set(old.clips.map((c) => c.id));
       const scenes =
         (args.placement ?? "auto") === "auto"
-          ? await captionScenes(call, project, words[0]!.start, words[words.length - 1]!.end + 1, (c) => oldIds.has(c.id) || kineticTag(c) !== undefined, (c) => matteOf(project, c))
+          ? await captionScenes(call, binned, words[0]!.start, words[words.length - 1]!.end + 1, (c) => oldIds.has(c.id) || kineticTag(c) !== undefined, (c) => matteOf(binned, c))
           : [];
       let built: KineticCaptionPlan;
       try {
@@ -366,6 +399,13 @@ export const kineticCaptionTools: CatalogTool[] = [
       const groupOf = (name: string) => built.groups[Number(/^g(\d+)/.exec(name)?.[1])]!;
 
       const result = await commitDrawn(call, written, (tx) => {
+        // The mattes made for this run join the bin; cut-outs read the bin's copies.
+        const added = new Map(made.map((m) => [m.source.id, addMatteFile(tx, m.source, m.matte, "person", m.scale)]));
+        for (const [id, matte] of mattes) {
+          const clip = clips.find((c) => c.id === id)!;
+          const fresh = added.get(clip.file_id);
+          if (fresh) mattes.set(id, fresh);
+        }
         for (const f of old.files) removeFile(tx, f.id);
         const leftover = old.clips.filter((c) => tx.project.clips.some((x) => x.id === c.id)).map((c) => c.id);
         if (leftover.length > 0) deleteClips(tx, leftover);
@@ -385,7 +425,7 @@ export const kineticCaptionTools: CatalogTool[] = [
           if (layer && !String(layer.label ?? "").trim()) tx.update(["layers", { id: layer.id }], { label: TRACK_LABEL });
         }
         const cutouts = cutLayer !== undefined ? clips.filter((c) => mattes.has(c.id)).map((c) => cutoutOf(tx, c, mattes.get(c.id)!, cutLayer, { source_clip_ids: [c.id], style, role: "cutout" })) : [];
-        return { placed, cutouts, replaced: old.clips.length };
+        return { placed, cutouts, replaced: old.clips.length, mattes: [...added.values()].map((f) => f.id) };
       }, `Add kinetic captions (${style})`);
 
       const doc = call.doc.project;
@@ -415,6 +455,7 @@ export const kineticCaptionTools: CatalogTool[] = [
             tracks: stack.layers.map((layer) => trackInfo(doc, layer)),
             created_clip_ids: [...result.placed.map((p) => p.clip.id), ...result.cutouts.map((c) => c.id)],
             cutout_clip_ids: result.cutouts.map((c) => c.id),
+            ...(result.mattes.length > 0 ? { matte_file_ids: result.mattes } : {}),
             groups: built.groups.map((g) => ({
               text: g.text,
               start: round(g.start),

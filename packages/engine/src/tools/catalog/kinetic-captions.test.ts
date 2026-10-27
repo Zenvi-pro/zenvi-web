@@ -211,6 +211,33 @@ describe("kinetic_captions_tool", () => {
     expect(asked.text).toContain("generate_subject_matte_tool");
   });
 
+  it("makes the footage's subject matte for placement where the host can, in the same undo step", async () => {
+    const { doc } = talking();
+    const h = host();
+    h.mattes = {
+      subjects: ["person"],
+      async generate(path, request) {
+        h.calls.push(`matte ${path} ${request.scale}`);
+        return { media: media("/media/talk-matte.mp4", videoInfo("/media/talk-matte.mp4", 10, { has_audio: false })), model: "test_matte", version: "0.1", license: "MIT", frames: 300, fps: 60 };
+      },
+    };
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator" });
+    expect(r.ok, r.text).toBe(true);
+    expect(h.calls.filter((c) => c.startsWith("matte "))).toEqual(["matte /media/talk.mp4 1"]);
+    const ids = dataOf(r).matte_file_ids as string[];
+    expect(ids).toHaveLength(1);
+    expect(dataOf(r).behind_subject).toBe("emphasis");
+    const cut = doc.project.clips.find((c) => kineticTag(c)?.role === "cutout")!;
+    expect(cut.effects?.at(-1)).toMatchObject({ type: "Mask", mask_reader: { id: ids[0] } });
+    expect(doc.undoLabels).toEqual(["Add kinetic captions (creator)"]);
+    doc.undo();
+    expect(doc.project.files.some((f) => f.id === ids[0])).toBe(false);
+    // Avoid boxes given: the captions keep off them and no matte is made.
+    h.calls.length = 0;
+    await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator", avoid: [{ x: 0.5, y: 0.3, w: 0.3, h: 0.3 }] });
+    expect(h.calls.some((c) => c.startsWith("matte "))).toBe(false);
+  });
+
   it("reads the shots to place the captions (placement auto), not with placement style", async () => {
     const { doc } = talking(true);
     const h = host();

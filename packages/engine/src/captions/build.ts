@@ -73,6 +73,8 @@ export interface KineticCaptionInput {
   groups?: readonly CaptionGroup[];
   /** Words whose letters move (scramble, stagger): the emphasis words (captions) or all (a title). Default emphasis. */
   letterWords?: "emphasis" | "all";
+  /** A full-frame card of this colour (#rrggbb) under the words for the whole plan (a title card); the words lose their shadow. */
+  backdrop?: string;
   /** Type size × the style's (emphasis words keep their ratio to the connectors). Default 1. */
   size?: number;
   /** Vertical centre of every group, share of the frame height, instead of the style's spots (still inside the safe area, still off the avoid boxes). */
@@ -247,8 +249,13 @@ interface Placement {
   overlap: number;
 }
 
-/** Cost a spot's later rank adds (0-1 scale of `cost`): a calmer spot must beat a preferred one by this much. */
-const RANK_COST = 0.04;
+/**
+ * Cost a spot's later rank adds (0-1 scale of `cost`): a calmer spot must
+ * beat a preferred one by this much. Without the shot's subject the picture
+ * alone cannot tell a dark wall from a dark shirt: the style's order counts
+ * for more.
+ */
+const RANK_COST = { subject: 0.04, picture: 0.15 } as const;
 
 /**
  * Where a `w` × `h` block goes: the first clear candidate centre, else the
@@ -256,7 +263,7 @@ const RANK_COST = 0.04;
  * cheapest of the candidates that overlap least, each later candidate a
  * little dearer.
  */
-function place(w: number, h: number, centres: readonly { x: number; y: number }[], safe: { left: number; top: number; right: number; bottom: number }, avoid: readonly Box[], cost?: (box: Box) => number): Placement {
+function place(w: number, h: number, centres: readonly { x: number; y: number }[], safe: { left: number; top: number; right: number; bottom: number }, avoid: readonly Box[], cost?: (box: Box) => number, rankCost: number = RANK_COST.subject): Placement {
   const all = centres.map((c, rank) => {
     const x = Math.min(Math.max(c.x - w / 2, safe.left), Math.max(safe.left, safe.right - w));
     const y = Math.min(Math.max(c.y - h / 2, safe.top), Math.max(safe.top, safe.bottom - h));
@@ -266,7 +273,7 @@ function place(w: number, h: number, centres: readonly { x: number; y: number }[
   const least = Math.min(...all.map((p) => p.overlap));
   if (!cost) return all.find((p) => p.overlap === 0) ?? all.find((p) => p.overlap === least)!;
   const level = all.filter((p) => p.overlap <= least + 1e-6);
-  const price = (p: (typeof all)[number]) => cost(p.box) + RANK_COST * p.rank;
+  const price = (p: (typeof all)[number]) => cost(p.box) + rankCost * p.rank;
   return level.reduce((a, b) => (price(b) < price(a) - 1e-9 ? b : a));
 }
 
@@ -382,8 +389,8 @@ function typingCrop(edges: readonly number[], step: number): Omit<Effect, "id"> 
   return { ...json, right: { Points: points } } as Omit<Effect, "id">;
 }
 
-/** Track numbers before compaction: words behind the cut-out lowest, then their letters, then the words in front, then theirs. */
-const TRACK = { under: 0, underLetters: 100, front: 500, frontLetters: 1000 } as const;
+/** Track numbers before compaction: a title's card lowest, words behind the cut-out, then their letters, then the words in front, then theirs. */
+const TRACK = { card: -1, under: 0, underLetters: 100, front: 500, frontLetters: 1000 } as const;
 
 /** Ink and advance box of one letter of a set word, in the word's block px. */
 function glyphBounds(b: TextBlock, g: TextBlock["glyphs"][number]): Box {
@@ -396,7 +403,13 @@ function glyphBounds(b: TextBlock, g: TextBlock["glyphs"][number]): Box {
 }
 
 export function buildKineticCaptions(input: KineticCaptionInput): KineticCaptionPlan {
-  const style: CaptionStyle = input.motion ? { ...CAPTION_STYLES[input.style], motion: input.motion } : CAPTION_STYLES[input.style];
+  const own = CAPTION_STYLES[input.style];
+  // A card is the title's alone: centred, as wide as the safe area allows, no legibility shadow (on a flat card it reads as a dirty outline).
+  // Display emphasis words may fill the card's width (twice the caption cap: the video essay's one huge word).
+  const card: Partial<CaptionStyle> = input.backdrop
+    ? { shadow: false, measure: 0.9, spots: { portrait: [{ x: 0.5, y: 0.5 }], landscape: [{ x: 0.5, y: 0.5 }] }, ...(own.emphasis.fillTo ? { emphasis: { ...own.emphasis, fillTo: own.emphasis.fillTo * 2 } } : {}) }
+    : {};
+  const style: CaptionStyle = { ...own, ...(input.motion ? { motion: input.motion } : {}), ...card };
   const { frame, lib } = input;
   const fps = frame.fps;
   const layout = { W: frame.width, H: frame.height };
@@ -433,9 +446,9 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     return out;
   };
   const portrait = H > W * 1.05;
-  const own = portrait ? style.spots.portrait : style.spots.landscape;
+  const ownSpots = portrait ? style.spots.portrait : style.spots.landscape;
   const behindAll = input.behind === true;
-  const spots = (behindAll ? [BEHIND[portrait ? "portrait" : "landscape"]] : input.y !== undefined ? [{ x: own[0]!.x, y: input.y }] : own).map((s) => ({ x: s.x * W, y: s.y * H }));
+  const spots = (behindAll ? [BEHIND[portrait ? "portrait" : "landscape"]] : input.y !== undefined ? [{ x: ownSpots[0]!.x, y: input.y }] : ownSpots).map((s) => ({ x: s.x * W, y: s.y * H }));
   const safeWidth = safe.right - safe.left;
   const letters = style.motion.letters;
   const tilt = style.motion.tilt;
@@ -457,6 +470,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     const subject = input.avoid[0] ?? scene.head;
     const avoid = given.length > 0 ? given : scene.head ? [toBox(scene.head)] : [];
     const cost = scene.cost ? (box: Box) => boxCost(scene.cost!, box, W, H) : undefined;
+    const rankCost = scene.subject ? RANK_COST.subject : RANK_COST.picture;
     // The emphasis words alone across the top of the head, the head hiding their lower third, where that reads: at
     // most a quarter of the word's box behind the subject (the matte's cover; without it, the head's box). Words
     // behind the head may rise into the top title margin (to 4 % of the frame) on frames without platform UI there:
@@ -499,7 +513,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
         for (const scale of [1, 0.85, 0.7]) {
           const b = layoutGroup(lib, style, rest, u, scale, style.measure * safeWidth);
           const centres = [...spots, { x: ex + eb.width / 2, y: ey - margin - b.height / 2 }, { x: ex + eb.width / 2, y: ey + eb.height + margin + b.height / 2 }, ...around(b)];
-          const p = place(b.width, b.height, centres, safe, [...avoid, eBox], cost);
+          const p = place(b.width, b.height, centres, safe, [...avoid, eBox], cost, rankCost);
           if (!best || p.overlap < best.overlap) best = { b, box: p.box, overlap: p.overlap };
           if (p.overlap === 0) break;
         }
@@ -533,7 +547,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
           }
           continue;
         }
-        const p = place(b.width, b.height, [...spots, ...around(b)], safe, avoid, cost);
+        const p = place(b.width, b.height, [...spots, ...around(b)], safe, avoid, cost, rankCost);
         if (!block || p.overlap < overlap) {
           block = b;
           overlap = p.overlap;
@@ -705,7 +719,18 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     }
   });
 
+  if (input.backdrop) {
+    const fill = input.backdrop;
+    elements.push({
+      name: "card",
+      track: TRACK.card,
+      from: 0,
+      to: prevEnd,
+      source: { kind: "svg", name: "card", width: W, height: H, cx: W / 2, cy: H / 2, draw: (k) => new Drawing(W, H, k).rect(0, 0, W, H, { fill }) },
+      keys: [{ frame: 0, pose: { x: W / 2, y: H / 2, s: 1, alpha: 1, rotation: 0 }, ease: "linear" }],
+    });
+  }
   const plan = planOf(`kinetic_captions_${style.id}`, prevEnd, elements, placed.map((p) => Math.round(p.start * fps) - f0), frame);
-  const under = behindAll ? plan.tracks : new Set(elements.filter((e) => e.track < TRACK.front).map((e) => e.track)).size;
+  const under = behindAll ? plan.tracks : new Set(elements.filter((e) => e.track >= TRACK.under && e.track < TRACK.front).map((e) => e.track)).size;
   return { plan, start: f0 / fps, groups: placed, missing: [...missing], under };
 }
