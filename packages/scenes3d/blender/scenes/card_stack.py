@@ -247,5 +247,5 @@ def build(job):
     elevation = float(p.get("elevation", 52))
     cam, aim = camera.camera(lens=50, target=target, dof=2.0 if p.get("dof", True) and job["quality"] == "final" else None)
     end_dir = Vector(lights.orbit_point(1.0, -10, elevation))
-    dist = camera.fit_points(cam, target, end_dir, corners, float(p.get("size", 0.66)), max_height=0.85)
+    dist = camera.fit_points(cam, target, end_dir, corners, float(p.get("size", 0.66)), max_height=0.95)
     motion.animate(cam, "location", [(1, lights.orbit_point(dist * 1.06, -22, elevation + 3, target)), (frames, lights.orbit_point(dist, -10, elevation, target))], "in-out")
