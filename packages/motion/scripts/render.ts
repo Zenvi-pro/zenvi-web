@@ -7,7 +7,7 @@
  */
 
 import { parseArgs } from "node:util";
-import { renderBlock } from "../src/node/index.js";
+import { closeChrome, renderBlock } from "../src/node/index.js";
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
@@ -30,6 +30,7 @@ if (!id) throw new Error("usage: render.ts <block> [--size WxH] [--out file]");
 const [width, height] = values.size.split("x").map(Number) as [number, number];
 const media = Object.fromEntries((values.media ?? []).map((m) => m.split("=", 2) as [string, string]));
 const params = { ...(JSON.parse(values.params) as Record<string, unknown>), ...Object.fromEntries(Object.keys(media).map((k) => [k, k])) };
+// The render leaves its Chrome warm for a next one this script never makes: close it so the script exits.
 const result = await renderBlock(id, params, {
   width,
   height,
@@ -44,6 +45,6 @@ const result = await renderBlock(id, params, {
   onProgress: (done, total) => {
     if (done === total || done % 30 === 0) process.stderr.write(`\r${done}/${total} frames`);
   },
-});
+}).finally(closeChrome);
 process.stderr.write("\n");
 console.log(JSON.stringify({ path: result.path, codec: result.codec, size: `${result.width}x${result.height}`, frames: result.frames, cached: result.cached, renderSeconds: result.renderSeconds }));

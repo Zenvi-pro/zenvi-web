@@ -11,10 +11,11 @@ import { existsSync } from "node:fs";
 import { copyFile, link, mkdir, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { projectAssetsDir, type MotionBlockInfo, type MotionBlockParam, type MotionHost } from "@zenvi/engine";
+import { projectAssetsDir, type MotionBlockInfo, type MotionBlockParam, type MotionHost, type MotionRuntimeStatus } from "@zenvi/engine";
 import { fingerprint as fileFingerprint, probe } from "@zenvi/render-node";
 import { BLOCKS, getBlock } from "../catalog.js";
 import { allParams, checkParams, type BlockManifest } from "../params.js";
+import { CHROME_DOWNLOAD_MB, findChrome, installChrome } from "./chrome.js";
 import { renderBlock, type RenderBlockOptions } from "./render.js";
 
 export interface MotionHostOptions {
@@ -47,8 +48,18 @@ export function blockInfo(manifest: BlockManifest): MotionBlockInfo {
   return { id: manifest.id, version: manifest.version, title: manifest.title, description: manifest.description, tags: [...manifest.tags], params, duration: { ...manifest.duration }, aspects: [...manifest.aspects], alpha: manifest.alpha };
 }
 
+/** Headless Chrome, as the engine's tools describe it to an agent. */
+export async function runtimeStatus(env: NodeJS.ProcessEnv = process.env): Promise<MotionRuntimeStatus> {
+  const found = await findChrome(env);
+  if (found) return { ready: true, detail: `Headless Chrome is installed (${found}).`, path: found };
+  const named = env.ZENVI_CHROME?.trim();
+  if (named) return { ready: false, detail: `ZENVI_CHROME names ${named}, which does not exist: fix or unset it.` };
+  return { ready: false, detail: `Headless Chrome is not installed, so motion blocks cannot render yet. setup_motion_runtime_tool (or \`zenvi motion setup\`) downloads it: about ${CHROME_DOWNLOAD_MB} MB, once.`, downloadMb: CHROME_DOWNLOAD_MB };
+}
+
 export function createMotionHost(options: MotionHostOptions): MotionHost {
   const infos = BLOCKS.map(blockInfo);
+  let installing: Promise<MotionRuntimeStatus> | undefined;
   const linksDir = async (): Promise<string> => {
     const project = options.projectFile();
     const dir = project ? path.join(projectAssetsDir(project), "links", "zenvi-motion") : path.join(tmpdir(), "zenvi-media", "links", "zenvi-motion");
@@ -57,6 +68,19 @@ export function createMotionHost(options: MotionHostOptions): MotionHost {
   };
   return {
     blocks: () => infos,
+    runtime: () => runtimeStatus(options.env),
+    // Two calls at once share one download.
+    setup() {
+      installing ??= (async () => {
+        const status = await runtimeStatus(options.env);
+        if (status.ready || status.downloadMb === undefined) return status;
+        await installChrome(options.env);
+        return runtimeStatus(options.env);
+      })().finally(() => {
+        installing = undefined;
+      });
+      return installing;
+    },
     check(block, params) {
       const manifest = getBlock(block);
       if (!manifest) return { ok: false, error: `unknown motion block ${block}` };

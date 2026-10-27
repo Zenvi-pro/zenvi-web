@@ -30,6 +30,10 @@ const DIVERGENCES: [string, string][] = [
     "A call that sends `clip_id` instead is accepted (the desktop refuses it) when the tool has no `clip_id` and the call does not also send `timeline_clip_id`; the receipt's warnings say to use `timeline_clip_id`. The same for `clip_ids` and `timeline_clip_ids`.",
   ],
   [
+    "mcp_health_tool",
+    "There is no Qt main thread to ask, so `main_thread_timeout_seconds` is accepted and unused; the call answering is the health check. The receipt adds whether Zenvi Motion blocks can render here (`data.motion.runtime`, with a warning when headless Chrome is missing; `setup_motion_runtime_tool` installs it).",
+  ],
+  [
     "add_clip_to_timeline_tool",
     "Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2726), leaving a one-frame black/silent gap.",
   ],

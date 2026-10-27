@@ -1,6 +1,6 @@
 {
   "id": "kinetic_headline",
-  "version": 1,
+  "version": 2,
   "title": "Kinetic headline",
   "description": "A big editorial headline that builds word by word: rise out of a mask, blur in, scale pop or a wipe. Two faces: *starred words* switch to the condensed display face (or the serif italic, or just the accent colour). Fits the safe area on any aspect.",
   "tags": [
@@ -30,7 +30,7 @@
     "text": {
       "type": "string",
       "maxLength": 160,
-      "default": "Cut less. / *Say* more.",
+      "default": "Less noise. / *More* signal.",
       "description": "The headline. '/' breaks a line; *words* in stars get the emphasis face."
     },
     "kicker": {

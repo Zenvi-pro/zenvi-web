@@ -190,6 +190,91 @@ describe("motion block tools", () => {
   });
 });
 
+type Receipt = { status: string; summary: string; warnings: string[]; undoSteps: number; data?: Data };
+const receiptOf = (result: { data?: unknown }): Receipt => result.data as Receipt;
+
+describe("the motion runtime (headless Chrome)", () => {
+  it("is named in the block list when it is missing, with the size of the download", async () => {
+    const doc = project();
+    for (const args of [{}, { block: "kinetic_headline" }]) {
+      const listed = receiptOf(await runTool({ doc, host: host(fakeMotionHost({ installed: false })) }, "list_motion_blocks_tool", args));
+      expect(listed.summary).toContain("Warning: Headless Chrome is not installed");
+      expect(listed.summary).toContain("about 90 MB");
+      expect(listed.warnings).toHaveLength(1);
+      expect(listed.data?.runtime).toMatchObject({ ready: false, downloadMb: 90 });
+    }
+    const ready = receiptOf(await runTool({ doc, host: host() }, "list_motion_blocks_tool", {}));
+    expect(ready.summary).not.toContain("Warning");
+    expect(ready.warnings).toEqual([]);
+    expect(ready.data?.runtime).toMatchObject({ ready: true });
+  });
+
+  it("is silent on a host that renders elsewhere", async () => {
+    const listed = receiptOf(await runTool({ doc: project(), host: host(fakeMotionHost({ remote: true })) }, "list_motion_blocks_tool", {}));
+    expect(listed.warnings).toEqual([]);
+    expect(listed.data?.runtime).toBeUndefined();
+  });
+
+  it("is installed by setup_motion_runtime_tool, once, with no undo step", async () => {
+    const doc = project();
+    const motion = fakeMotionHost({ installed: false });
+    const done = receiptOf(await runTool({ doc, host: host(motion) }, "setup_motion_runtime_tool", {}));
+    expect(done).toMatchObject({ status: "applied", undoSteps: 0 });
+    expect(done.summary).toMatch(/^Installed headless Chrome\./);
+    expect(motion.setups).toBe(1);
+    expect(doc.undoLabels).toEqual([]);
+    const again = receiptOf(await runTool({ doc, host: host(motion) }, "setup_motion_runtime_tool", {}));
+    expect(again.status).toBe("unchanged");
+    expect(motion.setups).toBe(1);
+    expect(receiptOf(await runTool({ doc, host: host(motion) }, "list_motion_blocks_tool", {})).warnings).toEqual([]);
+  });
+
+  it("is never installed by anything but that call", async () => {
+    const motion = fakeMotionHost({ installed: false });
+    const h = host(motion);
+    const doc = project();
+    await runTool({ doc, host: h }, "list_motion_blocks_tool", {});
+    await runTool({ doc, host: h }, "mcp_health_tool", {});
+    expect(motion.setups).toBe(0);
+  });
+
+  it("is refused with a reason where the host renders for itself (cloud)", async () => {
+    const result = await runTool({ doc: project(), host: host(fakeMotionHost({ remote: true })) }, "setup_motion_runtime_tool", {});
+    expect(result.ok).toBe(false);
+    expect(receiptOf(result).summary).toMatch(/^Error: setup_motion_runtime_tool is not available in this Zenvi surface: this host renders motion blocks itself/);
+  });
+
+  it("reports a failed install and how to retry", async () => {
+    const motion = fakeMotionHost({ installed: false, setupError: "getaddrinfo ENOTFOUND storage.googleapis.com" });
+    const result = await runTool({ doc: project(), host: host(motion) }, "setup_motion_runtime_tool", {});
+    expect(result.ok).toBe(false);
+    expect(receiptOf(result).summary).toMatch(/^Error: the motion runtime could not be installed: getaddrinfo ENOTFOUND.*zenvi motion setup/);
+  });
+
+  it("is in mcp_health_tool", async () => {
+    const doc = project();
+    const missing = receiptOf(await runTool({ doc, host: host(fakeMotionHost({ installed: false })) }, "mcp_health_tool", {}));
+    expect(missing.summary).toMatch(/^Zenvi is up\. Zenvi Motion blocks: Headless Chrome is not installed/);
+    expect(missing.warnings).toHaveLength(1);
+    expect(missing.data).toMatchObject({ ok: true, motion: { available: true, runtime: { ready: false } } });
+    const none = receiptOf(await runTool({ doc, host: fakeHost({ without: ["motion"] }) }, "mcp_health_tool", {}));
+    expect(none.summary).toBe("Zenvi is up. Zenvi Motion blocks: not available on this host.");
+    expect(none.data).toMatchObject({ ok: true, motion: { available: false } });
+  });
+});
+
+describe("params taken as a near miss", () => {
+  it("are named in the receipt's warnings, on add and on update", async () => {
+    const note = 'style "scale pop" was taken as "pop"; the options are rise, blur, pop, wipe.';
+    const motion = fakeMotionHost({ warnings: [note] });
+    const doc = project();
+    const added = await runTool({ doc, host: host(motion) }, "add_motion_block_tool", { block: "kinetic_headline" });
+    expect(receiptOf(added).warnings).toEqual([note]);
+    const updated = await runTool({ doc, host: host(motion) }, "update_motion_block_tool", { file_id: dataOf(added).file_id, params: { text: "Changed" } });
+    expect(receiptOf(updated).warnings).toEqual([note]);
+  });
+});
+
 describe("zenvi_link props", () => {
   it("JSON-encodes props with keys the desktop rewrites as paths", () => {
     const stored = encodeLinkProps({ image: "a.png", n: 1 });

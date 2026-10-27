@@ -39,6 +39,7 @@ const DIRECT_TOOLS = [
   "remove_motion_transition_tool",
   "speed_ramp_tool",
   "list_motion_blocks_tool",
+  "setup_motion_runtime_tool",
   "add_motion_block_tool",
   "update_motion_block_tool",
   "list_3d_scenes_tool",
@@ -78,7 +79,7 @@ function stringForm(schema: JsonSchema): string | undefined {
 describe("tool catalog", () => {
   it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
     const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
-    expect(ported).toHaveLength(163);
+    expect(ported).toHaveLength(164);
     expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
     for (const name of ported) expect(getTool(name)?.contract).toBe(true);

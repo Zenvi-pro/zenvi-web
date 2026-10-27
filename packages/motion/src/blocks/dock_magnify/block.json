@@ -1,6 +1,6 @@
 {
   "id": "dock_magnify",
-  "version": 1,
+  "version": 2,
   "title": "Dock magnify",
   "description": "A desktop app dock over a wallpaper: the pointer glides along it and the icons swell under it (real dock magnification), it settles on one app, its name shows, it is clicked, and that icon zooms at the camera until its colour fills the frame with its glyph and name — an 'open the app' transition into the next scene. Give `background` (a bin file id) for the wallpaper; without one a drawn scene is used.",
   "tags": ["ui", "dock", "desktop", "app", "icons", "cursor", "zoom", "transition", "promo"],
@@ -11,7 +11,7 @@
   "params": {
     "background": { "type": "media", "accept": ["image", "video"], "optional": true, "description": "Wallpaper photo or video behind the dock (file id)." },
     "scene": { "type": "enum", "options": ["hills", "peaks", "sea", "orb", "bloom", "dunes", "mascot"], "default": "dunes", "description": "The drawn wallpaper when no background is given (its colours follow the seed)." },
-    "apps": { "type": "strings", "minItems": 2, "maxItems": 9, "maxLength": 20, "default": ["Reel", "Sound", "Notes", "Frame", "Board", "Chat", "Sketch"], "description": "App names in dock order; each gets one of our drawn glyphs (film, wave, pen, play, grid, chat, sun, bolt, layers) in turn." },
+    "apps": { "type": "strings", "minItems": 2, "maxItems": 9, "maxLength": 20, "default": ["Mail", "Music", "Notes", "Maps", "Board", "Chat", "Sketch"], "description": "App names in dock order; each gets one of our drawn glyphs (film, wave, pen, play, grid, chat, sun, bolt, layers) in turn." },
     "target": { "type": "integer", "min": 0, "max": 8, "default": 3, "description": "Which app (0-based) is clicked and opens; it wears the accent colour." },
     "colors": { "type": "strings", "maxItems": 9, "maxLength": 9, "default": [], "description": "Icon colours as #rrggbb in dock order (empty: a drawn set; the target always takes the accent)." },
     "open": { "type": "boolean", "default": true, "description": "Zoom the clicked icon to fill the frame (false: it only bounces open and the dock stays)." }

@@ -52,12 +52,38 @@ describe("block defaults are original", () => {
   });
 });
 
+// Any block's defaults can end up on screen in someone else's promo (E2E round 2 N5: "Describe your video…" and
+// "Agent mode" showed up in an email product's prompt bar), so none of them speaks as Zenvi or about editing video.
+const OUR_COPY = ["Zenvi", "Agent mode", "Describe your video", "your video", "your cut"];
+const EDITING_WORDS = ["footage", "timeline", "teaser", "trailer", "rehearsal", "clips?", "reels?", "editors?", "FPS"];
+
+describe("block defaults are neutral", () => {
+  it("carry no Zenvi or video-editing copy", () => {
+    const pattern = new RegExp(`\\b(${OUR_COPY.join("|")})\\b`, "i");
+    const editing = new RegExp(`\\b(${[...OUR_COPY, ...EDITING_WORDS].join("|")})\\b`, "i");
+    for (const b of BLOCKS) {
+      const checked = checkParams(b, {});
+      expect(checked.ok, b.id).toBe(true);
+      const copy = Object.entries(checked.ok ? checked.params : {}).filter(([, v]) => typeof v === "string" || Array.isArray(v));
+      expect(editing.exec(JSON.stringify(copy))?.[0], `${b.id} defaults`).toBeUndefined();
+      const source = readFileSync(path.join(blocksDir, b.id, "block.ts"), "utf8");
+      expect(pattern.exec(source.replace(/\/\/.*$/gm, ""))?.[0], `${b.id}/block.ts`).toBeUndefined();
+    }
+  });
+
+  it("show no chip on the prompt bar unless asked", () => {
+    const bar = getBlock("prompt_bar")!;
+    expect(checkParams(bar, {})).toMatchObject({ ok: true, params: { chip: "", placeholder: "Type a message…" } });
+    expect(checkParams(bar, { chip: "Search" })).toMatchObject({ ok: true, params: { chip: "Search" } });
+  });
+});
+
 describe("checkParams", () => {
   const block = getBlock("counter")!;
 
   it("fills defaults", () => {
     const r = checkParams(block, {});
-    expect(r.ok && r.params.label).toBe("Clips cut this week");
+    expect(r.ok && r.params.label).toBe("Total this week");
     expect(r.ok && r.params.palette).toBe("mono");
     expect(r.ok && "accent" in r.params).toBe(false);
   });
@@ -84,6 +110,24 @@ describe("checkParams", () => {
     expect(checkParams(burst, { shape: "Square" })).toMatchObject({ ok: true, params: { shape: "confetti" } });
     expect(checkParams(burst, { shape: "spark" })).toMatchObject({ ok: true, params: { shape: "sparks" } });
     expect(checkParams(burst, { shape: "toString" })).toMatchObject({ ok: false, error: expect.stringContaining("shape must be one of sparks") });
+  });
+
+  it("takes a near-miss enum value and says so (kinetic_headline style 'scale pop', E2E round 2 N6)", () => {
+    const headline = getBlock("kinetic_headline")!;
+    const guess = checkParams(headline, { style: "scale pop" });
+    expect(guess).toMatchObject({ ok: true, params: { style: "pop" } });
+    expect(guess.ok && guess.warnings).toEqual(['style "scale pop" was taken as "pop"; the options are rise, blur, pop, wipe.']);
+    expect(checkParams(headline, { style: "Wipes" })).toMatchObject({ ok: true, params: { style: "wipe" } });
+    expect(checkParams(headline, { style: "pop" })).toMatchObject({ ok: true, warnings: [] });
+    // Two readings, or none: still refused.
+    expect(checkParams(headline, { style: "blur and pop" })).toMatchObject({ ok: false, error: "style must be one of rise, blur, pop, wipe" });
+    expect(checkParams(headline, { style: "spin" })).toMatchObject({ ok: false });
+    expect(checkParams(headline, { palette: "dark mode" })).toMatchObject({ ok: true, params: { palette: "dark" } });
+  });
+
+  it("warns for a block's old enum names too", () => {
+    const burst = getBlock("particle_burst")!;
+    expect(checkParams(burst, { shape: "streak" })).toMatchObject({ ok: true, params: { shape: "sparks" }, warnings: [expect.stringContaining('"streak" was taken as "sparks"')] });
   });
 
   it("keeps a text value that happens to start with the param's name", () => {

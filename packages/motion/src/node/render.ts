@@ -22,7 +22,7 @@ import { cacheDir, resolveBinary, spawnManaged } from "@zenvi/render-node";
 import { getBlock } from "../catalog.js";
 import { allParams, checkParams, type BlockManifest, type Params } from "../params.js";
 import type { BlockConfig, MediaRef, ZenviPageApi } from "../config.js";
-import { launchChrome } from "./chrome.js";
+import { leaseChrome } from "./chrome.js";
 import { prepareMedia } from "./media.js";
 import { blockPage, motionDir, pageHtml } from "./page.js";
 import { startPageServer } from "./server.js";
@@ -290,6 +290,16 @@ async function openTab(browser: Browser, url: string, design: { width: number; h
 }
 
 async function capture(fp: Fingerprinted, frames: number, output: string, work: string, options: RenderBlockOptions): Promise<void> {
+  if (options.browser) return captureWith(options.browser, fp, frames, output, work, options);
+  const lease = await leaseChrome(options.env);
+  try {
+    await captureWith(lease.browser, fp, frames, output, work, options);
+  } finally {
+    lease.release();
+  }
+}
+
+async function captureWith(browser: Browser, fp: Fingerprinted, frames: number, output: string, work: string, options: RenderBlockOptions): Promise<void> {
   const draft = options.draft === true;
   const design = designSize(fp.width, fp.height);
   const fpsValue = fp.fps.num / fp.fps.den;
@@ -304,8 +314,6 @@ async function capture(fp: Fingerprinted, frames: number, output: string, work: 
   const config: BlockConfig = { block: fp.manifest.id, params: fp.params, width: design.width, height: design.height, fps: fpsValue, seconds: fp.seconds, alpha: fp.alpha, media, draft };
   const page = await blockPage(fp.manifest.id, options.env);
   const server = await startPageServer({ html: pageHtml(page, config), script: page.script, fontsDir: path.join(motionDir(options.env), "fonts"), mediaDirs });
-  const ownBrowser = options.browser ? undefined : await launchChrome(options.env);
-  const browser = options.browser ?? ownBrowser!;
   const times = sampleTimes(frames, fpsValue, fp.samples);
   const clip = { x: 0, y: 0, width: design.width, height: design.height, scale: design.scale / Math.max(1, design.scale) };
   const captured = { width: Math.round(design.width * design.scale), height: Math.round(design.height * design.scale) };
@@ -358,6 +366,5 @@ async function capture(fp: Fingerprinted, frames: number, output: string, work: 
   } finally {
     await Promise.all(tabs.map((t) => t.page.close().catch(() => undefined)));
     await server.close();
-    if (ownBrowser) await ownBrowser.close();
   }
 }

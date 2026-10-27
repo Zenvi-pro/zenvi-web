@@ -4,6 +4,7 @@
  * sends (backend agents send every argument as a string).
  */
 
+import { matchOption } from "@zenvi/engine/tools";
 import { FONT_ROLES, PALETTE_NAMES } from "./tokens.js";
 
 interface ParamBase {
@@ -71,7 +72,8 @@ export function allParams(manifest: BlockManifest): Record<string, ParamSpec> {
   return { ...manifest.params, ...tokenParams(manifest) };
 }
 
-export type ParamsCheck = { ok: true; params: Params } | { ok: false; error: string };
+/** `warnings`: values that were not exact but had one reading ("scale pop" taken as "pop"). */
+export type ParamsCheck = { ok: true; params: Params; warnings: string[] } | { ok: false; error: string };
 
 const COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
@@ -97,7 +99,7 @@ function asList(v: unknown): unknown[] | undefined {
   return undefined;
 }
 
-type Coerced = { value: ParamValue } | { error: string };
+type Coerced = { value: ParamValue; warning?: string } | { error: string };
 
 function coerce(name: string, spec: ParamSpec, v: unknown): Coerced {
   const bad = (what: string): Coerced => ({ error: `${name} must be ${what}` });
@@ -131,14 +133,10 @@ function coerce(name: string, spec: ParamSpec, v: unknown): Coerced {
       return { value: s.toUpperCase() };
     }
     case "enum": {
-      const s = typeof v === "string" ? v.trim().toLowerCase() : "";
-      if (spec.options.includes(s)) return { value: s };
-      const aliased = spec.aliases && Object.hasOwn(spec.aliases, s) ? spec.aliases[s] : undefined;
-      if (aliased && spec.options.includes(aliased)) return { value: aliased };
-      // "dot" for "dots" and "lines" for "line": agents get the plural wrong more than the word.
-      const plural = spec.options.find((o) => s && (o === `${s}s` || `${o}s` === s));
-      if (plural) return { value: plural };
-      return bad(`one of ${spec.options.join(", ")}`);
+      const match = typeof v === "string" ? matchOption(v, spec.options, spec.aliases) : undefined;
+      if (!match) return bad(`one of ${spec.options.join(", ")}`);
+      const warning = match.how === "exact" ? undefined : `${name} "${String(v).trim()}" was taken as "${match.option}"; the options are ${spec.options.join(", ")}.`;
+      return warning ? { value: match.option, warning } : { value: match.option };
     }
     case "strings": {
       const list = asList(v) ?? (typeof v === "string" ? v.split("|").map((s) => s.trim()) : undefined);
@@ -180,6 +178,7 @@ export function checkParams(manifest: BlockManifest, raw: Readonly<Record<string
     return { ok: false, error: `${manifest.id} has no parameter ${unknown.join(", ")}; it takes ${Object.keys(specs).join(", ")}` };
   }
   const params: Params = {};
+  const warnings: string[] = [];
   for (const [name, spec] of Object.entries(specs)) {
     const given = raw[name];
     const optional = "optional" in spec && spec.optional === true;
@@ -191,6 +190,7 @@ export function checkParams(manifest: BlockManifest, raw: Readonly<Record<string
     const coerced = coerce(name, spec, given);
     if ("error" in coerced) return { ok: false, error: coerced.error };
     params[name] = coerced.value;
+    if (coerced.warning) warnings.push(coerced.warning);
   }
-  return { ok: true, params };
+  return { ok: true, params, warnings };
 }

@@ -1,6 +1,6 @@
 {
   "id": "liquid_glass",
-  "version": 1,
+  "version": 2,
   "title": "Liquid glass",
   "description": "A pill of liquid glass over a photo or video: the rim bends what is behind it like a lens (with a hint of colour fringing), the face is frosted, a lit bevel catches the light and one highlight runs round it as it settles. A prompt types into it, the send key is pressed, and the pill flows open into a card listing what happened. The premium AI-product look. Give `background` (a bin file id); without one a drawn scene sits behind.",
   "tags": ["ui", "glass", "liquid glass", "refraction", "prompt", "saas", "promo", "card"],
@@ -11,8 +11,8 @@
   "params": {
     "background": { "type": "media", "accept": ["image", "video"], "optional": true, "description": "Photo or video behind the glass (file id)." },
     "scene": { "type": "enum", "options": ["hills", "peaks", "sea", "orb", "bloom", "dunes", "mascot"], "default": "sea", "description": "The drawn scene behind the glass when no background is given (its colours follow the seed)." },
-    "text": { "type": "string", "maxLength": 60, "default": "Cut a 15 second teaser from this clip", "description": "What types into the pill." },
-    "results": { "type": "strings", "maxItems": 4, "maxLength": 36, "default": ["Found the opening line", "Marked three laughs", "Teaser ready to review"], "description": "Rows the pill opens to show after send, each with a check (empty: the pill stays a pill)." },
+    "text": { "type": "string", "maxLength": 60, "default": "Plan a weekend trip to Lisbon", "description": "What types into the pill." },
+    "results": { "type": "strings", "maxItems": 4, "maxLength": 36, "default": ["Found three good options", "Checked the dates", "Itinerary ready to review"], "description": "Rows the pill opens to show after send, each with a check (empty: the pill stays a pill)." },
     "frost": { "type": "number", "min": 0, "max": 1, "default": 0.55, "description": "How frosted the glass face is: 0 clear, 1 fully blurred." },
     "bend": { "type": "number", "min": 0, "max": 120, "default": 54, "description": "How far the rim bends the background, px at 1080." }
   }

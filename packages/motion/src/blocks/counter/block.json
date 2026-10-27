@@ -1,6 +1,6 @@
 {
   "id": "counter",
-  "version": 1,
+  "version": 2,
   "title": "Counter",
   "description": "A huge number that counts or rolls like an odometer from one value to the next (several steps allowed: 51 → 79 → 70), with a prefix/suffix (k, %, $) and a small label. For stats, specs and results.",
   "tags": [
@@ -61,7 +61,7 @@
     "label": {
       "type": "string",
       "maxLength": 60,
-      "default": "Clips cut this week",
+      "default": "Total this week",
       "description": "Small mono label under the number (empty: none)."
     },
     "style": {

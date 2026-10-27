@@ -1,6 +1,6 @@
 {
   "id": "glass_cards",
-  "version": 1,
+  "version": 2,
   "title": "Glass cards",
   "description": "Frosted-glass UI cards over a photo or video (real backdrop blur), entering in depth with a stagger; the pointer clicks one card's toggle on and a check pops. A headline can sit above. The SaaS promo look. Give `background` (a bin file id) for the glass to blur; without one a soft sky gradient is drawn.",
   "tags": [
@@ -40,7 +40,7 @@
     "headline": {
       "type": "string",
       "maxLength": 80,
-      "default": "All your *sources*, one timeline",
+      "default": "Everything in *one* place",
       "description": "Headline above the cards; *words* in stars get the serif italic (empty: none)."
     },
     "cards": {
@@ -49,9 +49,9 @@
       "maxItems": 4,
       "maxLength": 24,
       "default": [
-        "Footage",
-        "Music",
-        "Captions"
+        "Inbox",
+        "Calendar",
+        "Files"
       ],
       "description": "Card titles."
     },
@@ -60,8 +60,8 @@
       "maxItems": 4,
       "maxLength": 36,
       "default": [
-        "124 clips",
-        "18 tracks",
+        "12 new",
+        "3 today",
         "Waiting to sync"
       ],
       "description": "Second line of each card."

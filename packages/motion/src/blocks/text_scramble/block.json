@@ -1,6 +1,6 @@
 {
   "id": "text_scramble",
-  "version": 1,
+  "version": 2,
   "title": "Text scramble",
   "description": "Text that decodes out of random glyphs, left to right and line by line, with an accent block riding the decode front: the tech/HUD reveal. Mono by default; any face works.",
   "tags": [
@@ -31,7 +31,7 @@
     "text": {
       "type": "string",
       "maxLength": 160,
-      "default": "RENDER COMPLETE / 24 FPS · 4K",
+      "default": "ALL SYSTEMS READY / 99.9% UPTIME",
       "description": "The text. '/' breaks a line."
     },
     "glyphs": {

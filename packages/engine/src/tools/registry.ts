@@ -35,6 +35,7 @@ import { mediaTools } from "./catalog/media.js";
 import { mediaFilesTools } from "./catalog/media-files.js";
 import { mediaFilesTransitionTools } from "./catalog/media-files-transitions.js";
 import { metadataTools } from "./catalog/metadata.js";
+import { healthTools } from "./catalog/health.js";
 import { motionTools } from "./catalog/motion.js";
 import { motionBlockTools } from "./catalog/motion-blocks.js";
 import { motionTemplateTools } from "./catalog/motion-templates.js";
@@ -92,6 +93,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...mediaTools,
     ...searchTools,
     ...motionTools,
+    ...healthTools,
     ...metadataTools,
     ...phase3Tools,
     ...inspectTools,

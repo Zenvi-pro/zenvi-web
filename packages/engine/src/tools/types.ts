@@ -849,7 +849,8 @@ export interface MotionBlockInfo {
   alpha: boolean;
 }
 
-export type MotionParamsCheck = { ok: true; params: Record<string, unknown> } | { ok: false; error: string };
+/** `warnings`: values the host accepted as a near miss (`style "scale pop" was taken as "pop"`). */
+export type MotionParamsCheck = { ok: true; params: Record<string, unknown>; warnings?: string[] } | { ok: false; error: string };
 
 export interface MotionRenderRequest {
   block: string;
@@ -884,12 +885,30 @@ export interface MotionRender {
   renderSeconds: number;
 }
 
+/** Whether this host can render blocks right now (the CLI and `zenvi mcp` need headless Chrome on the computer). */
+export interface MotionRuntimeStatus {
+  ready: boolean;
+  /** One sentence: what is installed, or what is missing and what fixes it. */
+  detail: string;
+  /** Size of the one-time download that `setup` makes, when something is missing. */
+  downloadMb?: number;
+  /** Where the runtime is, when ready. */
+  path?: string;
+}
+
 /** Rendering Zenvi Motion blocks (headless Chrome on the person's computer: the CLI and `zenvi mcp`). */
 export interface MotionHost {
   blocks(): readonly MotionBlockInfo[];
   /** Params checked against the block and completed with defaults, or why they are wrong. */
   check(block: string, params: Readonly<Record<string, unknown>>): MotionParamsCheck;
   render(request: MotionRenderRequest, signal?: AbortSignal): Promise<MotionRender>;
+  /** Whether renders can run now. Hosts that render elsewhere (the cloud) leave it out. */
+  runtime?(): Promise<MotionRuntimeStatus>;
+  /**
+   * Install what `runtime` reports missing (a download). Only hosts running on
+   * the person's computer have it; it runs only when `setup_motion_runtime_tool` is called.
+   */
+  setup?(signal?: AbortSignal): Promise<MotionRuntimeStatus>;
 }
 
 export interface ToolHost {

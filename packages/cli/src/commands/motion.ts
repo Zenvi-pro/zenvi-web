@@ -8,7 +8,7 @@
 import path from "node:path";
 import type { Command } from "commander";
 import { allParams, BLOCKS, getBlock } from "@zenvi/motion";
-import { ChromeMissingError, findChrome, installChrome, MotionBlockError, renderBlock } from "@zenvi/motion/node";
+import { ChromeLaunchError, ChromeMissingError, findChrome, installChrome, MotionBlockError, renderBlock } from "@zenvi/motion/node";
 import { CliError } from "../output.js";
 import type { CommandContext } from "./context.js";
 import { parseFps } from "./render.js";
@@ -121,7 +121,7 @@ export function registerMotionCommands(program: Command, ctx: CommandContext): v
         else ctx.out.info(`${result.cached ? "Reused" : "Rendered"} ${id}: ${result.path} (${result.width}x${result.height}, ${result.frames} frames, ${result.codec}${result.cached ? "" : `, ${result.renderSeconds.toFixed(1)} s`})`);
       } catch (error) {
         if (error instanceof MotionBlockError) throw new CliError(error.message, 2);
-        if (error instanceof ChromeMissingError) throw new CliError(error.message, 1);
+        if (error instanceof ChromeMissingError || error instanceof ChromeLaunchError) throw new CliError(error.message, 1);
         throw error;
       }
     });
