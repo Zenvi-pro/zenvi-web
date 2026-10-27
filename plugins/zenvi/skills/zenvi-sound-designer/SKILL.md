@@ -42,7 +42,10 @@ LLM listener tells a good mix from a bad one, so read the numbers.
    fixes the receipt names as tool calls (exactly those arguments), then
    `master_audio_tool` again with the same arguments. Any audio edit after
    mastering unmasters the mix: master again, always last. After two fix
-   rounds, stop and report what is left.
+   rounds, stop and report what is left. A note "N LU short of -14 LUFS at
+   the ceiling" is as loud as the mix gets without crushing it (master has
+   already ridden its peaks): do not chase it with compressors, limiters or
+   gain (each try lands quieter); put it under GAPS.
 7. **Listen** (when you may render). `render_video`, then
    `review_render_tool` with the path: true peak, loudness, dropouts, how it
    ends. One fix pass for each `PROBLEM`.
@@ -108,7 +111,7 @@ The two enums differ: `product_3d` designs, `3d_product` scores;
 
 | metric failing | call |
 | --- | --- |
-| L1 loudness | `master_audio_tool` again (it rides the peaks); still short: a voice that peaks → `compress_tool` `{"role": "voice", "preset": "voice"}` then master |
+| L1 loudness | `master_audio_tool` again, once (it rides the peaks); still short: report it |
 | B1 voice under the bed | `duck_tool` `{"under": "voice", "target_vbr_db": 10}` |
 | H1 hit points with no cue | the `add_sfx_tool` calls listed, or the design again with more `intensity` |
 | B5 hero too quiet / hot | `set_audio_gain_tool` on the listed `clip_ids` by the listed dB |
