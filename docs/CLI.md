@@ -144,6 +144,7 @@ zenvi tools [--all] [--json] [--schema]     # the catalog (same as the MCP serve
 zenvi call <tool> key=value … [--args '{…}']
 zenvi call get_timeline_state_tool
 zenvi call set_keyframes_tool --args '{"timeline_clip_id":"K3J9X0Q2LM","property":"alpha","points":[{"seconds":0,"value":0},{"seconds":1,"value":1}]}'
+zenvi call review_render_tool path=reel.mp4 --images review/   # save returned images (frames, contact sheets)
 ```
 
 Arguments arrive as strings and are coerced by each tool's schema, exactly
