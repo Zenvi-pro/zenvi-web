@@ -120,6 +120,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
           fps: str("Frame rate, e.g. 30 or 30000/1001 (default: the project's)."),
           start: num("Render from this timeline time (seconds)."),
           end: num("Render up to this timeline time (seconds)."),
+          loudness: str("Normalise the mix on export: social (-14 LUFS, -1 dBTP), broadcast (-23), podcast (-16) or a LUFS number; two-pass loudnorm with a true-peak limiter. Use it when master_audio_tool says the peaks held the mix under its target. Default off."),
         },
         additionalProperties: false,
       },
@@ -142,6 +143,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
           fps: text(args.fps),
           start: text(args.start),
           end: text(args.end),
+          loudness: text(args.loudness),
         };
         let options;
         try {

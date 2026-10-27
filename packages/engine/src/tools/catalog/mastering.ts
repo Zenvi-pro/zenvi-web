@@ -352,7 +352,7 @@ export const masteringTools: CatalogTool[] = [
         if (plan.limitedBy === "peak" && plan.shortfallLu > 0.5) {
           notes.push(
             `${plan.shortfallLu.toFixed(1)} LU short of ${base.targetLufs} LUFS at the ${base.ceilingDbtp} dBTP ceiling: the peaks (usually SFX hits) set the limit. ` +
-              `Export with loudness normalisation (zenvi render --loudness ${args.preset}) to reach the target with a true-peak limiter, or turn the loudest SFX down.`,
+              `Export with loudness normalisation (render_video loudness='${args.preset}', zenvi render --loudness ${args.preset}) to reach the target with a true-peak limiter, or turn the loudest SFX down.`,
           );
         }
       };
