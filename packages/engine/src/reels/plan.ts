@@ -57,6 +57,8 @@ export interface PlannedShot {
 export interface ReelPlan {
   /** Total length, seconds. */
   duration: number;
+  /** `ReelGrid.lengthNote`: the length and why. */
+  lengthNote: string;
   bpm: number;
   /** Where the music starts in its file, seconds, or null without music. */
   musicStart: number | null;
@@ -70,7 +72,7 @@ export interface PlanInput {
   style: ReelStyle;
   media: readonly ReelMedia[];
   music: MusicBeats | null;
-  /** Target length, seconds (default: the style's). The reel ends on the last downbeat before it. */
+  /** Target length, seconds (default: the style's), rounded to whole bars as `planReelGrid` says. */
   seconds?: number;
   /**
    * The project's frame rate: the music's in-point snaps to its frame grid
@@ -122,14 +124,15 @@ function timelineGrid(music: MusicBeats | null, fallbackBpm: number, frameRate: 
   if (!music || music.beats.length < 2 || !(music.bpm > 0)) {
     const period = 60 / fallbackBpm;
     const beats: number[] = [];
-    for (let t = 0; t <= seconds + EPS; t += period) beats.push(round3(t));
+    // One bar of slack past the target: the reel may end on the bar line after it.
+    for (let t = 0; t <= seconds + 4 * period + EPS; t += period) beats.push(round3(t));
     return { beats, downbeats: beats.filter((_, i) => i % 4 === 0), bpm: fallbackBpm, musicStart: null };
   }
   const chosen = chooseMusicStart(music, seconds);
   const start = frameRate && frameRate > 0 ? Math.round(chosen * frameRate) / frameRate : chosen;
   const beats = music.beats.filter((t) => t >= start - 0.05).map((t) => round3(Math.max(0, t - start)));
   const period = 60 / music.bpm;
-  while (beats.length < 2 || beats[beats.length - 1]! < seconds) beats.push(round3((beats[beats.length - 1] ?? 0) + period));
+  while (beats.length < 2 || beats[beats.length - 1]! < seconds + 4 * period) beats.push(round3((beats[beats.length - 1] ?? 0) + period));
   const inMusic = music.downbeats.filter((t) => t >= start - 0.05).map((t) => round3(Math.max(0, t - start)));
   // Past the track's last downbeat, keep counting bars from it.
   const downbeats = [...inMusic];
@@ -182,6 +185,8 @@ export interface ReelGrid {
   duration: number;
   /** The length in beats (fractional when it is not on a beat). */
   beatsInReel: number;
+  /** The final length and why, for the tool's summary ("10.29s, ends on a bar line at 140 BPM: …"). */
+  lengthNote: string;
   bpm: number;
   /** Where the music starts in its file, seconds, or null without music. */
   musicStart: number | null;
@@ -192,7 +197,11 @@ export interface ReelGrid {
 
 export interface ReelGridInput {
   music: MusicBeats | null;
-  /** Target length, seconds: the reel ends on the last downbeat before it (or the last beat). */
+  /**
+   * Target length, seconds: the reel ends on the first bar line at or after
+   * it when that is at most a bar later, else on the nearest bar line (or
+   * beat), never past the music.
+   */
   seconds: number;
   /** Tempo of the grid when there is no music. */
   fallbackBpm: number;
@@ -204,15 +213,30 @@ export interface ReelGridInput {
 export function planReelGrid(input: ReelGridInput): ReelGrid {
   const target = input.seconds;
   const grid = timelineGrid(input.music, input.fallbackBpm, input.frameRate, target);
-  // End on the last downbeat in the target (or the last beat), never past the music.
+  const bar = (4 * 60) / grid.bpm;
   const musicLeft = input.music && grid.musicStart !== null ? input.music.duration - grid.musicStart : Infinity;
-  const limit = Math.min(target, musicLeft) + EPS;
-  const downEnd = [...grid.downbeats].reverse().find((t) => t <= limit && t >= target * 0.6);
-  const beatEnd = [...grid.beats].reverse().find((t) => t <= limit);
+  const inMusic = (t: number) => t > EPS && t <= musicLeft + EPS;
+  // Whole bars: the first bar line at or after the target when it is at most a
+  // bar later (asking for 10s gives 10.29s at 140 BPM, not 8.57s), else the
+  // nearest one; never past the music.
+  const bars = grid.downbeats.filter(inMusic);
+  const up = bars.find((t) => t >= target - EPS);
+  const nearest = [...bars].filter((t) => t >= target * 0.6).sort((a, b) => Math.abs(a - target) - Math.abs(b - target) || b - a)[0];
+  const downEnd = up !== undefined && up - target <= bar + EPS ? up : nearest;
+  const beatEnd = [...grid.beats].reverse().find((t) => t <= Math.min(target, musicLeft) + EPS && t > EPS);
   const duration = round3(downEnd ?? beatEnd ?? Math.min(target, musicLeft));
   const totalBeats = grid.beats.findIndex((t) => Math.abs(t - duration) < 1e-3);
-  const beatsInReel = totalBeats >= 0 ? totalBeats : (duration / (60 / grid.bpm));
-  return { duration, beatsInReel, bpm: grid.bpm, musicStart: grid.musicStart, beats: grid.beats, downbeats: grid.downbeats };
+  const beatsInReel = totalBeats >= 0 ? totalBeats : duration / (60 / grid.bpm);
+  const asked = `${round3(target)}s asked for`;
+  const onBar = `ends on a bar line at ${Math.round(grid.bpm)} BPM`;
+  let why: string;
+  if (downEnd === undefined) why = beatEnd === undefined ? `the music runs out before the ${asked}` : `ends on the last beat before the ${asked} (no bar line fits)`;
+  else if (Math.abs(duration - target) < 0.02) why = `${onBar}, as asked`;
+  else if (downEnd === up) why = `${onBar}: the first one at or after the ${asked}`;
+  else if (up === undefined && musicLeft < target) why = `${onBar}: the music runs out before the ${asked}`;
+  else why = `${onBar}: the nearest one to the ${asked}`;
+  const lengthNote = `${duration.toFixed(2)}s, ${why}`;
+  return { duration, beatsInReel, lengthNote, bpm: grid.bpm, musicStart: grid.musicStart, beats: grid.beats, downbeats: grid.downbeats };
 }
 
 /** Plan a reel: music window, cut points, and the media and source window of every shot. */
@@ -305,6 +329,7 @@ export function planReel(input: PlanInput): ReelPlan {
   shots.sort((a, b) => a.start - b.start);
   return {
     duration: onFrame(duration),
+    lengthNote: grid.lengthNote,
     bpm: grid.bpm,
     musicStart: grid.musicStart,
     beats: grid.beats.filter((t) => t <= duration + EPS),

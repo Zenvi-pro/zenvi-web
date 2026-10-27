@@ -79,7 +79,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         properties: {
           path: str("Project file, e.g. edits/trailer.zvn (relative to the working folder)."),
           create: bool("Create the file when it does not exist (default true)."),
-          profile: str('Video profile for a new project, e.g. "HD 1080p 30 fps" (default "HD 720p 30 fps").'),
+          profile: str('Video profile for a new project, e.g. "HD 1080p 30 fps", or a social preset: "instagram_reel", "tiktok", "youtube_shorts" (1080x1920), "youtube" (1920x1080), "square_post" (1080x1080). Default "HD 720p 30 fps".'),
         },
         required: ["path"],
         additionalProperties: false,
