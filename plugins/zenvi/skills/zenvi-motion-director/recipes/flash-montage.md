@@ -10,15 +10,20 @@ Reference feel: 12 s, ~0.16 s per shot, 5 flash events per 10 s, loud.
 | --- | --- | --- |
 | 0-0.8 | one establishing image, push in | 18-24 f |
 | 0.8-10 | the flash run: 50-60 images, shapes matched in pairs | 3-6 f (4 typical) |
-| every bar | `flash_white` or `flash_invert` | 3 f |
+| section starts | white flash (the run, the drop, the end title) | 3 f |
+| the drop (~2/3 in) | `glitch` (RGB split) on the cut | 4-5 f |
+| bar lines after the drop | `flash_invert` and `glitch`, alternating | 3-5 f |
 | 10-12 | end title over black or the last image | 50-60 f |
 
-Images can repeat (A B C A D B...): the eye reads rhythm, not novelty. Group
-by shape (spirals, circles, eyes), and inside a group keep the shape centred.
+No image back within 3 s while the bin has others: at 4 frames a shot that
+is ~22 different images in the busiest 3 s, so gather plenty (stills are fine
+at this speed). When the bin is short, space the repeats as far apart as the
+bin allows (A B C D E F … A), never A B A. Group by shape (spirals, circles,
+eyes), and inside a group keep the shape centred.
 
 ## Tools
 
-1. Assets: 10-16 clips/stills over 6-8 searches plus 2-4 AI stills
+1. Assets: 20-30 clips/stills over 8-10 searches plus 2-4 AI stills
    (`generate_image_and_add_to_timeline_tool` writes to the timeline; move or
    delete the clip after, the file stays in the bin).
 2. Cut: `match_cut_montage_tool` with `min_frames: 3`, `max_frames: 5`,
@@ -41,14 +46,17 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
 ```
 
    (one subjects entry per file). Without a shape idea, `build_reel_tool`
-   `style: "hype"` is the fallback, but it cuts slower.
-3. Extra flashes: `apply_motion_transition_tool` `preset: "flash_invert"` on
-   3-4 cuts that land on downbeats (`track`, `time`), `glitch` on one.
+   `style: "hype"` is the fallback (1/4-beat bursts after the drop, its own
+   flashes, glitch and negative hits, display titles: skip steps 3 and 5).
+3. Accents: `apply_motion_transition_tool` `preset: "glitch"` on the drop
+   cut (the first bar line from 2/3 in), `flash_invert` and `glitch`
+   alternating on the bar lines after it (`track`, `time`); white flashes
+   only where a section starts. Never two accents on neighbouring cuts.
 4. Look: `apply_look_tool` `look_id: "dreamy_cinema"` or `"night_glow"`,
    `all_clips: true`, `lut_intensity: 0.6`, grain `35mm_gritty`; then a glow:
    `add_effect_tool` `effect: "Glow"` `scope: "all"` (check the frame: bloom
    on highlights, not a white wash).
-5. End title: `add_title_tool` `text: "THE END"`, `font: "Instrument Serif"`,
+5. End title (1-2 words): `add_title_tool` `text: "THE END"`, `font: "Instrument Serif"` (or `"Anton"` for a harder edit),
    `font_scale: 1.6`, `fade_in_seconds: 0.4`, plus `add_effect_tool` Glow on
    that clip. Or `add_motion_block_tool` `block: "kinetic_headline"` with
    `style: "blur"`, `palette: "dark"`, `display_font: "serif"`.
@@ -56,11 +64,17 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
    receipt. Then `add_sfx_tool` `recipe: "riser_noise"` ending at the title
    (`align: "peak"`, `at_seconds` = title start) and `impact_boom` on it.
 
+7. Review: `review_edit_tool` `pace: "fast"`; fix `clip-back-soon` and
+   `repeated-footage` (more images, then rerun the cut with `replace: true`)
+   and `long-hold` (nothing but the first shot and the end title over
+   0.5 s). Call it again until no `high` or `medium` problem is left.
+
 ## Checks
 
 The contact sheet must show many different images; `preview_frame` on three
 flash cuts (bright but not clipped to pure white for more than 2 frames), the
-end title (readable, centred, glow not smeared).
+drop (the glitch frame shows the RGB split), the end title (readable,
+centred, glow not smeared).
 
 ## Pitfalls
 
@@ -69,6 +83,7 @@ end title (readable, centred, glow not smeared).
   piece, add files and rerun with `replace: true`.
 - Soft, blown-up shots: a `scale` above 1.5 in the receipt means a file had
   no box.
-- Every cut a flash: flashes are punctuation, about one per bar.
+- Every cut a flash: flashes are punctuation, about one per bar after the
+  drop, one per section before it.
 - Ticks too quiet: the ticking IS the music's pulse here; keep them at the
   recipe gain or 2 dB louder.

@@ -1,60 +1,76 @@
 # Hype / sport reel
 
-Very fast (a cut every 0.2-0.25 s on a 150-160 bpm track), whips and crash
-zooms, speed ramps on the hero moments, strip masks and mosaics, a treated
-hero shot, a hit on every cut, loud. Cars, bikes, sport, launches, events.
+Very fast (a cut every 0.2-0.3 s on a 120-160 bpm track, 4-frame bursts after
+the drop), a slow-motion wind-up that rushes into the drop, a white flash and
+a glitch on it, negative and glitch hits on the climax's bar lines, whips in
+one direction, condensed display type that slams in, a hit on every cut,
+loud. Cars, bikes, sport, launches, events.
 
-## Structure (9-15 s, 9:16)
+## Structure (12-20 s)
 
-| t (s) | what |
+| t | what |
 | --- | --- |
-| 0-0.5 | hook: the loudest image, a `swoosh_hit` on frame 1 |
-| 0.5-4 | cuts every 1/2 beat, whips in one direction |
-| ~4 | velocity ramp on the hero shot (rush → near-freeze on the beat → rush) |
-| 4-7 | strips / mosaic of 4-6 clips (`grid` `strips_v`, `mosaic`) |
-| 7 | riser → drop: `zoom_through` into the next shot, `impact_boom` |
-| last 1-2 s | logo / end word, hard stop on a hit |
+| 0-1 beat | hook: the loudest image, 1-3 words in condensed capitals slamming in, a `swoosh_hit` on frame 1 |
+| body | 1/2-beat cuts, a white flash where the body starts, a whip every other bar line (all the same direction) |
+| 2 beats before the drop | the wind-up: one shot in slow motion that ramps into a 3x rush and lands on the cut |
+| the drop (first bar line from 2/3 in) | white flash + glitch (RGB split), `impact_boom`; riser ending on it |
+| climax | 1/4- and 1/2-beat bursts; on each bar line a negative frame or a glitch, alternating |
+| last 2 beats | pull-back into the payoff shot, end word with hollow echo lines, hard stop on a hit |
 
 ## Tools
 
-1. Assets: 10-16 clips, close and wide, all with motion: at least one
-   distinct clip per 1.5 s of runtime, none back within 3 s. Music:
-   aggressive trap/house 150-160 bpm.
-2. Cut: `build_reel_tool` `style: "hype"`, `file_ids` in story order,
-   `music_file_id`, `duration_seconds`, `hook` (2-4 words), `end_card`.
-3. Hero ramp: `speed_ramp_tool` `clip_id`, `preset: "velocity"`, `hit_at` =
-   a downbeat from `data.beats`, `ripple: true` (needs ~2.5x the clip's
-   length in source footage).
-4. Transitions: `apply_motion_transitions_tool` `track: "1"`, `style:
-   "hype"` (whip, whip, crash zoom; pull-back on the last cut), one
-   `direction` for the piece. One `zoom_through` (`focus_x`/`focus_y` on the
-   subject) at the drop.
-5. Strips: `add_motion_template_tool` `template: "grid"`, `layout:
-   "strips_v"`, `tiles: 4`, `reveal: "wipe"`, `duration_seconds` 2-3, with
-   `beats`; or `layout: "mosaic"`, `tiles: 6`.
-6. Treated hero shot (CLI): `subject_glow_tool` `look: "thermal"` or
+1. Assets: 14-20 clips, close and wide, all with motion. The rule is no clip
+   back within 3 s: at this pace that is about one distinct clip per 0.25 s
+   of the busiest 3 s (the receipt warns with the number it needs: import
+   that many and rebuild with `replace: true`). Music: aggressive trap/house
+   120-160 bpm with a clear drop.
+2. Cut: `build_reel_tool` `style: "hype"`, `file_ids` in story order (the
+   last is the payoff), `music_file_id`, `duration_seconds`, `hook` (1-3
+   words), `end_card` (1-2 words: one line gets the echo). It does the
+   accents too; read them in the receipt: `drop`, `flashes`, `transitions`
+   (whips, glitch on the drop, flash_invert/glitch hits, zoom_out landing),
+   `speed_ramp` (the wind-up) and `sfx_cues`. Do **not** run
+   `apply_motion_transitions_tool` on top: a move on every cut is a template.
+3. No wind-up in the receipt (`speed_ramp: null`, the clip was too short):
+   `speed_ramp_tool` `clip_id` of the shot before `drop`, `preset:
+   "velocity"`, `hit_at` = `drop`, or pick a longer clip for that slot.
+4. Strips (optional, in the body): `add_motion_template_tool` `template:
+   "grid"`, `layout: "strips_v"`, `tiles: 4`, `reveal: "wipe"`,
+   `duration_seconds` 1-2, with `beats`; never across the drop.
+5. Treated hero shot (CLI): `subject_glow_tool` `look: "thermal"` or
    `replace_background_tool` `background: "color"`; else a contrasty LUT on
    that clip only (`apply_look_tool` `look_id: "noir_era"`).
-7. Look: `unify_grade_tool` first (daylight and night shots meet in the
+6. Look: `unify_grade_tool` first (daylight and night shots meet in the
    middle), with `look: "teal_punch"` or `"heroic_cinema"`, `look_intensity`
    0.6, leaving out the treated hero shot (`timeline_clip_ids`).
+7. Extra word cards (at most two before the end): `add_title_tool` with
+   `font: "Anton"`, uppercase, one word, on a downbeat, 0.5-1 s.
 8. Sound last: `auto_sound_design_tool` `intensity: "hype"`, `beats`,
-   `climax_seconds` = the drop. Check every cut has a transient;
-   `add_sfx_tool` `whip` on whips it missed. Then `master_audio_tool`
-   `preset: "social"`.
+   `climax_seconds` = `drop`. `add_sfx_tool` `recipe: "glitch_burst"` at the drop if the
+   receipt's glitch cue got no sound. Then `master_audio_tool` `preset:
+   "social"`.
+9. Review: `review_edit_tool` `pace: "fast"`. Fix `clip-back-soon` and
+   `repeated-footage` (more clips, rebuild with `replace: true`), `long-hold`
+   (a shot over 1.5 s outside the hook and the end: split it or rebuild
+   shorter), `cuts-off-beat`. Call it again; stop when no `high` or `medium`
+   problem is left.
 
 ## Checks
 
-Contact sheet: no shot repeats back to back, no black frames at whip peaks
-(`preview_frame` 1 frame before and after a whip). Ramp: frame at `hit_at`
-is the peak of the action. Loudness: music not lowered. After rendering,
-`review_render_tool` on the file: no repeated shot within 3 s, ends on the
-end word (not black), true peak at or under -1 dBTP.
+Contact sheet: no clip back within 3 s, no black frames at whip peaks
+(`preview_frame` 1 frame before and after a whip), the drop frame is the
+flash, the climax shows a negative frame. Ramp: the frame 2 frames before
+`drop` is a blur of motion, the frame a beat before it is slow and sharp.
+Titles: condensed capitals, readable in 0.5 s. After rendering,
+`review_render_tool` on the file: ends on the end word (not black), true
+peak at or under -1 dBTP.
 
 ## Pitfalls
 
 - Mixing whip directions: one current; up only for the reveal.
-- A transition on every cut: hype style already mixes; the rest are hard cuts
-  with hits.
-- Ramping a clip without enough source: the tool refuses or the shot gets
-  shorter than planned; pick a longer clip.
+- A flash on every bar: flashes open sections; the climax hits are negatives
+  and glitches.
+- Plain bold sans titles over the footage: use the style's titles (or Anton)
+  and keep them to 1-3 words.
+- Ramping a clip without enough source: the tool skips the ramp and says so;
+  give the wind-up slot a longer clip.

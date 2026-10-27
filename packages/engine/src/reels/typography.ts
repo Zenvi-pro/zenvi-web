@@ -4,9 +4,13 @@
  * templated so the text fits the frame and follows the style. Only what Qt's
  * SVG renderer (the desktop), resvg (Zenvi Cloud) and browsers all draw the
  * same: full-frame <rect>s and centred <text> with a font stack that ends in
- * sans-serif; the shadow is a second, offset copy of the text.
+ * sans-serif; the shadow is a second, offset copy of the text. A style with
+ * a bundled face (`typography.face`) names it first in the stack, and the
+ * tool redraws that text as outlines (typography/outline.ts) so no renderer
+ * needs the font installed.
  */
 
+import { FONT_FAMILIES, type FontFamilyId } from "../typography/families.js";
 import type { ReelTypography } from "./styles.js";
 
 export type CardRole = "hook" | "label" | "end";
@@ -22,8 +26,19 @@ export interface CardInput {
 }
 
 const FONT = "Inter, 'Helvetica Neue', Helvetica, Arial, 'DejaVu Sans', sans-serif";
+/** Behind a bundled face where its outlines cannot be drawn, by its category. */
+const FALLBACK: Partial<Record<string, string>> = {
+  condensed: "Impact, 'Arial Narrow', 'DejaVu Sans Condensed', sans-serif",
+  mono: "Menlo, 'Courier New', 'DejaVu Sans Mono', monospace",
+};
 /** Average advance of a bold sans glyph, in em (capitals run wider). */
 const GLYPH = { upper: 0.68, mixed: 0.58 } as const;
+
+function stack(family: FontFamilyId | undefined): string {
+  if (!family) return FONT;
+  const { name, category } = FONT_FAMILIES[family];
+  return `'${name}', ${FALLBACK[category] ?? FONT}`;
+}
 
 function escapeXml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
@@ -62,7 +77,7 @@ interface Fitted {
 /** The largest font size (and line breaks) that keeps the text inside `maxWidth` x `maxHeight`. */
 export function fitText(text: string, typography: ReelTypography, maxWidth: number, maxHeight: number, maxSize: number): Fitted {
   const words = text.split(" ").filter(Boolean);
-  const glyph = (typography.case === "upper" ? GLYPH.upper : GLYPH.mixed) + Math.max(0, typography.tracking);
+  const glyph = (typography.face?.advance ?? (typography.case === "upper" ? GLYPH.upper : GLYPH.mixed)) + Math.max(0, typography.tracking);
   let best: Fitted = { lines: [text], size: 1 };
   for (let n = 1; n <= Math.min(3, Math.max(1, words.length)); n += 1) {
     const lines = balance(words, n);
@@ -76,14 +91,30 @@ export function fitText(text: string, typography: ReelTypography, maxWidth: numb
   return best;
 }
 
-function textBlock(lines: string[], x: number, firstBaseline: number, size: number, lineHeight: number, typography: ReelTypography, fill: string, anchor: "middle" | "start"): string {
+function textAttrs(size: number, typography: ReelTypography, anchor: "middle" | "start", family?: FontFamilyId): string {
+  return `font-family="${stack(family)}" font-size="${size}" font-weight="${typography.weight}" letter-spacing="${(typography.tracking * size).toFixed(1)}" text-anchor="${anchor}"`;
+}
+
+function textBlock(lines: string[], x: number, firstBaseline: number, size: number, lineHeight: number, typography: ReelTypography, fill: string, anchor: "middle" | "start", family?: FontFamilyId): string {
   const shadow = Math.max(2, Math.round(size * 0.045));
-  const attrs = `font-family="${FONT}" font-size="${size}" font-weight="${typography.weight}" letter-spacing="${(typography.tracking * size).toFixed(1)}" text-anchor="${anchor}"`;
+  const attrs = textAttrs(size, typography, anchor, family);
   const spans = (dx: number, dy: number, color: string, opacity: number) =>
     lines
       .map((line, i) => `<text x="${x + dx}" y="${Math.round(firstBaseline + i * lineHeight + dy)}" ${attrs} fill="${color}" fill-opacity="${opacity}">${escapeXml(line)}</text>`)
       .join("");
   return spans(shadow, shadow, "#000000", 0.42) + spans(0, 0, fill, 1);
+}
+
+/** Hollow copies of a one-line title stacked above and below it, fading out: the hype end-card echo. */
+function echoLines(line: string, x: number, baseline: number, size: number, lineHeight: number, typography: ReelTypography, family: FontFamilyId): string {
+  const attrs = textAttrs(size, typography, "middle", family);
+  const stroke = Math.max(1.5, Math.round(size * 0.018 * 10) / 10);
+  return [-2, -1, 1, 2]
+    .map((k) => {
+      const opacity = Math.abs(k) === 1 ? 0.55 : 0.25;
+      return `<text x="${x}" y="${Math.round(baseline + k * lineHeight)}" ${attrs} fill="none" stroke="#ffffff" stroke-width="${stroke}" stroke-opacity="${opacity}">${escapeXml(line)}</text>`;
+    })
+    .join("");
 }
 
 /** A title card as SVG text, the size of the project frame, transparent around the type. */
@@ -93,31 +124,37 @@ export function cardSvg(input: CardInput): string {
   const short = Math.min(w, h);
   const body = cased(input.text, typography);
   const parts: string[] = [];
+  const face = typography.face;
+  const display = face?.display;
 
   if (input.role === "label") {
     const size = Math.round(short * 0.034);
-    const label = { ...typography, tracking: Math.max(typography.tracking, 0.22), weight: 600 as const };
+    const label = { ...typography, tracking: Math.max(typography.tracking, face ? 0.12 : 0.22), weight: face ? (700 as const) : (600 as const) };
     const x = Math.round(w * 0.07);
     const y = Math.round(h * (portrait ? 0.085 : 0.11));
     parts.push(`<rect x="${x}" y="${y - Math.round(size * 1.45)}" width="${Math.round(size * 1.6)}" height="${Math.max(2, Math.round(size * 0.14))}" fill="#ffffff"/>`);
-    parts.push(textBlock([cased(input.text, { ...label, case: "upper" })], x, y, size, size, label, "#ffffff", "start"));
+    parts.push(textBlock([cased(input.text, { ...label, case: "upper" })], x, y, size, size, label, "#ffffff", "start", face?.label));
   } else {
     const end = input.role === "end";
     if (end && typography.endPlate) parts.push(`<rect x="0" y="0" width="${w}" height="${h}" fill="#000000" fill-opacity="0.5"/>`);
-    const maxSize = Math.round(short * (end ? 0.12 : 0.135));
-    const fitted = fitText(body, typography, w * 0.84, h * (portrait ? 0.26 : 0.36), maxSize);
-    const lineHeight = Math.round(fitted.size * 1.04);
+    // Condensed display capitals run larger: they are the picture, not a caption on it.
+    const maxSize = Math.round(short * (face ? (end ? 0.24 : 0.3) : end ? 0.12 : 0.135));
+    const fitted = fitText(body, typography, w * (face ? 0.86 : 0.84), h * (portrait ? 0.26 : 0.36), maxSize);
+    const lineHeight = Math.round(fitted.size * (face ? 0.98 : 1.04));
     const centre = h * (end ? 0.5 : portrait ? 0.4 : 0.5);
     const subtitle = input.subtitle ? cased(input.subtitle, { ...typography, case: "as_is" }) : "";
     // Readable on a phone: never below 3% of the frame's short side.
     const subSize = Math.max(Math.round(fitted.size * 0.42), Math.round(short * 0.03));
     const blockHeight = fitted.lines.length * lineHeight + (subtitle ? subSize * 1.8 : 0);
     const firstBaseline = centre - blockHeight / 2 + fitted.size * 0.82;
-    parts.push(textBlock(fitted.lines, Math.round(w / 2), firstBaseline, fitted.size, lineHeight, typography, "#ffffff", "middle"));
+    if (end && face?.echo && display && fitted.lines.length === 1 && !subtitle) {
+      parts.push(echoLines(fitted.lines[0]!, Math.round(w / 2), firstBaseline, fitted.size, lineHeight, typography, display));
+    }
+    parts.push(textBlock(fitted.lines, Math.round(w / 2), firstBaseline, fitted.size, lineHeight, typography, "#ffffff", "middle", display));
     if (subtitle) {
       const subType = { ...typography, weight: 400 as const, tracking: Math.max(0.04, typography.tracking / 2) };
       const y = firstBaseline + (fitted.lines.length - 1) * lineHeight + subSize * 2.2;
-      parts.push(textBlock([subtitle], Math.round(w / 2), y, subSize, subSize, subType, "#ffffff", "middle"));
+      parts.push(textBlock([subtitle], Math.round(w / 2), y, subSize, subSize, subType, "#ffffff", "middle", face?.label));
     }
   }
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${parts.join("")}</svg>\n`;
