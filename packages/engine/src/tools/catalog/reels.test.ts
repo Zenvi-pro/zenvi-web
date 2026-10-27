@@ -262,6 +262,13 @@ describe("build_reel_tool with the beat grid given", () => {
     expect(data.beat_source).toBe("150 BPM");
   });
 
+  it("refuses beats that are one time repeated, without an undo step", async () => {
+    const { result, doc } = await reel({ beats: [1, 1] });
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("at least two different beat times");
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+
   it("refuses an offset without a tempo and leaves no undo step", async () => {
     const { result, doc } = await reel({ offset_seconds: 1 });
     expect(result.ok).toBe(false);

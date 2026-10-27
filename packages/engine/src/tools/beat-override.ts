@@ -38,13 +38,14 @@ export interface BeatOverride {
 /** What is wrong with the arguments, as an `Error:` line, or null. */
 export function beatOverrideProblem(args: BeatOverride): string | null {
   if (args.offset_seconds !== undefined && args.bpm === undefined) return "Error: offset_seconds goes with bpm (the first beat is at offset_seconds, the rest follow at that tempo).";
-  if (args.beats && args.beats.length === 1) return "Error: beats needs at least two beat times.";
+  if (args.beats && args.beats.length > 0 && new Set(args.beats).size < 2) return "Error: beats needs at least two different beat times.";
   return null;
 }
 
 /** Beat times covering `seconds` of audio from the caller's `beats`, or `bpm` + `offset_seconds`; null when neither is given. */
 export function explicitBeats(args: BeatOverride, seconds: number): { beats: number[]; source: string } | null {
-  if (args.beats && args.beats.length >= 2) return { beats: [...new Set(args.beats)].sort((a, b) => a - b), source: "the given beats" };
+  const distinct = [...new Set(args.beats ?? [])].sort((a, b) => a - b);
+  if (distinct.length >= 2) return { beats: distinct, source: "the given beats" };
   if (args.bpm !== undefined && args.offset_seconds !== undefined) {
     const grid = tempoGrid(args.bpm, Math.max(0, seconds - args.offset_seconds), args.offset_seconds);
     return { beats: [...grid.beats], source: `${args.bpm} BPM from ${args.offset_seconds} s` };
