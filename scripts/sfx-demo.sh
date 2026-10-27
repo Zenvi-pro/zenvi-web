@@ -17,6 +17,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 zenvi() { (cd "$out" && npx --prefix "$root" tsx "$root/packages/cli/src/bin.ts" -p demo.zvn "$@"); }
 
 mkdir -p "$out/media"
+out="$(cd "$out" && pwd)"
 cd "$out"
 rm -f demo.zvn demo.mp4 demo-dry.mp4
 
