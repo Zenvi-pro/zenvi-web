@@ -398,6 +398,7 @@ export const kineticCaptionTools: CatalogTool[] = [
       const clean = withoutPrevious(project, old);
       // The cut-out goes above the plan's `under` tracks (all of them for true), the other caption tracks above it.
       const cutout = behind !== false && built.under > 0;
+      if (behindArg === "emphasis" && !cutout) warnings.push("no emphasis word could go behind the speaker (too little headroom, too much of the word hidden, or nobody in the shot): they stay in front");
       const stack = planOverlayStack(clean, built.start, end, plan.tracks + (cutout ? 1 : 0));
       const cutLayer = cutout ? stack.layers[built.under]! : undefined;
       const captionLayers = cutout ? stack.layers.filter((_, i) => i !== built.under) : stack.layers;

@@ -322,4 +322,10 @@ describe("placement over the shots", () => {
     const built = buildKineticCaptions({ frame: WIDE, words: spoken("we made 3 million dollars"), style: "creator", emphasis: ["million"], avoid: [], behind: "emphasis", scenes: [{ from: 0, to: 10, head: { x: 0.5, y: 0.45, w: 0.12, h: 0.22 }, subject }], lib });
     expect(built.under).toBe(0);
   });
+
+  it("keeps emphasis words in front when the shot's matte shows nobody", () => {
+    const empty: CostGrid = { cols: 16, rows: 9, cells: new Array<number>(144).fill(0) };
+    const built = buildKineticCaptions({ frame: WIDE, words: spoken("we made 3 million dollars"), style: "creator", emphasis: ["million"], avoid: [], behind: "emphasis", scenes: [{ from: 0, to: 10, subject: empty }], lib });
+    expect(built.under).toBe(0);
+  });
 });

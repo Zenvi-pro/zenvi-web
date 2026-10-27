@@ -474,9 +474,10 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     // The emphasis words alone across the top of the head, the head hiding their lower third, where that reads: at
     // most a quarter of the word's box behind the subject (the matte's cover; without it, the head's box). Words
     // behind the head may rise into the top title margin (to 4 % of the frame) on frames without platform UI there:
-    // stock footage keeps little headroom.
+    // stock footage keeps little headroom. A matte read over these shots that finds no head (nobody in the shot)
+    // leaves nothing to go behind: the words stay in front, at the style's spots.
     let behind: { eb: GroupBlock; ex: number; ey: number } | null = null;
-    if (input.behind === "emphasis" && style.reveal === "word" && items.some((i) => i.emphasis)) {
+    if (input.behind === "emphasis" && style.reveal === "word" && items.some((i) => i.emphasis) && (subject !== undefined || !scene.subject)) {
       const eb = layoutGroup(lib, style, items.filter((i) => i.emphasis), u, 1, style.measure * safeWidth);
       const headX = subject ? subject.x * W : W / 2;
       const headTop = subject ? (subject.y - subject.h / 2) * H : BEHIND[portrait ? "portrait" : "landscape"].y * H + 0.15 * eb.height;

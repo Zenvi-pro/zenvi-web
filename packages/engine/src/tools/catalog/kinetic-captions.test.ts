@@ -8,6 +8,8 @@ import { addFile } from "../../ops/files.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "../test-support/fake-host.js";
 import { L1, SPOKEN_WORDS, imageInfo, media, snapshotOf, videoInfo } from "../test-support/fixture.js";
+import { pixelFrameHost, solid } from "../test-support/pixel-host.js";
+import type { RgbaImage } from "../../render/types.js";
 import { KINETIC_KEY, cueWords, emphasisArg, kineticTag } from "./kinetic-captions.js";
 
 /** A fake host that probes the SVGs it wrote for their real size (the fake recognizer hears SPOKEN_WORDS). */
@@ -39,6 +41,25 @@ function talking(matte = false): { doc: ProjectDocument; clipId: string } {
     return addClip(tx, { fileId: file.id, position: 2, layer: L1, start: 0, end: 10, id: "TALKCLIP01" }).id;
   });
   return { doc: new ProjectDocument(scratch.project), clipId };
+}
+
+/** A matte frame of someone in the middle of the shot: the head with headroom above it, the shoulders below. */
+function speaker(width: number, height: number): RgbaImage {
+  const image = solid(width, height, [0, 0, 0, 255]);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const head = x >= 0.4 * width && x < 0.6 * width && y >= 0.3 * height && y < 0.45 * height;
+      const body = x >= 0.25 * width && x < 0.75 * width && y >= 0.5 * height;
+      if (head || body) image.data.fill(255, (y * width + x) * 4, (y * width + x) * 4 + 3);
+    }
+  }
+  return image;
+}
+
+/** `h` reads frames with the CPU compositor: the footage dark and calm, its matte showing the speaker. */
+function seesSpeaker(h: FakeHost): FakeHost {
+  h.frames!.renderFrame = pixelFrameHost((path, width, height) => (path.includes("matte") ? speaker(width, height) : solid(width, height, [20, 20, 20, 255]))).renderFrame;
+  return h;
 }
 
 const dataOf = (r: { data?: unknown }) => (r.data as { data: Record<string, unknown> }).data;
@@ -183,7 +204,7 @@ describe("kinetic_captions_tool", () => {
 
   it("puts the emphasis words behind the speaker by default when the footage has a matte (auto), else none", async () => {
     const matted = talking(true);
-    const h = host();
+    const h = seesSpeaker(host());
     const r = await runTool({ doc: matted.doc, host: h }, "kinetic_captions_tool", { style: "creator", emphasis: ["cameras"] });
     expect(r.ok, r.text).toBe(true);
     expect(dataOf(r).behind_subject).toBe("emphasis");
@@ -209,11 +230,19 @@ describe("kinetic_captions_tool", () => {
     const asked = await runTool({ doc: plain.doc, host: host() }, "kinetic_captions_tool", { style: "creator", behind_subject: "emphasis" });
     expect(asked.ok).toBe(false);
     expect(asked.text).toContain("generate_subject_matte_tool");
+
+    // A matte that shows nobody: nothing to go behind, the words stay in front and the receipt says why.
+    const empty = talking(true);
+    const nobody = await runTool({ doc: empty.doc, host: host() }, "kinetic_captions_tool", { style: "creator", emphasis: ["cameras"], behind_subject: "emphasis" });
+    expect(nobody.ok, nobody.text).toBe(true);
+    expect(dataOf(nobody).behind_subject).toBe("none");
+    expect((nobody.data as { warnings: string[] }).warnings.join(" ")).toContain("stay in front");
+    expect(empty.doc.project.clips.some((c) => kineticTag(c)?.role === "cutout")).toBe(false);
   });
 
   it("makes the footage's subject matte for placement where the host can, in the same undo step", async () => {
     const { doc } = talking();
-    const h = host();
+    const h = seesSpeaker(host());
     h.mattes = {
       subjects: ["person"],
       async generate(path, request) {
