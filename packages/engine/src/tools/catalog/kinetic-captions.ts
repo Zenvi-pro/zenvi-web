@@ -401,9 +401,8 @@ export const kineticCaptionTools: CatalogTool[] = [
       const result = await commitDrawn(call, written, (tx) => {
         // The mattes made for this run join the bin; cut-outs read the bin's copies.
         const added = new Map(made.map((m) => [m.source.id, addMatteFile(tx, m.source, m.matte, "person", m.scale)]));
-        for (const [id, matte] of mattes) {
-          const clip = clips.find((c) => c.id === id)!;
-          const fresh = added.get(clip.file_id);
+        for (const id of mattes.keys()) {
+          const fresh = added.get(clips.find((c) => c.id === id)!.file_id);
           if (fresh) mattes.set(id, fresh);
         }
         for (const f of old.files) removeFile(tx, f.id);
