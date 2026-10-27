@@ -37,12 +37,14 @@ describe("the recorded kit", () => {
     expect(recordedGroupOf("swoosh_hit")).toBeUndefined();
   });
 
-  it("puts only fast-attack recordings on a transient, and no soft ones on a hero hit", () => {
+  it("puts only fast-attack recordings on a transient, short pre-rolls on a whoosh, and no soft ones on a hero hit", () => {
     for (const recipe of ["impact_punch", "impact_thud", "mouse_click", "pop"]) {
       const picks = pickRecorded(Array.from({ length: 30 }, (_, i) => ({ recipe, at: i * 2 })), 1);
       expect(picks.every((p) => p!.attackMs <= 30), recipe).toBe(true);
       expect(new Set(picks.map((p) => p!.id)).size, recipe).toBeGreaterThanOrEqual(4);
     }
+    const whooshes = pickRecorded(Array.from({ length: 30 }, (_, i) => ({ recipe: "whoosh_short", at: i * 2 })), 1);
+    expect(whooshes.every((p) => p!.peakMs - p!.onsetMs <= 400)).toBe(true);
     const booms = pickRecorded(Array.from({ length: 30 }, (_, i) => ({ recipe: "impact_boom", at: i * 2 })), 1);
     expect(booms.every((p) => kitTraits(p!).energy !== "soft")).toBe(true);
   });

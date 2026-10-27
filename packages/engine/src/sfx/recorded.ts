@@ -187,13 +187,16 @@ function groupSeed(seed: number, group: RecordedGroup): number {
 
 /** Longest attack of a sound whose transient goes on the moment, ms (DEPLOY S4.3: a hero's transient is <= 30 ms). */
 const MAX_ATTACK_MS = 30;
+/** Peaking recipes that may build for longer before their peak. */
+const LONG_PEAK_RECIPES: ReadonlySet<string> = new Set(["whoosh_long", "whoosh_rise"]);
 /** Recipes that play a hero hit: never from the softest third of their group. */
 const HERO_RECIPES: ReadonlySet<string> = new Set(["impact_punch", "impact_slam", "impact_boom", "impact_thud", "sub_drop"]);
 
 /**
  * The sounds of `group` that suit `recipe` by their measurements: a fast
  * attack where the recipe's transient lands on the moment (a slow one
- * smears it before the cut), and a hard hit for a hero. A filter that
+ * smears it before the cut), a pre-roll that fits where its peak lands on
+ * it, and a hard hit for a hero. A filter that
  * would leave fewer than four sounds is skipped, so variety holds.
  */
 function suited(group: RecordedGroup, recipe: string, samples: readonly RecordedSample[], kit: readonly RecordedSample[]): readonly RecordedSample[] {
@@ -202,7 +205,10 @@ function suited(group: RecordedGroup, recipe: string, samples: readonly Recorded
     const kept = pool.filter(test);
     if (kept.length >= 4) pool = kept;
   };
-  if (sfxRecipe(recipe)?.hit === "onset" && !SUSTAINED.has(group)) keep((s) => s.attackMs <= MAX_ATTACK_MS);
+  const hit = sfxRecipe(recipe)?.hit;
+  if (hit === "onset" && !SUSTAINED.has(group)) keep((s) => s.attackMs <= MAX_ATTACK_MS);
+  // A whoosh's peak lands on the cut, so its pre-roll plays before it: 150-400 ms for a short one, up to 800 for a long one (DEPLOY S4.2).
+  if (hit === "peak") keep((s) => s.peakMs - s.onsetMs <= (LONG_PEAK_RECIPES.has(recipe) ? 800 : 400));
   if (HERO_RECIPES.has(recipe)) keep((s) => kitTraits(s, kit).energy !== "soft");
   return pool;
 }
