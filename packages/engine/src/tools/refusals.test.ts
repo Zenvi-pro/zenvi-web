@@ -28,6 +28,7 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   generate_video_and_add_to_timeline_tool: { prompt: "a sunset over the sea" },
   generate_tts_and_add_to_timeline_tool: { text: "Hello there" },
   generate_image_and_add_to_timeline_tool: { prompt: "a red fox in snow" },
+  generate_sfx_tool: { prompt: "deep cinematic boom", duration_seconds: 2 },
   ingest_web_video_tool: { url: "https://youtu.be/abc" },
   resummarize_project_file_tool: { file_id: IDS.interview },
   reindex_project_file_tool: { file_id: IDS.broll },

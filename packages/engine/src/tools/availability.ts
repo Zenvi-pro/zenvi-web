@@ -437,6 +437,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       backend: "signed in with zenvi login",
       stock: "signed in with zenvi login",
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
+      "audio.generateSfx": "ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
       motion: "headless Chrome is installed: zenvi motion setup",
       scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
