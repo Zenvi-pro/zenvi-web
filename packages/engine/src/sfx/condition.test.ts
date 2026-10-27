@@ -42,7 +42,10 @@ describe("conditionSfx", () => {
     expect(loudestRms(quiet.left, quiet.right, SFX_SAMPLE_RATE)).toBeCloseTo(0.1, 2);
     expect(quiet.gainDb).toBeGreaterThan(10);
     const spiky = conditionSfx({ sampleRate: SR, left: sound(0, 0.5, 0, hitEnvelope, 0.9) }, { hit: "onset", maxSeconds: 5, targetRms: 0.9 })!;
-    expect(peakDb(spiky.left, spiky.right)).toBeCloseTo(SFX_PEAK_DBFS, 3);
+    // Its transient soft-limited just under the ceiling, its body driven louder than the peak alone allows.
+    expect(peakDb(spiky.left, spiky.right)).toBeLessThanOrEqual(SFX_PEAK_DBFS);
+    expect(peakDb(spiky.left, spiky.right)).toBeGreaterThan(SFX_PEAK_DBFS - 0.5);
+    expect(spiky.gainDb).toBeGreaterThan(20 * Math.log10(10 ** (SFX_PEAK_DBFS / 20) / 0.9) + 3);
   });
 
   it("finds a whoosh's peak, and a riser's hit at its end", () => {

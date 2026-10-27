@@ -19,12 +19,13 @@ const smooth = (x: number) => {
 };
 
 /**
- * Sabattier solarisation: each channel rises to white at mid-grey and folds
- * back to black in the highlights, so bright areas print as negatives with
+ * Sabattier solarisation: each channel rises to white above mid-grey and
+ * folds back down in the highlights, so bright areas print as negatives with
  * colour fringes where channels cross (the "solarized flash" of hype reels).
  */
 export function solarizeLut(): string {
-  const fold = (x: number) => Math.pow(Math.sin(Math.PI * clamp01(x)), 0.85);
+  // Peaks at 0.625 and folds white down to 0.59, not black: saturated colours keep a fringe, not a hole.
+  const fold = (x: number) => Math.sin(0.8 * Math.PI * clamp01(x));
   return cubeLut("Zenvi solarize", 33, (r, g, b) => [fold(r), fold(g), fold(b)]);
 }
 
@@ -55,7 +56,7 @@ export function bleachBypassLut(): string {
     const overlay = (x: number) => (l < 0.5 ? 2 * x * l : 1 - 2 * (1 - x) * (1 - l));
     const o: Rgb = [mix(r, overlay(r), 0.75), mix(g, overlay(g), 0.75), mix(b, overlay(b), 0.75)];
     const ol = luma(...o);
-    return [clamp01(mix(o[0], ol, 0.55)), clamp01(mix(o[1], ol, 0.55)), clamp01(mix(o[2], ol, 0.55))];
+    return [clamp01(mix(o[0], ol, 0.65)), clamp01(mix(o[1], ol, 0.65)), clamp01(mix(o[2], ol, 0.65))];
   });
 }
 

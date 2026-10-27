@@ -4,10 +4,11 @@
  * the loudness of the recipe it stands in for (so the recipe's mix gain
  * fits it too), with its hit point found. Pure.
  *
- * Loudness is the loudest 50 ms window's RMS, the part of an effect that
+ * Loudness is the loudest 300 ms window's RMS, the part of an effect that
  * reads in a mix; the peak never goes past the -1 dBFS every rendered
- * effect peaks at (render.ts SFX_PEAK_DBFS), so a spiky sound ends up a
- * little quieter rather than clipped.
+ * effect peaks at (render.ts SFX_PEAK_DBFS): a spiky sound's transient is
+ * soft-limited (up to 6 dB), and past that it ends up a little quieter
+ * rather than clipped.
  */
 
 import { SFX_SAMPLE_RATE } from "./dsp.js";
@@ -15,7 +16,7 @@ import type { SfxHitKind } from "./recipes.js";
 import { SFX_PEAK_DBFS, renderSfx } from "./render.js";
 
 /** Bump when conditioning changes, so cached library files are made again. */
-export const SFX_CONDITION_VERSION = 1;
+export const SFX_CONDITION_VERSION = 2;
 
 export interface PcmInput {
   sampleRate: number;
@@ -50,10 +51,24 @@ export interface ConditionOptions {
 const SILENCE_BELOW_PEAK_DB = -40;
 /** And never louder than this, dBFS (a quiet sound's noise floor stays silence). */
 const SILENCE_FLOOR_DBFS = -60;
-const WINDOW = 0.05;
+// About the ear's integration time: a 300 ms window weighs a hit's body, not only its transient.
+const WINDOW = 0.3;
 const HOP = 0.01;
 
 const db = (x: number) => Math.pow(10, x / 20);
+
+/** Most a sound is driven into the soft limiter, dB: a transient flattened by more starts to crackle. */
+const MAX_DRIVE_DB = 6;
+
+/** Unity below half the ceiling, then a tanh knee that never reaches the ceiling. */
+function softLimiter(ceiling: number): (x: number) => number {
+  const knee = ceiling * 0.5;
+  const room = ceiling - knee;
+  return (x) => {
+    const a = Math.abs(x);
+    return a <= knee ? x : Math.sign(x) * (knee + room * Math.tanh((a - knee) / room));
+  };
+}
 
 /** Loudest `WINDOW` RMS over both channels. */
 export function loudestRms(left: Float32Array, right: Float32Array, sampleRate: number): number {
@@ -64,7 +79,8 @@ export function loudestRms(left: Float32Array, right: Float32Array, sampleRate: 
     let sum = 0;
     const end = Math.min(left.length, start + size);
     for (let i = start; i < end; i += 1) sum += left[i]! * left[i]! + right[i]! * right[i]!;
-    best = Math.max(best, Math.sqrt(sum / (2 * (end - start))));
+    // A sound shorter than the window counts as padded with silence, so a click and a boom compare by energy.
+    best = Math.max(best, Math.sqrt(sum / (2 * size)));
   }
   return best;
 }
@@ -152,18 +168,24 @@ export function conditionSfx(input: PcmInput, options: ConditionOptions): Condit
   let regionPeak = 0;
   for (let i = 0; i < length; i += 1) regionPeak = Math.max(regionPeak, Math.abs(left[i]!), Math.abs(right[i]!));
   const rms = loudestRms(left, right, sr);
-  const gain = Math.min(rms > 0 ? options.targetRms / rms : 1, db(SFX_PEAK_DBFS) / regionPeak);
+  const ceiling = db(SFX_PEAK_DBFS);
+  // A recorded hit's transient sits far above its body: levelled by its peak alone it plays quieter than the
+  // synthesised one. Up to MAX_DRIVE_DB past the ceiling is allowed, and the transient soft-limited back under it.
+  const gain = Math.min(rms > 0 ? options.targetRms / rms : 1, (ceiling / regionPeak) * db(MAX_DRIVE_DB));
+  const limit = gain * regionPeak > ceiling ? softLimiter(ceiling) : (x: number) => x;
   for (let i = 0; i < length; i += 1) {
-    left[i]! *= gain;
-    right[i]! *= gain;
+    left[i] = limit(left[i]! * gain);
+    right[i] = limit(right[i]! * gain);
   }
+  let finalPeak = 0;
+  for (let i = 0; i < length; i += 1) finalPeak = Math.max(finalPeak, Math.abs(left[i]!), Math.abs(right[i]!));
   const duration = length / sr;
   let hit: number;
   if (options.hit === "end") hit = duration;
   else if (options.hit === "peak") hit = loudestAt(left, right, sr);
   else {
     // The transient: the first sample at half the peak.
-    const half = regionPeak * gain * 0.5;
+    const half = finalPeak * 0.5;
     let i = 0;
     while (i < length && Math.abs(left[i]!) < half && Math.abs(right[i]!) < half) i += 1;
     hit = Math.min(i, length - 1) / sr;
