@@ -516,9 +516,46 @@ export function scoreMix(input: ScoreInput): MixScore {
     genre,
     durationS: r2(dur),
     metrics,
-    topFixes: fixes.sort((a, b) => b.weight - a.weight).slice(0, 3),
+    topFixes: topFixes(fixes, cues),
     speech: speechWindows,
   };
+}
+
+/** What a fix's calls change: the stems and clip ids (a cue's clip counts as the sfx stem). */
+function touches(fix: MixFix, cueIds: ReadonlySet<string>): Set<string> {
+  const out = new Set<string>();
+  for (const c of fix.calls) {
+    if (c.tool === "master_audio_tool") out.add("master");
+    const role = c.args.role ?? (Array.isArray(c.args.bed) ? undefined : c.args.bed);
+    if (typeof role === "string") out.add(role);
+    if (Array.isArray(c.args.bed)) for (const b of c.args.bed) out.add(String(b));
+    const ids = Array.isArray(c.args.clip_ids) ? c.args.clip_ids : c.args.clip_id ? [c.args.clip_id] : [];
+    for (const id of ids) out.add(cueIds.has(String(id)) ? "sfx" : String(id));
+  }
+  return out;
+}
+
+/**
+ * The three fixes to apply this round (METRICS.md section 7): by weight, gates
+ * first, at most one per stem or clip (two level fixes on the SFX in one
+ * round overshoot), and mastering last: the loudness gate is met by
+ * master_audio_tool after the balance is right, or the fixes after it move
+ * the loudness again.
+ */
+function topFixes(fixes: readonly MixFix[], cues: readonly MixCue[]): MixFix[] {
+  const cueIds = new Set(cues.map((c) => c.id));
+  const ranked = [...fixes].sort((a, b) => b.weight - a.weight);
+  const master = ranked.filter((f) => f.metric === "L1_integrated");
+  const picked: MixFix[] = [];
+  const taken = new Set<string>();
+  for (const fix of ranked) {
+    if (picked.length >= 3 || fix.metric === "L1_integrated") continue;
+    const t = touches(fix, cueIds);
+    if ([...t].some((k) => taken.has(k))) continue;
+    for (const k of t) taken.add(k);
+    picked.push(fix);
+  }
+  return [...picked.slice(0, master.length ? 2 : 3), ...master];
 }
 
 const LABEL: Record<string, string> = {

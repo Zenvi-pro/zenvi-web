@@ -172,3 +172,51 @@ describe("mix tools", { timeout: 60_000 }, () => {
   });
 });
 
+
+describe("pan_tool", { timeout: 60_000 }, () => {
+  const sides = (pcm: Float32Array[]) => pcm.map((c) => 10 * Math.log10(c.reduce((s, x) => s + x * x, 0) / c.length + 1e-20));
+
+  it("pans with a -3 dB constant-power law, keeps the loudness, and pan 0 puts the original back", async () => {
+    const p = mixProject();
+    const hit = p.hits[2]!;
+    const [l0, r0] = sides(await render(p, [hit]));
+    const before = measureLoudness(await render(p, [hit]), MIX_RATE).integrated;
+    const undo = p.doc.undoLabels.length;
+    const receipt = await run(p, "pan_tool", { clip_ids: hit, pan: 0.6 });
+    expect(receipt.status).toBe("applied");
+    expect(p.doc.undoLabels.length).toBe(undo + 1);
+    const [l, r] = sides(await render(p, [hit]));
+    const theta = ((0.6 + 1) * Math.PI) / 4;
+    expect(l! - l0!).toBeCloseTo(20 * Math.log10(Math.SQRT2 * Math.cos(theta)), 0);
+    expect(r! - r0!).toBeCloseTo(20 * Math.log10(Math.SQRT2 * Math.sin(theta)), 0);
+    const after = measureLoudness(await render(p, [hit]), MIX_RATE).integrated;
+    expect(Math.abs(after - before)).toBeLessThan(0.3);
+    // Mono fold-down (METRICS.md P2) of a hero at 0.6: within 2 LU.
+    const panned = await render(p, [hit]);
+    const mono = panned[0]!.map((x, i) => (x + panned[1]![i]!) / 2);
+    expect(measureLoudness([mono, mono], MIX_RATE).integrated - after).toBeGreaterThan(-2);
+    const clip = p.doc.project.clips.find((c) => c.id === hit)!;
+    expect(String(p.doc.project.files.find((f) => f.id === clip.file_id)!.path)).toMatch(/^\/generated\/pan-/);
+    // Pan 0: the original file, the render gone from the bin.
+    const files = p.doc.project.files.length;
+    const back = await run(p, "pan_tool", { clip_ids: hit, pan: 0 });
+    expect(back.status).toBe("applied");
+    expect(p.doc.project.files.length).toBe(files - 1);
+    const [l2, r2] = sides(await render(p, [hit]));
+    expect(l2).toBeCloseTo(l0!, 3);
+    expect(r2).toBeCloseTo(r0!, 3);
+    expect((await run(p, "pan_tool", { clip_ids: hit, pan: 0 })).status).toBe("unchanged");
+  });
+
+  it("keyframes a travelling pan and refuses clips with picture", async () => {
+    const p = mixProject();
+    const music = p.music;
+    const r = await run(p, "pan_tool", { clip_ids: music, points: [{ t: 0, pan: -0.8 }, { t: 8, pan: 0.8 }] });
+    expect(r.status).toBe("applied");
+    const pcm = await render(p, [music]);
+    const early = sides([pcm[0]!.subarray(0, MIX_RATE), pcm[1]!.subarray(0, MIX_RATE)]);
+    const late = sides([pcm[0]!.subarray(7 * MIX_RATE), pcm[1]!.subarray(7 * MIX_RATE)]);
+    expect(early[0]! - early[1]!).toBeGreaterThan(6);
+    expect(late[1]! - late[0]!).toBeGreaterThan(6);
+  });
+});

@@ -34,21 +34,35 @@ export const SOURCES: Record<string, Float32Array> = {
   "hit.wav": click,
 };
 
-function sourceOf(path: string): Float32Array {
-  const key = Object.keys(SOURCES).find((k) => path.endsWith(k));
-  if (!key) throw new Error(`no source for ${path}`);
-  return SOURCES[key]!;
+/** 16-bit PCM WAV (what encodeWav writes) back to float channels. */
+function decodeWav(bytes: Uint8Array): Float32Array[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const channels = view.getUint16(22, true);
+  const frames = (bytes.byteLength - 44) / (2 * channels);
+  const out = Array.from({ length: channels }, () => new Float32Array(frames));
+  for (let i = 0; i < frames; i += 1) for (let c = 0; c < channels; c += 1) out[c]![i] = view.getInt16(44 + (i * channels + c) * 2, true) / 32767;
+  return out;
 }
 
-function renderClip(project: Project, clip: Clip, out: Float32Array[]): void {
+/** Stereo source audio of a file: a generated WAV the host wrote, else the synthetic source by name. */
+function sourceOf(path: string, host: FakeHost): Float32Array[] {
+  const bytes = host.written.get(path);
+  if (bytes instanceof Uint8Array) return decodeWav(bytes);
+  const key = Object.keys(SOURCES).find((k) => path.endsWith(k));
+  if (!key) throw new Error(`no source for ${path}`);
+  return [SOURCES[key]!, SOURCES[key]!];
+}
+
+function renderClip(project: Project, clip: Clip, out: Float32Array[], host: FakeHost): void {
   const file = project.files.find((f) => f.id === clip.file_id)!;
-  const source = sourceOf(String(file.path));
+  const source = sourceOf(String(file.path), host);
   const position = Number(clip.position);
   const start = Number(clip.start);
   const count = Math.round((Number(clip.end) - start) * MIX_RATE);
   const first = Math.round(position * MIX_RATE);
   const pcm = [new Float32Array(count), new Float32Array(count)];
-  for (let i = 0; i < count; i += 1) pcm[0]![i] = pcm[1]![i] = source[Math.round(start * MIX_RATE) + i] ?? 0;
+  const from = Math.round(start * MIX_RATE);
+  for (let i = 0; i < count; i += 1) for (let c = 0; c < 2; c += 1) pcm[c]![i] = source[c]![from + i] ?? 0;
   const effects = (clip.effects ?? []).filter((e) => getAudioKernel(String(e.class_name)));
   const states = effects.map(() => new Map<string, unknown>());
   for (let at = 0; at < count; at += FRAME) {
@@ -71,8 +85,13 @@ export function mixHost(): FakeHost {
     const only = options?.clipIds ? new Set(options.clipIds) : undefined;
     const seconds = project.clips.reduce((m, c) => Math.max(m, Number(c.position) + Number(c.end) - Number(c.start)), 0);
     const channels = [new Float32Array(Math.ceil(seconds * MIX_RATE)), new Float32Array(Math.ceil(seconds * MIX_RATE))];
-    for (const clip of project.clips) if (!only || only.has(String(clip.id))) renderClip(project, clip, channels);
+    for (const clip of project.clips) if (!only || only.has(String(clip.id))) renderClip(project, clip, channels, host);
     return { sampleRate: MIX_RATE, channels };
+  };
+  host.audio!.decodePcm = async (path, options) => {
+    const [left, right] = sourceOf(path, host);
+    const n = Math.min(left!.length, Math.round((options?.maxSeconds ?? Infinity) * MIX_RATE));
+    return { sampleRate: MIX_RATE, samples: left!.slice(0, n), ...(options?.channels === 2 ? { right: right!.slice(0, n) } : {}) };
   };
   return host;
 }

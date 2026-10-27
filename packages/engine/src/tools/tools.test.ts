@@ -1065,6 +1065,17 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { clip_ids: IDS.clipMusic, space: "room" }, summary: /^room \(3 Echo stage\(s\), mix 0\.15\) on 1 clip\(s\)/ },
     failure: { args: { space: "room" }, summary: /^Error: name the clips to change/ },
   },
+  pan_tool: {
+    happy: {
+      setup: (_doc, host) => {
+        const tone = Float32Array.from({ length: 16000 * 2 }, (_, i) => 0.1 * Math.sin((2 * Math.PI * 440 * i) / 16000));
+        host.audio!.decodePcm = async () => ({ sampleRate: 16000, samples: tone, right: tone });
+      },
+      args: { clip_ids: IDS.clipMusic, pan: "-0.5" },
+      summary: /^1 clip\(s\) panned left 0\.50: CLIPMUSC01\.$/,
+    },
+    failure: { args: { clip_ids: IDS.clipMusic, pan: "0.5" }, status: "refused", summary: /not available.*cannot decode and write audio/ },
+  },
   master_audio_tool: {
     happy: {
       setup: (_doc, host) => {

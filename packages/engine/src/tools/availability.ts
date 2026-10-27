@@ -197,6 +197,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   detect_beats_tool: { methods: ["audio.decodePcm"] },
   master_audio_tool: { methods: ["audio.mixPcm"] },
   analyze_mix_tool: { methods: ["audio.mixPcm"] },
+  pan_tool: { methods: ["audio.decodePcm", "media.writeGenerated"] },
   duck_tool: { optional: ["audio.mixPcm"], partialNote: "without mix rendering a duck under the voice needs depth_db and the voice's transcript or cues" },
   eq_tool: { webNote: "Zenvi desktop's libopenshot Parametric EQ computes its filters from the samples per frame instead of the sample rate, so the desktop hears these bands at other frequencies until that is fixed" },
   review_edit_tool: {

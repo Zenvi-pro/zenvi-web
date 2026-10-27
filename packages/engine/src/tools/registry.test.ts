@@ -29,6 +29,7 @@ const DIRECT_TOOLS = [
   "eq_tool",
   "compress_tool",
   "space_tool",
+  "pan_tool",
   "build_reel_tool",
   "align_match_cut_tool",
   "detect_subject_tool",
