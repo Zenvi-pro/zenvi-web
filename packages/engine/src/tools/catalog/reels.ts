@@ -41,7 +41,8 @@ import { MOTION_STYLE_IDS, MOTION_STYLES, isMotionStyleId } from "../../motion/s
 import { buildMotionReel } from "./motion-reels.js";
 import { placeMusicBed } from "./music-bed.js";
 import { cardSvg, flashSvg, type CardRole } from "../../reels/typography.js";
-import { beatsOfFile, canTrackBeats } from "../beats.js";
+import { beatOverrideProblem, beatOverrideShape, explicitBeats } from "../beat-override.js";
+import { beatsOfFile, canTrackBeats, octaveNearStyle, tempoReport, weakGridWarning } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { loadFamilies, missingGlyphWarnings } from "../fonts.js";
 import { applied, failed, refused } from "../receipt.js";
@@ -94,11 +95,7 @@ const input = z.strictObject({
     .max(12)
     .optional()
     .describe("Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial)."),
-  beats: z
-    .array(z.number().min(0))
-    .max(4000)
-    .optional()
-    .describe("Beat times of the music in seconds (e.g. from detect_beats_tool) instead of analysing it here."),
+  ...beatOverrideShape,
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (they are removed in the same undo step)."),
 });
 
@@ -131,12 +128,12 @@ export function usableRange(file: ProjectFile): [number, number] {
   return duration > 3 ? [0.2, duration - 0.1] : [0, duration];
 }
 
-/** Music from evenly spaced beat times given by the caller. */
-export function musicFromBeats(times: number[], duration: number): MusicBeats {
+/** Music from beat times given by the caller (`bpm` when they said it, else the median gap). */
+export function musicFromBeats(times: number[], duration: number, bpm?: number): MusicBeats {
   const beats = [...times].sort((a, b) => a - b);
   const gaps = beats.slice(1).map((t, i) => t - beats[i]!).sort((a, b) => a - b);
   const median = gaps[Math.floor(gaps.length / 2)] ?? 0.5;
-  return { bpm: median > 0 ? 60 / median : 120, beats, downbeats: beats.filter((_, i) => i % 4 === 0), duration };
+  return { bpm: bpm ?? (median > 0 ? 60 / median : 120), beats, downbeats: beats.filter((_, i) => i % 4 === 0), duration };
 }
 
 function aspectName(project: Project): string {
@@ -321,26 +318,65 @@ export const reelTools: CatalogTool[] = [
         return { fileId: id, kind, start, end, ...(labels.has(id) ? { label: labels.get(id)! } : {}) };
       });
 
-      // The music's beats: given, tracked here, or none (cut to the style's tempo).
+      // The music's beats: given (beats, or bpm + offset_seconds), tracked here (at the given bpm, if any), or none (cut to the style's tempo).
       const warnings: string[] = [];
+      const problem = beatOverrideProblem(args);
+      if (problem) return refused(TOOL, problem);
       let beats: MusicBeats | null = null;
+      let beatSource = "style tempo";
+      let tempo: Record<string, unknown> | undefined;
       if (music) {
         const musicLength = Number(music.duration) || 0;
-        if (args.beats && args.beats.length >= 2) {
-          beats = musicFromBeats(args.beats, musicLength);
+        const given = explicitBeats(args, musicLength);
+        if (given) {
+          beats = musicFromBeats(given.beats, musicLength, args.bpm);
+          beatSource = given.source;
         } else if (canTrackBeats(call)) {
-          const tracked = await beatsOfFile(call, music);
-          if (typeof tracked === "string") warnings.push(`${tracked} Cut to the style's tempo instead.`);
-          else if (tracked.beats.length >= 2) beats = { ...tracked, beats: tracked.beats.map((b) => b.timeSec), downbeats: tracked.downbeats.map((d) => d.timeSec), duration: Math.max(musicLength, tracked.duration) };
-          else warnings.push("No steady beat in the music: cut to the style's tempo instead.");
+          let tracked = await beatsOfFile(call, music, args.bpm ? { bpm: args.bpm } : {});
+          let movedFrom: number | null = null;
+          // A loop read at half speed cuts a hype reel too slowly: use the octave the audio also has that is nearer the style's.
+          const styleBpm = isMotionStyleId(styleId) ? MOTION_STYLES[styleId].defaultBpm : REEL_STYLES[styleId].defaultBpm;
+          const nearer = typeof tracked === "string" ? null : octaveNearStyle(tracked, styleBpm, styleId === "hype" || styleId === "highlight");
+          if (nearer !== null && typeof tracked !== "string") {
+            const retracked = await beatsOfFile(call, music, { bpm: nearer });
+            if (typeof retracked !== "string" && retracked.beats.length >= 2) {
+              warnings.push(`The music reads as ${tracked.bpm} BPM and also as ${nearer}: cutting at ${nearer} to suit ${styleId} (pass bpm to choose).`);
+              movedFrom = tracked.bpm;
+              tracked = retracked;
+            }
+          }
+          const instead = args.bpm ? `${args.bpm} BPM` : "the style's tempo";
+          if (typeof tracked === "string") warnings.push(`${tracked} Cut to ${instead} instead.`);
+          else if (tracked.beats.length >= 2) {
+            beats = { ...tracked, beats: tracked.beats.map((b) => b.timeSec), downbeats: tracked.downbeats.map((d) => d.timeSec), duration: Math.max(musicLength, tracked.duration) };
+            beatSource = args.bpm
+              ? `the music tracked at ${args.bpm} BPM`
+              : movedFrom !== null
+                ? `the music, tracked at ${tracked.bpm} BPM (its ${tracked.bpm > movedFrom ? "faster" : "slower"} reading)`
+                : "the music, tracked";
+            // The octave move was ours, not the caller's: the receipt must not say the tempo was given.
+            tempo = tempoReport(movedFrom !== null ? { ...tracked, forced: false } : tracked);
+            const weak = weakGridWarning(tracked);
+            if (weak) warnings.push(weak);
+          } else warnings.push(`No steady beat in the music: cut to ${instead} instead.`);
+        } else if (args.bpm) {
+          const grid = explicitBeats({ bpm: args.bpm, offset_seconds: 0 }, musicLength)!;
+          beats = musicFromBeats(grid.beats, musicLength, args.bpm);
+          beatSource = grid.source;
+          warnings.push(`This surface cannot analyse audio: the grid is ${args.bpm} BPM from the start of the music (pass offset_seconds if the first beat is later).`);
         } else {
           warnings.push("This surface cannot analyse audio: the cuts follow the style's tempo, not the music's beats.");
         }
+      } else if (args.beats || args.offset_seconds !== undefined) {
+        warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow the style's tempo (bpm applies).");
       }
+      // No grid from the music (none, or tracking failed): the caller's bpm still sets the cut tempo.
+      const fallbackBpm = beats ? undefined : args.bpm;
+      if (fallbackBpm) beatSource = `${fallbackBpm} BPM`;
 
       if (isMotionStyleId(styleId)) {
         if (args.labels && args.labels.length > ids.length) warnings.push("More labels than files: the extra labels are not used.");
-        return buildMotionReel(call, { style: styleId, ids, music: music ?? null, beats, names, warnings, args });
+        return buildMotionReel(call, { style: styleId, ids, music: music ?? null, beats, ...(fallbackBpm ? { fallbackBpm } : {}), beatInfo: { beat_source: beatSource, ...(tempo ? { music_tempo: tempo } : {}) }, names, warnings, args });
       }
       if (args.words) warnings.push("words are for the motion styles (ui_promo, editorial_motion, product_callout, tutorial); this style does not use them.");
       const style = REEL_STYLES[styleId];
@@ -348,7 +384,7 @@ export const reelTools: CatalogTool[] = [
       let plan: ReelPlan;
       const rate = rateOf(project);
       try {
-        plan = planReel({ style, media, music: beats, seconds: args.duration_seconds, frameRate: Number.isFinite(rate) && rate > 0 ? rate : undefined });
+        plan = planReel({ style, media, music: beats, ...(fallbackBpm ? { fallbackBpm } : {}), seconds: args.duration_seconds, frameRate: Number.isFinite(rate) && rate > 0 ? rate : undefined });
       } catch (error) {
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -483,6 +519,8 @@ export const reelTools: CatalogTool[] = [
           duration: plan.duration,
           bpm: plan.bpm,
           length_note: plan.lengthNote,
+          beat_source: beatSource,
+          ...(tempo ? { music_tempo: tempo } : {}),
           music_file_id: music ? String(music.id) : null,
           music_start: plan.musicStart,
           // The timeline's beat grid: where to put anything else that should land on the beat.

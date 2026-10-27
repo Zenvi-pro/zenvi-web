@@ -53,10 +53,20 @@ importing (`set_project_setting_tool`: 1080×1920 for 9:16, 1080×1080 for
 - One music track: an audio file in the bin (`search_freesound_music_tool`
   with `min_seconds` a little over the reel's length, then
   `import_stock_media_tool` with `source: "freesound"`, `sound_id`,
-  `preview_url`). `build_reel_tool` finds its tempo and starts it on a
-  downbeat of its loudest stretch. Prefer music with a clear beat and an
-  open licence (CC0, then CC BY); credit CC BY artists, and avoid
+  `preview_url`). Do not put a tempo in the query: Freesound matches words,
+  not tempo. Give `bpm_range` (e.g. `"140-170"` for a hype cut) and `energy`
+  (`high` for hype) and the tool filters on the tempo it measures from each
+  preview (bpm, loudness and energy are on every result; a half- or
+  double-time reading counts). `build_reel_tool` finds the tempo and starts
+  the music on a downbeat of its loudest stretch. Prefer music with a clear
+  beat and an open licence (CC0, then CC BY); credit CC BY artists, and avoid
   non-commercial tracks for anything that earns money.
+- If the cuts feel off the music, read `data.music_tempo` in the reel's
+  receipt (`confidence`, `alternatives`: the half/double readings) or call
+  `detect_beats_tool`. Fix it with `bpm` (track the music at that tempo) or,
+  when you know where the first beat is, `bpm` + `offset_seconds`, or an
+  explicit `beats` list; `build_reel_tool`, `add_motion_template_tool` and
+  `detect_beats_tool` all take them.
 - Motion graphics: the motion-led styles below (and `add_motion_template_tool`)
   draw UI cards, typing search bars, kinetic type, product callouts and step
   cards on the beat inside Zenvi. For anything else (charts, 3D, bespoke
@@ -123,7 +133,7 @@ To add a single piece of motion design to an existing edit (a search that
 types, cards, a callout, kinetic type, a step card, an end card, a grid
 background), use `add_motion_template_tool`: it places one template on the
 lowest free tracks above the video, in one undo step, timed to the music on
-the timeline (or `beats` / `bpm`).
+the timeline (or `beats` / `bpm` + `offset_seconds`).
 
 For the velocity edit (footage rushes, slows to a near-freeze on a beat,
 rushes again) call `speed_ramp_tool` on a shot with `preset=velocity` and

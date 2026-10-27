@@ -199,6 +199,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
       decodePcm: (p, o) => decodePcm(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
       mixPcm: (project, o) => renderMixPcm(project, { ...o, resolveMedia, engine: options.renderEngine, signal: o?.signal ?? options.signal }),
       measureMix: (project, o) => measureMix(project, { resolveMedia, engine: options.renderEngine, ...o, signal: o?.signal ?? options.signal }),
+      decodesUrls: true,
     },
     storage: {
       async save(project, target) {

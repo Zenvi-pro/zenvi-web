@@ -25,21 +25,32 @@ function groove(): Float32Array {
   return out;
 }
 
+/** How many times the host was asked to decode audio: a given grid must not decode. */
+let decodes = 0;
+
 function withAudio(host: FakeHost, decode = true): FakeHost {
+  decodes = 0;
   host.audio = {
     analyzeAudio: async () => ({ sampleRate: 16000, frameSize: 480, rms: new Float32Array(0) }),
-    ...(decode ? { decodePcm: async () => ({ sampleRate: SR, samples: groove() }) } : {}),
+    ...(decode
+      ? {
+          decodePcm: async () => {
+            decodes += 1;
+            return { sampleRate: SR, samples: groove() };
+          },
+        }
+      : {}),
   };
   return host;
 }
 
 /** A vertical project with four clips, a photo and a song in the bin (nothing on the timeline). */
-function reelProject(): ProjectDocument {
+function reelProject(song = true): ProjectDocument {
   const scratch = new ProjectDocument(createProject({ id: "REELPROJ01", profile: findProfile("FHD Vertical 1080p 30 fps")! }));
   scratch.transaction("fixture", (tx) => {
     for (const name of ["huddle", "dribble", "break", "strike"]) addFile(tx, media(`/media/${name}.mp4`, videoInfo(`/media/${name}.mp4`, 20)), { id: name.toUpperCase().padEnd(10, "X").slice(0, 10) });
     addFile(tx, media("/media/crowd.png", imageInfo("/media/crowd.png")), { id: "CROWDXXXXX" });
-    addFile(tx, media("/media/song.mp3", audioInfo("/media/song.mp3", 60)), { id: "SONGXXXXXX" });
+    if (song) addFile(tx, media("/media/song.mp3", audioInfo("/media/song.mp3", 60)), { id: "SONGXXXXXX" });
   });
   const project: Project = structuredClone(scratch.project);
   project.history = { undo: [], redo: [] };
@@ -237,7 +248,139 @@ describe("build_reel_tool", () => {
   });
 });
 
+describe("build_reel_tool with the beat grid given", () => {
+  type Reel = { bpm: number; beat_source: string; beats: number[]; music_tempo?: { given_bpm?: boolean; confidence: number; bpm: number } };
+  const reel = async (args: Record<string, unknown>, doc = reelProject()) => {
+    const result = await runTool({ doc, host: withAudio(fakeHost()) }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12, ...args });
+    return { result, doc, data: (result.data as { data: Reel }).data };
+  };
+
+  it("uses bpm + offset_seconds exactly, without decoding the music", async () => {
+    const { result, data } = await reel({ bpm: 160, offset_seconds: 0.25 });
+    expect(result.ok, result.text).toBe(true);
+    expect(decodes).toBe(0);
+    expect(data.bpm).toBe(160);
+    expect(data.beat_source).toBe("160 BPM from 0.25 s");
+    // The beats follow the given tempo (0.375 s apart; the in-point snaps to a frame).
+    expect((data.beats[9]! - data.beats[1]!) / 8).toBeCloseTo(0.375, 2);
+  });
+
+  it("uses the given beat times instead of detecting", async () => {
+    const beats = Array.from({ length: 80 }, (_, i) => 0.1 + i * 0.6);
+    const { result, data } = await reel({ beats });
+    expect(result.ok, result.text).toBe(true);
+    expect(decodes).toBe(0);
+    expect(data.beat_source).toBe("the given beats");
+    expect(data.bpm).toBeCloseTo(100, 6);
+  });
+
+  it("tracks the music at the given bpm when there is no offset", async () => {
+    const { result, data } = await reel({ bpm: 60 });
+    expect(result.ok, result.text).toBe(true);
+    expect(decodes).toBe(1);
+    expect(data.bpm).toBe(60);
+    expect(data.beat_source).toBe("the music tracked at 60 BPM");
+    expect(data.music_tempo?.given_bpm).toBe(true);
+  });
+
+  it("cuts a slow-reading loop at the faster octave the audio also has when the style is fast", async () => {
+    // A loop that reads as 80 with a full 160 pulse: hype (128) cuts at 160, not at half speed.
+    const slow = new Float32Array(40 * SR);
+    for (let t = 0; t < 40; t += 60 / 160) {
+      const start = Math.round(t * SR);
+      for (let k = 0; k < SR * 0.1 && start + k < slow.length; k += 1) slow[start + k] = (Math.round(t / (60 / 160)) % 2 === 0 ? 0.9 : 0.5) * Math.exp(-k / (0.02 * SR)) * Math.sin((2 * Math.PI * 900 * k) / SR);
+    }
+    const host = withAudio(fakeHost());
+    host.audio!.decodePcm = async () => ({ sampleRate: SR, samples: slow });
+    const result = await runTool({ doc: reelProject(), host }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12 });
+    expect(result.ok, result.text).toBe(true);
+    const data = (result.data as { data: Reel; warnings?: string[] }).data;
+    expect(data.bpm).toBeGreaterThan(155);
+    expect(data.beat_source).toMatch(/faster reading/);
+    // The octave was moved by the tool, not given by the caller.
+    expect((data as { music_tempo?: { given_bpm?: boolean } }).music_tempo?.given_bpm).toBeUndefined();
+  });
+
+  it("cuts to the given bpm when the music cannot be tracked", async () => {
+    const host = withAudio(fakeHost());
+    host.audio!.decodePcm = async () => {
+      throw new Error("ffmpeg exited 1");
+    };
+    const doc = reelProject();
+    const result = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12, bpm: 150 });
+    expect(result.ok, result.text).toBe(true);
+    const out = result.data as { data: Reel; warnings?: string[] };
+    expect(out.data.bpm).toBe(150);
+    expect(out.data.beat_source).toBe("150 BPM");
+    expect(out.warnings?.join(" ")).toContain("Cut to 150 BPM instead");
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("takes the double of a 174 pulse read as 87 for hype and highlight, keeping the half in the receipt", async () => {
+    const pulse = new Float32Array(40 * SR);
+    for (let t = 0; t < 40; t += 60 / 174) {
+      const start = Math.round(t * SR);
+      for (let k = 0; k < SR * 0.1 && start + k < pulse.length; k += 1) pulse[start + k] = 0.9 * Math.exp(-k / (0.02 * SR)) * Math.sin((2 * Math.PI * 900 * k) / SR);
+    }
+    for (const style of ["hype", "highlight", "cinematic"]) {
+      const host = withAudio(fakeHost());
+      host.audio!.decodePcm = async () => ({ sampleRate: SR, samples: pulse });
+      const result = await runTool({ doc: reelProject(), host }, "build_reel_tool", { style, file_ids: FILES, duration_seconds: 12 });
+      expect(result.ok, result.text).toBe(true);
+      const data = (result.data as { data: Reel; warnings?: string[] }).data;
+      if (style === "cinematic") {
+        expect(data.bpm).toBeLessThan(100);
+        continue;
+      }
+      expect(Math.abs(data.bpm - 174)).toBeLessThan(4);
+      expect(data.beat_source).toMatch(/faster reading/);
+      expect((data.music_tempo as unknown as { alternatives: { bpm: number }[] }).alternatives.some((a) => Math.abs(a.bpm - 87) < 3)).toBe(true);
+    }
+  });
+
+  it("reports how sure the detected grid is", async () => {
+    const { data } = await reel({});
+    expect(data.beat_source).toBe("the music, tracked");
+    expect(data.music_tempo?.confidence).toBeGreaterThan(0.6);
+    expect(data.music_tempo?.bpm).toBeGreaterThan(118);
+  });
+
+  it("cuts to the given bpm when there is no music", async () => {
+    const { result, data } = await reel({ bpm: 150 }, reelProject(false));
+    expect(result.ok, result.text).toBe(true);
+    expect(data.bpm).toBe(150);
+    expect(data.beat_source).toBe("150 BPM");
+  });
+
+  it("refuses beats that are one time repeated, without an undo step", async () => {
+    const { result, doc } = await reel({ beats: [1, 1] });
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("at least two different beat times");
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+
+  it("refuses an offset without a tempo and leaves no undo step", async () => {
+    const { result, doc } = await reel({ offset_seconds: 1 });
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("Error: offset_seconds goes with bpm");
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+});
+
 describe("detect_beats_tool on the web", () => {
+  it("reports confidence, the other octaves and the bar, and tracks a given bpm", async () => {
+    const run = (extra: Record<string, unknown>) => runTool({ doc: reelProject(), host: withAudio(fakeHost()) }, "detect_beats_tool", { file_id: "SONGXXXXXX", ...extra });
+    const auto = await run({});
+    const tempo = (auto.data as { data: { tempo: { confidence: number; beats_per_bar: number; alternatives: { bpm: number }[] } } }).data.tempo;
+    expect(tempo.confidence).toBeGreaterThan(0.6);
+    expect(tempo.beats_per_bar).toBe(4);
+    expect(tempo.alternatives.some((a) => Math.abs(a.bpm - 60) < 2)).toBe(true);
+    expect(auto.text).toMatch(/confidence/);
+    const forced = await run({ bpm: "60" });
+    expect(forced.ok, forced.text).toBe(true);
+    expect((forced.data as { data: { bpm: number; tempo: { given_bpm: boolean } } }).data).toMatchObject({ bpm: 60, tempo: { given_bpm: true } });
+  });
+
   it("returns the desktop's receipt shape with a tempo grid", async () => {
     const doc = reelProject();
     const result = await runTool({ doc, host: withAudio(fakeHost()) }, "detect_beats_tool", { file_id: "SONGXXXXXX" });

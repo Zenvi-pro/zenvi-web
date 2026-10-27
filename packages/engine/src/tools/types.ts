@@ -524,6 +524,12 @@ export interface AudioHost {
     options?: { range?: { start: number; end: number }; silenceDb?: number; minSilence?: number; signal?: AbortSignal },
   ): Promise<MixMeasurement>;
   /**
+   * `decodePcm` also reads an https URL (ffmpeg on the CLI and desktop). Hosts
+   * that only know the project's own media (Zenvi Cloud) leave it unset: stock
+   * music search then does not try to measure previews.
+   */
+  decodesUrls?: boolean;
+  /**
    * Transcribe the speech in `path`'s audio with word timings, through the
    * Zenvi backend (`POST /api/v1/transcription`, billed per started minute).
    * Hosts extract mono speech audio, split long media

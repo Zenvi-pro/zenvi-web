@@ -91,6 +91,19 @@ describe("add_motion_template_tool", () => {
     expect(doc.project.clips.map((c) => c.id)).toEqual(["SONGCLIP01"]);
   });
 
+  it("puts the first beat of a given bpm at offset_seconds", async () => {
+    const doc = verticalProject("none");
+    const result = await runTool({ doc, host: motionHost() }, "add_motion_template_tool", { template: "end_card", text: "Northwind", bpm: 150, offset_seconds: 0.3 });
+    expect(result.ok, result.text).toBe(true);
+    const data = dataOf(result) as { bpm: number; beats: number[] };
+    expect(data.bpm).toBe(150);
+    expect(data.beats[0]).toBeCloseTo(0.3, 2);
+    expect(data.beats[1]! - data.beats[0]!).toBeCloseTo(0.4, 2);
+    const refused = await runTool({ doc, host: motionHost() }, "add_motion_template_tool", { template: "end_card", text: "Northwind", offset_seconds: 0.3 });
+    expect(refused.ok).toBe(false);
+    expect(refused.text).toMatch(/offset_seconds goes with bpm/);
+  });
+
   it("lands over an edit on the lowest free tracks above every picture there", async () => {
     const doc = fixtureDoc();
     const result = await runTool({ doc, host: motionHost() }, "add_motion_template_tool", { template: "grid_background", variant: "paper", position_seconds: "2", duration_seconds: "2" });
