@@ -58,3 +58,17 @@ export function weakGridWarning(beats: BeatAnalysis): string | null {
   if (beats.confidence >= LOW_CONFIDENCE) return null;
   return `The beat grid is not reliable (confidence ${beats.confidence}, ${beats.bpm} BPM): listen to the cuts, or pass bpm + offset_seconds / beats.`;
 }
+
+/**
+ * The octave of a tracked tempo that suits a style: a 80 BPM loop with a real
+ * 160 pulse cuts a hype reel at 160, not at half speed. Null keeps the tracked
+ * tempo (it is already the nearest, or no other reading is in the audio).
+ */
+export function octaveNearStyle(beats: BeatAnalysis, styleBpm: number): number | null {
+  if (beats.forced) return null;
+  const distance = (bpm: number) => Math.abs(Math.log2(bpm / styleBpm));
+  const best = beats.alternatives
+    .filter((a) => a.support >= 0.8 && a.bpm >= 60 && a.bpm <= 200)
+    .sort((a, b) => distance(a.bpm) - distance(b.bpm))[0];
+  return best && distance(beats.bpm) - distance(best.bpm) >= 0.25 ? best.bpm : null;
+}

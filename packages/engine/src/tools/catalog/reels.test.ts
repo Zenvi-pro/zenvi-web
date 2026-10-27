@@ -215,6 +215,22 @@ describe("build_reel_tool with the beat grid given", () => {
     expect(data.music_tempo?.given_bpm).toBe(true);
   });
 
+  it("cuts a slow-reading loop at the faster octave the audio also has when the style is fast", async () => {
+    // A loop that reads as 80 with a full 160 pulse: hype (128) cuts at 160, not at half speed.
+    const slow = new Float32Array(40 * SR);
+    for (let t = 0; t < 40; t += 60 / 160) {
+      const start = Math.round(t * SR);
+      for (let k = 0; k < SR * 0.1 && start + k < slow.length; k += 1) slow[start + k] = (Math.round(t / (60 / 160)) % 2 === 0 ? 0.9 : 0.5) * Math.exp(-k / (0.02 * SR)) * Math.sin((2 * Math.PI * 900 * k) / SR);
+    }
+    const host = withAudio(fakeHost());
+    host.audio!.decodePcm = async () => ({ sampleRate: SR, samples: slow });
+    const result = await runTool({ doc: reelProject(), host }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12 });
+    expect(result.ok, result.text).toBe(true);
+    const data = (result.data as { data: Reel; warnings?: string[] }).data;
+    expect(data.bpm).toBeGreaterThan(155);
+    expect(data.beat_source).toMatch(/faster reading/);
+  });
+
   it("reports how sure the detected grid is", async () => {
     const { data } = await reel({});
     expect(data.beat_source).toBe("the music, tracked");

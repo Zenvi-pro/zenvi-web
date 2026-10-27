@@ -26,6 +26,10 @@ const OUT = path.join(ROOT, "docs", "TOOLS.md");
  */
 const DIVERGENCES: [string, string][] = [
   [
+    "detect_beats_tool",
+    "Beats are a tempo-consistent grid, not the desktop's energy peaks. The tempo is moved into 80-180 BPM when the faster/slower pulse is in the audio, and the receipt adds `tempo` (confidence 0-1, the half/double readings in `alternatives`, beats_per_bar, bar_confidence) so a half- or double-time grid can be corrected with `bpm`. build_reel_tool and add_motion_template_tool also take `beats`, or `bpm` + `offset_seconds`, instead of detecting.",
+  ],
+  [
     "add_clip_to_timeline_tool",
     "Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2726), leaving a one-frame black/silent gap.",
   ],
@@ -107,7 +111,7 @@ const DIVERGENCES: [string, string][] = [
   ],
   [
     "web-only arguments",
-    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), list_effects_tool category (older name for kind), remove_effect_tool effect_id (the older tool's one id, added to effect_ids), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).",
+    "Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), list_effects_tool category (older name for kind), remove_effect_tool effect_id (the older tool's one id, added to effect_ids), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import), detect_beats_tool bpm (track the beats at a given tempo). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).",
   ],
   [
     "desktop defaults the web does not follow yet",

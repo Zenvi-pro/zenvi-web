@@ -1514,6 +1514,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 | `file_id` | string |  | Alias for fileId. |
 | `clipId` | string |  | Timeline clip id. |
 | `timeline_clip_id` | string |  | Alias for clipId. |
+| `bpm` | number |  | Track the beats at this tempo instead of estimating it (e.g. the 160 of a loop read as 80): the grid still snaps to where the audio hits. (min 40, max 400) |
 
 ### diarize_media_tool
 
@@ -3174,7 +3175,9 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `end_card_subtitle` | string |  | A smaller line under the end card. |
 | `labels` | string[] |  | Small labels shown on each file's shots, in file_ids order ("" for none). Motion styles: the card captions (ui_promo), crop labels (editorial_motion), step captions (tutorial). |
 | `words` | string[] |  | Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial). |
-| `beats` | number[] |  | Beat times of the music in seconds (e.g. from detect_beats_tool) instead of analysing it here. |
+| `beats` | number[] |  | Beat times of the music in seconds (e.g. from detect_beats_tool), used as they are instead of detecting the beat. |
+| `bpm` | number |  | Tempo to use instead of the detected one. Alone: the music is tracked at this tempo (detect_beats_tool's alternatives lists the half/double readings). With offset_seconds: no detection, the grid is exact. (min 40, max 400) |
+| `offset_seconds` | number |  | With bpm: where the first beat falls in the music, seconds. The grid runs from there at that tempo. (min 0, max 3600) |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (they are removed in the same undo step). |
 
 ### add_motion_template_tool
@@ -3192,7 +3195,8 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `duration_seconds` | number |  | Length, seconds (default: the template's natural length in beats). (min 0.5, max 120) |
 | `palette` | "ui_light" \| "ui_dark" \| "editorial" \| "callout" \| "tutorial" |  | Colours: ui_light, ui_dark, editorial (paper, ink, red, one blue), callout (dark, hot accent), tutorial (grid paper, ink, highlighter). Default per template. |
 | `accent` | string |  | Replace the palette's accent colour (a brand colour): #rrggbb, #rgb, rgb(r,g,b) or a colour name. |
-| `bpm` | number |  | Tempo of the beat grid, beats from the timeline's start (when there is no `beats`). (min 40, max 240) |
+| `bpm` | number |  | Tempo of the beat grid, beats from the timeline's start or from offset_seconds (when there is no `beats`). (min 40, max 400) |
+| `offset_seconds` | number |  | With bpm: timeline seconds of the first beat (default 0). (min 0, max 3600) |
 | `beats` | number[] |  | Beat times on the timeline, seconds (build_reel_tool's data.beats, detect_beats_tool's beats moved to the music clip's position). |
 | `text` | string |  | Main text: the typed phrase (type_search), the headline (kinetic_type; * stands for an image tile), the title (end_card), the caption (step_card), the product name (callout). |
 | `subtitle` | string |  | A second line: end_card's subtitle, the text cards' line (ui_cards), the prompt above the search (type_search), a still header at the top (step_card). |
@@ -3235,9 +3239,13 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `query` | string | yes | Mood, genre or sound, e.g. 'upbeat lo-fi hip hop' or 'whoosh'. |
+| `query` | string | yes | Genre or sound, e.g. 'upbeat lo-fi hip hop' or 'whoosh'. No tempo here: use bpm / bpm_range. |
 | `count` | integer \| string |  | How many results (1-16, default 8). |
 | `min_seconds` | number \| string |  | Shortest track wanted, seconds (e.g. the video's length for a music bed). |
+| `bpm` | number \| string |  | Wanted tempo, BPM: tracks within about 5% of it, or whose half or double reading is. |
+| `bpm_range` | number[] \| string |  | Wanted tempo range, [min, max] or 'min-max' BPM (instead of bpm), e.g. '150-170' for a hype cut. |
+| `mood` | string |  | Mood words added to the search, e.g. 'dark energetic'. Dropped if they leave no results. |
+| `energy` | "low" \| "medium" \| "high" |  | Keep tracks of this energy (level and how hard the beats hit, measured); hype cuts want high. |
 
 ## Not ported yet
 
@@ -3253,6 +3261,7 @@ Arguments of ported tools that only Zenvi desktop takes so far. A call that sets
 
 Deliberate differences from the zenvi-core handlers:
 
+- **detect_beats_tool**: Beats are a tempo-consistent grid, not the desktop's energy peaks. The tempo is moved into 80-180 BPM when the faster/slower pulse is in the audio, and the receipt adds `tempo` (confidence 0-1, the half/double readings in `alternatives`, beats_per_bar, bar_confidence) so a half- or double-time grid can be corrected with `bpm`. build_reel_tool and add_motion_template_tool also take `beats`, or `bpm` + `offset_seconds`, instead of detecting.
 - **add_clip_to_timeline_tool**: Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2726), leaving a one-frame black/silent gap.
 - **add_clip_to_timeline_tool and the tools that place through it**: A host that cannot watch frames (no frame rendering or no Zenvi backend) counts as "not watched": a duration-only trim of a full video is refused instead of placing the first N seconds, and the result never says "(watched)". The desktop's watch falls back softly and places the window.
 - **watch (add_clip_to_timeline_tool, slice_clip_at_best_match_tool, search_clip_scenes_tool, watch_clip_window_tool)**: Up to 12 frames rendered by the host; no ffmpeg scene-cut detection (shot cuts are always reported as none) and no near-duplicate frame dedupe (watch_window.py extract_watch_window).
@@ -3273,7 +3282,7 @@ Deliberate differences from the zenvi-core handlers:
 - **remove_words_tool**: Cuts on real word timings only (a kept or new transcription, never the index's estimates). wordIndices must come from the words they cut: indices for a transcription made by the same call are refused (call get_transcript_tool first), and a transcription made after the index's words gets the next transcriptGeneration, so indices read from the index are refused as stale. Refusals that need no words (an unknown fillerPreset, a retimed clip, an ambiguous clipId) come before any transcription is paid for.
 - **duck_under_speech_tool / analyze_timeline_audio_tool**: With speech_clip_ids=auto and no indexed speech, talking footage (picture and sound) without a transcript is transcribed and its words become the speech windows (`transcript`); the desktop falls back to its local VAD. A kept transcription also marks a clip the index does not know as speech in analyze_timeline_audio_tool.
 - **remove_silence_tool**: Speech windows come from the desktop's energy VAD run on the host's RMS envelope (AudioHost.analyzeAudio), not from on-device VAD models.
-- **web-only arguments**: Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), list_effects_tool category (older name for kind), remove_effect_tool effect_id (the older tool's one id, added to effect_ids), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).
+- **web-only arguments**: Hosts without a playhead or local file paths, and the CLI, need a few arguments the desktop's schemas do not have (scripts/tool-schema-overlay.json `web_extra_props`): add_marker_tool label/text and add_track_tool label (older names for `name`), save_project_tool path, set_clip_volume_tool volume/gain/db, set_clip_speed_tool clip_id/factor/direction (the web's older speed tool: one clip id, speed, backward = reverse), list_effects_tool category (older name for kind), remove_effect_tool effect_id (the older tool's one id, added to effect_ids), watch_clip_tool file_id/timeline_clip_id, import_stock_media_tool position_seconds/track/duration_seconds/start_seconds (place the import), detect_beats_tool bpm (track the beats at a given tempo). Every argument the desktop accepts is accepted; the ones only the desktop handles so far are refused (see Not ported yet).
 - **desktop defaults the web does not follow yet**: save_project_tool and export_video_tool replace an existing file (the CLI's) where the desktop refuses unless overwrite=true; new_project_tool / open_project_tool have no unsaved-changes guard (every web surface autosaves, so discard_unsaved is accepted as is); generate_tts_and_add_to_timeline_tool defaults to the track below the picture, where the desktop picks or creates a free narration track.
 - **tools zenvi-core develop rewrote as editor tools**: get_project_info_tool, list_markers_tool, new/open/save_project_tool, play_tool, add_track_tool, add_marker_tool, generate_tts_and_add_to_timeline_tool and set_keyframes_tool take develop's schemas; their results keep the earlier text and receipts (develop answers with structured receipts). set_keyframes_tool animates the seven earlier properties (develop: any keyframable clip property) with develop's point times, interpolation, ease presets and modes, and refuses a point without a value (develop keeps the curve's value there).
 - **split_file_add_clip_tool**: require_visual_match reads true/false; the desktop's `bool(...)` treats the string "false" as true (tool_handlers.py:2370).

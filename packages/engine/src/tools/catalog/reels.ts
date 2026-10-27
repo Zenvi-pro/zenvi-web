@@ -28,7 +28,7 @@ import { buildMotionReel } from "./motion-reels.js";
 import { placeMusicBed } from "./music-bed.js";
 import { cardSvg, flashSvg, type CardRole } from "../../reels/typography.js";
 import { beatOverrideProblem, beatOverrideShape, explicitBeats } from "../beat-override.js";
-import { beatsOfFile, canTrackBeats, tempoReport, weakGridWarning } from "../beats.js";
+import { beatsOfFile, canTrackBeats, octaveNearStyle, tempoReport, weakGridWarning } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
@@ -258,11 +258,23 @@ export const reelTools: CatalogTool[] = [
           beats = musicFromBeats(given.beats, musicLength, args.bpm);
           beatSource = given.source;
         } else if (canTrackBeats(call)) {
-          const tracked = await beatsOfFile(call, music, args.bpm ? { bpm: args.bpm } : {});
+          let tracked = await beatsOfFile(call, music, args.bpm ? { bpm: args.bpm } : {});
+          let moved = false;
+          // A loop read at half speed cuts a hype reel too slowly: use the octave the audio also has that is nearer the style's.
+          const styleBpm = isMotionStyleId(styleId) ? MOTION_STYLES[styleId].defaultBpm : REEL_STYLES[styleId].defaultBpm;
+          const nearer = typeof tracked === "string" ? null : octaveNearStyle(tracked, styleBpm);
+          if (nearer !== null && typeof tracked !== "string") {
+            const retracked = await beatsOfFile(call, music, { bpm: nearer });
+            if (typeof retracked !== "string" && retracked.beats.length >= 2) {
+              warnings.push(`The music reads as ${tracked.bpm} BPM and also as ${nearer}: cutting at ${nearer} to suit ${styleId} (pass bpm to choose).`);
+              tracked = retracked;
+              moved = true;
+            }
+          }
           if (typeof tracked === "string") warnings.push(`${tracked} Cut to the style's tempo instead.`);
           else if (tracked.beats.length >= 2) {
             beats = { ...tracked, beats: tracked.beats.map((b) => b.timeSec), downbeats: tracked.downbeats.map((d) => d.timeSec), duration: Math.max(musicLength, tracked.duration) };
-            beatSource = args.bpm ? `the music tracked at ${args.bpm} BPM` : "the music, tracked";
+            beatSource = args.bpm ? `the music tracked at ${args.bpm} BPM` : moved ? `the music, tracked at ${tracked.bpm} BPM (its faster reading)` : "the music, tracked";
             tempo = tempoReport(tracked);
             const weak = weakGridWarning(tracked);
             if (weak) warnings.push(weak);
