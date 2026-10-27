@@ -261,7 +261,7 @@ def build(job):
     else:  # turntable
         motion.animate(cam, "location", [(1, at(-18, elevation, dist * 1.02)), (end, at(-18, elevation, dist * 0.97))], "in-out")
         turn = math.radians(float(p.get("turn_degrees", 120)))
-        motion.animate(pivot, "rotation_euler", [(1, (0, 0, -turn / 2)), (end, (0, 0, turn / 2))], "linear" if p.get("steady", True) else "in-out")
+        motion.animate(pivot, "rotation_euler", [(1, (0, 0, -turn / 2)), (end, (0, 0, turn / 2))], "linear")
     if p.get("land"):
         # Dropped onto the floor: falls fast, lands, settles (TASTE: enter fast, settle slowly).
         f1 = 1 + int(round(0.55 * fps))

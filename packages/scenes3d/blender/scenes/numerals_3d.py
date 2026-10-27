@@ -13,6 +13,7 @@ BLANK = 10
 STEP = 2 * math.pi / SLOTS
 ROLL = 0.6  # seconds a change takes
 STAGGER = 0.05  # TASTE: per item, left to right
+UNIT_SIZE = 0.45  # suffix text size (the numerals are 1); the prefix is 1.4 times it
 
 
 def fading(mat, radius, axis_y):
@@ -67,7 +68,7 @@ def build(job):
     radius = 1.25 * cap / STEP
 
     digit_mat = fading(materials.finish(style, p.get("color") or (None if style == "clay" else p.get("accent")), p.get("secondary")), radius, radius)
-    unit_mat = materials.finish(p.get("unit_style") or style, p.get("unit_color") or p.get("color") or (None if style == "clay" else p.get("accent")), p.get("secondary"))
+    unit_mat = materials.finish(style, p.get("unit_color") or p.get("color") or (None if style == "clay" else p.get("accent")), p.get("secondary"))
 
     columns = int_len + (decimals and decimals + 1)
     counter = core.empty("Counter")
@@ -107,10 +108,9 @@ def build(job):
             g.rotation_euler = (math.radians(90) + theta, 0, 0)
         drums.append(drum)
 
-    unit_size = float(p.get("unit_size", 0.45))
     left = 0.0
     if prefix:
-        pre = shapes.text(prefix, font, unit_size * 1.4, extrude, bevel, unit_mat, align="RIGHT", name="Prefix")
+        pre = shapes.text(prefix, font, UNIT_SIZE * 1.4, extrude, bevel, unit_mat, align="RIGHT", name="Prefix")
         b = shapes.ink_bounds(pre)
         pre.data.offset_y = -(b[2] + b[3]) / 2
         pre.rotation_euler = (math.radians(90), 0, 0)
@@ -119,7 +119,7 @@ def build(job):
         left = -advance * 0.12 - (b[1] - b[0])
     right = digits_right
     if suffix:
-        suf = shapes.text(suffix, font, unit_size, extrude * 0.8, bevel, unit_mat, align="LEFT", name="Suffix")
+        suf = shapes.text(suffix, font, UNIT_SIZE, extrude * 0.8, bevel, unit_mat, align="LEFT", name="Suffix")
         b = shapes.ink_bounds(suf)
         # On the numerals' baseline, like a unit set after a figure.
         suf.data.offset_y = -(b[2]) + (min(i[2] for i in inks) - y_mid)
