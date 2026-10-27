@@ -243,4 +243,23 @@ describe("unify_grade_tool", { timeout: 60_000 }, () => {
     const orphan = await unify(ed, { look_intensity: 0.5 });
     expect(orphan.summary).toBe("Error: look_intensity needs a look (a LUT id from list_looks_tool)");
   });
+
+  it("commits nothing when cancelled during the last clip's passes", async () => {
+    const ed = painted();
+    const dark = ed.addClip(ed.addFile("video", { name: "dark.mp4" }), { position: 0, end: 2 });
+    const bright = ed.addClip(ed.addFile("video", { name: "bright.mp4" }), { position: 2, end: 4 });
+    const controller = new AbortController();
+    let brightPaints = 0;
+    ed.host.frames = pixelFrameHost((path, w, h) => {
+      // Its first six paints measure it (five samples and the preview); the seventh is its first correction pass, after dark's.
+      if (path.includes("bright") && (brightPaints += 1) === 7) controller.abort();
+      return ramp(w, h, path.includes("dark") ? 50 : 200);
+    });
+    ed.mark();
+    const result = await runTool({ doc: ed.doc, host: ed.host, signal: controller.signal }, "unify_grade_tool", { samples: 5 });
+    expect(result.data!.summary).toBe("Error: cancelled; nothing changed");
+    expect(ed.clip(dark)!.effects).toEqual([]);
+    expect(ed.clip(bright)!.effects).toEqual([]);
+    expect(ed.stepsSinceMark()).toBe(0);
+  });
 });
