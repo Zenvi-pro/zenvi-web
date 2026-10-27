@@ -5,6 +5,7 @@
  * a frame is black (mean luma of the frame scaled to one grey pixel).
  */
 
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveBinary, runBinary, whichSync } from "@zenvi/render-node";
@@ -19,13 +20,13 @@ async function ffmpeg(args: readonly string[]): Promise<string> {
 /** Host programs a scenario may require, present or not. */
 export function hostHas(program: "ffmpeg" | "say"): boolean {
   if (program === "ffmpeg") {
-    try {
-      resolveBinary("ffmpeg");
-      resolveBinary("ffprobe");
-      return true;
-    } catch {
-      return false;
-    }
+    // resolveBinary never throws: when nothing is found it returns the bare
+    // name (and an env override unchecked), so check the result exists.
+    const present = (name: "ffmpeg" | "ffprobe"): boolean => {
+      const p = resolveBinary(name);
+      return path.isAbsolute(p) || p.includes(path.sep) ? existsSync(p) : whichSync(p) !== undefined;
+    };
+    return present("ffmpeg") && present("ffprobe");
   }
   return whichSync("say") !== undefined;
 }
