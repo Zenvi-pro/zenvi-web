@@ -26,7 +26,7 @@ import { getCloseMatches } from "./difflib.js";
 import { projectFps } from "./frame-time.js";
 import { pyFixed, pyReprString } from "./pyfmt.js";
 import { refused } from "./receipt.js";
-import { buildTrackStack, formatTrackLabelForLlm, normalizeTrackOrLayerArg } from "./tracks.js";
+import { buildTrackStack, formatTrackLabelForLlm, normalizeTrackOrLayerArg, resolvePlacementTrack, type TrackResolution } from "./tracks.js";
 import type { ImportedMedia } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -62,6 +62,11 @@ export async function guarded(tool: string, body: () => Promise<ToolOutcome> | T
 /** `_base.ok`'s summary line: whitespace collapsed. */
 export function summaryLine(text: string): string {
   return text.split(/\s+/).filter(Boolean).join(" ");
+}
+
+/** The summary suffix for receipt warnings (" Warning: …."), so an agent that reads only the summary sees them. */
+export function warningNote(warnings: readonly string[]): string {
+  return warnings.map((w) => ` Warning: ${w}.`).join("");
 }
 
 /** Python `round(x, digits)` (correctly rounded, ties to even on the binary value). */
@@ -314,12 +319,21 @@ export function ensureUnlocked(project: Project, layer: number): void {
 
 /** `resolve_layer`: a UI track number, label, track id or layer number → layer number. */
 export function resolveLayer(project: Project, track: unknown): number {
+  return requireTrack(track, (raw) => normalizeTrackOrLayerArg(raw, project.layers)).layer;
+}
+
+/** `resolve_placement_layer`: resolveLayer, or up to three tracks past the top to add (resolvePlacementTrack). */
+export function resolvePlacementLayer(project: Project, track: unknown): { layer: number; newTracks: number } {
+  return requireTrack(track, (raw) => resolvePlacementTrack(raw, project.layers));
+}
+
+function requireTrack(track: unknown, resolve: (raw: string) => TrackResolution): { layer: number; newTracks: number } {
   const raw = String(track ?? "").trim();
   if (!raw) toolError("a track is required (UI track number, name, or layer number)");
-  const res = normalizeTrackOrLayerArg(raw, project.layers);
+  const res = resolve(raw);
   if (res.error) toolError(res.error);
   if (res.layer === undefined) toolError(`no track matches ${pyReprString(raw)}`);
-  return res.layer;
+  return { layer: res.layer, newTracks: res.newTracks ?? 0 };
 }
 
 /** `track_info`: the receipt fields naming a track. */
@@ -345,11 +359,21 @@ export function clipsInWindow(project: Project, layer: number | null, start: num
   });
 }
 
+/** Where an overlay goes. `moved` is the receipt warning when the named track was busy and another was used. */
+export interface OverlayPlan {
+  layer: number;
+  created: boolean;
+  moved?: string;
+}
+
 /**
  * `plan_overlay_track`: where an overlay shown over [start, end) goes.
- * An explicit `track` must exist, be unlocked and be free in the window;
- * otherwise the lowest free, unlocked track above every clip with a
- * picture in the window, or a new track on top when none is free.
+ * An explicit `track` must exist, be unlocked and be free in the window,
+ * or be one to three tracks past the top (created, with the ones between);
+ * a named track that has a clip in the window sends the overlay to the
+ * first free track above it (`moved` says so); otherwise the lowest free,
+ * unlocked track above every clip with a picture in the window, or a new
+ * track on top when none is free.
  */
 export function planOverlayTrack(
   project: Project,
@@ -357,24 +381,34 @@ export function planOverlayTrack(
   end: number,
   track: unknown,
   exclude: ReadonlySet<string> = new Set(),
-): { layer: number; created: boolean } {
+): OverlayPlan {
   if (String(track ?? "").trim()) {
-    const layer = resolveLayer(project, track);
+    const { layer, newTracks } = resolvePlacementLayer(project, track);
+    if (newTracks > 0) return { layer, created: true };
     ensureUnlocked(project, layer);
     const busy = clipsInWindow(project, layer, start, end, exclude);
-    if (busy.length > 0) {
-      const [s, e] = clipExtent(busy[0]!);
-      const name = pyReprString(String(busy[0]!.title || busy[0]!.id));
-      toolError(
+    if (busy.length === 0) return { layer, created: false };
+    const [s, e] = clipExtent(busy[0]!);
+    const name = pyReprString(String(busy[0]!.title || busy[0]!.id));
+    // Agents name a track they believe is free; the overlay is what matters, not the lane.
+    const plan = firstFreeTrack(project, start, end, exclude, layer);
+    const where = plan.created ? `a new track on top (track ${project.layers.length + 1})` : `track ${uiTrackNumber(project, plan.layer) ?? plan.layer}`;
+    return {
+      ...plan,
+      moved:
         `track ${uiTrackNumber(project, layer) ?? layer} already has ${name} at ${pyFixed(s, 2)}-${pyFixed(e, 2)}s during ` +
-          `${pyFixed(start, 2)}-${pyFixed(end, 2)}s; pick another track or leave track empty to use the first free track above the video`,
-      );
-    }
-    return { layer, created: false };
+        `${pyFixed(start, 2)}-${pyFixed(end, 2)}s; placed on ${where} instead`,
+    };
   }
+  return firstFreeTrack(project, start, end, exclude, null);
+}
+
+/** The lowest free, unlocked track above `above` and above every picture in the window; a new track on top when none is. */
+function firstFreeTrack(project: Project, start: number, end: number, exclude: ReadonlySet<string>, above: number | null): OverlayPlan {
   const numbers = project.layers.map((l) => Math.trunc(Number(l.number) || 0)).sort((a, b) => a - b);
   const visual = clipsInWindow(project, null, start, end, exclude).filter(isVisualClip);
-  const floor = visual.length > 0 ? Math.max(...visual.map((c) => Math.trunc(Number(c.layer) || 0))) : null;
+  const floors = [...visual.map((c) => Math.trunc(Number(c.layer) || 0)), ...(above === null ? [] : [above])];
+  const floor = floors.length > 0 ? Math.max(...floors) : null;
   for (const num of numbers) {
     if (floor !== null && num <= floor) continue;
     if (isLocked(project, num)) continue;

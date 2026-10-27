@@ -3,6 +3,7 @@ export type * from "./types.js";
 export * from "./receipt.js";
 export * from "./wire.js";
 export * from "./json-schema.js";
+export { aliasArguments, matchOption, type AliasedArguments, type OptionMatch } from "./aliases.js";
 export { HIDDEN_PARAMS, normalizeArgs } from "./coerce.js";
 export {
   CONTRACT_REF,
@@ -58,4 +59,5 @@ export {
   type ToolNeeds,
 } from "./availability.js";
 export { RECEIPT_OUTPUT_SCHEMA } from "./output-schema.js";
-export { pickPexelsHdLink } from "./backend.js";
+export { backendStock, pickPexelsHdLink } from "./backend.js";
+export { SOUND_LIBRARY_ORIGINS, fetchLibraryHost, type LibraryFetch } from "./sfx-library.js";

@@ -10,6 +10,7 @@
  * summary line with its receipt object as `data`.
  */
 
+import type { Transaction } from "../../history/document.js";
 import type { Clip, Project, ProjectFile, Transition } from "../../model/types.js";
 import { DEFAULT_IMAGE_LENGTH, DEFAULT_TRANSITION_LENGTH, basename } from "../../model/defaults.js";
 import { findTransition } from "../../model/query.js";
@@ -17,6 +18,7 @@ import { alignedPositions, closeAllGaps } from "../../ops/arrange.js";
 import { closeGap, moveClip, splitClip, splitTransition, trimClip } from "../../ops/clips.js";
 import { fitLengths, placeFiles, type PlaceFileEntry } from "../../ops/add-to-timeline.js";
 import { duplicateItems, remapLayers, shiftAfter, trackEnd, transitionsBetween, type PlannedItem, type PlannedSpan } from "../../ops/sequence.js";
+import { ensureTrack } from "../../ops/overlays.js";
 import { moveTransition } from "../../ops/transitions.js";
 import { clipTimeBounds } from "../../model/timing.js";
 import { listGaps, itemsOnLayer } from "../../timeline/queries.js";
@@ -25,7 +27,7 @@ import { contractTool, type CatalogTool, type ToolCall } from "../define.js";
 import { sourceWindowForFile } from "../placement.js";
 import { pyFixed, pyG, pyReprString } from "../pyfmt.js";
 import type { ContractInput } from "../schemas.gen.js";
-import { defaultUnderlayLayerNumber } from "../tracks.js";
+import { defaultUnderlayLayerNumber, newTracksNote } from "../tracks.js";
 import { fileById, playheadSeconds, selectedTrack } from "./common.js";
 import {
   ToolError,
@@ -44,6 +46,7 @@ import {
   r3,
   requireUnlockedTracks,
   resolveLayer,
+  resolvePlacementLayer,
   spanOf,
   targetClips,
   trackName,
@@ -206,7 +209,9 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
     fitNote = `, already within ${pyG(fitTotal)} s so nothing was trimmed`;
   }
 
-  const layer = input.track?.trim() ? resolveLayer(project, input.track) : (selectedTrack(call)?.number ?? defaultUnderlayLayerNumber(project.layers));
+  const { layer, newTracks } = input.track?.trim()
+    ? resolvePlacementLayer(project, input.track)
+    : { layer: selectedTrack(call)?.number ?? defaultUnderlayLayerNumber(project.layers), newTracks: 0 };
   requireUnlockedTracks(project, [layer]);
   const startSeconds = input.start_seconds ?? -1;
   const start = startSeconds >= 0 ? g.snap(startSeconds) : g.snap(trackEnd(project, layer));
@@ -223,8 +228,9 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
   const placement: PlaceFileEntry[] = entries.map((entry) =>
     entry.image ? { fileId: entry.file.id, end: entry.length } : { fileId: entry.file.id, start: entry.start!, end: entry.start! + entry.length },
   );
-  const result = call.commit((tx) =>
-    placeFiles(tx, placement, start, layer, {
+  const result = call.commit((tx) => {
+    if (newTracks > 0) ensureTrack(tx, layer);
+    return placeFiles(tx, placement, start, layer, {
       ...(fade !== "none" ? { fade } : {}),
       fadeLength: fadeSeconds,
       ...(choice.mask ? { transition: choice.mask } : {}),
@@ -233,8 +239,8 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
       imageLength,
       ...(input.zoom && input.zoom !== "none" ? { zoom: input.zoom } : {}),
       transitionFirstClip: false,
-    }),
-  );
+    });
+  });
 
   const after = call.doc.project;
   const placed = result.clipIds.map((id) => clipById(after, id)).filter((c): c is Clip => c !== undefined).map((c) => describeClip(after, c));
@@ -248,7 +254,7 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
         : "";
   return ok(
     call,
-    `Placed ${placed.length} clip(s) on ${trackName(after, layer)} from ${f2(start)} s to ${f2(end)} s (${pyFixed(end - start, 1)} s${how}${fitNote}).`,
+    `Placed ${placed.length} clip(s) on ${trackName(after, layer)}${newTracksNote(newTracks)} from ${f2(start)} s to ${f2(end)} s (${pyFixed(end - start, 1)} s${how}${fitNote}).`,
     {
       track: uiTrack(after, layer),
       start: r3(start),
@@ -258,6 +264,7 @@ async function addClipsToTimeline(call: ToolCall, input: ContractInput<"add_clip
       transition_ids: result.transitionIds,
       trimmed_file_ids: trimmedIds,
       overlap_seconds: r3(overlap),
+      ...(newTracks > 0 ? { new_tracks: newTracks } : {}),
     },
   );
 }
@@ -272,15 +279,37 @@ function isClip(project: Project, item: Item): item is Clip {
   return project.clips.some((c) => c.id === item.id);
 }
 
-function layerMapFor(project: Project, sources: Set<number>, destTrack: string): Map<number, number> {
-  const dest = resolveLayer(project, destTrack);
-  const map = remapLayers(project, sources, dest);
+/**
+ * Where each source track goes for a destination track; `newTracks` is how
+ * many tracks the caller must add on top first (the destination named one to
+ * three past the top, as placement tools allow).
+ */
+function layerMapFor(project: Project, sources: Set<number>, destTrack: string): { map: Map<number, number>; newTracks: number } {
+  const { layer: dest, newTracks } = resolvePlacementLayer(project, destTrack);
+  const map = remapLayers(project, sources, dest, newTracks);
   if (!map) {
     throw new ToolError(
       `moving these clips' ${sources.size} tracks onto ${trackName(project, dest)} needs a track that does not exist; add one first (add_track_tool)`,
     );
   }
-  return map;
+  return { map, newTracks };
+}
+
+/** Add the tracks a remapped selection lands on, up to the highest one (ensureTrack adds the empty ones between). */
+function ensureMappedTracks(tx: Transaction, project: Project, layerMap: ReadonlyMap<number, number>): void {
+  const top = Math.max(0, ...project.layers.map((l) => l.number));
+  const highest = Math.max(...layerMap.values());
+  if (highest > top) ensureTrack(tx, highest);
+}
+
+/**
+ * Summary notes for the tracks a move/copy added: `[on the named track, at the end]`. A
+ * selection from several tracks can name an existing track while lower sources' tracks are
+ * the new ones, so the count goes at the end instead of "on a new track".
+ */
+function addedTracksNotes(newTracks: number, namedIsNew: boolean): [string, string] {
+  if (newTracks <= 0) return ["", ""];
+  return namedIsNew ? [newTracksNote(newTracks), ""] : ["", `; ${newTracks} track${newTracks === 1 ? "" : "s"} added on top`];
 }
 
 async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">) {
@@ -312,11 +341,12 @@ async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">
   }
 
   const srcLayers = new Set(clips.map((c) => c.layer));
-  const layerMap = anchor
+  const mapped = anchor
     ? layerMapFor(project, srcLayers, String(uiTrack(project, anchor.layer)))
     : toTrack
       ? layerMapFor(project, srcLayers, toTrack)
-      : new Map([...srcLayers].map((n) => [n, n]));
+      : { map: new Map([...srcLayers].map((n) => [n, n])), newTracks: 0 };
+  const { map: layerMap, newTracks } = mapped;
   requireUnlockedTracks(project, [...srcLayers, ...layerMap.values()]);
 
   const g = gridOf(project);
@@ -422,6 +452,7 @@ async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">
   }
 
   call.commit((tx) => {
+    ensureMappedTracks(tx, project, layerMap);
     for (const [id, [item, newPos, newLayer]] of movedItems) {
       const to = { position: g.snap(newPos), ...(item.layer !== newLayer ? { layer: newLayer } : {}) };
       if (isClip(project, item)) moveClip(tx, id, to);
@@ -446,12 +477,15 @@ async function moveClips(call: ToolCall, input: ContractInput<"move_clips_tool">
     }
   }
   const first = (moved[0]?.to ?? {}) as { position?: number };
+  const named = layerMap.get(clips[0]!.layer)!;
+  const [onNamed, added] = addedTracksNotes(newTracks, !project.layers.some((l) => l.number === named));
   const summary =
-    `Moved ${moved.length} clip(s) to ${trackName(after, layerMap.get(clips[0]!.layer)!)} at ${f2(first.position ?? 0)} s` +
+    `Moved ${moved.length} clip(s) to ${trackName(after, named)}${onNamed} at ${f2(first.position ?? 0)} s` +
     (shifted.length > 0 ? `; ${shifted.length} later clip(s) shifted` : "") +
     (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") +
+    added +
     ".";
-  return ok(call, summary, { moved, shifted: shifted.sort(), overlaps: hits, ripple });
+  return ok(call, summary, { moved, shifted: shifted.sort(), overlaps: hits, ripple, ...(newTracks > 0 ? { new_tracks: newTracks } : {}) });
 }
 
 // ---------------------------------------------------------------------------
@@ -725,7 +759,7 @@ async function duplicateClips(call: ToolCall, input: ContractInput<"duplicate_cl
   const clips = await targetClips(call, input);
   const srcLayers = new Set(clips.map((c) => c.layer));
   const toTrack = (input.to_track ?? "").trim();
-  const layerMap = toTrack ? layerMapFor(project, srcLayers, toTrack) : new Map([...srcLayers].map((n) => [n, n]));
+  const { map: layerMap, newTracks } = toTrack ? layerMapFor(project, srcLayers, toTrack) : { map: new Map([...srcLayers].map((n) => [n, n])), newTracks: 0 };
   const destLayers = new Set(layerMap.values());
   requireUnlockedTracks(project, destLayers, "the copies' destination");
 
@@ -767,6 +801,7 @@ async function duplicateClips(call: ToolCall, input: ContractInput<"duplicate_cl
   }
 
   const { created, transitionIds, shifted } = call.commit((tx) => {
+    ensureMappedTracks(tx, project, layerMap);
     const pushed: string[] = [];
     if (ripple) for (const layer of destLayers) pushed.push(...shiftAfter(tx, layer, base, copies * length));
     const batches: Record<string, unknown>[][] = [];
@@ -793,12 +828,20 @@ async function duplicateClips(call: ToolCall, input: ContractInput<"duplicate_cl
   });
   const first = created[0]![0]! as { position: number; track: number | null };
   const pushedClips = shifted.filter((id) => project.clips.some((c) => c.id === id)).length;
+  const [onFirst, added] = addedTracksNotes(newTracks, (first.track ?? 0) > project.layers.length);
   const summary =
-    `Made ${copies} cop${copies === 1 ? "y" : "ies"} of ${clips.length} clip(s); the first starts at ${f2(first.position)} s on track ${first.track}` +
+    `Made ${copies} cop${copies === 1 ? "y" : "ies"} of ${clips.length} clip(s); the first starts at ${f2(first.position)} s on track ${first.track}${onFirst}` +
     (shifted.length > 0 ? `; ${pushedClips} later clip(s) pushed` : "") +
     (hits.length > 0 ? `; overlaps ${hits.length} clip(s)` : "") +
+    added +
     ".";
-  return ok(call, summary, { copies: created, transition_ids: transitionIds, shifted: [...new Set(shifted)].sort(), overlaps: hits });
+  return ok(call, summary, {
+    copies: created,
+    transition_ids: transitionIds,
+    shifted: [...new Set(shifted)].sort(),
+    overlaps: hits,
+    ...(newTracks > 0 ? { new_tracks: newTracks } : {}),
+  });
 }
 
 // ---------------------------------------------------------------------------

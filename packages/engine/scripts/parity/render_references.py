@@ -11,6 +11,11 @@ Usage (the vitest suite ``render/parity/frame-parity.test.ts`` runs this)::
 
     PYTHONPATH=~/zenvi-deps-1.0/python ~/Projects/zenvi/.venv/bin/python \\
         packages/engine/scripts/parity/render_references.py <output-dir>
+
+It also writes ``motion-base.json`` (two clips cut back to back) for the
+engine to add motion transitions to; the suite then renders those projects
+here with ``--render-jobs <jobs.json>`` (``[{name, project, frames}]``),
+which writes ``<jobs>.out.json`` with the reference frames.
 """
 
 import copy
@@ -36,6 +41,8 @@ def make_media(out):
     # Lossless RGB video (PNG codec): FFmpegReader and the test decode identical pixels.
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2", "-c:v", "png", "-pix_fmt", "rgb24", p("bars.mkv"))
     ffmpeg("-f", "lavfi", "-i", "testsrc=s=192x108:r=24:d=2", "-c:v", "png", "-pix_fmt", "rgb24", p("clock24.mkv"))
+    # A second full-frame 30 fps picture for motion transitions (the incoming shot).
+    ffmpeg("-f", "lavfi", "-i", "testsrc=s=320x180:r=30:d=2", "-c:v", "png", "-pix_fmt", "rgb24", p("cells.mkv"))
     # Opaque still with smooth gradients (resampling-sensitive).
     ffmpeg("-f", "lavfi", "-i", "gradients=s=200x120:c0=0x2050c0:c1=0xf0a020:x0=0:y0=0:x1=200:y1=120:seed=1",
            "-frames:v", "1", "-pix_fmt", "rgb24", p("grad.png"))
@@ -54,7 +61,7 @@ def make_media(out):
     # Video with a PCM tone (exact samples for audio-reactive effects).
     ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x180:r=30:d=2", "-f", "lavfi", "-i", "sine=f=330:r=48000:d=2,aformat=channel_layouts=stereo",
            "-c:v", "png", "-pix_fmt", "rgb24", "-c:a", "pcm_s16le", "-shortest", p("tone.mkv"))
-    return {name: p(name) for name in ["bars.mkv", "clock24.mkv", "grad.png", "logo.png", "mask.png", "green.png", "tone.mkv"]}
+    return {name: p(name) for name in ["bars.mkv", "cells.mkv", "clock24.mkv", "grad.png", "logo.png", "mask.png", "green.png", "tone.mkv"]}
 
 
 def kf(*points):
@@ -217,6 +224,19 @@ def cases(media):
     out.append(("corner-rotate-alpha", project([clip(media, "grad.png", end=3.0, layer=1), rounded]), [1]))
     cropped = clip(media, "bars.mkv", rotation=kf((1, 15)), scale_x=kf((1, 0.7)), scale_y=kf((1, 0.7)), effects=[effect("Crop", left=kf((1, 0.2)), right=kf((1, 0.1)), resize=True)])
     out.append(("crop-resize-rotate", project([cropped]), [1]))
+    # A kaleidoscope as the grid template builds it (motion/templates/montage-grid.ts): four centred clips
+    # showing one Crop window, alternate ones mirrored by negative scales, in-points apart (a repeat's phase),
+    # all pushed in by a linear camera (drift).
+    window = dict(left=kf((1, 0.0)), top=kf((1, 0.0)), right=kf((1, 0.5)), bottom=kf((1, 0.5)), resize=True)
+    segments = []
+    for i, (sx, sy, start) in enumerate([(1, 1, 0.0), (-1, 1, 0.0), (1, -1, 0.2), (-1, -1, 0.4)]):
+        lx, ly = (0.25 if sx < 0 else -0.25), (0.25 if sy < 0 else -0.25)
+        n = round(start * 30)
+        segments.append(clip(media, "bars.mkv", layer=i + 1, start=start, end=start + 1.5,
+                             scale_x=kf((1 + n, 0.5 * sx), (45 + n, 0.56 * sx)), scale_y=kf((1 + n, 0.5 * sy), (45 + n, 0.56 * sy)),
+                             location_x=kf((1 + n, lx), (45 + n, lx * 1.12)), location_y=kf((1 + n, ly), (45 + n, ly * 1.12)),
+                             effects=[effect("Crop", **window)]))
+    out.append(("kaleidoscope-tiles", project(segments), [1, 15, 30]))
     out.append(("waveform-clip", project([clip(media, "bars.mkv", layer=1), clip(media, "tone.mkv", layer=2, waveform=True)]), [1, 20]))
     viz = clip(media, "tone.mkv", effects=[effect("AudioVisualization")])
     out.append(("audio-visualization", project([viz]), [1, 30]))
@@ -246,7 +266,23 @@ def render(proj, frames, out_prefix, max_size=None, export_size=None):
     return refs
 
 
+def render_jobs(jobs_path):
+    with open(jobs_path) as fh:
+        jobs = json.load(fh)
+    out = []
+    for job in jobs:
+        with open(job["project"]) as fh:
+            proj = json.load(fh)
+        prefix = os.path.splitext(job["project"])[0]
+        out.append({"name": job["name"], "project": job["project"], "frames": render(proj, job["frames"], prefix)})
+    with open(os.path.splitext(jobs_path)[0] + ".out.json", "w") as fh:
+        json.dump(out, fh, indent=1)
+
+
 def main():
+    if sys.argv[1] == "--render-jobs":
+        render_jobs(sys.argv[2])
+        return
     out = sys.argv[1]
     os.makedirs(out, exist_ok=True)
     media = make_media(out)
@@ -273,6 +309,11 @@ def main():
     refs = render(copy.deepcopy(proj), [1, 20], os.path.join(out, name), export_size=(192, 108))
     manifest["cases"].append({"name": name, "project": proj_path, "frames": refs, "export": [192, 108]})
     openshot.Settings.Instance().HIGH_QUALITY_SCALING = False
+    # Two shots cut back to back at 1 s, for the engine's motion transitions.
+    base = project([clip(media, "bars.mkv", position=0.0, end=1.0), clip(media, "cells.mkv", position=1.0, start=0.5, end=1.5)])
+    manifest["motion_base"] = os.path.join(out, "motion-base.json")
+    with open(manifest["motion_base"], "w") as fh:
+        json.dump(base, fh)
     with open(os.path.join(out, "manifest.json"), "w") as fh:
         json.dump(manifest, fh, indent=1)
     print(os.path.join(out, "manifest.json"))

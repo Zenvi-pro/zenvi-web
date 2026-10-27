@@ -32,6 +32,8 @@ import { fitArtboardToFrame, type ArtboardPlacement } from "../../titles/artboar
 import { getTitleTemplate, suggestTitleTemplates } from "../../titles/templates.js";
 import {
   artboardSize,
+  backgroundColor,
+  centerLines,
   parseTitleSvg,
   setFieldText,
   textZone,
@@ -50,7 +52,6 @@ import {
   fadeAlpha,
   fpsOfProject,
   guarded,
-  installedFontFamilies,
   isVertical,
   projectSize,
   planOverlayTrack,
@@ -59,13 +60,18 @@ import {
   summaryLine,
   toolError,
   trackInfo,
+  warningNote,
   type ScreenPosition,
 } from "../titles-text.js";
 import { text } from "./common.js";
+import { missingGlyphWarnings, outlineTitle, titleFontFamilies } from "../fonts.js";
 import { TitleStyle, assignTexts, fieldRows, readProjectSvg, writeTitle } from "./title-templates.js";
 
 /** #183's add_title_tool tried these in order when no template was named (titles_text.DEFAULT_TEMPLATES). */
 const DEFAULT_TEMPLATES = ["Bar_1", "Standard_1", "Footer_1"] as const;
+
+/** The one-centred-line template text is drawn with when the named template is a colour card (no text field). */
+const TEXT_OVER_CARD = "Text_Card";
 
 /** Where a template's text zone anchors its artboard (titles_text.ZONE_POSITION). */
 const ZONE_POSITION: Readonly<Record<"top" | "center" | "bottom", ScreenPosition>> = {
@@ -152,19 +158,37 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   const lines = (input.lines ?? []).map(String);
   const body = String(input.text ?? "");
   const subtitle = String(input.subtitle ?? "");
-  const template = await loadTemplate(call, String(input.template ?? ""));
-  const name = template.name;
-  let doc: TitleDoc;
-  try {
-    doc = parseTitleSvg(template.svg);
-  } catch (error) {
-    return toolError(`cannot read title SVG ${template.file}: ${errorMessage(error)}`);
-  }
-  const slots = titleFields(doc);
   const given = Boolean(body.trim() || subtitle.trim() || lines.some((v) => v.trim()));
-  if (slots.length === 0 && given) toolError(`${name} has no text; it is a background card (set background_color), or pick a template with text`);
-  if (slots.length > 0 && !given) toolError("add_title_tool needs text (or subtitle / lines)");
-  const style = new TitleStyle(input);
+  const colourCard = !given && Boolean(String(input.background_color ?? "").trim());
+  // A blank title with a background colour is a colour card (agents cut white flash frames this way).
+  let template = await loadTemplate(call, String(input.template ?? "").trim() || (colourCard ? "Solid_Color" : ""));
+  const parse = (t: LoadedTemplate): TitleDoc => {
+    try {
+      return parseTitleSvg(t.svg);
+    } catch (error) {
+      return toolError(`cannot read title SVG ${t.file}: ${errorMessage(error)}`);
+    }
+  };
+  let doc = parse(template);
+  let slots = titleFields(doc);
+  const warnings: string[] = [];
+  let card = false;
+  let colour = String(input.background_color ?? "");
+  if (slots.length === 0 && given) {
+    // Agents name Solid_Color for "this text on a coloured frame": draw the text on a text template over the card's colour.
+    card = true;
+    const cardTemplate = template;
+    const [cardColour, cardAlpha] = backgroundColor(doc);
+    template = await loadTemplate(call, TEXT_OVER_CARD);
+    doc = parse(template);
+    slots = titleFields(doc);
+    // '#rrggbb', plus the card's opacity as '#rrggbbaa' when it is not opaque.
+    if (!colour.trim() && cardAlpha > 0) colour = cardColour + (cardAlpha >= 1 ? "" : pyRound(cardAlpha * 255).toString(16).padStart(2, "0"));
+    warnings.push(`${cardTemplate.name} has no text; drew the text with ${template.name} over ${colour.trim() ? `the colour ${colour.trim()}` : "the video"}`);
+  }
+  const name = template.name;
+  if (slots.length > 0 && !given && !colourCard) toolError("add_title_tool needs text (or subtitle / lines), or a background_color for a blank colour card");
+  const style = new TitleStyle({ ...input, background_color: colour });
   const values = assignTexts(slots, body, subtitle, lines, name, true);
 
   const project = call.doc.project;
@@ -177,11 +201,12 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   // Where it goes, before anything is written: a refused call leaves no file and no undo step.
   planOverlayTrack(project, position, end, track);
   const taken = project.files.map((f) => String(f.path ?? "")).filter((p) => p.toLowerCase().endsWith(".svg")).map(basename);
-  const families = await installedFontFamilies(call);
+  const families = await titleFontFamilies(call);
   style.resolveFont(families);
 
   for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index)!);
   const styleInfo = style.apply(doc, families);
+  if (card) centerLines(doc);
   const zone = textZone(slots, artboardSize(doc)[1]);
   const wanted = input.screen_position ?? "auto";
   const posKey: ScreenPosition = ZONE_POSITION[wanted === "auto" ? zone : wanted] ?? "center";
@@ -192,12 +217,14 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
 
   const firstText = slots.map((s) => values.get(s.index) ?? "").find((v) => v.trim()) || name;
   const fileName = uniqueTitleName(text(input.file_name) || firstText, taken);
-  const media = await writeTitle(call, fileName, titleSvgText(doc));
+  const outlined = await outlineTitle(call, titleSvgText(doc));
+  if (typeof outlined === "string") toolError(outlined.replace(/^Error: /, ""));
+  const media = await writeTitle(call, fileName, outlined.svg);
 
   const fadeIn = Number(input.fade_in_seconds ?? 0);
   const fadeOut = Number(input.fade_out_seconds ?? 0);
   const placed = call.commit((tx) => {
-    const { layer, created } = planOverlayTrack(tx.project, position, end, track);
+    const { layer, created, moved } = planOverlayTrack(tx.project, position, end, track);
     const file = addFile(tx, media, { mediaType: "image" });
     const props: Record<string, unknown> = { gravity: GRAVITY[posKey] };
     // A title fitted to the frame carries its lift in its viewBox.
@@ -205,7 +232,7 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
     const alpha = fadeAlpha(tx.project, 0, duration, fadeIn, fadeOut);
     if (alpha) props.alpha = alpha;
     const clip = placeOverlayClip(tx, { fileId: file.id, position, duration, layer, newTrackLabel: "Titles", props });
-    return { fileId: file.id, clipId: clip.id, layer, created };
+    return { fileId: file.id, clipId: clip.id, layer, created, moved };
   });
 
   const shown =
@@ -235,7 +262,12 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   if (fadeIn || fadeOut) Object.assign(data, { fade_in: fadeIn, fade_out: fadeOut });
   if (Object.keys(fitted).length > 0) data.text_shrunk_to_fit = fitted;
   if (lift) data.lifted_for_vertical_ui = lift;
-  return applied(tool, summaryLine(summary), { data });
+  if (placed.moved) warnings.push(placed.moved);
+  if (warnings.length > 0) data.warnings = warnings;
+  return applied(tool, summaryLine(summary + warningNote(warnings)), {
+    data,
+    warnings: [...warnings, ...missingGlyphWarnings(outlined.missing)],
+  });
 }
 
 export const titleTools: CatalogTool[] = [

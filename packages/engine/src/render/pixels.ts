@@ -118,6 +118,13 @@ export function unpremulChannel(c: number, a: number): number {
   return Math.floor((c * INV_PREMUL_FACTOR[a]! + 0x8000) / 65536);
 }
 
+const LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+
+/** RGBA bytes as one word per pixel (alpha in the top byte), when the buffer allows it. */
+function words(data: Uint8ClampedArray): Uint32Array | null {
+  return LITTLE_ENDIAN && data.byteOffset % 4 === 0 && data.length % 4 === 0 ? new Uint32Array(data.buffer, data.byteOffset, data.length / 4) : null;
+}
+
 /** Straight RGBA → premultiplied, like Qt `qPremultiply` / ARGB32 → RGBA8888_Premultiplied. */
 export function premultiply(src: RgbaImage, out?: PremulImage): PremulImage {
   const target = out ?? createPremul(src.width, src.height);
@@ -126,6 +133,25 @@ export function premultiply(src: RgbaImage, out?: PremulImage): PremulImage {
   }
   const s = src.data;
   const d = target.data;
+  const s32 = words(s);
+  const d32 = s32 && words(d);
+  if (s32 && d32) {
+    // Opaque and transparent pixels move as one word; video is mostly opaque.
+    for (let j = 0; j < s32.length; j += 1) {
+      const v = s32[j]!;
+      const a = v >>> 24;
+      if (a === 255) d32[j] = v;
+      else if (a === 0) d32[j] = 0;
+      else {
+        const i = j * 4;
+        d[i] = byteMul(s[i]!, a);
+        d[i + 1] = byteMul(s[i + 1]!, a);
+        d[i + 2] = byteMul(s[i + 2]!, a);
+        d[i + 3] = a;
+      }
+    }
+    return target;
+  }
   for (let i = 0; i < s.length; i += 4) {
     const a = s[i + 3]!;
     if (a === 255) {
@@ -156,6 +182,25 @@ export function unpremultiply(src: PremulImage, out?: RgbaImage): RgbaImage {
   }
   const s = src.data;
   const d = target.data;
+  const s32 = words(s);
+  const d32 = s32 && words(d);
+  if (s32 && d32) {
+    for (let j = 0; j < s32.length; j += 1) {
+      const v = s32[j]!;
+      const a = v >>> 24;
+      if (a === 255) d32[j] = v;
+      else if (a === 0) d32[j] = 0;
+      else {
+        const i = j * 4;
+        const inv = INV_PREMUL_FACTOR[a]!;
+        d[i] = Math.floor((s[i]! * inv + 0x8000) / 65536);
+        d[i + 1] = Math.floor((s[i + 1]! * inv + 0x8000) / 65536);
+        d[i + 2] = Math.floor((s[i + 2]! * inv + 0x8000) / 65536);
+        d[i + 3] = a;
+      }
+    }
+    return target;
+  }
   for (let i = 0; i < s.length; i += 4) {
     const a = s[i + 3]!;
     if (a === 255) {

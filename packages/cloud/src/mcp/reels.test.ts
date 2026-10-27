@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { StockHost } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { nodeAnalyzeAudio, nodeAssetSource, nodeDecodePcm, nodeProber } from "../render/node.js";
@@ -67,9 +68,24 @@ describe("create_reel", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  async function setup(musicLicense = "Creative Commons 0"): Promise<{ h: Harness; client: Client; searches: string[] }> {
+  /** Stock through the backend's proxies, or (`ownKeys`) the deployment's own provider keys with the backend off. */
+  async function setup(musicLicense = "Creative Commons 0", source: "backend" | "ownKeys" = "backend"): Promise<{ h: Harness; client: Client; searches: string[] }> {
+    const searches: string[] = [];
+    const clipFor = (q: string) => (q.includes("huddle") ? "a" : q.includes("dribble") ? "b" : "c");
+    const ownKeys: StockHost = {
+      searchPexelsVideos: async (q) => {
+        searches.push(`pexels?${q}`);
+        const name = clipFor(q);
+        return { total: 1, videos: [{ id: name.charCodeAt(0), width: 360, height: 640, duration: 4, url: `https://pexels.test/${name}`, user_name: "Someone", video_files: [{ quality: "hd", file_type: "video/mp4", width: 360, height: 640, link: `${base}/${name}.mp4` }] }] };
+      },
+      searchFreesound: async (q) => {
+        searches.push(`freesound?${q}`);
+        return { total: 1, sounds: [{ id: 77, name: "Beat loop", duration: 20, username: "maker", tags: [], license: musicLicense, previews: { hq_mp3: `${base}/beat.mp3`, lq_mp3: "" } }] };
+      },
+    };
     const h = await harness({
-      config: { backendAuth: { kind: "assertion", secret: "s".repeat(40) } },
+      config: source === "backend" ? { backendAuth: { kind: "assertion", secret: "s".repeat(40) } } : {},
+      stock: source === "ownKeys" ? ownKeys : null,
       engine: await loadEngineRegistry(),
       prober: nodeProber,
       analyzeAudio: nodeAnalyzeAudio,
@@ -80,14 +96,12 @@ describe("create_reel", () => {
         resolver: async () => [{ address: "127.0.0.1", family: 4 as const }],
       },
     });
-    const searches: string[] = [];
     h.services.backendSessions.fetchImpl = async (url) => {
       const u = new URL(String(url));
       searches.push(`${u.pathname}?${u.searchParams.get("query")}`);
       const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
       if (u.pathname.endsWith("/pexels/search")) {
-        const q = u.searchParams.get("query") ?? "";
-        const name = q.includes("huddle") ? "a" : q.includes("dribble") ? "b" : "c";
+        const name = clipFor(u.searchParams.get("query") ?? "");
         return json({ videos: [{ id: name.charCodeAt(0), width: 360, height: 640, duration: 4, url: `https://pexels.test/${name}`, user_name: "Someone", video_files: [{ quality: "hd", file_type: "video/mp4", width: 360, height: 640, link: `${base}/${name}.mp4` }] }] });
       }
       if (u.pathname.endsWith("/freesound/search")) {
@@ -143,6 +157,22 @@ describe("create_reel", () => {
     await client.close();
   }, 60_000);
 
+  it("finds footage and music with the deployment's own stock keys when the backend is off", async () => {
+    const { h, client, searches } = await setup("Creative Commons 0", "ownKeys");
+    expect(h.services.backendSessions.enabled).toBe(false);
+    const result = (await client.callTool({
+      name: "create_reel",
+      arguments: { prompt: "A 6 second match day reel", style: "highlight", duration_seconds: 6, stock_queries: ["team huddle", "player dribble"], music_query: "stadium drums" },
+    })) as CallResult;
+    expect(result.isError, result.content[0]?.text).toBeFalsy();
+    const data = result.structuredContent as { footage: unknown[]; music?: { credit: string }; warnings: string[] };
+    expect(data.warnings.join(" ")).not.toMatch(/Stock search/);
+    expect(data.footage).toHaveLength(2);
+    expect(data.music).toMatchObject({ credit: "maker on Freesound" });
+    expect(searches.sort()).toEqual(["freesound?stadium drums", "pexels?player dribble", "pexels?team huddle"]);
+    await client.close();
+  }, 60_000);
+
   it("says when the only music it found is for non-commercial use", async () => {
     const { client } = await setup("http://creativecommons.org/licenses/by-nc/4.0/");
     const result = (await client.callTool({
@@ -187,7 +217,7 @@ describe("create_reel", () => {
   it("uses what arrived when a download misses the time limit, and says which one", async () => {
     const { h } = await setup();
     const { reelTools } = await import("./reels.js");
-    const [tool] = reelTools(h.services.engine!, true, { fetchDeadlineMs: 1500 });
+    const [tool] = reelTools(h.services.engine!, { fetchDeadlineMs: 1500 });
     const token = (await h.services.tokens.createPat({ userId: USER_A, name: "t", scopes: [SCOPE_READ, SCOPE_WRITE], ttlDays: 1 })).token;
     const principal = await h.services.auth.authenticate(token);
     const ctx = { services: h.services, principal: principal as never, connection: "test", origin: "https://cloud.test", signal: new AbortController().signal };

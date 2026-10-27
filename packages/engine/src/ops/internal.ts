@@ -155,6 +155,32 @@ export function mapKeyframesDeep(value: unknown, fn: (kf: Keyframe) => Keyframe)
   return out;
 }
 
+/**
+ * A clip's keyframe X is a frame of its reader counted from the reader's
+ * first frame (the first one shown is round(start * fps) + 1; zenvi-core
+ * editor_tools/clip_props_model.py ClipTime), and a time curve's Y is a
+ * reader frame too. Every curve on the clip and its effects goes through
+ * `frame` when the reader changes under it; points that land on one frame
+ * collapse, last one wins, as libopenshot loads them.
+ */
+export function moveKeyframes(clip: Clip, frame: (x: number) => number): Partial<Clip> {
+  const move = (kf: Keyframe, values: boolean): Keyframe => {
+    // One point holds its value at every frame (and libopenshot ignores a one-point time curve).
+    if (kf.Points.length < 2) return kf;
+    const points = new Map<number, Keyframe["Points"][number]>();
+    for (const p of kf.Points) {
+      const x = frame(Number(p.co.X));
+      points.set(x, { ...p, co: { ...p.co, X: x, ...(values ? { Y: frame(Number(p.co.Y)) } : {}) } });
+    }
+    return { ...kf, Points: [...points.values()] };
+  };
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(clip)) {
+    if (key !== "reader") out[key] = mapKeyframesDeep(value, (kf) => move(kf, key === "time"));
+  }
+  return out as Partial<Clip>;
+}
+
 /** Replace a clip wholesale when anything changed. */
 export function replaceClip(tx: Transaction, before: Clip, after: Clip): Clip {
   if (sameJson(before, after)) return before;

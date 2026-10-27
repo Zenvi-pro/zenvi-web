@@ -2,7 +2,8 @@
  * The web editor as a tool host: what engine tools may use when the
  * Assistant (or the command palette) runs them here.
  */
-import type { CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import type { BackendHost, CloudMediaRef, ExportOptions, ExportResult, ImportedMedia, ReaderInfo, ToolHost, ToolImage } from "@zenvi/engine";
+import { backendStock, fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { canExportWith } from "@zenvi/render-web";
 import { backendRequest } from "@/lib/backend";
 import { config } from "@/lib/env";
@@ -10,7 +11,7 @@ import { downloadBlob, safeFileName } from "@/lib/projectFactory";
 import { projectRepository } from "@/lib/storage/projects";
 import { savePanels } from "../session/uiStore";
 import { toast } from "@/ui/Toast";
-import { exportAvailable, extensionForMime, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
+import { exportAvailable, extensionForMime, mixPcm, probe, renderFrame, resolveBundledMedia, startExport } from "../render";
 import { editorLayout, editorPreferences, withLayout, withPreference } from "./editorSettings";
 import type { EditorSession } from "../session/EditorSession";
 import { assetUrl } from "../catalog";
@@ -94,6 +95,15 @@ async function readAsset(path: string): Promise<string> {
   return response.text();
 }
 
+/** A bundled binary asset (the typesetter's fonts), fetched when a tool first needs it. */
+async function readAssetBytes(path: string): Promise<Uint8Array> {
+  const url = assetUrl(path);
+  if (!url) throw new Error(`No bundled asset ${path}`);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not load ${path} (${response.status})`);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 /** A download's file name for a path a tool gave (its base name, made safe), with a fallback name. */
 function downloadName(path: string, fallback: string, extension: string): string {
   const base = path.split(/[\\/]/).pop() ?? "";
@@ -111,6 +121,10 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
     const spec = (file ? session.media.spec(file.id) : undefined) ?? intakeOf(session).specs.get(path);
     if (!spec) throw new Error(`the media for ${path} is not loaded (relink it first)`);
     return spec;
+  };
+  const backend: BackendHost = {
+    baseUrl: config.backendUrl,
+    request: (path, init) => backendRequest(path, { ...init, auth: true }),
   };
   const host: ToolHost = {
     player: {
@@ -206,10 +220,10 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         return files.map((f) => gone.has(f.id));
       },
     },
-    backend: {
-      baseUrl: config.backendUrl,
-      request: (path, init) => backendRequest(path, { ...init, auth: true }),
-    },
+    // Openverse answers browsers (CORS *); anonymous: 20 searches a minute, 200 a day per address.
+    library: fetchLibraryHost({ fetch: (url, init) => fetch(url, init) as unknown as ReturnType<LibraryFetch> }),
+    backend,
+    stock: backendStock(backend),
     storage: {
       async save(project) {
         await session.autosave.flush();
@@ -270,6 +284,10 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       async decodePcm(path, options) {
         return decodePcm(specFor(path), options);
       },
+      // Rendered offline by the exporter's own mixer (Web Audio), so mastering measures what an export encodes.
+      async mixPcm(project, options) {
+        return mixPcm(project, session.media, options);
+      },
       // Speech recognition through the Zenvi backend, as the signed-in person.
       async transcribe(path, options) {
         const file = session.project.files.find((f) => f.path === path || f.id === path);
@@ -296,7 +314,7 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
       supports: (format, videoCodec, audioCodec, frame) => canExportWith(format, videoCodec, audioCodec, frame),
     };
   }
-  host.assets = { readText: readAsset };
+  host.assets = { readText: readAsset, readBytes: readAssetBytes };
   host.frames = {
     async renderFrame(project, seconds, options): Promise<ToolImage> {
       return renderFrame(project, seconds, options ?? {}, session.media);

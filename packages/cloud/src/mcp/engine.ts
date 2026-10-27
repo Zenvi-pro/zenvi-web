@@ -22,6 +22,8 @@ import type { JsonSchemaObject, McpCallContext, McpTool } from "./types.js";
 export interface EngineRegistry {
   tools: readonly AnyTool[];
   run(ctx: ToolContext, name: string, args: unknown): Promise<ToolResult>;
+  /** A host capability in words ("Zenvi 3D (Blender on this computer)"). */
+  capabilityName?: (capability: HostCapability) => string;
 }
 
 /** Engine tools that stay off the remote MCP server. */
@@ -47,6 +49,8 @@ export const HIDDEN_ENGINE_TOOLS = new Set([
   "set_preference_tool",
   // Kling is slower than ChatGPT's tool budget. generate_video starts a job instead.
   "generate_video_and_add_to_timeline_tool",
+  // Zenvi 3D renders with Blender, which this server has not: listing scenes it cannot add misleads.
+  "list_3d_scenes_tool",
 ]);
 
 const PROJECT_ID_PROPERTY = {
@@ -118,6 +122,21 @@ export function engineTools(
   return out;
 }
 
+/**
+ * Why an engine tool this server does not list cannot run here, for a client
+ * that calls it anyway (a model that knows it from the CLI or a skill): the
+ * capabilities this server lacks, in words. Undefined for names that are not
+ * engine tools, or that are hidden on purpose.
+ */
+export function unavailableToolReason(registry: EngineRegistry, capabilities: Set<HostCapability>, name: string): string | undefined {
+  const tool = registry.tools.find((t) => t.name === name);
+  if (!tool || !tool.surfaces.includes("mcp") || HIDDEN_ENGINE_TOOLS.has(name)) return undefined;
+  const missing = (tool.requires ?? []).filter((cap) => !capabilities.has(cap));
+  if (missing.length === 0) return undefined;
+  const named = missing.map((cap) => registry.capabilityName?.(cap) ?? cap).join(" and ");
+  return `${name} does not run on Zenvi Cloud: it needs ${named}. The zenvi CLI and its local MCP server (zenvi mcp) run it on a computer that has it.`;
+}
+
 async function callEngineTool(
   ctx: McpCallContext,
   registry: EngineRegistry,
@@ -170,5 +189,6 @@ export async function loadEngineRegistry(): Promise<EngineRegistry | null> {
   const runTool = mod.runTool;
   if (!Array.isArray(allTools) || typeof runTool !== "function") return null;
   const run = runTool as (ctx: ToolContext, name: string, args: unknown) => Promise<ToolResult>;
-  return { tools: allTools as AnyTool[], run: (ctx, name, args) => run(ctx, name, args) };
+  const named = typeof mod.capabilityName === "function" ? (mod.capabilityName as (capability: HostCapability) => string) : undefined;
+  return { tools: allTools as AnyTool[], run: (ctx, name, args) => run(ctx, name, args), ...(named ? { capabilityName: named } : {}) };
 }

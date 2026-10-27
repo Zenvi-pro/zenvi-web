@@ -626,6 +626,7 @@ export const contractInputs = {
     "file_id": z.string().describe("Alias for fileId.").optional(),
     "clipId": z.string().describe("Timeline clip id.").optional(),
     "timeline_clip_id": z.string().describe("Alias for clipId.").optional(),
+    "bpm": z.number().min(40).max(400).describe("Track the beats at this tempo instead of estimating it (e.g. the 160 of a loop read as 80): the grid still snaps to where the audio hits.").optional(),
   }),
   diarize_media_tool: z.strictObject({
     "fileId": z.string().describe("Media-bin file id.").optional(),
@@ -2955,7 +2956,7 @@ export const contractMeta: { readonly [N in ContractToolName]: ContractToolMeta 
   detect_beats_tool: {
     name: "detect_beats_tool",
     title: "Detect beats",
-    description: "Detect music beats (times, frames, BPM) in a media-bin file or timeline clip (hosts with on-device beat tracking).",
+    description: "Detect music beats (times, frames, BPM) in a media-bin file or timeline clip (hosts with on-device beat tracking). The tempo is moved into 80-180 BPM when the pulse is really there; the receipt gives a confidence, the half/double-time readings (alternatives) and the bar length. If the grid is at the wrong octave or off, run it again with bpm.",
     assistant: false,
     desktopReadOnly: true,
     handler: "src/classes/agent_tools/speech_extra.py:detect_beats_tool_handler",
@@ -2967,6 +2968,7 @@ export const contractMeta: { readonly [N in ContractToolName]: ContractToolMeta 
         "file_id": {"type": "string", "description": "Alias for fileId."},
         "clipId": {"type": "string", "description": "Timeline clip id."},
         "timeline_clip_id": {"type": "string", "description": "Alias for clipId."},
+        "bpm": {"type": "number", "minimum": 40, "maximum": 400, "description": "Track the beats at this tempo instead of estimating it (e.g. the 160 of a loop read as 80): the grid still snaps to where the audio hits."},
       },
     },
   },

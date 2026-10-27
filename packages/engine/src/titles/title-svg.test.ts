@@ -37,7 +37,7 @@ function doc(name: string): TitleDoc {
 // Ported from zenvi-core develop tests/test_editor_tools_titles_text.py (title_svg section).
 describe("title_svg: fields, text, font, colours, names", () => {
   it("parses every bundled template and round-trips it", () => {
-    expect(TITLE_TEMPLATES).toHaveLength(50);
+    expect(TITLE_TEMPLATES).toHaveLength(51);
     for (const t of TITLE_TEMPLATES) {
       const d = doc(t.id);
       titleFields(d);

@@ -1,16 +1,17 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { FILLER_PROMPT, isTranscriptionError, parseTranscription, type AudioEnvelope, type ReaderInfo } from "@zenvi/engine";
+import { FILLER_PROMPT, isTranscriptionError, parseTranscription, type AudioEnvelope, type MotionBlockInfo, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
-import type { AssetSource, MediaProber, RenderInput, SpeechTranscriber } from "../render/renderer.js";
+import type { AssetSource, MatteHostFactory, MediaProber, MixRenderer, MotionHostFactory, RenderInput, SpeechTranscriber } from "../render/renderer.js";
 import { fakeRenderer } from "../testing/fakes.js";
 import { type Harness, harness, sampleProject, USER_A } from "../testing/helpers.js";
 import { loadEngineRegistry } from "./engine.js";
-import { createCloudHost } from "./host.js";
+import { cloudCapabilities, createCloudHost } from "./host.js";
 import type { McpCallContext } from "./types.js";
 
 const ENGINE_ASSETS = fileURLToPath(new URL("../../../engine/assets/", import.meta.url));
@@ -201,17 +202,18 @@ describe("export_video_tool in the cloud", () => {
   });
 });
 
+async function projectWithMedia(h: Harness, name: string, bytes: Buffer, contentType: string) {
+  const hash = sha(bytes);
+  await h.services.media.storeBytes(USER_A, { sha256: hash, bytes, name, contentType });
+  const created = await h.services.projects.create(USER_A, {
+    name: "P",
+    project: sampleProject({ files: [{ id: "F1", path: `/Users/me/${name}`, media_type: "video", cloud: { sha256: hash, size: bytes.length, name } }] }) as never,
+  });
+  const loaded = await h.services.projects.get(USER_A, created.id);
+  return { projectId: created.id, project: loaded.project };
+}
+
 describe("the cloud ToolHost", () => {
-  async function projectWithMedia(h: Harness, name: string, bytes: Buffer, contentType: string) {
-    const hash = sha(bytes);
-    await h.services.media.storeBytes(USER_A, { sha256: hash, bytes, name, contentType });
-    const created = await h.services.projects.create(USER_A, {
-      name: "P",
-      project: sampleProject({ files: [{ id: "F1", path: `/Users/me/${name}`, media_type: "video", cloud: { sha256: hash, size: bytes.length, name } }] }) as never,
-    });
-    const loaded = await h.services.projects.get(USER_A, created.id);
-    return { projectId: created.id, project: loaded.project };
-  }
 
   it("reads project media as text and exports text as a download link", async () => {
     const h = await harness({ prober });
@@ -238,6 +240,27 @@ describe("the cloud ToolHost", () => {
     expect((await host.audio!.analyzeAudio("/Users/me/voice.wav")).rms).toEqual([0.1, 0.2]);
     expect(seen).toEqual(["pcm bytes"]);
     await dispose();
+  });
+
+  it("renders the timeline mix for master_audio_tool from local copies of the bin's media", async () => {
+    const seen: string[] = [];
+    const mixPcm: MixRenderer = async (current, options) => {
+      for (const file of current.files) seen.push(await readFile(await options.resolveMedia(String(file.path)), "utf8"));
+      return { sampleRate: 48000, channels: [new Float32Array(4), new Float32Array(4)] };
+    };
+    const analyzeAudio = async (): Promise<AudioEnvelope> => ({ sampleRate: 16000, frameSize: 480, rms: [] });
+    const h = await harness({ prober, analyzeAudio, mixPcm });
+    const { projectId, project } = await projectWithMedia(h, "voice.wav", Buffer.from("pcm bytes"), "audio/wav");
+    const { host, dispose } = createCloudHost(context(h), projectId, () => project);
+    expect((await host.audio!.mixPcm!(project, { clipIds: ["C1"] })).channels).toHaveLength(2);
+    expect(seen).toEqual(["pcm bytes"]);
+    await dispose();
+
+    const without = await harness({ prober, analyzeAudio });
+    const bare = await projectWithMedia(without, "voice.wav", Buffer.from("pcm bytes"), "audio/wav");
+    const plain = createCloudHost(context(without), bare.projectId, () => bare.project);
+    expect(plain.host.audio!.mixPcm).toBeUndefined();
+    await plain.dispose();
   });
 
   it("tells which project files are not in Zenvi Cloud (missing media)", async () => {
@@ -299,6 +322,10 @@ describe("the cloud ToolHost", () => {
     expect(info).toMatchObject({ path, cloud: { sha256: sha("<svg>hi</svg>"), content_type: "image/svg+xml", name: "Hi.svg" } });
     expect(await h.services.media.get(USER_A, sha("<svg>hi</svg>"))).toMatchObject({ verified: true });
     await expect(host.media!.writeGenerated!("x.html", bytes, "text/html")).rejects.toThrow("does not store");
+    // Discarded: this call no longer serves it, and the stored (shared, content-addressed) bytes stay.
+    await host.media!.discardGenerated!([path]);
+    await expect(host.media!.probe(path)).rejects.toThrow();
+    expect(await h.services.media.get(USER_A, sha("<svg>hi</svg>"))).toMatchObject({ verified: true });
     await dispose();
   });
 });
@@ -402,5 +429,142 @@ describe("speech recognition in the cloud", () => {
     const h = await harness({ prober, analyzeAudio: async () => ({ sampleRate: 16000, frameSize: 480, rms: [] }), transcribeMedia });
     const { host } = createCloudHost(context(h), "c_x", () => sampleProject() as never);
     expect(host.audio?.transcribe).toBeUndefined();
+  });
+});
+
+const HEADLINE: MotionBlockInfo = {
+  id: "kinetic_headline",
+  version: 1,
+  title: "Kinetic headline",
+  description: "A big headline that builds word by word.",
+  tags: ["type"],
+  params: [
+    { name: "text", type: "string", description: "The headline.", default: "Hello" },
+    { name: "background", type: "media", description: "Photo behind.", accept: ["image", "video"], optional: true },
+  ],
+  duration: { default: 3, min: 1.5, max: 10 },
+  aspects: ["16:9"],
+  alpha: true,
+};
+
+/** A motion host factory that "renders" a small file into the call's work folder, recording what it read. */
+function fakeMotion(renders: { workDir: string; media: Record<string, string> }[]): MotionHostFactory {
+  return ({ workDir, resolveMedia }) => ({
+    blocks: () => [HEADLINE],
+    check: (block, params) => (block === HEADLINE.id ? { ok: true, params: { text: "Hello", ...params } } : { ok: false, error: `unknown motion block ${block}` }),
+    async render(request) {
+      const media = Object.fromEntries(Object.entries(request.media).map(([name, path]) => [name, resolveMedia(path)]));
+      renders.push({ workDir, media });
+      const file = join(workDir, "kinetic_headline-0123456789abcdef.mov");
+      await writeFile(file, `prores ${JSON.stringify(request.params)}`);
+      return {
+        media: { path: file, name: basename(file), info: await prober.probe(file) },
+        codec: "prores4444",
+        width: request.width,
+        height: request.height,
+        fps: request.fps,
+        frames: 90,
+        fingerprint: "0123456789abcdef",
+        cached: false,
+        renderSeconds: 1,
+      };
+    },
+  });
+}
+
+describe("Zenvi Motion and subject mattes in the cloud", () => {
+  it("lists the motion and matte capabilities only with a renderer and a prober", async () => {
+    expect(cloudCapabilities((await harness({ prober })).services)).not.toContain("motion");
+    expect(cloudCapabilities((await harness({ motion: fakeMotion([]) })).services)).not.toContain("motion");
+    const caps = cloudCapabilities((await harness({ prober, motion: fakeMotion([]), mattes: () => ({ subjects: ["person"], generate: async () => Promise.reject(new Error("no")) }) })).services);
+    expect(caps).toContain("motion");
+    expect(caps).toContain("mattes");
+  });
+
+  it("renders a block from local copies in the call's scratch folder and keeps it as content-addressed media", async () => {
+    const renders: { workDir: string; media: Record<string, string> }[] = [];
+    const h = await harness({ prober, motion: fakeMotion(renders) });
+    const photo = Buffer.from("photo bytes");
+    await h.services.media.storeBytes(USER_A, { sha256: sha(photo), bytes: photo, name: "photo.png", contentType: "image/png" });
+    const project = sampleProject({ files: [{ id: "F1", path: "/Users/me/photo.png", media_type: "image", cloud: { sha256: sha(photo), size: photo.length, name: "photo.png" } }] });
+    const { host, dispose } = createCloudHost(context(h), "c_x", () => project as never);
+    expect(host.motion!.blocks().map((b) => b.id)).toEqual(["kinetic_headline"]);
+    const made = await host.motion!.render({
+      block: "kinetic_headline",
+      params: { text: "Hi", background: "F1" },
+      media: { background: "/Users/me/photo.png" },
+      width: 1280,
+      height: 720,
+      fps: { num: 30, den: 1 },
+      seconds: 3,
+      alpha: true,
+      motionBlurSamples: 1,
+      draft: false,
+    });
+    expect(renders).toHaveLength(1);
+    expect(renders[0]!.workDir.startsWith(join(h.config.renderTmpDir, "zenvi-tool-"))).toBe(true);
+    expect(await readFile(renders[0]!.media.background!, "utf8")).toBe("photo bytes");
+    const bytes = `prores ${JSON.stringify({ text: "Hi", background: "F1" })}`;
+    expect(made.media).toMatchObject({
+      path: "@assets/links/zenvi-motion/kinetic_headline-0123456789abcdef.mov",
+      info: { path: "@assets/links/zenvi-motion/kinetic_headline-0123456789abcdef.mov" },
+      cloud: { sha256: sha(bytes), size: bytes.length, content_type: "video/quicktime" },
+    });
+    expect(await h.services.media.get(USER_A, sha(bytes))).toMatchObject({ verified: true, contentType: "video/quicktime" });
+    // Later tools in the same call read it back like other generated media.
+    expect(await host.media!.probe(made.media.path)).toMatchObject({ cloud: { sha256: sha(bytes) } });
+    await dispose();
+  });
+
+  it("add_motion_block_tool places the cloud-kept render over MCP", async () => {
+    const h = await harness({ engine: await loadEngineRegistry(), prober, motion: fakeMotion([]) });
+    const client = await connect(h);
+    const names = (await client.listTools()).tools.map((t) => t.name);
+    expect(names).toEqual(expect.arrayContaining(["list_motion_blocks_tool", "add_motion_block_tool", "update_motion_block_tool"]));
+    expect(names).not.toContain("add_3d_scene_tool");
+    expect(names).not.toContain("list_3d_scenes_tool");
+    // Not listed, but a client that calls it anyway learns why.
+    const scene = await call(client, "add_3d_scene_tool", { scene: "title_3d" });
+    expect(scene.isError).toBe(true);
+    expect(textOf(scene)).toBe(
+      "Error: add_3d_scene_tool does not run on Zenvi Cloud: it needs Zenvi 3D (Blender on this computer). The zenvi CLI and its local MCP server (zenvi mcp) run it on a computer that has it.",
+    );
+    await expect(client.callTool({ name: "no_such_tool", arguments: {} })).rejects.toThrow(/Unknown tool: no_such_tool/);
+    const projectId = (await call(client, "create_project", { name: "Promo" })).structuredContent?.project_id as string;
+    const added = await call(client, "add_motion_block_tool", { block: "kinetic_headline", params: { text: "Ship it" } });
+    expect(added.isError, textOf(added)).toBeFalsy();
+    const { project } = await h.services.projects.get(USER_A, projectId);
+    const file = project.files.find((f) => String(f.path).startsWith("@assets/links/zenvi-motion/"));
+    expect(file?.cloud).toMatchObject({ content_type: "video/quicktime" });
+    expect(project.clips.some((c) => c.file_id === file?.id)).toBe(true);
+    await client.close();
+  });
+
+  it("mattes a short video and refuses a long one in words", async () => {
+    let runs = 0;
+    const mattes: MatteHostFactory = ({ workDir, resolveMedia }) => ({
+      subjects: ["person"],
+      async generate(path) {
+        runs += 1;
+        expect(await readFile(resolveMedia(path), "utf8")).toBe("clip");
+        const file = join(workDir, "clip.person-matte.mp4");
+        await writeFile(file, "matte");
+        return { media: { path: file, name: basename(file), info: await prober.probe(file) }, model: "rvm", version: "1.0.0", license: "GPL-3.0", frames: 60, fps: 30 };
+      },
+    });
+    const h = await harness({ prober, mattes });
+    const { projectId, project } = await projectWithMedia(h, "clip.mp4", Buffer.from("clip"), "video/mp4");
+    const { host, dispose } = createCloudHost(context(h), projectId, () => project);
+    const made = await host.mattes!.generate("/Users/me/clip.mp4", { subject: "person", scale: 0.5 });
+    expect(made.media).toMatchObject({ path: "@assets/mattes/clip.person-matte.mp4", cloud: { sha256: sha("matte"), content_type: "video/mp4" } });
+    await dispose();
+
+    const long: MediaProber = { available: true, probe: async (path) => ({ ...(await prober.probe(path)), video_length: 5400 }) };
+    const hl = await harness({ prober: long, mattes });
+    const other = await projectWithMedia(hl, "clip.mp4", Buffer.from("clip"), "video/mp4");
+    const refusing = createCloudHost(context(hl), other.projectId, () => other.project);
+    await expect(refusing.host.mattes!.generate("/Users/me/clip.mp4", { subject: "person", scale: 0.5 })).rejects.toThrow(/up to 300 frames per call and this one has 5400/);
+    expect(runs).toBe(1);
+    await refusing.dispose();
   });
 });

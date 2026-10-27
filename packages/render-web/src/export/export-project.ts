@@ -6,6 +6,7 @@
 
 import {
   AudioBufferSource,
+  type AudioCodec,
   BufferTarget,
   CanvasSource,
   MkvOutputFormat,
@@ -22,13 +23,12 @@ import {
   type StreamTargetChunk,
   type Target,
 } from "mediabunny";
-import { audioCutNote, defaultExportEnd, lastFrameBefore, projectAtFrameRate, type Project } from "@zenvi/engine";
+import { audioCutNote, defaultExportEnd, exportCeilingDb, lastFrameBefore, projectAtFrameRate, TruePeakLimiter, type Project } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
 import type { ContainerFormat, ExportOptions } from "@zenvi/engine/tools";
-import { windowEnd } from "../audio/channels.js";
-import { mixWindow, planHasSound } from "../audio/mixdown.js";
+import { mixRange, planHasSound } from "../audio/mixdown.js";
 import { AudioRenderer } from "../audio/renderer.js";
-import type { LayerError } from "../compositor/compositor.js";
+import type { LayerError, PreparedFrame } from "../compositor/compositor.js";
 import { defaultEngine, type RenderEngine } from "../engine.js";
 import type { MediaRegistry } from "../media/registry.js";
 import type { SvgRasterizer } from "../media/svg.js";
@@ -65,6 +65,9 @@ export interface ExportRunOptions {
   allowVideoOnly?: boolean;
   svgRasterizer?: SvgRasterizer;
 }
+
+/** New clips start decoding this many frames before they are drawn. */
+const DECODE_AHEAD = 8;
 
 /** Audio is mixed about this many seconds at a time (windows end on audio frame boundaries). */
 const AUDIO_WINDOW = 10;
@@ -185,6 +188,17 @@ export function exportAudio(project: Project, engine: RenderEngine, options: Pic
   return { plan, sampleRate, channels, hasAudio: options.format === "wav" || planHasSound(plan) };
 }
 
+/** Whether an export's audio codec loses detail (and overshoots a limited mix). */
+function isLossy(codec: AudioCodec): boolean {
+  return !codec.startsWith("pcm-") && codec !== "flac";
+}
+
+function audioBufferOf(pcm: readonly Float32Array[], sampleRate: number): AudioBuffer {
+  const buffer = new AudioBuffer({ numberOfChannels: pcm.length, length: pcm[0]!.length, sampleRate });
+  pcm.forEach((channel, c) => buffer.copyToChannel(channel as Float32Array<ArrayBuffer>, c));
+  return buffer;
+}
+
 /**
  * The seconds an export covers. An explicit range may run past the last clip
  * (black, silent frames); without one, video ends with the last picture
@@ -256,28 +270,49 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
   const report = (frame: number, stage: ExportProgress["stage"]) =>
     run.onProgress?.({ fraction: stage === "finalizing" ? 1 : Math.min(0.999, frame / frameCount), frame, frames: frameCount, stage });
 
+  // Last on the mix: nothing that reaches the file passes the ceiling (ExportOptions.truePeakLimit).
+  const limiter =
+    choice.audioCodec && options.truePeakLimit !== false
+      ? new TruePeakLimiter({ sampleRate, channels, ceilingDb: exportCeilingDb(isLossy(choice.audioCodec)) })
+      : null;
+  const addPcm = async (pcm: Float32Array[]) => {
+    if (audioSource && (pcm[0]?.length ?? 0) > 0) await audioSource.add(audioBufferOf(pcm, sampleRate));
+  };
   let audioAt = start;
   const mixUntil = async (until: number) => {
     if (!audio || !audioSource) return;
-    while (audioAt < until - 1e-9) {
-      if (signal?.aborted) throw abortReason(signal);
-      const to = windowEnd(audioAt, AUDIO_WINDOW, end, sampleRate, fps, channels);
-      const buffer = await mixWindow(audio, audioPlan, audioAt, to, sampleRate, channels, fps);
-      await audioSource.add(buffer);
-      await audio.releaseEnded(audioPlan, to);
-      audioAt = to;
-    }
+    if (signal?.aborted) throw abortReason(signal);
+    audioAt = await mixRange(audio, audioPlan, { from: audioAt, to: end, until }, { sampleRate, channels, fps, window: AUDIO_WINDOW, signal }, async (buffer) => {
+      if (!limiter) return audioSource!.add(buffer);
+      await addPcm(limiter.process(Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c))));
+    });
   };
+
+  const size = { width: choice.width, height: choice.height };
+  const frameOf = (i: number) => engine.frameAt(project, start + i / rate);
+  // The next frame decodes while this one draws (its kernels run on this thread), and new clips start decoding a few
+  // frames before their cut.
+  let next: Promise<PreparedFrame> | null = null;
+  const prepare = (i: number) => {
+    const pending = frames!.prepare(project, frameOf(i), size, "sequential");
+    pending.catch(() => undefined);
+    return pending;
+  };
+  const warmed = new Set<string>();
+  let warmedTo = 0;
 
   try {
     await output.start();
+    if (frames && videoSource) next = prepare(0);
     for (let i = 0; i < frameCount; i += 1) {
       if (signal?.aborted) throw abortReason(signal);
       const time = start + i / rate;
-      if (frames && videoSource) {
-        const frame = engine.frameAt(project, time);
-        const errors = await frames.draw(project, frame, { width: choice.width, height: choice.height }, "sequential");
-        for (const error of errors) run.onLayerError?.(error, frame);
+      if (frames && videoSource && next) {
+        for (; warmedTo < frameCount && warmedTo <= i + DECODE_AHEAD; warmedTo += 1) frames.warm(project, frameOf(warmedTo), size, warmed);
+        const prepared = await next;
+        next = i + 1 < frameCount ? prepare(i + 1) : null;
+        const errors = frames.drawPrepared(prepared, size);
+        for (const error of errors) run.onLayerError?.(error, prepared.plan.frame);
         await videoSource.add(i / rate, 1 / rate);
         if (i % 120 === 119) frames.sweep();
       }
@@ -286,6 +321,7 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
       report(i + 1, "video");
     }
     await mixUntil(end);
+    if (limiter) await addPcm(limiter.flush());
     report(frameCount, "finalizing");
     videoSource?.close();
     audioSource?.close();
@@ -294,6 +330,7 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
     await output.cancel().catch(() => undefined);
     throw signal?.aborted ? abortReason(signal) : error;
   } finally {
+    await next?.then((prepared) => prepared.release(), () => undefined);
     await frames?.dispose();
     await audio?.dispose();
   }

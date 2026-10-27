@@ -39,8 +39,8 @@ describe("compositeThreads", () => {
     expect(compositeThreads(480, {}, { cpus: 8, memoryBytes: 2 * GiB })).toBe(Math.min(2, availableParallelism() - 1));
   });
 
-  it("uses up to four workers outside a container, none for a short render, and ZENVI_RENDER_THREADS when set", () => {
-    expect(compositeThreads(480, {}, {})).toBe(Math.max(0, Math.min(4, availableParallelism() - 1)));
+  it("uses up to eight workers outside a container, none for a short render, and ZENVI_RENDER_THREADS when set", () => {
+    expect(compositeThreads(480, {}, {})).toBe(Math.max(0, Math.min(8, availableParallelism() - 1)));
     expect(compositeThreads(30, {}, {})).toBe(0);
     expect(compositeThreads(480, { ZENVI_RENDER_THREADS: "3" }, { cpus: 1, memoryBytes: GiB })).toBe(3);
   });

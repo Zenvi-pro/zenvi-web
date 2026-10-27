@@ -5,6 +5,7 @@
 export { ProjectParseError, type ProjectIssue } from "./errors.js";
 export { PROJECT_FORMAT_VERSION } from "./versions.js";
 export { parseProject, parseProjectText, serializeProject, type ParseProjectOptions } from "./parse.js";
+export { replaceNonFiniteTokens } from "./repair.js";
 export {
   PATH_KEYS,
   fromStoredPath,
@@ -28,3 +29,4 @@ export {
   type EmojiSource,
   type OpenMojiMeta,
 } from "./emojis.js";
+export { encodeWav } from "./wav.js";

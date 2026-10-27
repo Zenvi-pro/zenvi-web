@@ -9,6 +9,7 @@
  * ValueError text; handlers answer them as "Error: <message>".
  */
 
+import { STYLIZED_LOOKS, stylizedLook, type StylizedLook } from "../looks/stylized.js";
 import type { Effect } from "../model/types.js";
 import { BUILTIN_LUTS } from "../effects/luts.js";
 import { applyColorGradePreset, isColorGradePreset } from "../ops/look.js";
@@ -996,7 +997,7 @@ function lookMatches(entry: Json, query: string): boolean {
   return tokens.every((token) => hay.includes(token) || (LOOK_QUERY_SYNONYMS[token] ?? []).some((syn) => hay.includes(syn)));
 }
 
-const KIND_RANK: Readonly<Record<string, number>> = { color_preset: 0, lut: 1, film_grain: 2 };
+const KIND_RANK: Readonly<Record<string, number>> = { color_preset: 0, lut: 1, generated: 1, film_grain: 2 };
 
 /** Python string order (by code point), for sorting ids. */
 function cmp(a: string, b: string): number {
@@ -1026,6 +1027,10 @@ export function listLooksCatalog(query = ""): Json {
       if (lookMatches(entry, q)) looks.push(entry);
     }
   }
+  for (const look of STYLIZED_LOOKS) {
+    const entry: Json = { id: look.id, kind: "generated", label: look.label, description: look.description, vibe_tags: [...look.vibe_tags] };
+    if (lookMatches(entry, q)) looks.push(entry);
+  }
   for (const [grainId, meta] of Object.entries(GRAIN_META)) {
     const entry: Json = {
       id: `grain:${grainId}`,
@@ -1046,7 +1051,9 @@ export function listLooksCatalog(query = ""): Json {
 export type ResolvedLook =
   | { kind: "film_grain"; grain_id: string; id: string }
   | { kind: "color_preset"; preset_name: string; id: string }
-  | { kind: "lut"; lut_path: string; id: string; category?: string };
+  | { kind: "lut"; lut_path: string; id: string; category?: string }
+  /** A stylised look whose LUT is generated (looks/stylized.ts). */
+  | { kind: "generated"; id: string; look: StylizedLook };
 
 /** `resolve_look_id`: a lookId or lutPath → what apply_look_tool does with it. */
 export function resolveLookId(lookId: string): ResolvedLook {
@@ -1059,6 +1066,8 @@ export function resolveLookId(lookId: string): ResolvedLook {
     return { kind: "film_grain", grain_id: grainId, id: `grain:${grainId}` };
   }
   if ((LOOK_PRESET_IDS as readonly string[]).includes(lowered)) return { kind: "color_preset", preset_name: lowered, id: lowered };
+  const stylized = stylizedLook(raw);
+  if (stylized) return { kind: "generated", id: stylized.id, look: stylized };
   if (lowered.endsWith(".cube") || raw.includes("/") || raw.includes("\\") || raw.startsWith("@colors")) return { kind: "lut", lut_path: raw, id: raw };
   const matches: [string, string][] = [];
   for (const [category, ids] of BUILTIN_LUTS) {

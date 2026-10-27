@@ -152,7 +152,7 @@ describe("render jobs", () => {
     await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
     // A second service over the same tables (the other instance) recovers the queued job too.
     const { createServices } = await import("../container.js");
-    const other = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, transcribeMedia: undefined, fontFamilies: undefined, supabase: { verify: async () => null }, renderer });
+    const other = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, mixPcm: undefined, resolveAsset: undefined, transcribeMedia: undefined, fontFamilies: undefined, motion: undefined, mattes: undefined, supabase: { verify: async () => null }, renderer });
     await other.renders.recover();
     await Promise.all([h.services.renders.drain(), other.renders.drain()]);
     expect(renderer.renders).toBe(1);
@@ -198,7 +198,7 @@ describe("render jobs", () => {
     const first = (await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} })).json.renderId as string;
     // A worker: its own render service over the same stores, as render-job.ts builds it.
     const { createServices } = await import("../container.js");
-    const worker = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, transcribeMedia: undefined, fontFamilies: undefined, supabase: { verify: async () => null }, renderer });
+    const worker = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, mixPcm: undefined, resolveAsset: undefined, transcribeMedia: undefined, fontFamilies: undefined, motion: undefined, mattes: undefined, supabase: { verify: async () => null }, renderer });
     await worker.renders.runOne(USER_A, first);
     expect(renderer.renders).toBe(1);
     expect((await h.request("GET", `/v1/projects/${id}/renders/${first}`, { token })).json.status).toBe("done");
@@ -235,6 +235,10 @@ describe("render options", () => {
     expect(resolveRenderOptions(project, "mp4-720p")).toMatchObject({ width: 1280, height: 720, quality: "medium" });
     expect(resolveRenderOptions(project, "mp4", { width: 853 })).toMatchObject({ width: 854, height: 480 });
     expect(resolveRenderOptions(project, "mp3")).toMatchObject({ format: "mp3" });
+    expect(resolveRenderOptions(project, "mp4", { loudness: { targetLufs: -14, truePeakDbtp: -1 } }).loudness).toEqual({ targetLufs: -14, truePeakDbtp: -1 });
+    expect(resolveRenderOptions(project, "mp4").loudness).toBeUndefined();
+    expect(resolveRenderOptions(project, "mp4").truePeakLimit).toBeUndefined();
+    expect(resolveRenderOptions(project, "mp4", { truePeakLimit: false }).truePeakLimit).toBe(false);
     expect(resolveRenderOptions(project, "gif")).toMatchObject({ format: "gif", width: 640, height: 360 });
   });
 

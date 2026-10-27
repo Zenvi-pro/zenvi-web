@@ -18,6 +18,7 @@ import { probe } from "../probe/probe.js";
 import { projectAssetsDir, sequenceFramesPresent } from "@zenvi/engine";
 import { cacheDir } from "../svg/fonts.js";
 import { isInside } from "./paths.js";
+import { createKitSampleCache } from "./sfx-kit.js";
 import { createWebVideoFetcher } from "./web-video.js";
 
 /**
@@ -213,6 +214,8 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
   const maxBytes = options.maxDownloadBytes ?? 4 * 1024 ** 3;
   const doFetch = options.fetchImpl ?? fetch;
   const scratch = options.scratchDir ?? path.join(tmpdir(), "zenvi-media");
+  /** What writeGenerated wrote: the only files discardGenerated deletes. */
+  const generated = new Set<string>();
 
   const mediaDir = async (sub: "media" | "title"): Promise<string> => {
     const project = options.projectFile();
@@ -282,6 +285,8 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
       }
     },
 
+    kitSample: createKitSampleCache({ cacheRoot: options.cacheRoot ?? cacheDir(options.env), fetchImpl: options.fetchImpl }),
+
     fetchWebVideo:
       options.fetchWebVideo ??
       createWebVideoFetcher({
@@ -294,7 +299,12 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
       const sub = contentType === "image/svg+xml" || name.toLowerCase().endsWith(".svg") ? "title" : "media";
       const dest = await uniquePath(await mediaDir(sub), safeName(name));
       await writeFile(dest, bytes);
+      generated.add(dest);
       return dest;
+    },
+
+    async discardGenerated(paths) {
+      for (const p of paths) if (generated.delete(p)) await rm(p, { force: true });
     },
   };
 }

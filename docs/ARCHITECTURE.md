@@ -17,7 +17,7 @@ Plus two that already exist and are extended, not replaced:
 
 | Surface | Change |
 | --- | --- |
-| **Desktop editor** (zenvi-core, PyQt + libopenshot) | "Push to Zenvi Cloud" / "Open from Zenvi Cloud" |
+| **Desktop editor** (zenvi-core, PyQt + libopenshot) | "Push to Zenvi Cloud" / "Open from Zenvi Cloud"; runs engine tools it does not implement through the bundled CLI ([ENGINE_BRIDGE.md](ENGINE_BRIDGE.md), prototype, off by default) |
 | **Zenvi Assistant** (zenvi-backend agent) | can drive the web editor exactly like it drives the desktop |
 
 ```
@@ -63,6 +63,7 @@ Plus two that already exist and are extended, not replaced:
 packages/engine        @zenvi/engine       model · keyframes · history · ops · tools · frame planner · effect kernels
 packages/render-web    @zenvi/render-web   Mediabunny decode · Canvas2D compositor · Web Audio · WebCodecs export
 packages/render-node   @zenvi/render-node  ffmpeg probe/decode/encode · CPU compositor · resvg-wasm SVG raster
+packages/scenes3d      @zenvi/scenes3d     Zenvi 3D: procedural Blender scenes (bpy) · persistent Blender worker · render cache
 packages/cli           @zenvi/cli          `zenvi` binary · local MCP (stdio) · cloud client · device login
 packages/cloud         @zenvi/cloud        REST /v1 · remote MCP · OAuth 2.1 AS · render jobs · Azure storage
 packages/adobe-link    @zenvi/adobe-link   Zenvi Link: ae_* / premiere_* catalogs (zod) · ExtendScript tools · CEP server/panel · discovery + client
@@ -91,6 +92,7 @@ src/transitions/ transition registry (mask catalog from zenvi-core `src/transiti
 src/titles/      title templates (SVG) + text substitution
 src/render/      frame planner (Project × frame → FramePlan), audio planner, effect kernels (RGBA),
                  CPU compositor (reference implementation, used by render-node)
+src/fx/          Zenvi FX: footage effect catalog, ffmpeg filtergraphs, zenvi-fx links (docs/FX.md)
 src/tools/       tool catalog (zod schemas + handlers + host capability interfaces)
 src/io/          parse/validate/migrate project JSON, path/media resolution, export presets
 ```
@@ -115,16 +117,31 @@ Key contracts (see `packages/engine/src/**/types.ts` for the source of truth):
 from a `File`/OPFS blob or a signed URL. Each `LayerPlan` is drawn with Canvas2D
 (`setTransform` + `globalAlpha` + `drawImage`, GPU-backed). Clips with effects or
 masks are first drawn into a scratch canvas and run through the engine's RGBA
-kernels. Preview renders at the preview widget size; export renders at full
+kernels. Preview renders at the preview widget size, in a Worker on an
+`OffscreenCanvas` where the browser allows (the page keeps the clock and Web
+Audio; playback drops resolution while effects cannot keep up); export renders at full
 size and encodes with Mediabunny (`CanvasSource` + `AudioBufferSource`, H.264/AAC
-MP4 when the browser can encode it, VP9/Opus WebM otherwise). Audio preview
-schedules decoded `AudioBuffer`s with Web Audio and applies the gain curve.
+MP4 when the browser can encode it, VP9/Opus WebM otherwise); an export decodes
+the next frame while it draws this one, and starts each new clip's decoding a few
+frames before its cut. Audio preview schedules decoded `AudioBuffer`s with Web
+Audio and applies the gain curve.
 
 **Node (`render-node`).** ffmpeg decodes each active clip to raw RGBA at the size
-it is drawn, the engine's CPU compositor composites the frame, and ffmpeg encodes
-the result (libx264/aac by default). Audio is mixed by an ffmpeg filter graph
+it is drawn, the engine's CPU compositor composites the frame (on up to 8 worker
+threads), and ffmpeg encodes the result (libx264/aac by default). A render plans a
+few frames ahead to start the next cuts' decoders early, and a clip takes over the
+decoder of the previous clip of its file when it can read forward to its first
+frame (montages cut a source in order), so cuts rarely relaunch ffmpeg or seek. Audio is mixed by an ffmpeg filter graph
 generated from the `AudioPlan`. SVG titles are rasterized with resvg (WASM) so the
 bundle stays pure JS + WASM. The cloud render worker uses the same code.
+
+**Loudness.** The engine owns the meter (`mastering/loudness.ts`: BS.1770-4 /
+EBU R128 LUFS, true peak) and the gain-staging plan (`mastering/gain-stage.ts`);
+a renderer only supplies PCM through `AudioHost.mixPcm` (render-node runs the
+export's own audio graph). `master_audio_tool` turns the plan into clip volume
+and Compressor makeup gain, so the desktop plays the same mix. Export-time
+`ExportOptions.loudness` (render-node, cloud, `zenvi render --loudness`) is the
+safety net: two-pass ffmpeg `loudnorm` plus a limiter, off unless asked for.
 
 Both renderers execute the same `FramePlan`, so a frame looks the same in the
 browser preview, a CLI render and a cloud render.
@@ -142,7 +159,7 @@ Two families, one registry (`packages/engine/src/tools`):
    coding agents need: `move_clip`, `trim_clip`, `split_clip`, `set_clip_property`
    (keyframe-aware), `add_effect`, `set_effect_property`, `remove_effect`,
    `add_title`, `set_clip_speed`, `fade_clip`, `add_transition`, `render_video`,
-   `preview_frame` (returns a PNG so the model can see the frame), `probe_media`,
+   `preview_frame` (returns a PNG so the model can see the frame), `review_edit_tool` (one contact sheet of the whole cut plus pacing, beat and loudness numbers and a ranked problem list: the agent watches its own edit), `probe_media`,
    `list_effects`, `describe_project`.
 
 Every mutating tool returns a receipt: `{ ok, text, data }` where `data` lists

@@ -50,7 +50,9 @@ HyperFrames code the `code-video-handoff` skill.
 3. **Timeline.** `add_clip_to_timeline_tool` (file id, `position_seconds`,
    `track`, source `start_seconds`/`end_seconds`), then trim, split, move and
    delete clips; `apply_transition_tool` between clips; `add_title_tool` for
-   text; `add_effect_tool` for looks; `set_clip_volume_tool` and
+   static text, `add_kinetic_title_tool` for titles that animate in
+   (pop, slam, tilt, scramble, letters, typewriter), `kinetic_captions_tool`
+   for word-by-word captions of speech; `add_effect_tool` for looks; `set_clip_volume_tool` and
    `set_keyframes_tool` for levels and motion; `add_marker_tool` for notes.
    `get_timeline_state_tool` / `list_clips_tool` describe the timeline.
 4. **Look before you claim it is done.** `preview_frame` returns the
@@ -59,7 +61,10 @@ HyperFrames code the `code-video-handoff` skill.
    end, mid-hold, the last frame; pass `grid: true` for a 0-1 coordinate
    grid when placing things) against the review checklist in
    `zenvi://taste`. If something is off, fix it or `undo_tool`, and look
-   again. The `edit_review` prompt runs this loop.
+   again. The `edit_review` prompt runs this loop. To judge the cut as a
+   whole (pacing, rhythm against the music, black or empty frames, loudness)
+   call `review_edit_tool`: one contact sheet plus a ranked problem list;
+   fix what it flags and call it again.
 5. **Render.** `render_video` (mp4 by default; webm, mov, gif, mp3, wav, png
    frames). It returns the output path, duration and size.
 6. **Hand off.** `launch_editor` opens the project in the Zenvi desktop app

@@ -15,7 +15,6 @@ import type { ContractToolName } from "./schemas.gen.js";
 export const PENDING_DESKTOP_TOOLS: ReadonlySet<ContractToolName> = new Set<ContractToolName>([
   "capture_editor_screenshot_tool",
   "get_log_paths_tool",
-  "mcp_health_tool",
   "send_assistant_prompt_tool",
   "wait_for_editor_job_tool",
   "zenvi_api_request",

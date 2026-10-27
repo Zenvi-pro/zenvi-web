@@ -4,7 +4,9 @@
  * the same build as zenvi.pro/editor. Serving it from this origin keeps the
  * embed's API calls same-origin (its token is this service's) and lets chat
  * hosts frame it; zenvi.pro is never framed. Every other editor route
- * redirects to zenvi.pro, where the person signs in.
+ * redirects to the deployment's editor (`ZENVI_EDITOR_URL`, zenvi.pro by
+ * default), where the person signs in; when that editor is this service's own
+ * `/editor` (a lab or self-hosted copy), the build answers them itself.
  */
 
 import { readFile, stat } from "node:fs/promises";
@@ -49,9 +51,11 @@ interface StaticFile {
   type: string;
 }
 
-export function editorRoutes(dist: string | null, editorUrl: string): Hono<AppEnv> {
+export function editorRoutes(dist: string | null, editorUrl: string, ownOrigins: readonly string[]): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
   const root = dist ? path.resolve(dist) : null;
+  // Redirecting to ourselves would loop.
+  const selfHosted = ownOrigins.some((origin) => editorUrl === `${origin}/editor`);
 
   async function read(relative: string): Promise<StaticFile | null> {
     if (!root) return null;
@@ -87,6 +91,13 @@ export function editorRoutes(dist: string | null, editorUrl: string): Hono<AppEn
       // Vite fingerprints everything under assets/; the rest may change in place.
       c.header("Cache-Control", relative.startsWith("assets/") ? "public, max-age=31536000, immutable" : "public, max-age=300");
       return c.body(new Uint8Array(file.data));
+    }
+    if (selfHosted) {
+      const index = await read("index.html");
+      if (!index) return c.text("The editor is not part of this Zenvi Cloud build.", 503);
+      c.header("Content-Type", index.type);
+      c.header("Cache-Control", "no-cache");
+      return c.body(new Uint8Array(index.data));
     }
     const rest = urlPath.replace(/^\/editor/, "");
     return c.redirect(`${editorUrl}${rest}`, 302);

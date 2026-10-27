@@ -1,9 +1,9 @@
-/** `zenvi render` and `zenvi frame`. */
+/** `zenvi render`, `zenvi frame` and `zenvi review`. */
 
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
-import { defaultExportEnd, isSequenceFormat, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
+import { defaultExportEnd, isSequenceFormat, MASTER_PRESETS, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
 import { ENCODER_PRESETS, FORMATS, formatFromPath, frameCaption, isEncoderPreset, type NodeExportOptions, type RenderResult } from "@zenvi/render-node";
 import { PortableExecutor, type CallOutcome, type Executor } from "../engine/executor.js";
 import { CliError } from "../output.js";
@@ -38,7 +38,21 @@ export interface RenderFlags {
   audioBitrate?: string;
   crf?: string;
   encoderPreset?: string;
+  loudness?: string;
+  /** false from `--no-limiter`. */
+  limiter?: boolean;
   open?: boolean;
+}
+
+/** `--loudness social|broadcast|podcast|<LUFS>|off` as the export's normalisation target. */
+export function parseLoudness(text: string | undefined): ExportOptions["loudness"] {
+  const t = text?.trim().toLowerCase();
+  if (!t || t === "off" || t === "none") return undefined;
+  const preset = Object.hasOwn(MASTER_PRESETS, t) ? MASTER_PRESETS[t as keyof typeof MASTER_PRESETS] : undefined;
+  if (preset) return { targetLufs: preset.targetLufs, truePeakDbtp: preset.ceilingDbtp };
+  const lufs = Number(t);
+  if (Number.isFinite(lufs) && lufs >= -40 && lufs <= -6) return { targetLufs: lufs, truePeakDbtp: -1 };
+  throw new CliError("--loudness must be social, broadcast, podcast, off, or a target between -40 and -6 LUFS.", 2);
 }
 
 /** Export options from flags + project defaults. */
@@ -79,6 +93,9 @@ export function exportOptionsFrom(project: Project, output: string | undefined, 
     if (!isEncoderPreset(flags.encoderPreset)) throw new CliError(`--encoder-preset must be one of ${ENCODER_PRESETS.join(", ")}.`, 2);
     options.encoderPreset = flags.encoderPreset;
   }
+  const loudness = parseLoudness(flags.loudness);
+  if (loudness) options.loudness = loudness;
+  if (flags.limiter === false) options.truePeakLimit = false;
   if (output) options.output = output;
   return options;
 }
@@ -132,11 +149,14 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
     .option("--audio-bitrate <rate>", "e.g. 192k")
     .option("--crf <n>", "constant quality for H.264/H.265/VP9 (wins over --quality; 0 = lossless)")
     .option("--encoder-preset <preset>", "encoder speed: ultrafast … veryslow (default veryfast; the desktop app encodes at medium)")
+    .option("--loudness <target>", "normalize the mix: social (-14 LUFS, -1 dBTP), broadcast (-23), podcast (-16), or a LUFS number; two-pass loudnorm with a true-peak limiter (default off)")
+    .option("--no-limiter", "export the mix as the timeline plays, without the -1 dBTP true-peak limiter every portable render ends with")
     .option("--open", "open the result when done")
     .action(async (outputArg: string | undefined, flags: RenderFlags) => {
       await withExecutor(ctx, async (executor) => {
         const output = outputArg ? path.resolve(ctx.cwd, outputArg) : undefined;
         if (!(executor instanceof PortableExecutor)) {
+          if (parseLoudness(flags.loudness)) ctx.out.warn("--loudness is applied by the portable renderer only; the desktop export was not normalized.");
           printOutcome(ctx, await exportOnDesktop(executor, output));
           return;
         }
@@ -206,6 +226,44 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
         await writeFile(output, Buffer.from(data, "base64"));
         if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output}`, engine: executor.engine, project: executor.project ?? null, file: output, mimeType, seconds });
         else ctx.out.line(`${ctx.out.style("✓", "green")} Wrote ${output}`);
+      });
+    });
+
+  program
+    .command("review")
+    .description("watch the cut: one contact sheet of the edit at its cut points plus rhythm, loudness and a ranked list of problems with fixes (review_edit_tool)")
+    .argument("[output]", "contact sheet file (default: review-sheet.jpg)")
+    .option("--start <time>", "review from here (seconds or timecode)")
+    .option("--end <time>", "review up to here")
+    .option("--pace <pace>", "fast (default; reels, hype), medium (b-roll, promos) or slow (talking head, documentary)")
+    .option("--max-tiles <n>", "most frames on the sheet (default 24)")
+    .option("--tile-width <px>", "width of each frame, for a closer look at a short range")
+    .option("--no-audio", "skip mixing the audio down (no loudness, silence or beat alignment)")
+    .option("--no-image", "numbers and problems only")
+    .action(async (outputArg: string | undefined, opts: { start?: string; end?: string; pace?: string; maxTiles?: string; tileWidth?: string; audio: boolean; image: boolean }) => {
+      const args: Record<string, unknown> = {
+        start: parseTime(opts.start),
+        end: parseTime(opts.end),
+        pace: opts.pace,
+        max_tiles: opts.maxTiles,
+        tile_width: opts.tileWidth,
+        audio: opts.audio,
+        image: opts.image,
+      };
+      for (const key of Object.keys(args)) if (args[key] === undefined) delete args[key];
+      await withExecutor(ctx, async (executor) => {
+        const outcome = await executor.call("review_edit_tool", args);
+        let saved: string | undefined;
+        if (outcome.ok && outcome.images.length > 0) {
+          saved = path.resolve(ctx.cwd, outputArg ?? "review-sheet.jpg");
+          await writeFile(saved, Buffer.from(outcome.images[0]!.data, "base64"));
+        }
+        printOutcome(ctx, outcome, saved ? { sheet_file: saved } : {});
+        if (outcome.ok && !ctx.out.json) {
+          const problems = (outcome.receipt?.data as { problems?: { severity: string; code: string; at: number; message: string; fix: string }[] } | undefined)?.problems ?? [];
+          for (const [i, p] of problems.entries()) ctx.out.line(`${i + 1}. [${p.severity}] ${p.code} @${p.at.toFixed(2)}s  ${p.message}\n     fix: ${p.fix}`);
+          if (saved) ctx.out.line(`${ctx.out.style("✓", "green")} Wrote ${saved}`);
+        }
       });
     });
 }

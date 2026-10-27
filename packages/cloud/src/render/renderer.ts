@@ -7,7 +7,7 @@
  * a clear message while queues and job records keep working.
  */
 
-import type { AudioEnvelope, ExportOptions, Project, ReaderInfo, Transcription } from "@zenvi/engine";
+import type { AudioEnvelope, ExportOptions, MatteHost, MixPcm, MotionHost, Project, ReaderInfo, Transcription } from "@zenvi/engine";
 import type { TranscribeFileOptions } from "@zenvi/render-node";
 
 /**
@@ -60,6 +60,8 @@ export interface MediaProber {
 /** Files bundled with the engine (`packages/engine/assets/…`), e.g. `titles/Bar_1.svg`. */
 export interface AssetSource {
   readText(path: string): Promise<string>;
+  /** Bytes of a binary asset (the bundled fonts). */
+  readBytes?(path: string): Promise<Uint8Array>;
 }
 
 /** Mono RMS envelope of a local file's audio (`@zenvi/render-node` `analyzeAudio`). */
@@ -71,8 +73,17 @@ export type AudioAnalyzer = (
 /** Mono float PCM of a local file's audio (`@zenvi/render-node` `decodePcm`), for beat tracking. */
 export type PcmDecoder = (
   filePath: string,
-  options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
-) => Promise<{ sampleRate: number; samples: Float32Array }>;
+  options?: { sampleRate?: number; startSeconds?: number; maxSeconds?: number; channels?: 1 | 2; signal?: AbortSignal },
+) => Promise<{ sampleRate: number; samples: Float32Array; right?: Float32Array }>;
+
+/**
+ * The timeline's mix (or the stem of `clipIds`) through the export's audio
+ * graph (`@zenvi/render-node` `renderMixPcm`), for master_audio_tool.
+ */
+export type MixRenderer = (
+  project: Project,
+  options: { resolveMedia: PathResolver; clipIds?: readonly string[]; maxSeconds?: number; signal?: AbortSignal },
+) => Promise<MixPcm>;
 
 /**
  * The font families SVG titles render with in this process
@@ -89,6 +100,20 @@ export type FontLister = () => Promise<string[]>;
  * up in pieces).
  */
 export type SpeechTranscriber = (filePath: string, options: TranscribeFileOptions) => Promise<Transcription>;
+
+/**
+ * A host that renders next to local files, made for one tool call: it writes
+ * under `workDir` (the call's scratch folder, removed after the call) and
+ * reads media through `resolveMedia`, which knows the local copies the call
+ * fetched before rendering.
+ */
+export type LocalHostFactory<T> = (options: { workDir: string; resolveMedia: (projectPath: string) => string }) => T;
+
+/** Zenvi Motion blocks (`@zenvi/motion/node` `createMotionHost`, headless Chrome). */
+export type MotionHostFactory = LocalHostFactory<MotionHost>;
+
+/** Subject mattes (`@zenvi/render-node` `createNodeMatteHost`, Robust Video Matting in onnxruntime-node). */
+export type MatteHostFactory = LocalHostFactory<MatteHost>;
 
 export class RendererUnavailableError extends Error {
   constructor(what = "renderer") {

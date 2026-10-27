@@ -1,0 +1,57 @@
+{
+  "id": "chat_thread",
+  "version": 2,
+  "title": "Chat thread",
+  "description": "A chat with an AI assistant playing out: the question types into the composer and is sent up as a bubble, typing dots answer, then the reply streams in word by word in large display type; after a beat, *starred* words in the reply get an accent marker sweep. Up to three exchanges. For AI product demos, 'I asked…' hooks and support/assistant promos.",
+  "tags": [
+    "ui",
+    "ai",
+    "chat",
+    "assistant",
+    "typing",
+    "messages",
+    "saas"
+  ],
+  "duration": {
+    "default": 7,
+    "min": 3.5,
+    "max": 16
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "sky",
+    "display": "serif",
+    "radius": 34
+  },
+  "params": {
+    "messages": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 6,
+      "maxLength": 240,
+      "default": [
+        "Can you turn my 40-page report into a one-page summary?",
+        "Done. I kept the *three key findings*, one line each, and ended on the *next steps*."
+      ],
+      "description": "The conversation, alternating: the user first, then the assistant, and so on. Wrap words of a reply in *stars* for the marker sweep."
+    },
+    "assistant": {
+      "type": "string",
+      "maxLength": 24,
+      "default": "Wren",
+      "description": "The assistant's name, shown above its replies and in the composer's placeholder."
+    },
+    "placeholder": {
+      "type": "string",
+      "maxLength": 48,
+      "default": "",
+      "description": "Grey text in the empty composer (empty: 'Ask <assistant>…')."
+    }
+  }
+}

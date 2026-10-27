@@ -1,0 +1,117 @@
+{
+  "id": "chart_build",
+  "version": 2,
+  "title": "Chart build",
+  "description": "A bar, line or donut chart that builds itself: bars grow from the baseline, the line draws across, the donut sweeps round, every label counting up. A big number counts to the highlighted value; after a beat of stillness the highlighted bar/point/segment turns the accent, the rest dim, and a change badge lands. For stats, results and growth claims in promos and explainers.",
+  "tags": [
+    "chart",
+    "data",
+    "stats",
+    "counter",
+    "bar",
+    "line",
+    "donut",
+    "infographic"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 3,
+    "max": 12
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "sage",
+    "display": "sans",
+    "radius": 6
+  },
+  "params": {
+    "kind": {
+      "type": "enum",
+      "options": [
+        "bar",
+        "line",
+        "donut"
+      ],
+      "default": "bar",
+      "description": "bar (categories side by side), line (a trend over time) or donut (parts of a whole)."
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 60,
+      "default": "Hours saved per person, each month",
+      "description": "What the chart measures, in sentence case (empty: none)."
+    },
+    "values": {
+      "type": "strings",
+      "minItems": 2,
+      "maxItems": 8,
+      "maxLength": 16,
+      "default": [
+        "12",
+        "18",
+        "15",
+        "24",
+        "31",
+        "46"
+      ],
+      "description": "The numbers, one per bar/point/segment (\"1,240\", \"46%\" and \"$3.5\" are read as numbers; donut takes at most 6)."
+    },
+    "labels": {
+      "type": "strings",
+      "maxItems": 8,
+      "maxLength": 14,
+      "default": [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun"
+      ],
+      "description": "Category or time label of each value."
+    },
+    "highlight": {
+      "type": "integer",
+      "min": -1,
+      "max": 7,
+      "default": -1,
+      "description": "Which value the big number counts to and the accent marks (0-based; -1: the largest, or a line's last point)."
+    },
+    "prefix": {
+      "type": "string",
+      "maxLength": 4,
+      "default": "",
+      "description": "Before every number, e.g. $."
+    },
+    "suffix": {
+      "type": "string",
+      "maxLength": 6,
+      "default": "h",
+      "description": "After every number, e.g. %, k or h."
+    },
+    "decimals": {
+      "type": "integer",
+      "min": 0,
+      "max": 2,
+      "default": 0,
+      "description": "Decimal places shown."
+    },
+    "caption": {
+      "type": "string",
+      "maxLength": 32,
+      "default": "",
+      "description": "Badge text at the highlight (empty: the change from the first value, e.g. \"+283% vs Jan\", for bar and line; none for donut)."
+    },
+    "rest": {
+      "type": "color",
+      "optional": true,
+      "description": "Colour of the bars/line/segments that are not highlighted (default the ink)."
+    }
+  }
+}

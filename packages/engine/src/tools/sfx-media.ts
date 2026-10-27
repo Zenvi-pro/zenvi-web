@@ -1,0 +1,253 @@
+/**
+ * Sound-effect media for add_sfx_tool and auto_sound_design_tool: render a
+ * recipe (sfx/render.ts) to WAV, store it through the host once per sound
+ * (the bin entry records its cache key, so a rerun reuses the file), and
+ * place it on the SFX track with its hit point on the moment.
+ *
+ * Files are padded so the hit sits on a frame boundary: libopenshot places
+ * a clip's audio by whole frames, so the frame-snapped clip then puts the
+ * hit exactly on the cut.
+ *
+ * No effect plays past the picture: renders run to the last clip of any
+ * kind, so a tail past the last frame would deliver black. A tail that would
+ * is cut at the picture's end and faded out.
+ */
+
+import type { Transaction } from "../history/document.js";
+import { encodeWav } from "../io/wav.js";
+import { isAudioOnlyMedia } from "../model/media.js";
+import type { Clip, Layer, Project, ProjectFile } from "../model/types.js";
+import { updateClipValues } from "../ops/clip-props.js";
+import { addClip, fadeClip, setClipProperty } from "../ops/clips.js";
+import { addFile, removeFile, updateFile } from "../ops/files.js";
+import { addTrack } from "../ops/tracks.js";
+import { SFX_ROLE, isSfxClip, type SfxClipMark } from "../sfx/moments.js";
+import type { SfxCredit } from "../sfx/library.js";
+import { sfxRecipe } from "../sfx/recipes.js";
+import { SFX_VERSION, framePad, padSfx, renderSfx, resolveSfxParams, sfxKey, type ResolvedSfxParams, type SfxParams } from "../sfx/render.js";
+import { fileById, fpsFloatOf } from "./catalog/common.js";
+import type { ToolCall } from "./define.js";
+import type { ImportedMedia } from "./types.js";
+
+/** Label of the first sound-effect track; more lanes are "SFX 2", "SFX 3"… */
+export const SFX_TRACK_LABEL = "SFX";
+const LANE = /^SFX(?: (\d+))?$/;
+
+/** What a sound-effect file records about itself (`file.zenvi_sfx`). */
+export interface SfxFileMark {
+  key: string;
+  /** The recipe it is, or (a library sound) the recipe it stands in for. */
+  recipe: string;
+  /** Procedural sounds: what it was rendered with. */
+  params?: ResolvedSfxParams;
+  /** Library sounds: the sound it was made from. */
+  library?: { provider: string; id: string };
+  /** Seconds from the file's start to its hit point. */
+  hit: number;
+  /** Seconds of audio in the file. */
+  duration: number;
+  version: number;
+}
+
+/** One rendered (or cached) sound, ready to place. */
+export interface PreparedSfx {
+  key: string;
+  recipe: string;
+  params?: ResolvedSfxParams;
+  hit: number;
+  duration: number;
+  /** A bin entry that already holds this sound. */
+  fileId?: string;
+  /** Freshly written media, added to the bin when placed. */
+  media?: ImportedMedia;
+  /** Library sounds: the clip's title, and the credit recorded on the file. */
+  title?: string;
+  credit?: SfxCredit;
+}
+
+export interface SfxRequest {
+  recipe: string;
+  params: SfxParams;
+}
+
+export function markOf(file: ProjectFile): Partial<SfxFileMark> | undefined {
+  return file.zenvi_role === SFX_ROLE ? (file.zenvi_sfx as Partial<SfxFileMark> | undefined) : undefined;
+}
+
+/** Snap seconds to the project's frame grid. */
+export function snapToFrame(project: Project, seconds: number): number {
+  const fps = fpsFloatOf(project);
+  return fps > 0 ? Math.round(seconds * fps) / fps : seconds;
+}
+
+/**
+ * Render and store every requested sound not already in the bin (same
+ * recipe, parameters, seed and frame rate). Returns one entry per request;
+ * equal requests share an entry. Host writes happen here, before the edit.
+ */
+export async function prepareSfx(call: ToolCall, requests: readonly SfxRequest[]): Promise<PreparedSfx[]> {
+  const project = call.doc.project;
+  const fps = fpsFloatOf(project);
+  const cached = new Map<string, ProjectFile>();
+  for (const file of project.files) {
+    const key = markOf(file)?.key;
+    if (key) cached.set(key, file);
+  }
+  const byKey = new Map<string, PreparedSfx>();
+  const out: PreparedSfx[] = [];
+  for (const request of requests) {
+    const recipe = sfxRecipe(request.recipe);
+    if (!recipe) throw new Error(`unknown sound effect recipe: ${request.recipe}`);
+    const params = resolveSfxParams(recipe, request.params);
+    const key = sfxKey(recipe.id, params, fps);
+    let prepared = byKey.get(key);
+    if (!prepared) {
+      const file = cached.get(key);
+      const mark = file ? markOf(file) : undefined;
+      if (file && mark && typeof mark.hit === "number") {
+        prepared = { key, recipe: recipe.id, params, hit: mark.hit, duration: typeof mark.duration === "number" ? mark.duration : Number(file.duration) || 0, fileId: String(file.id) };
+      } else {
+        const rendered = renderSfx(recipe.id, params);
+        const audio = padSfx(rendered, framePad(rendered.hit, fps));
+        const name = `sfx-${recipe.id}-${key.slice(0, 8)}.wav`;
+        const media = call.host.media!;
+        const path = await media.writeGenerated!(name, encodeWav([audio.left, audio.right], audio.sampleRate), "audio/wav");
+        const info = await media.probe(path);
+        prepared = {
+          key,
+          recipe: recipe.id,
+          params,
+          hit: audio.hit,
+          duration: audio.duration,
+          media: { path, info: { ...info, media_type: "audio", has_video: false, has_audio: true }, name: `SFX ${recipe.title}` },
+        };
+      }
+      byKey.set(key, prepared);
+    }
+    out.push(prepared);
+  }
+  return out;
+}
+
+/**
+ * Where the picture ends, seconds: the end of the last clip that shows a
+ * picture (of any clip but an effect when none does). Null when the
+ * timeline holds nothing but effects.
+ */
+export function pictureEnd(project: Project): number | null {
+  const content = project.clips.filter((c) => !isSfxClip(c));
+  const visual = content.filter((c) => {
+    const file = fileById(project, String(c.file_id));
+    return file ? !isAudioOnlyMedia(file) : true;
+  });
+  const clips = visual.length > 0 ? visual : content;
+  return clips.length > 0 ? clips.reduce((end, c) => Math.max(end, c.position + (c.end - c.start)), 0) : null;
+}
+
+/** Longest fade on a tail cut at the picture's end, seconds. */
+const TAIL_FADE = 0.5;
+
+/** Sound-effect tracks, bottom to top. */
+export function sfxLanes(project: Project): Layer[] {
+  return project.layers.filter((l) => LANE.test(String(l.label ?? "").trim())).sort((a, b) => a.number - b.number);
+}
+
+function overlaps(project: Project, layer: number, from: number, to: number): boolean {
+  return project.clips.some((c) => c.layer === layer && c.position < to - 1e-6 && c.position + (c.end - c.start) > from + 1e-6);
+}
+
+/** The first SFX track free over [from, to); a new lane above the others when none is (the first is named "SFX"). */
+function laneFor(tx: Transaction, from: number, to: number): number {
+  const lanes = sfxLanes(tx.project);
+  const free = lanes.find((l) => !l.lock && !overlaps(tx.project, l.number, from, to));
+  if (free) return free.number;
+  const top = lanes[lanes.length - 1];
+  // Next number after the highest lane ("SFX" counts as 1), so a gap never repeats a label.
+  const highest = Math.max(0, ...lanes.map((l) => Number(LANE.exec(String(l.label ?? "").trim())?.[1] ?? 1)));
+  const label = lanes.length === 0 ? SFX_TRACK_LABEL : `${SFX_TRACK_LABEL} ${highest + 1}`;
+  return addTrack(tx, top ? { above: top.number, label } : { label }).number;
+}
+
+export interface SfxPlacement {
+  /** Timeline seconds of the moment (frame-snapped by the caller). */
+  at: number;
+  /** `peak`: the hit point lands on `at`; `start`: the file starts there. */
+  align: "peak" | "start";
+  gainDb: number;
+  auto: boolean;
+  reason?: string;
+  /** Timeline seconds the sound must not play past (the picture's end); its tail is cut there and faded. */
+  until?: number;
+}
+
+export interface PlacedSfx {
+  clip: Clip;
+  /** Seconds of the sound's tail cut at `until` (0 when it fits). */
+  trimmed: number;
+  /** Length of the fade-out on the cut tail, seconds (0 when it fits). */
+  fadeOut: number;
+}
+
+/**
+ * Place a prepared sound: its bin entry (added once), a clip on a free SFX
+ * lane, the gain as clip volume, and the marks that let tools find it. A
+ * hit before the timeline's start trims the head instead; a tail past
+ * `until` is cut there and faded out after the hit. Returns null when
+ * nothing of the sound is left on the timeline.
+ */
+export function placeSfx(tx: Transaction, sound: PreparedSfx, where: SfxPlacement): PlacedSfx | null {
+  const recipe = sfxRecipe(sound.recipe)!;
+  let position = where.at - (where.align === "peak" ? sound.hit : 0);
+  let start = 0;
+  if (position < 0) {
+    start = -position;
+    position = 0;
+  }
+  let end = sound.duration;
+  if (where.until !== undefined) end = Math.min(end, start + (where.until - position));
+  if (end - start < 0.01) return null;
+  if (!sound.fileId) sound.fileId = addSfxFile(tx, sound);
+  const layer = laneFor(tx, position, position + end - start);
+  const clip = addClip(tx, { fileId: sound.fileId, position, layer, start, end, title: sound.title ?? recipe.title });
+  setClipProperty(tx, clip.id, "volume", Math.round(10 ** (where.gainDb / 20) * 1000) / 1000);
+  const trimmed = sound.duration - end > 1e-6 ? sound.duration - end : 0;
+  let fadeOut = 0;
+  if (trimmed > 0) {
+    // Fade what plays after the hit (all of it when the cut comes first), never into the hit; at least a frame so the cut never clicks.
+    const from = sound.hit < end ? Math.max(start, sound.hit) : start;
+    const frame = 1 / (fpsFloatOf(tx.project) || 30);
+    fadeOut = Math.min(TAIL_FADE, end - start, Math.max((end - from) * 0.6, frame));
+    fadeClip(tx, clip.id, { fadeOut, audio: true, video: false });
+  }
+  const mark: SfxClipMark = {
+    recipe: sound.recipe,
+    auto: where.auto,
+    ...(where.reason ? { reason: where.reason } : {}),
+    ...(sound.credit ? { library: `${sound.credit.provider}:${sound.credit.id}` } : {}),
+  };
+  return { clip: updateClipValues(tx, clip.id, { zenvi_role: SFX_ROLE, zenvi_sfx: mark }), trimmed, fadeOut };
+}
+
+/** Add a prepared sound's file to the bin, marked so tools find it (and, from a library, with its credit). Returns its id. */
+export function addSfxFile(tx: Transaction, sound: PreparedSfx): string {
+  const file = addFile(tx, sound.media!, { dedupe: true, mediaType: "audio" });
+  const mark: SfxFileMark = {
+    key: sound.key,
+    recipe: sound.recipe,
+    ...(sound.params ? { params: sound.params } : {}),
+    ...(sound.credit ? { library: { provider: sound.credit.provider, id: sound.credit.id } } : {}),
+    hit: sound.hit,
+    duration: sound.duration,
+    version: SFX_VERSION,
+  };
+  updateFile(tx, String(file.id), { zenvi_role: SFX_ROLE, zenvi_sfx: mark, name: sound.media!.name, ...(sound.credit ? { zenvi_credit: sound.credit } : {}) });
+  return String(file.id);
+}
+
+/** Remove sound-effect files no clip plays any more (a rerun's leftovers), but the ones in `keep` (the sound kit's). Returns their ids. */
+export function removeUnusedSfxFiles(tx: Transaction, keep: ReadonlySet<string> = new Set()): string[] {
+  const used = new Set([...tx.project.clips.map((c) => String(c.file_id)), ...keep]);
+  const unused = tx.project.files.filter((f) => f.zenvi_role === SFX_ROLE && !used.has(String(f.id))).map((f) => String(f.id));
+  for (const id of unused) removeFile(tx, id);
+  return unused;
+}

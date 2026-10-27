@@ -148,6 +148,27 @@ export function artboardSize(doc: TitleDoc): [number, number] {
 // Font and colours (the dialog's Change Font / Text Color / Background Color)
 // ---------------------------------------------------------------------------
 
+/** Where the middle of capital letters sits above the baseline, as a share of the font size. */
+const CAP_MIDDLE = 0.36;
+
+/**
+ * `center_lines`: put each line's capitals on the artboard's middle at its
+ * current font size, so a card with one centred word (Text_Card) stays
+ * centred when the size is scaled. QtSvg ignores dy in em, so the baseline
+ * is written as a number.
+ */
+export function centerLines(doc: TitleDoc): void {
+  const middle = artboardSize(doc)[1] / 2;
+  for (const node of lineNodes(doc)) {
+    const size = px(nodeProperty(node, "font-size"));
+    if (size === null) continue;
+    const y = fmt(middle + CAP_MIDDLE * size);
+    setAttr(node, "y", y);
+    const parent = node.parent;
+    if (parent && parent.name === "text" && hasAttr(parent, "y")) setAttr(parent, "y", y);
+  }
+}
+
 /** `_fmt`: "%.4f" without trailing zeros. */
 function fmt(value: number): string {
   return pyFixed(value, 4).replace(/0+$/, "").replace(/\.$/, "");

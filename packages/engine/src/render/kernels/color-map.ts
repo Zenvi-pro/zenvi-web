@@ -19,6 +19,13 @@ import type { KernelSpec, Params } from "./types.js";
 const f32 = Math.fround;
 const INV_255 = f32(1 / 255);
 
+/**
+ * Results kept per call: an opaque pixel's output is a pure function of its 8-bit RGB, and pictures repeat colours, so
+ * a repeat skips the lookup (as ColorGrade does). Direct-mapped by a multiplicative hash of the RGB; the bytes are the
+ * same either way.
+ */
+const MEMO_BITS = 16;
+
 /** Fused float multiply-add: the float product is exact in double. */
 function fmaf(a: number, b: number, c: number): number {
   return f32(a * b + c);
@@ -40,33 +47,6 @@ function constrainByte(v: number): number {
 function normalizeToDomain(value: number, min: number, range: number): number {
   const v = range <= 0 ? value : f32(f32(value - min) / range);
   return v < 0 ? 0 : v > 1 ? 1 : v;
-}
-
-/** One channel of the trilinear lookup (ColorMap.cpp:277-299): lerp along r, then g, then b. */
-function trilinear(
-  t: Float32Array,
-  i000: number,
-  i100: number,
-  i010: number,
-  i110: number,
-  i001: number,
-  i101: number,
-  i011: number,
-  i111: number,
-  dr: number,
-  odr: number,
-  dg: number,
-  odg: number,
-  db: number,
-  odb: number,
-): number {
-  const c00 = fmaf(t[i000]!, odr, f32(t[i100]! * dr));
-  const c01 = fmaf(t[i001]!, odr, f32(t[i101]! * dr));
-  const c10 = fmaf(t[i010]!, odr, f32(t[i110]! * dr));
-  const c11 = fmaf(t[i011]!, odr, f32(t[i111]! * dr));
-  const c0 = fmaf(c00, odg, f32(c10 * dg));
-  const c1 = fmaf(c01, odg, f32(c11 * dg));
-  return fmaf(c0, odb, f32(c1 * db));
 }
 
 /** `sample1d` (ColorMap.cpp:204-218). */
@@ -103,9 +83,25 @@ export function applyCubeLut(image: PremulImage, lut: CubeLut, intensity: number
   const last = n - 1;
   const is3d = lut.kind === "3d";
   const d = image.data;
+  const memoRgb = new Int32Array(1 << MEMO_BITS).fill(-1);
+  const memoOut = new Int32Array(1 << MEMO_BITS);
   for (let i = 0; i < d.length; i += 4) {
-    const alpha = f32(d[i + 3]! / 255);
-    if (alpha === 0) continue;
+    const A = d[i + 3]!;
+    if (A === 0) continue;
+    let rgb = -1;
+    let slot = 0;
+    if (A === 255) {
+      rgb = (d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!;
+      slot = Math.imul(rgb, 0x9e3779b1) >>> (32 - MEMO_BITS);
+      if (memoRgb[slot] === rgb) {
+        const out = memoOut[slot]!;
+        d[i] = out >>> 16;
+        d[i + 1] = (out >>> 8) & 255;
+        d[i + 2] = out & 255;
+        continue;
+      }
+    }
+    const alpha = f32(A / 255);
     const rn = f32(f32(d[i]! / alpha) * INV_255);
     const gn = f32(f32(d[i + 1]! / alpha) * INV_255);
     const bn = f32(f32(d[i + 2]! / alpha) * INV_255);
@@ -143,18 +139,39 @@ export function applyCubeLut(image: PremulImage, lut: CubeLut, intensity: number
       const i101 = (b1g0 + r1) * 3;
       const i011 = (b1g1 + r0) * 3;
       const i111 = (b1g1 + r1) * 3;
-      lr = trilinear(t, i000, i100, i010, i110, i001, i101, i011, i111, dr, odr, dg, odg, db, odb);
-      lg = trilinear(t, i000 + 1, i100 + 1, i010 + 1, i110 + 1, i001 + 1, i101 + 1, i011 + 1, i111 + 1, dr, odr, dg, odg, db, odb);
-      lb = trilinear(t, i000 + 2, i100 + 2, i010 + 2, i110 + 2, i001 + 2, i101 + 2, i011 + 2, i111 + 2, dr, odr, dg, odg, db, odb);
+      // One channel of the trilinear lookup per pass (ColorMap.cpp:277-299): lerp along r, then g, then b. Written out
+      // (not a helper) so V8 keeps it inline; `f32(a * b + c)` is `fmaf`, the float product being exact in double.
+      let c00 = f32(t[i000]! * odr + f32(t[i100]! * dr));
+      let c01 = f32(t[i001]! * odr + f32(t[i101]! * dr));
+      let c10 = f32(t[i010]! * odr + f32(t[i110]! * dr));
+      let c11 = f32(t[i011]! * odr + f32(t[i111]! * dr));
+      lr = f32(f32(c00 * odg + f32(c10 * dg)) * odb + f32(f32(c01 * odg + f32(c11 * dg)) * db));
+      c00 = f32(t[i000 + 1]! * odr + f32(t[i100 + 1]! * dr));
+      c01 = f32(t[i001 + 1]! * odr + f32(t[i101 + 1]! * dr));
+      c10 = f32(t[i010 + 1]! * odr + f32(t[i110 + 1]! * dr));
+      c11 = f32(t[i011 + 1]! * odr + f32(t[i111 + 1]! * dr));
+      lg = f32(f32(c00 * odg + f32(c10 * dg)) * odb + f32(f32(c01 * odg + f32(c11 * dg)) * db));
+      c00 = f32(t[i000 + 2]! * odr + f32(t[i100 + 2]! * dr));
+      c01 = f32(t[i001 + 2]! * odr + f32(t[i101 + 2]! * dr));
+      c10 = f32(t[i010 + 2]! * odr + f32(t[i110 + 2]! * dr));
+      c11 = f32(t[i011 + 2]! * odr + f32(t[i111 + 2]! * dr));
+      lb = f32(f32(c00 * odg + f32(c10 * dg)) * odb + f32(f32(c01 * odg + f32(c11 * dg)) * db));
     } else {
       lr = sample1d(t, n, rd, 0);
       lg = sample1d(t, n, gd, 1);
       lb = sample1d(t, n, bd, 2);
     }
     // (lut*t + in*(1-t)) * alpha, truncated; alpha is left unchanged (ColorMap.cpp:307-314).
-    d[i] = constrainByte(f32(f32(alpha * fmaf(lr, tR, f32(rn * keepR))) * 255));
-    d[i + 1] = constrainByte(f32(f32(alpha * fmaf(lg, tG, f32(gn * keepG))) * 255));
-    d[i + 2] = constrainByte(f32(f32(alpha * fmaf(lb, tB, f32(bn * keepB))) * 255));
+    const r8 = constrainByte(f32(f32(alpha * fmaf(lr, tR, f32(rn * keepR))) * 255));
+    const g8 = constrainByte(f32(f32(alpha * fmaf(lg, tG, f32(gn * keepG))) * 255));
+    const b8 = constrainByte(f32(f32(alpha * fmaf(lb, tB, f32(bn * keepB))) * 255));
+    d[i] = r8;
+    d[i + 1] = g8;
+    d[i + 2] = b8;
+    if (A === 255) {
+      memoRgb[slot] = rgb;
+      memoOut[slot] = (r8 << 16) | (g8 << 8) | b8;
+    }
   }
 }
 

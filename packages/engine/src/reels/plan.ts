@@ -6,10 +6,13 @@
  *   music window  the loudest stretch of the track that starts on a downbeat
  *                 (a quiet intro is skipped); the reel ends on a downbeat
  *   cuts          the style's beat pattern from the first beat, the climax
- *                 pattern from two thirds in, the last shot held under the
- *                 end card
+ *                 pattern from two thirds in (from the first bar line there
+ *                 when the style winds up into a drop: the shot before it
+ *                 holds `windupBeats`), the last shot held under the end card
  *   shots         media in the order given (story order), the last item
- *                 saved for the final shot (the payoff); a long clip gives
+ *                 saved for the final shot (the payoff); a clip comes back
+ *                 no sooner than 3 s after it was last on screen while
+ *                 another one can fill the shot, and a long clip gives
  *                 different moments each time it comes back; a shot no
  *                 clip can fill is split on the beat instead of leaving a gap
  */
@@ -49,8 +52,10 @@ export interface PlannedShot {
   speed: number;
   /** The cut into this shot is on a downbeat. */
   onDownbeat: boolean;
-  /** The shot starts in the last third. */
+  /** The shot starts in the climax (the last third, or from the drop). */
   climax: boolean;
+  /** The shot winds up into the drop (the style's `windupBeats`, ending on the climax's first downbeat). */
+  windup?: boolean;
   label?: string;
 }
 
@@ -66,6 +71,12 @@ export interface ReelPlan {
   beats: number[];
   downbeats: number[];
   shots: PlannedShot[];
+  /** Timeline second of the drop (the climax's first cut, on a downbeat), or null when the style has no wind-up or the reel is too short. */
+  drop: number | null;
+  /** Shots that bring a clip back sooner than `REUSE_GAP_SECONDS` after it was last on screen (too few clips for the pace). */
+  closeRepeats: number;
+  /** Distinct clips the busiest `REUSE_GAP_SECONDS` of the cut needs so none comes back that soon. */
+  clipsNeeded: number;
 }
 
 export interface PlanInput {
@@ -74,6 +85,8 @@ export interface PlanInput {
   music: MusicBeats | null;
   /** Target length, seconds (default: the style's), rounded to whole bars as `planReelGrid` says. */
   seconds?: number;
+  /** Tempo of the grid when there is no music (default: the style's). */
+  fallbackBpm?: number;
   /**
    * The project's frame rate: the music's in-point snaps to its frame grid
    * (as the clip will), so the beats stay where the cuts are.
@@ -86,6 +99,8 @@ const EPS = 1e-6;
 export const MIN_SHOT_SECONDS = 0.2;
 /** Slowest a clip may play to fill a shot. */
 const MIN_SPEED = 0.5;
+/** A clip is not back on screen sooner than this, seconds, while another clip can fill the shot. */
+export const REUSE_GAP_SECONDS = 3;
 
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 
@@ -150,14 +165,40 @@ export function timeAtBeat(beats: readonly number[], k: number): number {
   return beats[last]! + (k - last) * gap;
 }
 
-/** Cut points in beats: first shot, the pattern (climax from two thirds in), the held last shot. */
+/**
+ * The beat of the drop: the first bar line at or after two thirds in, when
+ * the style winds up into it and there is room for the wind-up after the
+ * first shot and for the last shot after it; else null.
+ */
+export function dropBeat(style: ReelStyle, totalBeats: number): number | null {
+  const windup = style.accents?.windupBeats ?? 0;
+  if (!(windup > 0)) return null;
+  const drop = Math.ceil((totalBeats * 2) / 3 / 4 - EPS) * 4;
+  // A bar of the body before the wind-up, and the climax at least a bar before the last shot.
+  if (drop - windup < style.firstBeats + 4 - EPS || drop + 4 > totalBeats - style.lastBeats + EPS) return null;
+  return drop;
+}
+
+/** Cut points in beats: first shot, the pattern (climax from two thirds in, or from the drop after a wind-up), the held last shot. */
 export function cutBeats(style: ReelStyle, totalBeats: number): number[] {
   if (totalBeats <= style.firstBeats + EPS) return [0, totalBeats];
   const cuts = [0, Math.min(style.firstBeats, totalBeats)];
+  const drop = dropBeat(style, totalBeats);
+  const climaxAt = drop ?? (totalBeats * 2) / 3;
   let k = cuts[1]!;
   for (let i = 0; ; i += 1) {
-    const pattern = style.climax && k >= (totalBeats * 2) / 3 - EPS ? style.climax : style.pattern;
+    const pattern = style.climax && k >= climaxAt - EPS ? style.climax : style.pattern;
     const next = k + pattern[i % pattern.length]!;
+    if (drop !== null && k < drop - EPS && next > drop - style.accents!.windupBeats + EPS) {
+      // The wind-up: the body stops where it starts (a sliver of a shot before it is absorbed), it holds into the drop.
+      const windupAt = drop - style.accents!.windupBeats;
+      if (windupAt - k < 0.5 - EPS && cuts.length > 2) cuts.pop();
+      if (windupAt - cuts[cuts.length - 1]! > EPS) cuts.push(windupAt);
+      cuts.push(drop);
+      k = drop;
+      i = -1;
+      continue;
+    }
     if (next > totalBeats - style.lastBeats + EPS) break;
     cuts.push(next);
     k = next;
@@ -244,7 +285,7 @@ export function planReel(input: PlanInput): ReelPlan {
   const { style, media } = input;
   if (media.length === 0) throw new Error("A reel needs at least one video or image.");
   const target = Math.max(2, input.seconds ?? style.defaultSeconds);
-  const grid = planReelGrid({ music: input.music, seconds: target, fallbackBpm: style.defaultBpm, frameRate: input.frameRate });
+  const grid = planReelGrid({ music: input.music, seconds: target, fallbackBpm: input.fallbackBpm ?? style.defaultBpm, frameRate: input.frameRate });
   const { duration, beatsInReel } = grid;
 
   // Cuts sit on the frame grid, so one shot ends exactly where the next begins
@@ -257,16 +298,29 @@ export function planReel(input: PlanInput): ReelPlan {
     slots.push({ start: onFrame(timeAtBeat(grid.beats, cuts[i]!)), end: onFrame(timeAtBeat(grid.beats, cuts[i + 1]!)), k0: cuts[i]!, k1: cuts[i + 1]! });
   }
   if (slots.length > 0) slots[slots.length - 1]!.end = onFrame(duration);
+  const drop = dropBeat(style, beatsInReel);
+  const dropAt = drop !== null ? onFrame(timeAtBeat(grid.beats, drop)) : null;
+  const climaxAt = dropAt ?? (duration * 2) / 3;
 
   const cursors = new Map<string, number>();
   // A clip's first use starts a third of the way in: stock and phone footage often opens on a rack focus or a shake.
   const nextFrom = (m: ReelMedia, seconds: number) => cursors.get(m.fileId) ?? m.start + Math.max(0, (m.end - m.start - seconds) * 0.3);
   const fits = (m: ReelMedia, seconds: number) => m.kind === "image" || m.end - m.start >= seconds * MIN_SPEED - EPS;
+  // Source stretches each clip has shown: a clip that comes back shows a moment not seen yet while it has one.
+  const shown = new Map<string, [number, number][]>();
+  const fresh = (m: ReelMedia, seconds: number): number | null => {
+    if (m.kind === "image") return m.start;
+    // Too short for the slot (it plays slowed down whole): fresh until it has been on.
+    if (m.end - m.start < seconds - EPS) return shown.has(m.fileId) ? null : m.start;
+    return freshFrom(m, seconds, nextFrom(m, seconds), shown.get(m.fileId) ?? []);
+  };
   // The last item is the payoff: it closes the reel (when there are enough items to tell a story).
   const payoff = media.length >= 3 ? media[media.length - 1]! : null;
   const body = payoff ? media.slice(0, -1) : media;
 
   const shots: PlannedShot[] = [];
+  // When each clip was last on screen (its shot's end).
+  const lastSeen = new Map<string, number>();
   let rotation = 0;
   const queue = [...slots];
   while (queue.length > 0) {
@@ -275,11 +329,28 @@ export function planReel(input: PlanInput): ReelPlan {
     const isLast = queue.length === 0;
     let chosen: ReelMedia | undefined;
     if (isLast && payoff && fits(payoff, seconds)) chosen = payoff;
-    for (let j = 0; !chosen && j < body.length; j += 1) {
-      const m = body[(rotation + j) % body.length]!;
-      if (fits(m, seconds)) {
-        chosen = m;
-        rotation = (rotation + j + 1) % body.length;
+    if (!chosen) {
+      // Story order, skipping clips seen in the last few seconds and, while a rested one has a moment not shown yet, the
+      // rested ones that have shown everything; with none rested, the one seen longest ago.
+      const seen = (j: number) => lastSeen.get(body[(rotation + j) % body.length]!.fileId) ?? -Infinity;
+      const rested = (j: number) => seen(j) <= slot.start - REUSE_GAP_SECONDS + EPS;
+      let pick = -1;
+      let exhausted = -1;
+      for (let j = 0; j < body.length; j += 1) {
+        const m = body[(rotation + j) % body.length]!;
+        if (!fits(m, seconds)) continue;
+        if (rested(j)) {
+          if (fresh(m, seconds) !== null) {
+            pick = j;
+            break;
+          }
+          if (exhausted < 0) exhausted = j;
+        } else if (pick < 0 || seen(j) < seen(pick) - EPS) pick = j;
+      }
+      if (exhausted >= 0 && !(pick >= 0 && rested(pick))) pick = exhausted;
+      if (pick >= 0) {
+        chosen = body[(rotation + pick) % body.length]!;
+        rotation = (rotation + pick + 1) % body.length;
       }
     }
     if (!chosen) {
@@ -298,21 +369,25 @@ export function planReel(input: PlanInput): ReelPlan {
     if (chosen.kind === "video") {
       const length = chosen.end - chosen.start;
       if (length >= seconds - EPS) {
-        sourceStart = nextFrom(chosen, seconds);
+        // A moment not shown yet (from the cursor on, else from the top), else the cursor's, wrapping to the start.
+        sourceStart = fresh(chosen, seconds) ?? nextFrom(chosen, seconds);
         if (sourceStart + seconds > chosen.end + EPS) sourceStart = chosen.start;
         // On the frame grid too: an in-point and an out-point rounded to frames on their own can lose a frame.
         sourceStart = onFrame(sourceStart);
         if (sourceStart + seconds > chosen.end + EPS) sourceStart = Math.max(chosen.start, onFrame(chosen.end - seconds - (fps ? 0.5 / fps : 0)));
         sourceEnd = sourceStart + seconds;
+        shown.set(chosen.fileId, [...(shown.get(chosen.fileId) ?? []), [sourceStart, sourceEnd]]);
         // Next time this clip comes back, show a later moment.
         cursors.set(chosen.fileId, sourceEnd + Math.min(0.5, seconds / 4));
       } else {
         sourceStart = chosen.start;
         sourceEnd = chosen.end;
         speed = Math.max(MIN_SPEED, length / seconds);
+        shown.set(chosen.fileId, [...(shown.get(chosen.fileId) ?? []), [sourceStart, sourceEnd]]);
       }
     }
     const onDownbeat = grid.downbeats.some((d) => Math.abs(d - slot.start) < 0.03);
+    lastSeen.set(chosen.fileId, slot.end);
     shots.push({
       fileId: chosen.fileId,
       kind: chosen.kind,
@@ -322,11 +397,13 @@ export function planReel(input: PlanInput): ReelPlan {
       sourceEnd: round3(sourceEnd),
       speed: round3(speed),
       onDownbeat,
-      climax: slot.start >= (duration * 2) / 3 - EPS,
+      climax: slot.start >= climaxAt - EPS,
+      ...(dropAt !== null && Math.abs(slot.end - dropAt) < EPS && slot.k1 - slot.k0 >= style.accents!.windupBeats - EPS ? { windup: true } : {}),
       ...(chosen.label ? { label: chosen.label } : {}),
     });
   }
   shots.sort((a, b) => a.start - b.start);
+  const reuse = reuseStats(shots);
   return {
     duration: onFrame(duration),
     lengthNote: grid.lengthNote,
@@ -335,5 +412,33 @@ export function planReel(input: PlanInput): ReelPlan {
     beats: grid.beats.filter((t) => t <= duration + EPS),
     downbeats: grid.downbeats.filter((t) => t <= duration + EPS),
     shots,
+    drop: dropAt,
+    ...reuse,
   };
+}
+
+/**
+ * The earliest in-point at or after `from` (else at or after the clip's own
+ * start) of a `seconds`-long stretch of `m` that overlaps no `shown` stretch;
+ * null when no such stretch is left. The earliest such start is `from`, the
+ * clip's start or the end of a shown stretch.
+ */
+export function freshFrom(m: Pick<ReelMedia, "start" | "end">, seconds: number, from: number, shown: readonly [number, number][]): number | null {
+  const fits = (s: number) => s >= m.start - EPS && s + seconds <= m.end + EPS && shown.every(([a, b]) => s + seconds <= a + EPS || s >= b - EPS);
+  const ends = shown.map(([, b]) => b).sort((a, b) => a - b);
+  return [from, ...ends.filter((e) => e >= from), m.start, ...ends].find(fits) ?? null;
+}
+
+/** How many shots bring a clip back within `REUSE_GAP_SECONDS`, and how many clips the busiest stretch needs. */
+export function reuseStats(shots: readonly Pick<PlannedShot, "fileId" | "start" | "end">[]): { closeRepeats: number; clipsNeeded: number } {
+  let closeRepeats = 0;
+  let clipsNeeded = 0;
+  shots.forEach((shot, i) => {
+    const earlier = shots.slice(0, i).filter((s) => s.fileId === shot.fileId);
+    const last = earlier[earlier.length - 1];
+    if (last && shot.start - last.end < REUSE_GAP_SECONDS - EPS) closeRepeats += 1;
+    // Shots on screen in the gap after this one starts: each needs its own clip.
+    clipsNeeded = Math.max(clipsNeeded, shots.filter((s) => s.start >= shot.start - EPS && s.start < shot.start + REUSE_GAP_SECONDS - EPS).length);
+  });
+  return { closeRepeats, clipsNeeded };
 }

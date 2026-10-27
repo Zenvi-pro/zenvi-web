@@ -13,7 +13,19 @@ import { createServices } from "./container.js";
 import { createLogger, errorMessage } from "./http/log.js";
 import { loadEngineRegistry } from "./mcp/engine.js";
 import { queueDispatch, type RenderDispatch, renderQueue } from "./render/dispatch.js";
-import { nodeAnalyzeAudio, nodeAssetResolver, nodeAssetSource, nodeDecodePcm, nodeFontFamilies, nodeProber, nodeRenderer, nodeTranscribeMedia } from "./render/node.js";
+import {
+  nodeAnalyzeAudio,
+  nodeAssetResolver,
+  nodeAssetSource,
+  nodeDecodePcm,
+  nodeFontFamilies,
+  nodeMatteHosts,
+  nodeMixPcm,
+  nodeMotionHosts,
+  nodeProber,
+  nodeRenderer,
+  nodeTranscribeMedia,
+} from "./render/node.js";
 import { unavailableProber } from "./render/renderer.js";
 import { AzureBlobStore, AzureTableStore } from "./storage/azure.js";
 import { MemoryBlobStore, MemoryTableStore } from "./storage/memory.js";
@@ -55,6 +67,10 @@ async function main(): Promise<void> {
   if (!assets) log.warn("engine assets not found: title tools are disabled");
   const { renderer, reason } = await nodeRenderer();
   if (reason) log.warn("rendering unavailable", { reason });
+  const motion = await nodeMotionHosts();
+  if (motion.reason) log.warn("motion blocks unavailable", { reason: motion.reason });
+  const mattes = nodeMatteHosts();
+  if (mattes.reason) log.warn("subject matting unavailable", { reason: mattes.reason });
   let renderDispatch: RenderDispatch | undefined;
   if (config.renderQueue && config.storage.kind === "azure") {
     const queue = renderQueue(config.storage.connectionString, config.renderQueue);
@@ -74,10 +90,13 @@ async function main(): Promise<void> {
     assets,
     analyzeAudio: haveFfmpeg ? nodeAnalyzeAudio : undefined,
     decodePcm: haveFfmpeg ? nodeDecodePcm : undefined,
+    mixPcm: haveFfmpeg && haveFfprobe ? nodeMixPcm : undefined,
     transcribeMedia: haveFfmpeg && haveFfprobe ? nodeTranscribeMedia : undefined,
     fontFamilies: nodeFontFamilies,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl, log: (message) => log.warn(message) }),
     renderDispatch,
+    motion: motion.factory,
+    mattes: mattes.factory,
   });
   const app = createApp(services);
 
@@ -88,6 +107,8 @@ async function main(): Promise<void> {
       storage: blobs.kind,
       renderer: services.renders.rendererAvailable,
       engineTools: engine?.tools.length ?? 0,
+      motion: services.motion !== null,
+      mattes: services.mattes !== null,
       renderWorkers: config.renderQueue ?? "none",
       version: config.version,
     });

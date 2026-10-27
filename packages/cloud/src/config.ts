@@ -52,6 +52,11 @@ export interface Config {
   backendUrl: string;
   /** How connector calls reach the backend as the person (auth/backend-session.ts). */
   backendAuth: BackendAuth;
+  /**
+   * Provider keys for stock search without the backend (services/stock.ts), "" when unset. Used only when the
+   * backend is off; never logged.
+   */
+  stockKeys: { pexels: string; freesound: string };
   storage: { kind: "azure"; connectionString: string; container: string } | { kind: "memory" };
   /** Origins allowed for browser CORS on /v1 (patterns with `*`). */
   corsOrigins: string[];
@@ -147,6 +152,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const supabaseUrl = origin.parse(env.SUPABASE_URL ?? "https://xktarhzbrdnxkaovtdxj.supabase.co");
   const backendUrl = env.ZENVI_BACKEND_URL === "" ? "" : origin.parse(env.ZENVI_BACKEND_URL ?? "https://api.zenvi.pro");
   const backendAuth = loadBackendAuth(env);
+  const stockKeys = { pexels: env.PEXELS_API_KEY?.trim() ?? "", freesound: env.FREESOUND_API_KEY?.trim() ?? "" };
 
   const storageKind = (env.STORAGE ?? "azure").toLowerCase();
   let storage: Config["storage"];
@@ -186,6 +192,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     supabaseUrl,
     backendUrl,
     backendAuth,
+    stockKeys,
     storage,
     corsOrigins,
     mcpAllowedOrigins,

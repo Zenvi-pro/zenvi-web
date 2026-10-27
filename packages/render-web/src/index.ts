@@ -42,13 +42,17 @@ export { CanvasTextRasterizer } from "./compositor/text.js";
 
 // Preview
 export { PreviewPlayer, type PlayerErrorEvent, type PlayerState, type PreviewPlayerOptions } from "./player/preview-player.js";
+
+export { canPreviewInWorker } from "./player/worker/client.js";
+export { servePreviewWorker, type PreviewWorkerOptions } from "./player/worker/host.js";
 export { fitViewport } from "./player/layout.js";
 
 // Audio
 export { AudioRenderer, type PreparedPiece } from "./audio/renderer.js";
 export { KernelAudioSource } from "./audio/kernel-audio.js";
 export { AudioPlayback, type AudioPlaybackOptions } from "./audio/playback.js";
-export { mixWindow } from "./audio/mixdown.js";
+export { mixRange, mixWindow } from "./audio/mixdown.js";
+export { renderMixPcm, DEFAULT_MIX_SECONDS, type MixPcmOptions } from "./audio/mix-pcm.js";
 
 // Export
 export {

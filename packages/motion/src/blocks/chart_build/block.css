@@ -1,0 +1,28 @@
+.cb-head { position: absolute; display: flex; flex-direction: column; align-items: flex-start; gap: 22px; }
+.cb-title { font-size: 46px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.14; color: var(--ink); max-width: 15em; }
+.cb-big { font-family: var(--font-display); letter-spacing: -0.055em; line-height: 0.92; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); margin-left: -0.05em; }
+.cb-affix { font-size: 0.4em; letter-spacing: -0.02em; margin: 0 0.08em; vertical-align: 0.95em; }
+.cb-bar { position: absolute; border-radius: var(--radius) var(--radius) 0 0; transform-origin: 50% 100%; }
+.cb-base { position: absolute; height: 3px; margin-top: -1px; background: var(--ink); transform-origin: 0 50%; }
+.cb-val { position: absolute; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; white-space: nowrap; color: var(--ink); }
+.cb-cat { position: absolute; text-align: center; font-size: 26px; font-weight: 450; color: var(--muted); white-space: nowrap; }
+.cb-tick { position: absolute; text-align: left; font-size: 22px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cb-badge { position: absolute; padding: 12px 22px; border-radius: 999px; background: var(--accent); font-weight: 650; font-size: 30px; letter-spacing: -0.01em; white-space: nowrap; }
+.cb-badge::after { content: ""; position: absolute; left: var(--notch, 50%); bottom: -9px; width: 18px; height: 18px; margin-left: -9px; background: var(--accent); transform: rotate(45deg); border-radius: 3px; }
+.cb-badge.is-flat::after { display: none; }
+.cb-svg { position: absolute; inset: 0; overflow: visible; }
+.cb-rule { stroke: var(--line); stroke-width: 2; }
+.cb-axis { stroke: var(--ink); stroke-width: 3; }
+.cb-line { fill: none; stroke-width: 7; stroke-linejoin: round; stroke-linecap: round; }
+.cb-area { fill-opacity: 0.09; stroke: none; }
+.cb-dot { stroke-width: 5; }
+.cb-guide { stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; }
+.cb-ring { fill: none; stroke: var(--line); }
+.cb-arc { fill: none; }
+.cb-centre { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.cb-sub { font-size: 30px; font-weight: 500; color: var(--muted); }
+.cb-legend { position: absolute; display: flex; flex-direction: column; gap: 0; }
+.cb-row { display: flex; align-items: center; gap: 20px; height: 64px; font-size: 32px; font-weight: 500; color: var(--ink); border-bottom: 2px solid var(--line); }
+.cb-swatch { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+.cb-name { flex: 1; letter-spacing: -0.01em; }
+.cb-amount { font-variant-numeric: tabular-nums; font-weight: 600; }

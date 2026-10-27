@@ -14,6 +14,10 @@
   },
   "dependencies": {
     "@resvg/resvg-wasm": "^2.6.2",
-    "@zenvi/engine": "*"
+    "@zenvi/engine": "*",
+    "@zenvi/scenes3d": "*"
+  },
+  "optionalDependencies": {
+    "onnxruntime-node": "^1.30.0"
   }
 }

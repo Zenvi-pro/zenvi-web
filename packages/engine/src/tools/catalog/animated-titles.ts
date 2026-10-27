@@ -53,6 +53,7 @@ import {
   summaryLine,
   toolError,
   trackInfo,
+  warningNote,
   type OverlayCarrier,
 } from "../titles-text.js";
 
@@ -237,7 +238,7 @@ export const animatedTitleTools = [
         }
 
         const placed = call.commit((tx) => {
-          const { layer, created } = planOverlayTrack(tx.project, position, position + duration, input.track);
+          const { layer, created, moved } = planOverlayTrack(tx.project, position, position + duration, input.track);
           const nextId = idFactory(tx.project);
           const clips = prepared.map((seg) => {
             const file = "media" in seg.source ? addFile(tx, seg.source.media, { mediaType: "image" }) : carrierFile(tx, seg.source.carrier);
@@ -246,7 +247,7 @@ export const animatedTitleTools = [
             const clip = placeOverlayClip(tx, { fileId: file.id, position: seg.position, duration: seg.duration, layer, newTrackLabel: "Titles", title: template.title, props });
             return { clip, fileId: file.id };
           });
-          return { clips, layer, created };
+          return { clips, layer, created, moved };
         });
 
         const t = trackInfo(call.doc.project, placed.layer);
@@ -268,14 +269,17 @@ export const animatedTitleTools = [
           data.timeline_clip_ids = placed.clips.map((c) => c.clip.id);
           data.file_ids = placed.clips.map((c) => c.fileId);
         }
+        const warnings = placed.moved ? [placed.moved] : [];
+        if (warnings.length > 0) data.warnings = warnings;
         return applied(
           tool,
           summaryLine(
             `Added animated title ${pyReprString(template.title)} (a 2D keyframed title, ${frames} frames) on track ${t.track} at ` +
-              `${pyFixed(position, 2)}-${pyFixed(position + duration, 2)}s.`,
+              `${pyFixed(position, 2)}-${pyFixed(position + duration, 2)}s.${warningNote(warnings)}`,
           ),
           {
             data,
+            warnings,
             notes: ["Zenvi desktop renders this template in 3D with Blender; this surface draws a 2D version of it with keyframes, which stays editable."],
           },
         );

@@ -1,0 +1,83 @@
+{
+  "id": "notification_stack",
+  "version": 1,
+  "title": "Notification stack",
+  "description": "Notifications or DMs dropping in one after another and stacking with depth: each new card lands on top and pushes the older ones down, smaller, dimmer and softer; after a beat the last one lands in the accent colour. Over video by default. For 'my phone won't stop' moments, social proof, app promos and reaction hooks.",
+  "tags": [
+    "ui",
+    "notification",
+    "dm",
+    "messages",
+    "social",
+    "stack",
+    "phone"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 2.5,
+    "max": 12
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": true,
+  "tokens": {
+    "palette": "light",
+    "radius": 30
+  },
+  "params": {
+    "items": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 6,
+      "maxLength": 90,
+      "default": [
+        "Mara Lindqvist: Rough cut is up, notes by six?",
+        "Render queue: Final_v4 exported in 2m 14s",
+        "Theo Brandt: Client approved the opener",
+        "Ines Okoro: Can we get the vertical by Friday?"
+      ],
+      "description": "One per card, oldest first, as 'Sender: message' (the text before the first colon is the bold title)."
+    },
+    "style": {
+      "type": "enum",
+      "options": [
+        "notification",
+        "dm"
+      ],
+      "default": "notification",
+      "description": "notification (app tile, app name, title and body) or dm (round avatar with initials, name and message)."
+    },
+    "app": {
+      "type": "string",
+      "maxLength": 24,
+      "default": "Relay",
+      "description": "App name on notification cards."
+    },
+    "time": {
+      "type": "string",
+      "maxLength": 12,
+      "default": "now",
+      "description": "Time label on every card."
+    },
+    "highlight_last": {
+      "type": "boolean",
+      "default": true,
+      "description": "The last card lands in the accent colour after a short pause (the punchline)."
+    },
+    "position": {
+      "type": "enum",
+      "options": [
+        "auto",
+        "top",
+        "center",
+        "right"
+      ],
+      "default": "auto",
+      "description": "Where the stack sits: auto (top on vertical frames, top-right on landscape), top, center or right."
+    }
+  }
+}

@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { estimatedTextWidth } from "../titles/title-svg.js";
+import { FONT_FAMILY_IDS, bundledFamily } from "../typography/families.js";
+import { FontLibrary } from "../typography/library.js";
+import { readBundledFont } from "../typography/test-fonts.js";
+import { setRun } from "../typography/typeset.js";
 import { elementsByTagName, getAttr, parseXml } from "../titles/xml.js";
 import { REEL_STYLES, REEL_STYLE_IDS } from "./styles.js";
 import { cardSvg, type CardRole } from "./typography.js";
@@ -12,6 +16,17 @@ const FRAMES: [string, number, number][] = [
   ["4:3", 1440, 1080],
   ["21:9", 2560, 1080],
 ];
+
+let lib: FontLibrary;
+beforeAll(async () => {
+  lib = await FontLibrary.load(readBundledFont, FONT_FAMILY_IDS);
+});
+
+/** A line's width: set in its bundled face when it names one (the tool outlines those), else the title estimate. */
+function lineWidth(text: string, size: number, weight: number, fontFamily: string, letterSpacing: number): number {
+  const family = bundledFamily(fontFamily.split(",")[0]!.trim().replace(/^'|'$/g, ""));
+  return family ? setRun(lib, text, { family, size, weight, tracking: letterSpacing / size }).width : estimatedTextWidth(text, size, weight >= 600);
+}
 
 describe.each(FRAMES)("reel title cards, %s", (_name, width, height) => {
   it.each(REEL_STYLE_IDS)("%s: hook, label and end card are the frame's size, every line inside title-safe", (style) => {
@@ -26,7 +41,7 @@ describe.each(FRAMES)("reel title cards, %s", (_name, width, height) => {
         const y = Number(getAttr(line, "y"));
         const size = Number(getAttr(line, "font-size"));
         const text = line.children.map((c) => (c.kind === "text" ? c.data : "")).join("");
-        const w = estimatedTextWidth(text, size, Number(getAttr(line, "font-weight")) >= 600);
+        const w = lineWidth(text, size, Number(getAttr(line, "font-weight")), getAttr(line, "font-family") ?? "", Number(getAttr(line, "letter-spacing") || 0));
         const anchor = getAttr(line, "text-anchor") || "start";
         const left = anchor === "middle" ? x - w / 2 : anchor === "end" ? x - w : x;
         expect(left / width, `${role} "${text}" left`).toBeGreaterThanOrEqual(0.05);

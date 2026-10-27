@@ -1,0 +1,63 @@
+{
+  "id": "toggle_panel",
+  "version": 2,
+  "title": "Toggle panel",
+  "description": "A settings panel whose switches a pointer turns on one by one: each knob slides, the track fills with the accent and the header's count ticks up; after a beat the header turns to its done state (check + accent). For security/privacy features, 'set it once' onboarding and SaaS feature lists. Over video by default.",
+  "tags": [
+    "ui",
+    "saas",
+    "settings",
+    "toggle",
+    "switch",
+    "cursor",
+    "security"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 3,
+    "max": 12
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": true,
+  "tokens": {
+    "palette": "forest",
+    "radius": 30
+  },
+  "params": {
+    "title": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "Workspace safeguards",
+      "description": "Panel title."
+    },
+    "rows": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 6,
+      "maxLength": 80,
+      "default": [
+        "+Single sign-on: Everyone signs in with the team account",
+        "Review before publish: A second person approves each change",
+        "Watermark drafts: Shared links show a draft mark",
+        "Lock brand kit: Logos and fonts can't be swapped"
+      ],
+      "description": "One per switch as 'Label: detail' (the detail is optional). Start a row with + to show it already on; the pointer switches the others on, top to bottom."
+    },
+    "done": {
+      "type": "string",
+      "maxLength": 28,
+      "default": "All on",
+      "description": "What the header's count becomes once every switch is on."
+    },
+    "cursor": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show the pointer clicking each switch (false: the switches flip by themselves)."
+    }
+  }
+}

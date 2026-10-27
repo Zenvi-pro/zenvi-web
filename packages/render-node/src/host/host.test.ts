@@ -1,10 +1,11 @@
 import { createServer, type Server } from "node:http";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { createClip, createProject, createTransition } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { analyzeAudio, NoAudioError } from "../audio/analyze.js";
+import { analyzeAudio, decodePcm, NoAudioError } from "../audio/analyze.js";
 import { probe } from "../probe/probe.js";
 import { makeAudio, makeImage, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { createBackendHost } from "./backend.js";
@@ -226,6 +227,17 @@ describe("media host", () => {
     const c = await host.writeGenerated!("../voice.mp3", new Uint8Array([1]), "audio/mpeg");
     expect(c).toBe(path.join(dir, "gen", "edit_assets", "media", "voice.mp3"));
   });
+
+  it("discards only the generated files it wrote", async () => {
+    const projectFile = path.join(dir, "discard", "edit.zvn");
+    const host = createNodeMediaHost({ projectFile: () => projectFile });
+    const made = await host.writeGenerated!("title.svg", new TextEncoder().encode("<svg/>"), "image/svg+xml");
+    const other = path.join(dir, "discard", "edit_assets", "title", "mine.svg");
+    await writeFile(other, "<svg/>");
+    await host.discardGenerated!([made, other]);
+    expect(existsSync(made)).toBe(false);
+    expect(existsSync(other)).toBe(true);
+  });
 });
 
 describe("backend host", () => {
@@ -269,5 +281,18 @@ describe("analyzeAudio", () => {
     expect(mid).toBeLessThan(0.38);
     const silent = await makeVideo(dir, "noaudio.mp4", { duration: 1, width: 64, height: 48 });
     await expect(analyzeAudio(silent)).rejects.toBeInstanceOf(NoAudioError);
+  });
+});
+
+describe("decodePcm", () => {
+  it("decodes mono by default and both channels when asked (a mono source on both sides)", async () => {
+    const tone = await makeAudio(dir, "tone-pcm.wav", { hz: 440, duration: 0.5, amplitude: 0.5 });
+    const mono = await decodePcm(tone, { sampleRate: 48000 });
+    expect(mono.right).toBeUndefined();
+    const stereo = await decodePcm(tone, { sampleRate: 48000, channels: 2 });
+    expect(stereo.samples.length).toBe(mono.samples.length);
+    expect(stereo.right).toHaveLength(mono.samples.length);
+    expect(stereo.right![1000]).toBeCloseTo(stereo.samples[1000]!, 5);
+    expect(Math.max(...stereo.samples.slice(0, 4800).map(Math.abs))).toBeGreaterThan(0.3);
   });
 });

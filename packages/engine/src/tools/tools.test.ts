@@ -13,10 +13,11 @@ import type { Project } from "../model/types.js";
 import type { ReceiptStatus, ToolReceipt } from "./receipt.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
-import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf } from "./test-support/fixture.js";
+import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf, videoInfo } from "./test-support/fixture.js";
 import { createProject } from "../model/defaults.js";
 import { addClip } from "../ops/clips.js";
-import { addFile } from "../ops/files.js";
+import { addFile, updateFile } from "../ops/files.js";
+import { motionLink } from "../links/zenvi-link.js";
 import { addTransition } from "../ops/transitions.js";
 import { parseTitleSvg, setFieldText, titleFields, titleSvgText } from "../titles/title-svg.js";
 import type { ToolResult } from "./types.js";
@@ -95,6 +96,14 @@ function withTransitions(doc: ProjectDocument): void {
     addTransition(tx, { layer: L1, position: 9, duration: 1, maskId: "common/fade", direction: "out", id: "TRANSFADE1" });
     addTransition(tx, { layer: L1, position: 12, duration: 1, maskId: "common/circle_in_to_out", id: "TRANSCIRC1" });
   });
+}
+
+/** A matting host that "mattes" any file into /assets/mattes/<id>.mp4 (the composites' plumbing, not a model). */
+function withMattes(_doc: ProjectDocument, host: FakeHost): void {
+  host.mattes = {
+    subjects: ["person"],
+    generate: async (path) => ({ media: media(`/assets/mattes/${path.split("/").pop()}`, videoInfo(path, 30, { has_audio: false })), model: "fake", version: "0", license: "MIT", frames: 900, fps: 30 }),
+  };
 }
 
 const SPECS: Record<string, Spec> = {
@@ -950,6 +959,34 @@ const SPECS: Record<string, Spec> = {
 
   // --- direct tools ----------------------------------------------------------------------------------------
   describe_project_tool: { happy: { summary: /^1280x720 30\/1 fps, 5 track\(s\), 5 clip\(s\), 0 transition\(s\), 4 file\(s\); content ends at 19\.00s\.$/ }, failure: null },
+  generate_subject_matte_tool: {
+    happy: { args: { clip_id: IDS.clipA }, setup: withMattes, summary: /^Made a person matte of interview\.mp4: 900 frames at 30\.0 fps/ },
+    failure: { args: { clip_id: IDS.clipLogo }, setup: withMattes, summary: /^Error: clip CLIPLOGO01 is not video/ },
+  },
+  text_behind_subject_tool: {
+    happy: { args: { clip_id: IDS.clipA, text: "TIME" }, setup: withMattes, summary: /^Put "TIME" behind the subject of clip CLIPINTV01: text on track \d+, cut-out on track \d+\.$/ },
+    failure: { args: { clip_id: IDS.clipA, text: "TIME" }, summary: /^Error: text_behind_subject_tool is not available in this Zenvi surface: .* has no person matte yet/ },
+  },
+  replace_background_tool: {
+    happy: { args: { clip_id: IDS.clipA, background: "blur" }, setup: withMattes, summary: /^Replaced the background of clip CLIPINTV01 with the footage blurred/ },
+    failure: { args: { clip_id: IDS.clipA, background: "file" }, setup: withMattes, summary: /^Error: background=file needs file_id$/ },
+  },
+  subject_glow_tool: {
+    happy: { args: { clip_id: IDS.clipA, look: "thermal" }, setup: withMattes, summary: /^Made the subject of clip CLIPINTV01 a thermal silhouette on track \d+ \(background: cold\)\.$/ },
+    failure: { args: { clip_id: "NOPE" }, setup: withMattes, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
+  pop_out_tool: {
+    happy: { args: { clip_id: IDS.clipA }, setup: withMattes, summary: /^Letterboxed clip CLIPINTV01 at 2\.39:1 with the subject popping out/ },
+    failure: { args: { clip_id: IDS.clipA, band_aspect: "1.2" }, setup: withMattes, summary: /no bars/ },
+  },
+  add_vignette_tool: {
+    happy: { args: { clip_ids: [IDS.clipA], amount: 0.5 }, summary: /^Vignette \(amount 0\.5, feather 0\.5\) on 1 clip\(s\)\.$/ },
+    failure: { args: { clip_ids: ["NOPE"] }, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
+  add_shape_mask_tool: {
+    happy: { args: { clip_ids: [IDS.clipA], shape: "ellipse", keyframes: [{ seconds: 0, grow: -0.5 }, { seconds: 1, grow: 0 }] }, summary: /^Masked 1 clip\(s\) to an ellipse, 2 keyframes\.$/ },
+    failure: { args: { clip_ids: ["NOPE"], shape: "ellipse" }, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
   move_clip_tool: {
     happy: { args: { clip_id: IDS.clipLogo, position_seconds: "6", track: "4" }, summary: /^Moved clip CLIPLOGO01\.$/, check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)).toMatchObject({ position: 6, layer: 4_000_000 }) },
     failure: { args: { clip_id: "NOPE", position_seconds: "6" }, summary: /^Error: No timeline clip with id='NOPE'\.$/ },
@@ -988,6 +1025,19 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { path: "/media/interview.mp4" }, summary: /^\/media\/interview\.mp4: 1280x720 30\/1 fps, 2 ch 48000 Hz, 8\.00s\.$/ },
     failure: { args: { path: "/media/missing.mp4" }, summary: /^Error: No media at \/media\/missing\.mp4$/ },
   },
+  master_audio_tool: {
+    happy: {
+      setup: (_doc, host) => {
+        const tone = Float32Array.from({ length: 16000 * 3 }, (_, i) => 0.03 * Math.sin((2 * Math.PI * 1000 * i) / 16000));
+        host.audio!.mixPcm = async () => ({ sampleRate: 16000, channels: [tone, Float32Array.from(tone)] });
+      },
+      args: { dry_run: true },
+      status: "unchanged",
+      summary: /^Would master -[\d.]+ LUFS, -[\d.]+ dBTP -> -14\.0 LUFS/,
+    },
+    failure: { status: "refused", summary: /not available.*cannot render the timeline mix/ },
+  },
+
   build_reel_tool: {
     happy: {
       args: { style: "cinematic", replace: "true", duration_seconds: "8", hook: "Camera day" },
@@ -998,6 +1048,59 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
 
+  align_match_cut_tool: {
+    happy: {
+      args: {
+        clips: [
+          { clip_id: IDS.clipA, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.35 } },
+          { clip_id: IDS.clipB, box: { x: 0.55, y: 0.4, w: 0.1, h: 0.18 } },
+        ],
+        zoom_drift: "0.04",
+      },
+      summary: /^Aligned 2 clip\(s\) on a subject at \(0\.5, 0\.475\), 0\.353 of the frame tall; 1 zoomed in to keep the frame covered\.$/,
+    },
+    failure: { args: { clips: [{ clip_id: "NOPE000000", box: { x: 0.4, y: 0.3, w: 0.2, h: 0.2 } }] }, summary: /^Error: No clip with id NOPE000000\.$/ },
+  },
+  detect_subject_tool: {
+    happy: { args: { clip_id: IDS.clipA }, summary: /^(No circle found|Found \d+ circle\(s\)) in /, check: ({ receipt }) => expect(receipt.undoSteps).toBe(0) },
+    failure: { args: { file_id: IDS.music }, status: "refused", summary: /^Error: .* has no picture to look at\.$/ },
+  },
+  match_cut_montage_tool: {
+    happy: {
+      args: {
+        file_ids: [IDS.interview, IDS.broll],
+        subjects: [
+          { file_id: IDS.interview, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.35 } },
+          { file_id: IDS.broll, box: { x: 0.45, y: 0.35, w: 0.1, h: 0.18 } },
+        ],
+        duration_seconds: "4",
+        replace: "true",
+      },
+      summary: /^Cut a match-cut montage: \d+ shots \(\d+ of 3-8 frames\) at \d+ BPM, [\d.]+ s, every subject at \(0\.5, 0\.5\)/,
+      check: ({ receipt, doc }) => {
+        expect(doc.project.clips.some((c) => c.id === IDS.clipA)).toBe(false);
+        expect(receipt.undoSteps).toBe(1);
+      },
+    },
+    failure: { args: { file_ids: [IDS.interview], subjects: [{ file_id: IDS.broll, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.2 } }], replace: "true" }, status: "refused", summary: /^Error: subjects names .*, which is not in file_ids\.$/ },
+  },
+
+  unify_grade_tool: {
+    happy: { args: { timeline_clip_ids: [IDS.clipA, IDS.clipB], dry_run: true }, summary: /^Dry run: \d+ of 2 clip\(s\) brought within the band/ },
+    failure: { args: { timeline_clip_ids: [IDS.clipA], reference_clip_id: "NOPE" }, status: "refused", summary: /^Error: reference clip NOPE not found$/ },
+  },
+  review_edit_tool: {
+    happy: {
+      args: { image: "false", audio: "false" },
+      summary: /^Reviewed 0\.00-[\d.]+ s: \d+ shots \(median [\d.]+ s, longest [\d.]+ s\), \d+ cuts?/,
+      check: ({ receipt, doc }) => {
+        expect((receipt.data as { shots: { count: number } }).shots.count).toBeGreaterThan(0);
+        expect(doc.undoLabels).toEqual([]);
+      },
+    },
+    failure: { args: { start: "5", end: "2" }, status: "refused", summary: /^Error: end must be after start\.$/ },
+  },
+
   review_render_tool: {
     happy: {
       args: { path: "/out/reel.mp4" },
@@ -1006,6 +1109,14 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for review_render_tool/ },
   },
+  swap_shot_tool: {
+    happy: {
+      args: { clip_id: IDS.clipB },
+      summary: /^Clip CLIPBROL01 now shows \S+ from 2\.10 s \(was \S+ from 0\.00 s\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipB)).toMatchObject({ start: 2.1, end: 7.1, position: 10 }),
+    },
+    failure: { args: { clip_id: IDS.clipB, file_id: IDS.music }, status: "refused", summary: /^Error: \S+ is not a video or image to cut to\.$/ },
+  },
   add_motion_template_tool: {
     happy: {
       args: { template: "end_card", text: "Northwind", subtitle: "Brews in four minutes", position_seconds: "1", bpm: "120" },
@@ -1013,6 +1124,211 @@ const SPECS: Record<string, Spec> = {
       check: ({ host }) => expect([...host.written.keys()].filter((p) => p.startsWith("/generated/end_card-"))).toHaveLength(4),
     },
     failure: { args: { template: "word_scroll", words: ["Only"] }, status: "refused", summary: /^Error: word_scroll needs words: 2 to 10 of them\.$/ },
+  },
+
+  kinetic_captions_tool: {
+    happy: {
+      args: { style: "karaoke", start_seconds: "0", accent: "#00ff88" },
+      summary: /^Added \d+ karaoke caption group\(s\) \(\d+ words\) at [\d.]+-[\d.]+s on 2 track\(s\)\.$/,
+      check: ({ host }) => expect([...host.written.keys()].some((p) => p.startsWith("/generated/captions-karaoke-"))).toBe(true),
+    },
+    failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
+  },
+
+  add_kinetic_title_tool: {
+    happy: {
+      args: { text: "No lights no brakes", position_seconds: "1", duration_seconds: "2", animation: "letters" },
+      summary: /^Added the title "No lights no brakes" \(stack, letters\) at 1\.00-3\.00s: \d+ clip\(s\) on \d+ track\(s\)\.$/,
+      check: ({ doc, host }) => {
+        expect(doc.undoLabels.at(-1)).toBe("Add kinetic title (letters)");
+        expect([...host.written.keys()].some((p) => p.startsWith("/generated/title-letters-"))).toBe(true);
+      },
+    },
+    failure: { args: { text: "one two three four five six seven eight nine ten eleven twelve thirteen" }, status: "refused", summary: /^Error: a title has at most 12 words \(got 13\)/ },
+  },
+
+  // --- sound design --------------------------------------------------------------------
+  list_sfx_tool: {
+    happy: { args: { family: "impact" }, summary: /^\d+ sound effects: impact_punch, /, check: ({ doc, before }) => expect(doc.project).toEqual(before) },
+    failure: null,
+  },
+  add_sfx_tool: {
+    happy: {
+      args: { recipe: "impact_punch", clip_id: IDS.clipB },
+      summary: /^Added impact, punch with its transient on the start of broll\.mp4 \(-8 dB\)\.$/,
+      check: ({ doc, host }) => {
+        expect(doc.project.layers.some((l) => l.label === "SFX")).toBe(true);
+        expect([...host.written.keys()].some((p) => /^\/generated\/sfx-impact_punch-[0-9a-f]{8}\.wav$/.test(p))).toBe(true);
+      },
+    },
+    failure: { args: { recipe: "pop" }, status: "refused", summary: /^Error: give exactly one of at_seconds, clip_id or marker_id\.$/ },
+  },
+  auto_sound_design_tool: {
+    happy: { args: { intensity: "hype" }, summary: /^Sound-designed the edit \(hype\): \d+ effects/, check: ({ doc }) => expect(doc.undoLabels.at(-1)).toBe("Automatic sound design") },
+    failure: { args: { climax_seconds: "999" }, status: "refused", summary: /^Error: climax_seconds \(999\) is after the end of the edit/ },
+  },
+
+  // --- motion transitions ------------------------------------------------------------------
+  list_motion_transitions_tool: {
+    happy: { args: {}, summary: /^13 motion transitions; 0 on the timeline\.$/ },
+    failure: null,
+  },
+  apply_motion_transition_tool: {
+    happy: {
+      args: { preset: "whip", clip1_id: IDS.clipA, direction: "left", intensity: "1.5" },
+      summary: /^Added whip left on the cut at 10\.00s \(8 frames\) between interview\.mp4 and broll\.mp4\.$/,
+      check: ({ receipt }) => expect((receipt.data as { sfx_cues: { kind: string }[] }).sfx_cues.map((c) => c.kind)).toEqual(["whoosh"]),
+    },
+    failure: { args: { preset: "whip", clip1_id: IDS.clipA, clip2_id: IDS.clipLogo }, status: "refused", summary: /^Error: Clips CLIPINTV01 and CLIPLOGO01 are on different tracks/ },
+  },
+  apply_motion_transitions_tool: {
+    happy: { args: { track: String(L1), style: "hype" }, summary: /^Added 2 motion transition\(s\) on track 1 \(hype\): whip@10\.00s, whip@15\.00s\.$/ },
+    failure: { args: { track: String(L1), preset: "whip", style: "hype" }, status: "refused", summary: /^Error: give preset or style/ },
+  },
+  remove_motion_transition_tool: {
+    happy: {
+      setup: async (doc, host) => {
+        await runTool({ doc, host }, "apply_motion_transition_tool", { preset: "spin", clip1_id: IDS.clipB });
+      },
+      args: { clip_id: IDS.clipTail },
+      summary: /^Removed 1 motion transition\(s\); restored clips CLIPBROL01, CLIPINTV02\.$/,
+    },
+    failure: { args: { transition_id: "MTNOPE" }, status: "refused", summary: /^Error: no motion transition with id MTNOPE\.$/ },
+  },
+
+  speed_ramp_tool: {
+    happy: {
+      args: { clip_id: IDS.clipA, preset: "velocity", hit_at: "4" },
+      summary: /^Ramped the clip \(velocity\): 10\.00 s -> \d+\.\d\d s, speed 0\.1x-2\.5x, slowest at 4\.00 s\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipA)!.time.Points.length).toBeGreaterThan(10),
+    },
+    failure: { args: { clip_id: IDS.clipA, preset: "ramp_in", hit_at: "3" }, status: "refused", summary: /^Error: hit_at needs hero, velocity or custom/ },
+  },
+
+  // --- Zenvi Motion blocks (the fake host renders one block) ---------------------------
+  list_motion_blocks_tool: {
+    happy: { args: {}, summary: /^1 motion block\(s\):\nkinetic_headline \(1\.5-10 s, default 3; over video\)/ },
+    failure: { args: { block: "nope" }, status: "refused", summary: /^Error: unknown motion block nope; blocks: kinetic_headline\.$/ },
+  },
+  setup_motion_runtime_tool: {
+    happy: { args: {}, status: "unchanged", summary: /^Headless Chrome is installed \(\/cache\/chrome\)\. Nothing to download\.$/ },
+    failure: { args: {}, host: { without: ["motion"] }, status: "refused", summary: /not available/ },
+  },
+  mcp_health_tool: {
+    happy: { args: {}, summary: /^Zenvi is up\. Zenvi Motion blocks: ready\.$/ },
+    failure: null,
+  },
+  add_motion_block_tool: {
+    happy: {
+      args: { block: "kinetic_headline", params: { text: "Big news" }, position_seconds: "1" },
+      summary: /^Added Kinetic headline at 1\.00-4\.00s on track \d+ over the video\.$/,
+      check: ({ doc, receipt }) => expect(doc.project.files.find((f) => f.id === (receipt.data as { file_id: string }).file_id)?.zenvi_link).toMatchObject({ kind: "zenvi-motion" }),
+    },
+    failure: { args: { block: "kinetic_headline", params: { colour: "red" } }, status: "refused", summary: /^Error: kinetic_headline has no parameter colour$/ },
+  },
+  update_motion_block_tool: {
+    happy: {
+      setup: (doc) => {
+        doc.transaction("motion block", (tx) => {
+          addFile(tx, media("/links/old.mov", videoInfo("/links/old.mov", 3)), { id: "MOTIONFILE" });
+          const spec = { block: "kinetic_headline", params: { text: "Old" }, seconds: 3, alpha: true, motionBlurSamples: 1, draft: false };
+          updateFile(tx, "MOTIONFILE", { zenvi_link: motionLink(spec, { codec: "prores4444", width: 1280, height: 720, fps: { num: 30, den: 1 }, frames: 90, output: "/links/old.mov", fingerprint: "old", renderedAt: "2026-10-26T00:00:00Z" }) });
+          addClip(tx, { fileId: "MOTIONFILE", position: 2, layer: L3, start: 0, end: 3, id: "MOTIONCLIP" });
+        });
+      },
+      args: { file_id: "MOTIONFILE", params: { text: "New" } },
+      summary: /^Re-rendered Kinetic headline; 1 clip\(s\) now play the new render\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === "MOTIONCLIP")?.reader).toMatchObject({ path: "/links/kinetic_headline-1.mov" }),
+    },
+    failure: { args: { file_id: IDS.broll }, status: "refused", summary: /is not a Zenvi Motion block/ },
+  },
+
+  // --- Zenvi 3D (scenes3d.test.ts covers placement, media, cube_cut, re-rendering) ----------
+  list_3d_scenes_tool: { happy: { summary: /^12 3D scene\(s\); this surface cannot render them/ }, failure: null },
+  add_3d_scene_tool: {
+    happy: {
+      setup: (_doc, host) => {
+        host.scenes3d = { render: async (r) => ({ path: "/cache/scenes3d/t.mov", codec: "prores4444", width: r.width, height: r.height, fps: r.fps, frames: r.frames, fingerprint: "a".repeat(64), cached: true, seconds: 0, renderedAt: "2026-10-26T00:00:00Z", blender: "5.2.3" }) };
+      },
+      args: { scene: "title_3d", params: { text: "Zenvi" }, position_seconds: "1" },
+      summary: /^Added title_3d \(final, from the render cache\) at 1\.00-4\.00s\.$/,
+    },
+    failure: { setup: (_doc, host) => void (host.scenes3d = { render: async () => ({}) as never }), args: { scene: "title_3d", params: {} }, status: "refused", summary: /^Error: title_3d params: text: / },
+  },
+  rerender_3d_scene_tool: {
+    happy: {
+      setup: async (doc, host) => {
+        host.scenes3d = { render: async (r) => ({ path: `/cache/scenes3d/${r.params.background}.mp4`, codec: "h264", width: r.width, height: r.height, fps: r.fps, frames: r.frames, fingerprint: "b".repeat(64), cached: false, seconds: 2, renderedAt: "2026-10-26T00:00:00Z", blender: "5.2.3" }) };
+        doc.transaction("fixture", (tx) => {
+          addFile(tx, media("/cache/scenes3d/dark.mp4"), { id: "SCENE3D001" });
+          tx.update(["files", { id: "SCENE3D001" }], { zenvi_link: { kind: "blender", version: 1, source: { composition: "glass_hero" }, props: { background: "dark" }, render: { duration_frames: 120 } } });
+        });
+      },
+      args: { file_id: "SCENE3D001", params: { background: "light" } },
+      summary: /^Re-rendered glass_hero \(final, 2\.0s\); 0 clip\(s\) updated\.$/,
+      check: ({ doc }) => expect(doc.project.files.find((f) => f.id === "SCENE3D001")?.path).toBe("/cache/scenes3d/light.mp4"),
+    },
+    failure: { args: { file_id: IDS.broll }, status: "refused", summary: /^Error: tool rerender_3d_scene_tool needs|^Error: rerender_3d_scene_tool is not available/ },
+  },
+
+  // --- Zenvi FX (catalog/fx.test.ts covers stacks, windows, slow motion, restoring) ------
+  list_fx_tool: { happy: { summary: /^13 FX\.$/ }, failure: null },
+  apply_fx_tool: {
+    happy: {
+      args: { clip_id: IDS.clipB, effects: JSON.stringify([{ effect: "bloom", amount: 0.6 }]) },
+      summary: /^Clip CLIPBROL01 now plays bloom \(rendered in 1\.5s\)\.$/,
+      check: ({ doc, host }) => {
+        expect(host.calls).toContain("fx /media/broll.mp4 0-5 bloom");
+        const clip = doc.project.clips.find((c) => c.id === IDS.clipB)!;
+        expect(doc.project.files.find((f) => f.id === clip.file_id)?.zenvi_link).toMatchObject({ kind: "zenvi-fx", source: { file_id: IDS.broll, start: 0, end: 5 } });
+      },
+    },
+    failure: { args: { clip_id: IDS.clipLogo, effects: JSON.stringify([{ effect: "glitch" }]) }, status: "refused", summary: /^Error: clip CLIPLOGO01 is not video footage/ },
+  },
+  update_fx_tool: {
+    happy: {
+      setup: async (doc, host) => void (await runTool({ doc, host }, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "glitch" }] })),
+      args: { clip_id: IDS.clipB, amount: "0.9", params: { seed: 3 } },
+      summary: /^Clip CLIPBROL01 now plays glitch \(rendered in 1\.5s\)\.$/,
+    },
+    failure: { args: { clip_id: IDS.clipB, amount: "0.9" }, status: "refused", summary: /^Error: clip CLIPBROL01 has no FX; add some with apply_fx_tool\.$/ },
+  },
+  remove_fx_tool: {
+    happy: {
+      setup: async (doc, host) => void (await runTool({ doc, host }, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "vignette" }] })),
+      args: { clip_id: IDS.clipB },
+      summary: /^Clip CLIPBROL01 plays the original .* again \(1 clip\(s\) restored\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipB)?.file_id).toBe(IDS.broll),
+    },
+    failure: { args: { clip_id: "NOPE000000" }, status: "refused", summary: /^Error: unknown timeline clip NOPE000000\.$/ },
+  },
+
+  search_sfx_tool: {
+    happy: {
+      args: { query: "whoosh", provider: "openverse" },
+      // Commercial-use licences only: the non-commercial riser is left out.
+      summary: /^2 sound effects for 'whoosh' \(commercial-ok\):\n {2}provider=openverse {2}id=0e8a6e2a-\S+ {2}"Deep Whoosh #1" {2}1\.20 s {2}CC0 1\.0 \(no credit needed\)/,
+      check: ({ doc, before, host }) => {
+        expect(doc.project).toEqual(before);
+        expect(host.calls).toContain("library https://api.openverse.org/v1/audio/?q=whoosh&license=cc0%2Cpdm%2Cby%2Cby-sa&page_size=12&mature=false");
+      },
+    },
+    failure: { args: { query: "whoosh", provider: "openverse" }, host: { without: ["library"] }, status: "refused", summary: /^Error: Openverse search failed: this surface cannot reach Openverse\.$/ },
+  },
+  list_credits_tool: {
+    happy: { summary: /^No library sounds on the timeline: nothing to credit\.$/, check: ({ doc, before }) => expect(doc.project).toEqual(before) },
+    failure: null,
+  },
+  create_sound_kit_tool: {
+    happy: {
+      args: { name: "Promo", tone: "dark" },
+      summary: /^Created sound kit 'Promo' \(procedural, dark\):\n {2}whoosh: whoosh_\w+ \(pitch -?[\d.]+, brightness [\d.]+\)/,
+      check: ({ doc }) => {
+        expect(doc.undoLabels.at(-1)).toBe("Create sound kit 'Promo'");
+        expect((doc.project.settings as Record<string, unknown>).zenvi_sound_kit).toMatchObject({ name: "Promo", source: "procedural", tone: "dark" });
+      },
+    },
+    failure: { args: { style: "cinematic" }, status: "refused", summary: /^Error: style goes with source=library or mixed\.$/ },
   },
 
   // --- stock search (web) -------------------------------------------------------------
@@ -1028,6 +1344,26 @@ const SPECS: Record<string, Spec> = {
       },
     },
     failure: { args: { query: "coffee" }, host: { routes: { "/api/v1/pexels/search": () => ({ error: "Pexels is not configured" }) } }, status: "refused", summary: /^Error: Pexels search failed: Pexels is not configured$/ },
+  },
+  gather_stock_footage_tool: {
+    happy: {
+      args: { queries: "coffee pour; latte art", count: "3" },
+      // Without frames: the near-duplicate look is covered in stock-gather.test.ts.
+      host: { routes: { "/api/v1/pexels/search": () => PEXELS }, without: ["frames"] },
+      // Both searches answer the same three videos: the portrait one is left out, the others are imported once each, round-robin.
+      summary: /^Imported 2 clip\(s\) from 2 search\(es\) \(skipped: 2 duplicate, 2 wrong orientation\):\n {2}file_id=\w+ {2}12s {2}1920×1080 {2}'coffee pour'\n {2}file_id=\w+ {2}20s {2}3840×2160 {2}'latte art'$/,
+      check: ({ doc, host, receipt }) => {
+        expect(host.calls.filter((c) => c.startsWith("importUrl"))).toEqual(["importUrl https://cdn.test/11-720.mp4", "importUrl https://cdn.test/12-720.mp4"]);
+        expect(doc.undoLabels.at(-1)).toBe("Gather stock footage (2)");
+        expect(receipt.warnings).toContain("Imported 2 of 3: the queries ran out of distinct clips. Add queries (other subjects, angles, places) for more.");
+      },
+    },
+    failure: {
+      args: { queries: ["coffee"] },
+      host: { routes: { "/api/v1/pexels/search": () => ({ error: "Pexels is not configured" }) } },
+      status: "refused",
+      summary: /^Error: no clip could be imported for 'coffee'\. Search 'coffee' failed: Pexels is not configured/,
+    },
   },
   search_freesound_music_tool: {
     happy: {

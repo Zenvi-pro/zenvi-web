@@ -37,11 +37,11 @@ const WORKER_OVERHEAD_BYTES = 96 * 1024 * 1024;
 const WORKER_MEMORY_SHARE = 0.25;
 /** Renders shorter than this composite on the main thread (worker start-up costs more). */
 const MIN_POOL_FRAMES = 60;
-const MAX_THREADS = 4;
+const MAX_THREADS = 8;
 
 /**
  * Worker threads for a render of `frames` frames: `ZENVI_RENDER_THREADS`
- * when set (0 disables the pool), else up to 4, one core left for the main
+ * when set (0 disables the pool), else up to 8, one core left for the main
  * thread, ffmpeg and the encoder. In a container the CPU quota and the
  * memory limit bound it too, so a small one composites on the main thread.
  */
@@ -191,12 +191,15 @@ export class CompositePool {
       return layer.source.kind === "image" || layer.source.kind === "svg" ? stable(image) : { image };
     });
     const images = [...prepared.images].map(([p, image]): [string, WireImage] => [p, stable(image)]);
+    // Video frames an effect reads are new every frame: inline, so they never push stills out of the cache.
+    const layerImages = prepared.layerImages.map((own) => (own ? [...own].map(([p, image]): [string, WireImage] => [p, { image }]) : null));
     const request: CompositeRequest = {
       type: "composite",
       id: this.nextId++,
       plan,
       layers,
       images,
+      layerImages,
       texts: [...prepared.texts],
       audio: prepared.audio,
       text,

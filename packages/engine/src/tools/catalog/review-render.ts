@@ -30,6 +30,8 @@ import {
   type RepeatGroup,
   type Shot,
 } from "../../review/render.js";
+import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
+import { reviewTimeline } from "../../review/timeline.js";
 import { FrameRenderError, mediaFileProject, renderPixels, secondsToFrame } from "../color-frames.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
@@ -45,6 +47,10 @@ const MAX_HASHED_SHOTS = 120;
 const SHEET_LAYER = 1_000_000;
 const LABEL_LAYER = 2_000_000;
 const FONT = "Lato, Helvetica, Arial, sans-serif";
+/** A render this much longer or shorter than the open timeline is not of it: no swaps are suggested. */
+const SAME_EDIT_SECONDS = 0.5;
+/** Swaps listed at most. */
+const MAX_SWAPS = 12;
 
 const input = z.strictObject({
   path: z.string().min(1).describe("The rendered video to review, as render/export wrote it (a path relative to the project's folder, or absolute)."),
@@ -151,6 +157,34 @@ function problemLines(problems: readonly Problem[]): string {
   return ordered.map((p) => `- ${p.severity === "problem" ? "PROBLEM" : "warning"}: ${p.message}`).join("\n");
 }
 
+/**
+ * Swaps for the repeats (every appearance after the first, the ones back too
+ * soon first), read off the open timeline at each shot's middle: the render
+ * must be of it. Null when it is not.
+ */
+function repeatSwaps(project: Project, duration: number, shots: readonly Shot[], repeats: readonly RepeatGroup[], windowSeconds: number): ShotSwap[] | null {
+  const review = reviewTimeline(project);
+  if (Math.abs(review.range.end - duration) > SAME_EDIT_SECONDS) return null;
+  const byIndex = new Map(shots.map((s) => [s.index, s]));
+  const groups = [...repeats].sort((a, b) => Number(b.minGapSeconds < windowSeconds) - Number(a.minGapSeconds < windowSeconds));
+  const toFix: number[] = [];
+  for (const group of groups) {
+    for (const index of group.shots.slice(1)) {
+      const mid = byIndex.get(index)?.mid;
+      const at = mid === undefined ? undefined : review.shots.find((s) => s.start <= mid && mid < s.end);
+      if (at) toFix.push(at.index);
+    }
+  }
+  // The close repeats first, so the cap keeps them.
+  return swapSuggestions(project, review, toFix.slice(0, MAX_SWAPS));
+}
+
+function swapLines(swaps: readonly ShotSwap[]): string {
+  return swaps
+    .map((s) => `- ${fmt(s.at)} ${s.name} → ${s.to_name} from ${fmt(s.start_seconds)} (${s.why}): swap_shot_tool ${JSON.stringify({ clip_id: s.clip_id, file_id: s.to_file_id, start_seconds: s.start_seconds })}`)
+    .join("\n");
+}
+
 function tilesFor(shots: readonly Shot[], repeats: readonly RepeatGroup[], end: EndVerdict, inspection: RenderInspection, maxTiles: number): Tile[] {
   const repeatOf = new Map<number, number>();
   for (const group of repeats) for (const index of group.shots.slice(1)) repeatOf.set(index, group.shots[0]!);
@@ -216,6 +250,7 @@ export const reviewRenderTools: CatalogTool[] = [
       const repeats = repeatedShots(shots, hashes);
       const end = endVerdict(inspection, shots);
       const problems = renderProblems(inspection, shots, repeats, end, targets);
+      const swaps = repeats.length > 0 ? repeatSwaps(project, inspection.duration, shots, repeats, targets.repeatWindowSeconds) : [];
 
       const tiles = tilesFor(shots, repeats, end, inspection, args.max_tiles ?? 12);
       const images: ToolImage[] = [];
@@ -240,6 +275,8 @@ export const reviewRenderTools: CatalogTool[] = [
         `${count("problem")} problem(s), ${count("warning")} warning(s). ` +
         `${shots.length} shot(s), ${distinct} distinct, ${(shots.length / inspection.duration).toFixed(1)} cuts/s; ${loudWords}; ${end.message}.` +
         (problems.length > 0 ? `\n${problemLines(problems)}` : "") +
+        (swaps && swaps.length > 0 ? `\nSwap the repeats for footage not on screen yet (one call each, then render and review again):\n${swapLines(swaps)}` : "") +
+        (swaps && swaps.length === 0 && repeats.length > 0 ? "\nNo unused clip or unused part of a clip is left to swap in: import more footage for the repeats." : "") +
         (images.length > 0 ? "\nContact sheet attached: shots in order, the last tile is the end; problems are framed red." : "");
       const data = {
         path: args.path,
@@ -255,6 +292,7 @@ export const reviewRenderTools: CatalogTool[] = [
         shots: shots.map((s, i) => ({ ...s, hash: hashes[i] ?? null })),
         distinct_shots: distinct,
         repeats,
+        swaps,
         black: inspection.black,
         frozen: inspection.frozen,
         silences: inspection.silences,
