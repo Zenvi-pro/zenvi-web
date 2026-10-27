@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { measureLoudness } from "../../mastering/loudness.js";
+import { setClipKeyframes, setClipProperty } from "../../ops/clips.js";
 import { addEffect } from "../../ops/effects.js";
 import { curvePoints } from "../audio-mix.js";
 import { runTool } from "../registry.js";
@@ -97,5 +98,25 @@ describe("master_audio_tool peak rides", { timeout: 60_000 }, () => {
     expect(p.doc.undoLabels.length).toBe(undo);
     p.doc.undo();
     expect(p.doc.project.clips.find((c) => c.id === p.hits[0])).not.toHaveProperty(RIDE_MARK);
+  });
+
+  it("keeps the ride mark through a reshaped curve and drops it when another tool resets the volume", async () => {
+    const p = peaky();
+    await master(p, {});
+    const [a, b, c] = p.hits as [string, string, string];
+    const marked = (id: string) => p.doc.project.clips.find((x) => x.id === id)! as Record<string, unknown>;
+    for (const id of [a, b, c]) expect(marked(id)).toHaveProperty(RIDE_MARK);
+    // set_audio_gain_tool scales the curve the rides are in: the mark stays.
+    const gain = await runTool({ doc: p.doc, host: p.host }, "set_audio_gain_tool", { clip_ids: [a], gain_db: -2 });
+    expect(gain.ok, gain.text).toBe(true);
+    expect(marked(a)).toHaveProperty(RIDE_MARK);
+    // A level or keyframes written from scratch replace the curve: the rides are gone, and so is the mark.
+    p.doc.transaction("level", (tx) => setClipProperty(tx, b, "volume", 0.5));
+    expect(marked(b)).not.toHaveProperty(RIDE_MARK);
+    p.doc.transaction("keys", (tx) => setClipKeyframes(tx, c, "volume", [{ frame: 1, value: 0.8 }]));
+    expect(marked(c)).not.toHaveProperty(RIDE_MARK);
+    // Undo brings curve and mark back together.
+    p.doc.undo();
+    expect(marked(c)).toHaveProperty(RIDE_MARK);
   });
 });

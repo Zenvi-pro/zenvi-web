@@ -15,7 +15,7 @@
 import type { Transaction } from "../../history/document.js";
 import type { Clip, Project } from "../../model/types.js";
 import { setClipKeyframes } from "../../ops/clips.js";
-import { patchClip } from "../../ops/internal.js";
+import { PEAK_RIDE_MARK, patchClip } from "../../ops/internal.js";
 import { shapeVolume, type GainPoint } from "../mix-curves.js";
 import { fpsFloatOf } from "./common.js";
 
@@ -38,7 +38,7 @@ const r2 = (x: number): number => Math.round(x * 100) / 100;
  * A second run measures the mix with the first run's rides in it; without the
  * mark it would ride the same peaks down again, past the caps.
  */
-export const RIDE_MARK = "zenvi_peak_ride";
+export const RIDE_MARK = PEAK_RIDE_MARK;
 
 /** dB already ridden (a clip's mark), or left to ride (a plan's budget). */
 export interface RideDepth {
@@ -154,7 +154,7 @@ export function applyPeakRides(tx: Transaction, rides: Rides, clips: readonly { 
     }
     if (points.every((p) => p.db === 0)) continue;
     const shaped = shapeVolume(clip, fps, points, "relative");
-    setClipKeyframes(tx, id, "volume", shaped.points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
+    setClipKeyframes(tx, id, "volume", shaped.points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace", derived: true });
     const deepest = (a: Float64Array): number => a.subarray(first, last + 1).reduce((m, d) => Math.max(m, d), 0);
     const done = readRideMark(clip);
     const mark: RideDepth = { bed: r2(done.bed + (bed ? deepest(rides.bed) : 0)), all: r2(done.all + deepest(rides.all)) };

@@ -47,8 +47,9 @@ const names = (entries: readonly MixEntry[]): string => {
   return entries.length > 6 ? `${shown} +${entries.length - 6} more` : shown;
 };
 
-function writeVolume(tx: Transaction, clipId: string, points: readonly KeyframePoint[]): void {
-  setClipKeyframes(tx, clipId, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
+/** `derived`: the points reshape the clip's own curve (a duck, relative automation), so the marks on it stay. */
+function writeVolume(tx: Transaction, clipId: string, points: readonly KeyframePoint[], derived: boolean): void {
+  setClipKeyframes(tx, clipId, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace", derived });
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +270,7 @@ const automateVolume = directTool({
     }
     if (plans.length === 0) return unchanged(tool, `The ${args.shape} does not reach any of the clips (${names(targets)}) or changes nothing: nothing written.`);
     call.commit((tx) => {
-      for (const p of plans) writeVolume(tx, p.entry.id, p.points);
+      for (const p of plans) writeVolume(tx, p.entry.id, p.points, args.mode !== "absolute");
     }, "Automate volume");
     const clamped = plans.filter((p) => p.clamped > 0);
     return applied(tool, `${args.shape} on ${plans.length} clip(s): ${names(plans.map((p) => p.entry))}.`, {
@@ -441,7 +442,7 @@ const duck = directTool({
       : [];
     if (args.dry_run) return unchanged(tool, `${summary} dry_run: nothing written.`, { data, warnings });
     call.commit((tx) => {
-      for (const p of plans) writeVolume(tx, p.entry.id, p.points);
+      for (const p of plans) writeVolume(tx, p.entry.id, p.points, true);
     }, "Duck");
     return applied(tool, summary, { data, warnings });
   },

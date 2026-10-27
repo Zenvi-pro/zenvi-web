@@ -477,12 +477,16 @@ export function scoreMix(input: ScoreInput): MixScore {
     }
     if (errs.length > 0) {
       const frameMs = 1000 / fps + 1;
+      const layers = new Map<string, number>();
+      for (const c of cues) if (c.group !== undefined) layers.set(c.group, (layers.get(c.group) ?? 0) + 1);
+      const layered = (c: MixCue): boolean => c.group !== undefined && (layers.get(c.group) ?? 0) > 1;
       const within = errs.filter((e) => Math.abs(e.err) <= frameMs).length / errs.length;
       const worst = [...errs].sort((a, b) => Math.abs(b.err) - Math.abs(a.err)).filter((e) => Math.abs(e.err) > frameMs).slice(0, 5);
       put("H3_timing_within_1f", within, 0.9, 1, "placement", {
         text: `move the late/early cues by -err: ${worst.map((e) => `${e.cue.id} ${e.err >= 0 ? "+" : ""}${Math.round(e.err)} ms`).join(", ")}`,
-        // A layer of a designed hit is never moved alone: that would pull it off its other layers and its hit point.
-        calls: worst.filter((e) => e.cue.position !== undefined && e.cue.group === undefined).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
+        // One layer of a multi-layer hit is never moved alone: that would pull it off its other layers and its hit
+        // point. A single-layer cue (an auto-designed tick, a whoosh) is moved like any other.
+        calls: worst.filter((e) => e.cue.position !== undefined && !layered(e.cue)).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
       }, { medianAbsMs: r1(median(errs.map((e) => Math.abs(e.err)))), worst: worst.map((e) => ({ cue: e.cue.id, errMs: Math.round(e.err) })) });
     }
     for (const role of ["hero", "sweetener", "micro"] as const) {

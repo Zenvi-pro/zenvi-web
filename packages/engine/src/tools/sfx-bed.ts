@@ -67,7 +67,7 @@ export function applyBedDips(tx: Transaction, clipId: string, dips: readonly Bed
     if (!dipped.has(b)) values.set(b, base(b));
   }
   const frames = [...values.keys()].filter((f) => f >= 1).sort((x, y) => x - y);
-  const updated = setClipKeyframes(tx, clipId, "volume", frames.map((frame) => ({ frame, value: Math.round(values.get(frame)! * 1e6) / 1e6, interpolation: Interpolation.LINEAR })), { mode: "replace" });
+  const updated = setClipKeyframes(tx, clipId, "volume", frames.map((frame) => ({ frame, value: Math.round(values.get(frame)! * 1e6) / 1e6, interpolation: Interpolation.LINEAR })), { mode: "replace", derived: true });
   const mark: SfxBedMark = { before, after: structuredClone(updated.volume), dips: [...dips] };
   patchClip(tx, clipId, { [BED_MARK]: mark } as Partial<Clip>);
   return frames.length;

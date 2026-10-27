@@ -99,11 +99,35 @@ export function sameJson(a: unknown, b: unknown): boolean {
   return ka.every((k) => sameJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
 }
 
+/**
+ * Clip keys that describe what a tool wrote into the clip's volume curve
+ * (master_audio_tool's peak rides, tools/catalog/master-limit.ts). A volume
+ * written from scratch (a level, a fade, keyframes set by hand) drops them; a
+ * curve reshaped from the one it had (gain, a duck, relative automation)
+ * keeps them.
+ */
+export const PEAK_RIDE_MARK = "zenvi_peak_ride";
+export const VOLUME_CURVE_MARKS: readonly string[] = [PEAK_RIDE_MARK];
+
+export interface PatchClipOptions {
+  /** The patch's `volume` is the clip's own curve reshaped, so VOLUME_CURVE_MARKS still hold. */
+  volumeDerived?: boolean;
+}
+
 /** Record a shallow merge of `patch` into clip `id` when it changes anything. Returns the clip after. */
-export function patchClip(tx: Transaction, id: string, patch: Record<string, unknown>): Clip {
+export function patchClip(tx: Transaction, id: string, patch: Record<string, unknown>, opts: PatchClipOptions = {}): Clip {
   const clip = requireClip(tx.project, id);
   const changed = changedFields(clip as Record<string, unknown>, patch);
   if (Object.keys(changed).length > 0) tx.update(["clips", { id }], changed);
+  if ("volume" in changed && !opts.volumeDerived) {
+    const after = requireClip(tx.project, id) as Record<string, unknown>;
+    const stale = VOLUME_CURVE_MARKS.filter((key) => key in after && !(key in patch));
+    if (stale.length > 0) {
+      const next = { ...after };
+      for (const key of stale) delete next[key];
+      tx.replace(["clips", { id }], next);
+    }
+  }
   return requireClip(tx.project, id);
 }
 

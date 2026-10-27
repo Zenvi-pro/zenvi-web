@@ -196,7 +196,7 @@ export function applyClipGain(tx: Transaction, clipId: string, deltaDb: number):
     const headroom = rest > 0 ? MAX_LEVEL / curvePeak(current) : 1;
     const factor = Math.min(dbToFactor(rest), headroom);
     const points = scaledVolume(current, project.fps, factor);
-    setClipKeyframes(tx, clipId, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
+    setClipKeyframes(tx, clipId, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace", derived: true });
     rest -= 20 * Math.log10(factor);
   }
   return { appliedDb: deltaDb - rest, makeupDb: makeup - before };
@@ -225,7 +225,7 @@ export function applyEdits(tx: Transaction, edits: Edits): Map<string, ClipGainR
       // The windows are already padded (duckedWindows), so the envelope must not pad them again.
       const points = buildDuckPoints(clip, tx.project.fps, windows, dbToFactor(duck.db), { padBefore: 0, padAfter: 0 });
       if (points.length === 0) continue;
-      setClipKeyframes(tx, id, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
+      setClipKeyframes(tx, id, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace", derived: true });
     }
   }
   for (const [id, db] of edits.gains) results.set(id, applyClipGain(tx, id, db));
