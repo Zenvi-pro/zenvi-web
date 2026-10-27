@@ -26,6 +26,8 @@ interface Verdict {
   ok: boolean;
   quality: number;
   note: string;
+  /** The category it was heard as (a sound moved to another group is heard again). */
+  group?: string;
 }
 
 const RULES =
@@ -71,13 +73,13 @@ const key = process.env.OPENAI_API_KEY;
 if (!key) throw new Error("listen-kit.ts needs OPENAI_API_KEY in the environment");
 const file = path.join(dir, "listen.json");
 const heard = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Record<string, Verdict>) : {};
-const todo = (JSON.parse(readFileSync(path.join(dir, "curated.json"), "utf8")) as Measured[]).filter((m) => !heard[m.id]);
+const todo = (JSON.parse(readFileSync(path.join(dir, "curated.json"), "utf8")) as Measured[]).filter((m) => !heard[m.id] || (heard[m.id]!.group !== undefined && heard[m.id]!.group !== m.group));
 // Batches stay within one category where they can, so the model compares like with like.
 todo.sort((a, b) => a.group.localeCompare(b.group) || a.id - b.id);
 for (let i = 0; i < todo.length; i += BATCH) {
   const batch = todo.slice(i, i + BATCH);
   const verdicts = await listen(batch, path.join(dir, "previews"), key);
-  batch.forEach((m, k) => (heard[m.id] = { ok: verdicts[k]!.ok && verdicts[k]!.quality >= 3, quality: verdicts[k]!.quality, note: verdicts[k]!.note }));
+  batch.forEach((m, k) => (heard[m.id] = { ok: verdicts[k]!.ok && verdicts[k]!.quality >= 3, quality: verdicts[k]!.quality, note: verdicts[k]!.note, group: m.group }));
   writeFileSync(file, JSON.stringify(heard, null, 1));
   console.log(`${Math.min(i + BATCH, todo.length)}/${todo.length}: ${batch.map((m, k) => `${m.group}:${m.id}=${verdicts[k]!.ok ? verdicts[k]!.quality : "x"}`).join(" ")}`);
 }

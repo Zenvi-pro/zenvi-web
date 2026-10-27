@@ -12,7 +12,8 @@
  * synthesised, music, voice or a rip. measure downloads every candidate's
  * HQ preview (cdn.freesound.org, no key) and measures it with the engine's
  * own analysis (sfx/analyse.ts), rejecting noisy, clipped, band-limited or
- * badly trimmed sounds. select ranks what is left by ratings, downloads and
+ * badly trimmed sounds, and moves a sound named for another group there
+ * (a paper slide a whoosh search found is paper). select ranks what is left by ratings, downloads and
  * measurement, keeps at most three sounds per uploader in a group, drops
  * what the listening pass (listen.json: id -> {ok, note}) refused, and
  * keeps each group's quota; --heard keeps only sounds the pass heard and
@@ -180,6 +181,48 @@ async function search(dir: string): Promise<void> {
   console.log(`${out.size} candidates; refused: ${JSON.stringify(Object.fromEntries(refused))}`);
 }
 
+/** Words a sound of each group is named or tagged with: a sound found by one group's search but named for another moves there. */
+const GROUP_WORDS: Readonly<Record<RecordedGroup, readonly string[]>> = {
+  whoosh: ["whoosh", "woosh", "swoosh", "swosh", "whooshing", "passby", "pass", "flyby", "fly", "air", "wind", "zip", "transition"],
+  swish: ["swish", "swing", "swinging", "sword", "swipe", "blade", "stick", "saber", "slash", "swoop"],
+  whip: ["whip", "bullwhip", "lash", "crack"],
+  punch: ["punch", "slap", "fist", "smack", "face", "kick", "fight", "body"],
+  hit: ["clap", "snap", "stick", "wood", "wooden", "metal", "snare", "hit", "strike", "clank", "knock"],
+  thud: ["thud", "thump", "drop", "fall", "slam", "door", "landing", "bump", "dull"],
+  boom: ["boom", "explosion", "explode", "impact", "blast", "thunder", "firework", "bomb", "cinematic"],
+  sub: ["bass", "kick", "drum", "timpani", "taiko", "sub", "low", "808"],
+  riser: ["riser", "rise", "rising", "build", "buildup", "swell", "crescendo", "uplifter", "reverse"],
+  reverse: ["reverse", "reversed", "backwards", "swell"],
+  click: ["click", "mouse", "button", "pen", "clicker", "clicking"],
+  toggle: ["switch", "toggle", "latch", "light"],
+  tap: ["tap", "taps", "tapping", "knock", "finger", "touch"],
+  key: ["key", "keyboard", "keypress", "press", "typewriter", "spacebar", "keystroke"],
+  typing: ["typing", "type", "keyboard", "typewriter", "keys"],
+  shutter: ["shutter", "camera", "photo", "snapshot", "polaroid", "dslr"],
+  pop: ["pop", "bubble", "cork", "balloon", "popping"],
+  glitch: ["glitch", "static", "electric", "electricity", "spark", "crackle", "interference", "radio", "tv", "buzz"],
+  sparkle: ["chime", "chimes", "bell", "bells", "glockenspiel", "triangle", "sparkle", "shimmer", "glass", "twinkle", "magic"],
+  notify: ["ding", "bell", "notification", "chime", "xylophone", "marimba", "ping", "alert"],
+  paper: ["paper", "page", "book", "crumple", "cardboard", "newspaper"],
+  cloth: ["cloth", "fabric", "clothes", "jacket", "textile", "clothing", "coat"],
+  scratch: ["scratch", "vinyl", "record", "dj", "turntable"],
+  ambience: ["ambience", "ambient", "room", "tone", "atmosphere", "city", "office", "nature", "forest", "rain", "cafe", "background", "street"],
+};
+
+/**
+ * The group a candidate belongs in: the one its search found it for when
+ * its name or tags say so, else the group whose words it carries most,
+ * else none (named like no category: dropped).
+ */
+function groupOf(c: Candidate): RecordedGroup | undefined {
+  const words = new Set(`${c.name} ${c.tags.join(" ")}`.toLowerCase().split(/[^a-z0-9]+/));
+  const hits = (g: RecordedGroup) => GROUP_WORDS[g].filter((w) => words.has(w)).length;
+  if (hits(c.group) > 0) return c.group;
+  let best: RecordedGroup | undefined;
+  for (const g of RECORDED_GROUPS) if (hits(g) > (best ? hits(best) : 0)) best = g;
+  return best;
+}
+
 /** Decode to planar float stereo at 48 kHz with ffmpeg (mono sources come out as two equal channels). */
 function decode(file: string): Float32Array[] {
   const raw = execFileSync("ffmpeg", ["-v", "error", "-i", file, "-f", "f32le", "-ac", "2", "-ar", "48000", "-"], { maxBuffer: 256 * 1024 * 1024 });
@@ -275,9 +318,11 @@ async function measure(dir: string): Promise<void> {
   for (const c of candidates) {
     const m = known.get(c.id);
     if (!m) continue;
-    const rejected = measuredRefusal(c, m.analysis);
+    const group = c.kept ? c.group : groupOf(c);
+    const placed = { ...c, group: group ?? c.group };
+    const rejected = group ? measuredRefusal(placed, m.analysis) : "named like no category";
     const { rejected: _old, ...rest } = m;
-    out.push({ ...rest, group: c.group, kept: c.kept, score: scoreOf(c, m.analysis), ...(rejected ? { rejected } : {}) });
+    out.push({ ...rest, group: placed.group, kept: c.kept, score: scoreOf(c, m.analysis), ...(rejected ? { rejected } : {}) });
   }
   writeFileSync(path.join(dir, "measured.json"), JSON.stringify(out, null, 1));
   const rejected = out.filter((m) => m.rejected).length;
