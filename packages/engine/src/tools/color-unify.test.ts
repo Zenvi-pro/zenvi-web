@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandScore, closestToTarget, gradeSpread, outOfBand, solveUnifyKnobs, unifyGap, unifyTarget } from "./color-unify.js";
+import { bandScore, closestToTarget, gradeSpread, outOfBand, passClips, solveUnifyKnobs, unifyGap, unifyTarget } from "./color-unify.js";
 
 const profile = (avg_luma: number, warm_cool = 0, extra: Record<string, number> = {}): Record<string, unknown> => ({
   present: true,
@@ -84,5 +84,18 @@ describe("solveUnifyKnobs", () => {
 
   it("leaves a clip already on target alone", () => {
     expect(solveUnifyKnobs(profile(0.5), profile(0.51), neutral)).toEqual(neutral);
+  });
+});
+
+describe("passClips", () => {
+  const goal = profile(0.5);
+  it("keeps a pass that clips less on a shot already clipping past the limit", () => {
+    expect(passClips(profile(0.8, 0, { clipped_highlights: 0.3 }), profile(0.7, 0, { clipped_highlights: 0.2 }), goal)).toBe(false);
+  });
+  it("drops a pass that takes highlights over the limit, or spikes them or the shadows", () => {
+    expect(passClips(profile(0.6, 0, { clipped_highlights: 0.1 }), profile(0.55, 0, { clipped_highlights: 0.13 }), goal)).toBe(true);
+    expect(passClips(profile(0.6), profile(0.55, 0, { clipped_highlights: 0.05 }), goal)).toBe(true);
+    expect(passClips(profile(0.4), profile(0.45, 0, { clipped_shadows: 0.07 }), goal)).toBe(true);
+    expect(passClips(profile(0.6), profile(0.55), goal)).toBe(false);
   });
 });

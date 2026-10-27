@@ -17,13 +17,14 @@ import { z } from "zod";
 import type { Clip, Effect } from "../../model/types.js";
 import { setClipEffects } from "../../ops/effects.js";
 import { editedWhileRendering } from "../color-frames.js";
-import { assessGradeOutcome, findColorGrade, SCALAR_DEFAULTS, SCALAR_KEYS, scalarY } from "../color-agent.js";
+import { findColorGrade, SCALAR_DEFAULTS, SCALAR_KEYS, scalarY } from "../color-agent.js";
 import { roundTo } from "../color-stats.js";
 import {
   bandScore,
   closestToTarget,
   gradeSpread,
   outOfBand,
+  passClips,
   solveUnifyKnobs,
   unifyGap,
   unifyStats,
@@ -187,9 +188,7 @@ async function unifyClip(
     passes += 1;
     if (!measured.present) break;
     // A pass that clips the picture or does not move toward the target is dropped; the last good one stays.
-    const outcome = assessGradeOutcome(current, measured, goal, false);
-    const clipped = (outcome.reasons as string[]).some((r) => r.startsWith("clipped_"));
-    if (clipped || bandScore(measured, goal) >= bandScore(current, goal) - 1e-6) {
+    if (passClips(current, measured, goal) || bandScore(measured, goal) >= bandScore(current, goal) - 1e-6) {
       damping /= 2;
       continue;
     }
@@ -363,6 +362,8 @@ export const colorUnifyTools: CatalogTool[] = [
                 warnings,
               });
         }
+        // A cancel during the last clip's passes ends them early; it must not commit the clips before it.
+        if (call.signal?.aborted) return refused(TOOL, "Error: cancelled; nothing changed");
         // The renders take a while: write nothing over an edit that landed meanwhile.
         for (const [id] of writes) {
           const original = subjects.find((c) => c.id === id) ?? project.clips.find((c) => c.id === id)!;

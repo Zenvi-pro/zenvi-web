@@ -10,6 +10,7 @@
  * the middle instead of following whichever shot came first.
  */
 
+import { assessGradeOutcome } from "./color-agent.js";
 import { roundTo } from "./color-stats.js";
 
 type Json = Record<string, unknown>;
@@ -216,6 +217,18 @@ export function gradeSpread(profiles: readonly Json[]): Partial<Record<UnifyKey,
     if (values.length > 0) spread[key] = roundTo(Math.max(...values) - Math.min(...values), 4);
   }
   return spread;
+}
+
+/**
+ * Whether a correction pass clips the picture, by match_color's rules
+ * (`assessGradeOutcome`). Its highlight rule is also absolute (any pass ending
+ * at or above its limit), so on a shot that already clips that much a pass
+ * clipping less would be dropped too: here only a rise in highlights counts.
+ */
+export function passClips(current: Json, measured: Json, goal: Json): boolean {
+  const reasons = assessGradeOutcome(current, measured, goal, false).reasons as string[];
+  const highlights = (p: Json): number => finite(p.clipped_highlights) ?? 0;
+  return reasons.some((r) => r === "clipped_shadows_spike" || (r === "clipped_highlights_spike" && highlights(measured) > highlights(current)));
 }
 
 /** How far a profile is from the target, in tolerances (squared, summed over the continuity keys); 0 = on target. */
