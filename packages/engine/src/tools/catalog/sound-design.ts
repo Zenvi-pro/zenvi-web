@@ -22,14 +22,16 @@ import { z } from "zod";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import type { Clip, Project } from "../../model/types.js";
 import { deleteClips } from "../../ops/clips.js";
-import { isAutoSfxClip, isSfxClip, soundMoments, type BeatGrid } from "../../sfx/moments.js";
-import { CLIMAX_TAIL, SFX_DENSITIES, SFX_INTENSITIES, musicClimax, planSoundDesign, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
+import { designSound, type DesignedCue } from "../../sfx/design.js";
+import { KINETIC_CAPTIONS_KEY, isAutoSfxClip, isSfxClip, type BeatGrid } from "../../sfx/moments.js";
+import { PALETTES, PALETTE_IDS, guessPalette, traitsOf, type PaletteId } from "../../sfx/palettes.js";
+import { CLIMAX_TAIL, SFX_DENSITIES, SFX_INTENSITIES, musicClimax, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
+import { spotHitPoints, type HitPoint } from "../../sfx/spot.js";
 import { KIT_SLOTS, KIT_SLOT_SPECS, applyKit, guessSlot, kitFileIds, proceduralKit, rawSoundKit, readSoundKit, slotOfRecipe, slotRecipe, type KitPick, type KitSlot, type SoundKit } from "../../sfx/kit.js";
 import { SFX_PROVIDERS, allowsCommercialUse } from "../../sfx/library.js";
 import { SFX_RECIPES, SFX_RECIPE_IDS, sfxRecipe, type SfxFamily } from "../../sfx/recipes.js";
 import { SFX_KITS, pickRecordedOne, recordedGroupOf, recordedMaxSeconds, recordedSample, type SfxKit } from "../../sfx/recorded.js";
 import type { SfxParams } from "../../sfx/render.js";
-import { fpsFloat } from "../../timeline/time.js";
 import { getEffectiveAiMetadata } from "../ai-metadata.js";
 import { MUSIC_MIN_DURATION, classifyClipAudioRole, speechWindowsFromCues } from "../audio-mix.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
@@ -39,12 +41,16 @@ import { lookupLibrarySound, prepareLibrarySfx } from "../sfx-library.js";
 import { kitRequests, prepareKitSfx, prepareRecordedSfx, recordedIdOfKey, recordedKitAvailable, resolveSfxKit } from "../sfx-recorded.js";
 import { markOf, pictureEnd, placeSfx, prepareSfx, removeUnusedSfxFiles, snapToFrame, type PlacedSfx, type PreparedSfx } from "../sfx-media.js";
 import { fileById } from "./common.js";
+import { missingBlockEvents } from "./motion-blocks.js";
+import { applyBedDips, readBedMark, restoreBed } from "../sfx-bed.js";
+import { levelCues } from "../sfx-levels.js";
 import { clipTitle } from "./timeline-edit-common.js";
 import { fillLibrarySlots } from "./sound-library.js";
 
 const LIST = "list_sfx_tool";
 const ADD = "add_sfx_tool";
 const AUTO = "auto_sound_design_tool";
+const SPOT = "spot_sound_tool";
 
 const RECIPE_IDS = SFX_RECIPE_IDS as [string, ...string[]];
 const FAMILIES = [...new Set(SFX_RECIPES.map((r) => r.family))] as [SfxFamily, ...SfxFamily[]];
@@ -136,6 +142,12 @@ const autoInput = z.strictObject({
     .describe(
       "auto (default): the intensity's own spacing. every_cut: a sound on every cut, as hype edits have it (build_reel_tool's hype receipt asks for it): light hits and short whooshes alternating on the cuts, whooshes on whips, clicks on flashes and title slams, no sound twice in a row.",
     ),
+  genre: z
+    .enum(["auto", ...PALETTE_IDS])
+    .optional()
+    .describe(
+      "The genre's palette: which cues, how dense, which space, its signature moves (CRAFT.md §10). auto (default) reads it from the edit: speech with captions = talking_head, speech = video_essay or documentary, UI blocks = saas_ui, 3D scenes = product_3d, tiles = multiplicity, 3-6 frame shots = flash_montage, fast cuts on music = hype, else editorial.",
+    ),
   seed: z.number().int().optional().describe("Another variation of the whole design (default 1)."),
   beats: z
     .array(z.number().min(0))
@@ -149,8 +161,17 @@ const autoInput = z.strictObject({
     .describe("Where the climax is (a riser builds into it, an impact lands on it). Default: the music's biggest jump in loudness; none without music."),
 });
 
+const spotInput = z.strictObject({
+  genre: autoInput.shape.genre,
+  beats: autoInput.shape.beats,
+  climax_seconds: autoInput.shape.climax_seconds,
+  include_dry: z.boolean().optional().describe("Also list the hit points the doctrine leaves dry (connector words, cuts inside a flash run, moves too small to whoosh), with why. Default false: counted only."),
+  limit: z.number().int().min(1).max(400).optional().describe("Most points listed (default 120); the counts cover all."),
+});
+
 type AddInput = z.infer<typeof addInput>;
 type AutoInput = z.infer<typeof autoInput>;
+type SpotArgs = z.infer<typeof spotInput>;
 
 function paramsOf(args: Partial<Record<keyof typeof paramShape, number>>): SfxParams {
   const out: SfxParams = {};
@@ -241,25 +262,6 @@ function trimOf(trimmed: number): { trimmed_seconds?: number } {
 
 function pastPicture(hitAt: number, end: number): string {
   return `Error: ${hitAt.toFixed(2)} s is at or after the end of the picture (${end.toFixed(2)} s): the sound's hit would play over black. Pick an earlier moment.`;
-}
-
-const FAMILY_WORDS: Record<SfxFamily, [string, string]> = {
-  whoosh: ["whoosh", "whooshes"],
-  impact: ["hit", "hits"],
-  riser: ["riser", "risers"],
-  transition: ["swoosh-hit", "swoosh-hits"],
-  click: ["click", "clicks"],
-  ui: ["UI sound", "UI sounds"],
-  texture: ["texture", "textures"],
-};
-
-function familyCounts(cues: readonly SfxCue[]): string {
-  const counts = new Map<SfxFamily, number>();
-  for (const cue of cues) {
-    const family = sfxRecipe(cue.recipe)!.family;
-    counts.set(family, (counts.get(family) ?? 0) + 1);
-  }
-  return [...counts].map(([family, n]) => `${n} ${FAMILY_WORDS[family][n === 1 ? 0 : 1]}`).join(", ");
 }
 
 /** Receipt fields of a library sound (none for a synthesised one). */
@@ -484,12 +486,56 @@ export const soundDesignTools: CatalogTool[] = [
   }),
 
   directTool({
+    name: SPOT,
+    title: "Spot the edit for sound",
+    description:
+      "The cue sheet of the edit, read-only: every hit point the eye registers (cuts, transitions, title and emphasis-word entrances, flash runs, keyframed moves and landings, speed-ramp hits, " +
+      "motion block events (clicks, toggles, typing, card lands, counter ticks, logo reveals) and 3D scene events (lands, bursts, spins), the music's climax), each with its time, kind, weight 0-1, " +
+      "role (hero, slam, transition, impact, ui, move, micro), screen x for pan, whether someone speaks over it, and whether the doctrine gives it a sound. Also the genre it reads as. " +
+      "auto_sound_design_tool designs from this sheet; use it to check the plan or to place cues by hand with add_sfx_tool.",
+    input: spotInput,
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    run: async (call, args: SpotArgs) => {
+      const project = call.doc.project;
+      const duration = pictureEnd(project) ?? 0;
+      if (duration <= 0) return refused(SPOT, "Error: the timeline is empty: there is nothing to spot.");
+      const sheet = await cueSheet(call, args, duration);
+      const { points, palette } = sheet;
+      const shown = points.filter((p) => args.include_dry || p.needsCue).slice(0, args.limit ?? 120);
+      const count = (pred: (p: HitPoint) => boolean) => points.filter(pred).length;
+      const byKind = Object.fromEntries([...new Set(points.map((p) => p.kind))].map((k) => [k, count((p) => p.kind === k)]));
+      const wanted = count((p) => p.needsCue);
+      return unchanged(
+        SPOT,
+        `${points.length} hit points over ${duration.toFixed(2)} s, ${wanted} that want a sound (${Object.entries(byKind).map(([k, n]) => `${n} ${k}`).join(", ")}); it reads as ${PALETTES[palette].title} (${palette}).`,
+        {
+          warnings: sheet.warnings,
+          data: {
+            duration,
+            genre: palette,
+            genre_guessed: !args.genre || args.genre === "auto",
+            density_band: PALETTES[palette].density,
+            points_total: points.length,
+            needs_cue: wanted,
+            by_kind: byKind,
+            climax: sheet.climax,
+            speech_windows: sheet.speech.length,
+            points: shown.map(pointRow),
+            ...(shown.length < (args.include_dry ? points.length : wanted) ? { points_note: `${(args.include_dry ? points.length : wanted) - shown.length} more not listed (limit)` } : {}),
+          },
+        },
+      );
+    },
+  }),
+
+  directTool({
     name: AUTO,
     title: "Automatic sound design",
     description:
-      "Sound-design the whole edit in one step: whooshes on cuts and transitions (peaking on the cut, sized to the move), hits on strong cuts, downbeats and flash frames, " +
-      "clicks and swishes on title entrances, a riser into the climax and an impact on it, all varied and gain-staged under the music and dialogue. " +
-      "Tasteful by default (not every cut); intensity sets the density, density=every_cut puts a sound on every cut (hype). Running it again replaces its previous effects (hand-placed ones stay). One undo step.",
+      "Sound-design the whole edit in one step from its cue sheet (spot_sound_tool) in the genre's palette: layered hits (transient + body + sub with a phone harmonic + a tail in one shared space) on heroes, " +
+      "whooshes peaking on cuts and moves (pre-rolled, panned with the motion), clicks, toggles, typing and counter ticks on motion block events, micro sounds on glints and lands, a riser into the climax " +
+      "that stops a beat early with the bed sucked out under it, an ambience bed where the genre wants one, density held to the genre's band (cuts under speech and inside flash runs left dry), " +
+      "no recipe twice in a row, levels by role (hero, sweetener, micro). Running it again replaces its previous effects and bed dips (hand-placed ones stay). Run master_audio_tool after it. One undo step.",
     input: autoInput,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["media"],
@@ -512,26 +558,23 @@ export const soundDesignTools: CatalogTool[] = [
       const duration = pictureEnd(project) ?? 0;
       if (duration <= 0) return refused(AUTO, "Error: the timeline is empty: there is nothing to sound-design.");
       const intensity = args.intensity ?? "normal";
-      const warnings: string[] = [];
-
-      const bed = musicBed(project);
-      const music = await analyseMusic(call, bed, args, duration);
-      if (music.note) warnings.push(music.note);
-      const found = args.climax_seconds ?? music.climax;
-      const climax = found === null ? null : snapToFrame(project, found);
-      if (climax !== null && climax > duration) return refused(AUTO, `Error: climax_seconds (${climax}) is after the end of the edit (${duration.toFixed(2)} s).`);
-      // The planner drops a climax with no picture left for its impact: say so instead of silently placing none.
-      if (args.climax_seconds !== undefined && climax !== null && climax > duration - CLIMAX_TAIL) {
-        return refused(AUTO, `Error: climax_seconds (${climax}) leaves less than ${CLIMAX_TAIL} s of picture for its impact (the edit ends at ${duration.toFixed(2)} s); pick an earlier moment.`);
+      if (args.climax_seconds !== undefined) {
+        const asked = snapToFrame(project, args.climax_seconds);
+        if (asked > duration) return refused(AUTO, `Error: climax_seconds (${asked}) is after the end of the edit (${duration.toFixed(2)} s).`);
+        // The planner drops a climax with no picture left for its impact: say so instead of silently placing none.
+        if (asked > duration - CLIMAX_TAIL) return refused(AUTO, `Error: climax_seconds (${asked}) leaves less than ${CLIMAX_TAIL} s of picture for its impact (the edit ends at ${duration.toFixed(2)} s); pick an earlier moment.`);
       }
-      const moments = soundMoments(project, music.grid);
-      if (moments.length === 0 && climax === null) {
-        return refused(AUTO, "Error: nothing to sound-design: the timeline has no cuts, transitions, titles or flashes, and no climax (pass climax_seconds).");
+      const sheet = await cueSheet(call, args, duration);
+      const warnings = [...sheet.warnings];
+      if (sheet.points.length === 0) {
+        return refused(AUTO, "Error: nothing to sound-design: the timeline has no cuts, transitions, titles, moves, block events or flashes, and no climax (pass climax_seconds).");
       }
-      const plan = planSoundDesign({ moments, duration, climax, music: bed !== undefined, speech: speechWindows(project), intensity, density: args.density ?? "auto", seed: args.seed ?? 1 });
-      const cues = plan.cues.map((cue) => ({ ...cue, at: snapToFrame(project, cue.at) }));
-      if (cues.length === 0 && previous.length === 0) {
-        return unchanged(AUTO, `No sound effects at ${intensity} intensity: no moment of this edit is strong enough. Try intensity=hype.`, { warnings });
+      const palette = PALETTES[sheet.palette];
+      const design = designSound({ points: sheet.points, palette, intensity, density: args.density ?? "auto", duration, climax: sheet.climax, music: sheet.bed !== undefined, seed: args.seed ?? 1 });
+      const cues: DesignedCue[] = design.cues.map((cue) => ({ ...cue, at: snapToFrame(project, cue.at) }));
+      const bedState = sheet.bed ? readBedMark(sheet.bed) : null;
+      if (cues.length === 0 && previous.length === 0 && !bedState) {
+        return unchanged(AUTO, `No sound effects at ${intensity} intensity: every hit point of this edit stays dry in the ${palette.id} palette. Try intensity=hype or another genre.`, { warnings });
       }
 
       if (rawSoundKit(project) !== undefined && !projectKit) warnings.push("The project's sound kit could not be read (edited by hand, or from a newer Zenvi), so it is not used.");
@@ -556,61 +599,81 @@ export const soundDesignTools: CatalogTool[] = [
         return failed(AUTO, `Error: failed to store the sound effects: ${errorText(error)}`);
       }
       // A kit's recipe may mix louder or quieter than the one the planner staged.
-      const gains = cues.map((cue, i) => Math.round((cue.gainDb + sfxRecipe(sounds[i]!.recipe)!.mixDb - sfxRecipe(cue.recipe)!.mixDb) * 10) / 10);
+      const designed = cues.map((cue, i) => Math.min(0, Math.round((cue.gainDb + sfxRecipe(sounds[i]!.recipe)!.mixDb - sfxRecipe(cue.recipe)!.mixDb) * 10) / 10));
+      // The mix pass: each cue's level from what plays under it.
+      const levels = await levelCues(call, cues, sounds, designed, previous);
+      if (levels.note) warnings.push(levels.note);
+      const gains = levels.gains;
       const reused = new Set(sounds.filter((s) => s.fileId !== undefined).map((s) => s.key)).size;
       const keep = kitFileIds(projectKit);
 
       const placed = call.commit((tx) => {
         if (previous.length > 0) deleteClips(tx, previous.map((c) => c.id), { ripple: false });
-        const rows: (PlacedSfx & { cue: SfxCue; hit: number; sound: PreparedSfx; gainDb: number })[] = [];
+        const rows: (PlacedSfx & { cue: DesignedCue; hit: number; sound: PreparedSfx; gainDb: number })[] = [];
         cues.forEach((cue, i) => {
           // A moment too close to the start for the sound's lead-in starts the sound instead of cutting into it.
           const sound = sounds[i]!;
           const align = cue.at >= sound.hit ? "peak" : "start";
           const hit = align === "peak" ? cue.at : cue.at + sound.hit;
           if (hit >= duration && sfxRecipe(sound.recipe)!.hit !== "end") return;
-          const placed = placeSfx(tx, sound, { at: cue.at, align, gainDb: gains[i]!, auto: true, reason: cue.reason, until: duration });
+          const placed = placeSfx(tx, sound, { at: cue.at, align, gainDb: gains[i]!, auto: true, reason: cue.reason, until: duration, mark: { role: cue.role, layer: cue.layer, cue: cue.point >= 0 ? `p${cue.point}` : `${cue.layer}${i}` } });
           if (placed) rows.push({ ...placed, cue, hit, sound, gainDb: gains[i]! });
         });
+        // The bed: the last run's dips come off first, then this run's go on.
+        let bed: "restored" | "edited" | "none" = "none";
+        let dipPoints = 0;
+        if (sheet.bed) {
+          bed = restoreBed(tx, tx.project.clips.find((c) => c.id === sheet.bed!.id)!);
+          if (bed !== "edited") dipPoints = applyBedDips(tx, sheet.bed.id, design.dips, tx.project.fps);
+        }
         const removedFiles = removeUnusedSfxFiles(tx, keep);
-        return { rows, removedFiles };
+        return { rows, removedFiles, bed, dipPoints };
       }, "Automatic sound design");
+      if (placed.bed === "edited" && design.dips.length > 0) warnings.push("The music's volume curve was edited since the last run, so its suck-out and pre-hit dips are not written again (reset the curve, then rerun).");
 
       const after = call.doc.project;
       const cut = placed.rows.filter((r) => r.trimmed > 0);
-      // Cuts whose moment got a sound (a cue within a frame of it).
-      const frame = 1 / (fpsFloat(project.fps) || 30);
-      const cutTimes = moments.filter((m) => m.kind === "cut").map((m) => m.time);
-      const sounded = cutTimes.filter((t) => placed.rows.some((r) => Math.abs(r.cue.at - t) <= frame)).length;
+      const wanted = sheet.points.filter((p) => p.needsCue).length;
+      const sounded = new Set(placed.rows.map((r) => r.cue.point).filter((i) => i >= 0));
+      const byRole = (role: string) => placed.rows.filter((r) => r.cue.role === role).length;
+      const heroes = new Set(placed.rows.filter((r) => r.cue.role === "hero" && r.cue.point >= 0).map((r) => r.cue.point)).size;
       const summary =
         placed.rows.length === 0
-          ? `Removed the ${previous.length} effects of the last run: no moment of this edit is strong enough at ${intensity} intensity.`
-          : `Sound-designed the edit (${intensity}${args.density === "every_cut" ? ", every cut" : ""}${kit ? `, ${kit === projectKit ? `sound kit '${kit.name}'` : `${sources} sounds`}` : ""}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
+          ? `Removed the ${previous.length} effects of the last run: every hit point stays dry at ${intensity} intensity in the ${palette.id} palette.`
+          : `Sound-designed the edit as ${palette.title} (${palette.id}${sheet.guessed ? ", read from the edit" : ""}; ${intensity}${args.density === "every_cut" ? ", every cut" : ""}${kit ? `, ${kit === projectKit ? `sound kit '${kit.name}'` : `${sources} sounds`}` : ""}): ` +
+            `${sounded.size} of ${sheet.points.length} hit points have a sound (${wanted} wanted one), ${placed.rows.length} layers — ${heroes} layered heroes, ${byRole("sweetener")} sweeteners, ${byRole("micro")} micro sounds${byRole("bed") > 0 ? ", an ambience bed" : ""}` +
             (recorded > 0 ? `; ${recorded} recorded (CC0 kit)` : "") +
-            (cutTimes.length > 0 ? `; ${sounded} of ${cutTimes.length} cuts have a sound` : "") +
-            (plan.climax !== null ? `, ${plan.riser ? "a build into the climax and an impact on it" : "an impact on the climax"} at ${plan.climax.toFixed(2)} s` : "") +
+            (design.climax !== null ? `; ${design.riser ? "a riser into the climax and the drop on it" : "the drop on the climax"} at ${design.climax.toFixed(2)} s` : "") +
+            (placed.dipPoints > 0 ? `; ${design.dips.length} ${design.dips.length === 1 ? "dip" : "dips"} of the music (${design.dips.some((d) => d.reason.startsWith("suck")) ? "suck-out" : "pre-hit ducks"})` : "") +
             (previous.length > 0 ? `; replaced ${previous.length} from the last run` : "") +
             (cut.length > 0 ? `; ${cut.length} ${cut.length === 1 ? "tail" : "tails"} cut and faded to end with the picture at ${duration.toFixed(2)} s` : "") +
-            ".";
+            ". Run master_audio_tool next.";
       return applied(AUTO, summary, {
         warnings,
-        clips: placed.rows.slice(0, 30).map(({ clip, cue, hit, trimmed, sound, gainDb }) => clipRow(after, clip, { recipe: sound.recipe, ...libraryOf(sound), hit_seconds: hit, gain_db: gainDb, reason: cue.reason, ...trimOf(trimmed) })),
+        clips: placed.rows.slice(0, 30).map(({ clip, cue, hit, trimmed, sound, gainDb }) => clipRow(after, clip, { recipe: sound.recipe, ...libraryOf(sound), role: cue.role, layer: cue.layer, hit_seconds: hit, gain_db: gainDb, reason: cue.reason, ...trimOf(trimmed) })),
         ...(placed.rows.length > 30 ? { clipsNote: `${placed.rows.length - 30} more in data.cues` } : {}),
         data: {
+          genre: palette.id,
+          genre_guessed: sheet.guessed,
           intensity,
           density: args.density ?? "auto",
-          cuts: cutTimes.length,
-          cuts_with_sound: sounded,
+          density_band: palette.density,
+          cues_per_second: Math.round((sounded.size / duration) * 100) / 100,
+          hit_points: sheet.points.length,
+          needs_cue: wanted,
+          sounded: sounded.size,
+          dry: design.dry.slice(0, 20).map((d) => ({ t: sheet.points[d.point]!.t, kind: sheet.points[d.point]!.kind, why: d.why })),
           // `at` is the moment; `hit_seconds` where the sound's hit plays (later when the moment is too early for its lead-in).
           sources,
           kit: kit ? { name: kit.name, source: kit.source, stored: kit === projectKit } : null,
           own_sounds: sources === "kit" ? null : { kit: ownKit, recorded },
-          cues: placed.rows.map(({ clip, cue, hit, trimmed, sound, gainDb }) => ({ clip_id: clip.id, recipe: sound.recipe, ...libraryOf(sound), at: cue.at, hit_seconds: hit, gain_db: gainDb, reason: cue.reason, ...trimOf(trimmed) })),
+          levelled_over_bed: levels.levelled,
+          cues: placed.rows.map(({ clip, cue, hit, trimmed, sound, gainDb }) => ({ clip_id: clip.id, recipe: sound.recipe, ...libraryOf(sound), role: cue.role, layer: cue.layer, at: cue.at, hit_seconds: hit, gain_db: gainDb, reason: cue.reason, ...trimOf(trimmed) })),
           picture_end: duration,
-          music: bed ? { clip_id: bed.id, bpm: music.bpm ?? null, beats_analysed: music.grid !== null } : null,
-          climax: plan.climax,
-          riser: plan.riser,
-          moments: moments.length,
+          music: sheet.bed ? { clip_id: sheet.bed.id, bpm: sheet.bpm ?? null, beats_analysed: sheet.grid !== null } : null,
+          bed_dips: placed.dipPoints > 0 ? design.dips.map((d) => ({ from: round3(d.from), to: round3(d.to), db: d.db, reason: d.reason })) : [],
+          climax: design.climax,
+          riser: design.riser,
           replaced_clip_ids: previous.map((c) => c.id),
           removed_file_ids: placed.removedFiles,
           files_reused: reused,
@@ -619,3 +682,80 @@ export const soundDesignTools: CatalogTool[] = [
     },
   }),
 ];
+
+interface CueSheet {
+  points: HitPoint[];
+  palette: PaletteId;
+  guessed: boolean;
+  climax: number | null;
+  speech: [number, number][];
+  bed: Clip | undefined;
+  grid: BeatGrid | null;
+  bpm?: number;
+  warnings: string[];
+}
+
+/** The cue sheet both tools read: music analysed, speech found, block events filled in, the genre picked. */
+async function cueSheet(call: ToolCall, args: Pick<AutoInput, "genre" | "beats" | "climax_seconds">, duration: number): Promise<CueSheet> {
+  const project = call.doc.project;
+  const warnings: string[] = [];
+  const bed = musicBed(project);
+  const music = await analyseMusic(call, bed, args as AutoInput, duration);
+  if (music.note) warnings.push(music.note);
+  const found = args.climax_seconds ?? music.climax;
+  const climax = found === null || found > duration - CLIMAX_TAIL ? null : snapToFrame(project, found);
+  const speech = [...speechWindows(project), ...captionSpeech(project), ...voiceClipSpeech(project, bed)];
+  const blocks = await missingBlockEvents(call);
+  if (blocks.note) warnings.push(blocks.note);
+  const points = spotHitPoints(project, { grid: music.grid, climax, speech, events: blocks.events });
+  const guessed = !args.genre || args.genre === "auto";
+  const palette = guessed ? guessPalette(traitsOf(points, { duration, speech: speech.length > 0, tiles: hasTiles(project), matchCuts: false, music: bed !== undefined })) : (args.genre as PaletteId);
+  return { points, palette, guessed, climax, speech, bed, grid: music.grid, ...(music.bpm !== undefined ? { bpm: music.bpm } : {}), warnings };
+}
+
+/** Where kinetic captions show someone speaking (their words' times), for edits whose voice has no transcript in the project. */
+function captionSpeech(project: Project): [number, number][] {
+  return project.clips.flatMap((c): [number, number][] => {
+    const said = (c[KINETIC_CAPTIONS_KEY] as { said?: unknown } | undefined)?.said;
+    return Array.isArray(said) && said.length === 2 && said.every((x) => typeof x === "number") ? [[said[0] as number, (said[1] as number) + 0.4]] : [];
+  });
+}
+
+/** Voice-over clips no one has transcribed (a TTS narration, a recorded VO): audio-only clips named for a voice speak from start to end. */
+function voiceClipSpeech(project: Project, bed: Clip | undefined): [number, number][] {
+  return project.clips.flatMap((c): [number, number][] => {
+    if (c === bed || isSfxClip(c)) return [];
+    const file = fileById(project, String(c.file_id));
+    if (!file || !isAudioOnlyMedia(file) || !VOICE_NAME.test(`${String(file.name ?? "")} ${String(c.title ?? "")}`)) return [];
+    return [[c.position, c.position + (c.end - c.start)]];
+  });
+}
+
+const VOICE_NAME = /\b(narration|narrator|voice[- ]?over|voice|vo|tts|dialog(ue)?|speech|interview)\b/i;
+
+/** Several small pictures on screen at once (a grid, a mirror wall); titles, captions and rendered graphics are not tiles. */
+function hasTiles(project: Project): boolean {
+  const small = project.clips.filter((c) => {
+    const file = fileById(project, String(c.file_id));
+    if (!file || isSfxClip(c) || c[KINETIC_CAPTIONS_KEY] || isAudioOnlyMedia(file) || file.zenvi_link || /\.svg$/i.test(String(file.path ?? ""))) return false;
+    return Math.abs(Number(c.scale_x?.Points?.[0]?.co?.Y ?? 1)) < 0.6;
+  });
+  return small.some((c) => small.filter((o) => o.position < c.position + (c.end - c.start) && o.position + (o.end - o.start) > c.position).length >= 4);
+}
+
+function pointRow(p: HitPoint): Record<string, unknown> {
+  return {
+    t: round3(p.t),
+    kind: p.kind,
+    ...(p.event ? { event: p.event } : {}),
+    weight: p.weight,
+    role: p.role,
+    x: p.x,
+    needs_cue: p.needsCue,
+    ...(p.dry ? { dry: p.dry } : {}),
+    ...(p.speech ? { speech: true } : {}),
+    ...(p.lead !== undefined ? { lead: round3(p.lead) } : {}),
+    ...(p.until !== undefined ? { until: round3(p.until), rate: p.rate } : {}),
+    label: p.label,
+  };
+}

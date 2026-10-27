@@ -211,11 +211,15 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote:
       "without Openverse, downloads and audio decoding only procedural recipes (and Freesound sounds where they can be downloaded and decoded) can be placed; without the recorded kit's cache recipes are synthesised (kit=synth)",
   },
+  spot_sound_tool: {
+    optional: ["audio.decodePcm", "motion"],
+    partialNote: "without audio decoding cuts are weighed by `beats` (when given) instead of the music and the climax comes only from `climax_seconds`; without the motion host, blocks placed before blocks recorded their events are spotted by their edges only",
+  },
   auto_sound_design_tool: {
     methods: ["media.writeGenerated"],
-    optional: ["audio.decodePcm", "library", "media.importUrl", "media.kitSample"],
+    optional: ["audio.decodePcm", "audio.mixPcm", "motion", "library", "media.importUrl", "media.kitSample"],
     partialNote:
-      "without audio decoding cuts are weighed by `beats` (when given) instead of the music, the climax comes only from `climax_seconds`, and sources=library / mixed are refused; without Openverse library sounds come from Freesound (signed in); without the recorded kit's cache the sounds are synthesised (kit=synth)",
+      "without audio decoding cuts are weighed by `beats` (when given) instead of the music, the climax comes only from `climax_seconds`, effects keep their designed levels instead of being levelled over what plays under them, and sources=library / mixed are refused; without Openverse library sounds come from Freesound (signed in); without the recorded kit's cache the sounds are synthesised (kit=synth)",
   },
   add_vignette_tool: { methods: ["media.writeGenerated"] },
   add_shape_mask_tool: { methods: ["media.writeGenerated"] },

@@ -8,7 +8,7 @@ import { addFile } from "../../ops/files.js";
 import { addTrack } from "../../ops/tracks.js";
 import { addMarker } from "../../ops/markers.js";
 import { isAutoSfxClip, isSfxClip } from "../../sfx/moments.js";
-import { MIN_TRANSIENT_GAP } from "../../sfx/plan.js";
+import { PALETTES } from "../../sfx/palettes.js";
 import { SFX_RECIPES } from "../../sfx/recipes.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
@@ -31,10 +31,17 @@ function song(): Float32Array {
   return out;
 }
 
+/** A 20 ms click: what every generated effect decodes to here. */
+function click(): Float32Array {
+  const out = new Float32Array(SR / 2);
+  for (let i = 0; i < SR / 50; i += 1) out[i] = 0.8 * Math.exp(-i / 200);
+  return out;
+}
+
 function withAudio(host: FakeHost): FakeHost {
   host.audio = {
     analyzeAudio: async () => ({ sampleRate: 16000, frameSize: 480, rms: new Float32Array(0) }),
-    decodePcm: async () => ({ sampleRate: SR, samples: song() }),
+    decodePcm: async (path) => ({ sampleRate: SR, samples: path === "/media/song.mp3" ? song() : click() }),
   };
   return host;
 }
@@ -230,165 +237,155 @@ describe("add_sfx_tool", () => {
   });
 });
 
+interface AutoData {
+  genre: string;
+  genre_guessed: boolean;
+  climax: number | null;
+  riser: boolean;
+  music: { bpm: number } | null;
+  hit_points: number;
+  sounded: number;
+  bed_dips: { from: number; to: number; db: number; reason: string }[];
+  cues: { clip_id: string; recipe: string; role: string; layer: string; at: number; hit_seconds: number; gain_db: number; reason: string; trimmed_seconds?: number }[];
+  replaced_clip_ids: string[];
+  removed_file_ids: string[];
+}
+
+/** Two 0.9 s shots of one file: one weak cut, no music. */
+function quietProject(id: string): ProjectDocument {
+  const doc = new ProjectDocument(createProject({ id }));
+  doc.transaction("two shots", (tx) => {
+    addFile(tx, media("/media/aa.mp4", videoInfo("/media/aa.mp4", 30)), { id: "SHOTAAXXXX" });
+    const layer = tx.project.layers[0]!.number;
+    addClip(tx, { fileId: "SHOTAAXXXX", position: 0, layer, start: 0, end: 0.9 });
+    addClip(tx, { fileId: "SHOTAAXXXX", position: 0.9, layer, start: 3, end: 3.9 });
+  });
+  return doc;
+}
+
+describe("spot_sound_tool", () => {
+  it("lists the cue sheet and the genre it reads as, read-only", async () => {
+    const doc = editProject();
+    const result = await runTool({ doc, host: withAudio(fakeHost()) }, "spot_sound_tool", {});
+    expect(result.ok, result.text).toBe(true);
+    expect((result.data as { status: string }).status).toBe("unchanged");
+    expect(doc.undoLabels).toHaveLength(0);
+    const d = data<{ genre: string; points_total: number; needs_cue: number; by_kind: Record<string, number>; climax: number; points: { t: number; kind: string; role: string; needs_cue: boolean }[] }>(result);
+    expect(d.by_kind.cut).toBe(19);
+    expect(d.climax).toBeCloseTo(12, 1);
+    // The drop lands on the cut at 12 s.
+    expect(d.points.find((p) => Math.abs(p.t - 12) < 0.01)!.role).toBe("hero");
+    expect(d.points.every((p) => p.needs_cue)).toBe(true);
+    const named = data<{ genre: string; genre_guessed: boolean }>(await runTool({ doc, host: withAudio(fakeHost()) }, "spot_sound_tool", { genre: "documentary" }));
+    expect([named.genre, named.genre_guessed]).toEqual(["documentary", false]);
+  });
+});
+
 describe("auto_sound_design_tool", () => {
-  it("places a varied, spaced, gain-staged set with a build into the drop, in one undo step", async () => {
+  it("designs from the cue sheet in the genre's palette: layered heroes, a riser that stops a beat early, the bed sucked out, one undo step", async () => {
     const doc = editProject();
     const host = withAudio(fakeHost());
-    const result = await runTool({ doc, host }, "auto_sound_design_tool", {});
+    const result = await runTool({ doc, host }, "auto_sound_design_tool", { genre: "hype" });
     expect(result.ok, result.text).toBe(true);
     expect(doc.undoLabels).toEqual(["Automatic sound design"]);
-    const d = data<{ cues: { clip_id: string; recipe: string; at: number; gain_db: number }[]; climax: number | null; music: { bpm: number } }>(result);
-    expect(d.music.bpm).toBeGreaterThan(115);
+    const d = data<AutoData>(result);
+    expect(d.genre).toBe("hype");
+    expect(d.music!.bpm).toBeGreaterThan(115);
     expect(d.climax).toBeCloseTo(12, 1);
     const clips = sfxClips(doc);
     expect(clips).toHaveLength(d.cues.length);
     expect(clips.every(isAutoSfxClip)).toBe(true);
-    // Tasteful: not one per cut (19 cuts), but most moments covered.
-    expect(d.cues.length).toBeGreaterThan(6);
-    expect(d.cues.length).toBeLessThan(19);
-    expect(d.cues.some((c) => c.recipe.startsWith("riser") && Math.abs(c.at - d.climax!) < 1e-6)).toBe(true);
-    expect(d.cues.some((c) => c.recipe === "impact_boom" && Math.abs(c.at - d.climax!) < 1e-6)).toBe(true);
-    const times = [...new Set(d.cues.map((c) => c.at))].sort((a, b) => a - b);
-    for (let i = 1; i < times.length; i += 1) expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(MIN_TRANSIENT_GAP - 1e-9);
+    // The drop: transient, body, sub and tail on one sample, marked as one cue.
+    const drop = d.cues.filter((c) => Math.abs(c.at - d.climax!) < 1e-6 && c.role === "hero");
+    expect(drop.map((c) => c.layer).sort()).toEqual(["body", "sub", "tail", "transient"]);
+    expect(new Set(drop.map((c) => (doc.project.clips.find((x) => x.id === c.clip_id)!.zenvi_sfx as { cue: string }).cue)).size).toBe(1);
+    const riser = d.cues.find((c) => c.layer === "riser")!;
+    expect(riser.at).toBeCloseTo(d.climax! - PALETTES.hype.suckOut, 1);
+    expect(d.bed_dips.some((b) => b.reason === "suck-out before the drop" && b.db === -18)).toBe(true);
+    expect(volumePoints(doc.project.clips.find((c) => c.id === "MUSICCLIP1")!).some((p) => p.Y < 0.2)).toBe(true);
     for (const c of d.cues) {
-      expect(c.gain_db).toBeLessThanOrEqual(-7);
-      expect(c.gain_db).toBeGreaterThanOrEqual(-16);
+      expect(c.gain_db).toBeLessThanOrEqual(0);
       // Every hit lands on its moment.
       const clip = clips.find((x) => x.id === c.clip_id)!;
-      if (c.at >= hitOf(doc, clip)) expect(clip.position - clip.start + hitOf(doc, clip)).toBeCloseTo(c.at, 6);
-      else expect(clip.position).toBeCloseTo(c.at, 6);
+      expect(clip.position - clip.start + hitOf(doc, clip)).toBeCloseTo(c.hit_seconds, 4);
     }
-    expect(new Set(d.cues.map((c) => c.recipe)).size).toBeGreaterThan(3);
+    // Most of the 19 cuts sound in hype; nothing plays inside the suck-out.
+    expect(d.sounded).toBeGreaterThan(14);
+    expect(d.cues.filter((c) => c.at > d.climax! - PALETTES.hype.suckOut + 1e-6 && c.at < d.climax! - 1e-6)).toHaveLength(0);
   });
 
-  it("replaces its previous run (hand-placed effects stay), reuses cached sounds, and undoes in one step", async () => {
+  it("replaces its previous run and its bed dips (hand-placed effects stay), reuses cached sounds, and undoes in one step", async () => {
     const doc = editProject();
     const host = withAudio(fakeHost());
     expect((await runTool({ doc, host }, "add_sfx_tool", { recipe: "camera_shutter", at_seconds: 2.5 })).ok).toBe(true);
     const manual = sfxClips(doc)[0]!;
-    const first = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "hype" });
-    const firstIds = data<{ cues: { clip_id: string }[] }>(first).cues.map((c) => c.clip_id);
+    const bedBefore = structuredClone(doc.project.clips.find((c) => c.id === "MUSICCLIP1")!.volume);
+    const first = data<AutoData>(await runTool({ doc, host }, "auto_sound_design_tool", { genre: "hype" }));
+    const bedAfterFirst = structuredClone(doc.project.clips.find((c) => c.id === "MUSICCLIP1")!.volume);
     const written = host.written.size;
 
-    const same = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "hype" });
+    const same = await runTool({ doc, host }, "auto_sound_design_tool", { genre: "hype" });
     expect(same.ok, same.text).toBe(true);
-    // Same design: every sound comes from the bin, nothing is rendered or written again.
+    // Same design: every sound comes from the bin, and the bed's dips are put back before they go on again.
     expect(host.written.size).toBe(written);
-    expect(data<{ replaced_clip_ids: string[] }>(same).replaced_clip_ids.sort()).toEqual([...firstIds].sort());
+    expect(data<AutoData>(same).replaced_clip_ids.sort()).toEqual(first.cues.map((c) => c.clip_id).sort());
+    expect(doc.project.clips.find((c) => c.id === "MUSICCLIP1")!.volume).toEqual(bedAfterFirst);
 
-    const subtle = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "subtle" });
-    const subtleCues = data<{ cues: { clip_id: string }[]; removed_file_ids: string[] }>(subtle);
-    expect(subtleCues.cues.length).toBeLessThan(firstIds.length);
-    const auto = doc.project.clips.filter(isAutoSfxClip);
-    expect(auto.map((c) => c.id).sort()).toEqual(subtleCues.cues.map((c) => c.clip_id).sort());
+    const subtle = data<AutoData>(await runTool({ doc, host }, "auto_sound_design_tool", { genre: "hype", intensity: "subtle" }));
+    expect(subtle.sounded).toBeLessThan(first.sounded);
+    expect(doc.project.clips.filter(isAutoSfxClip).map((c) => c.id).sort()).toEqual(subtle.cues.map((c) => c.clip_id).sort());
     expect(doc.project.clips.find((c) => c.id === manual.id)).toBeDefined();
-    // Sounds no clip plays any more leave the bin.
-    expect(subtleCues.removed_file_ids.length).toBeGreaterThan(0);
     const used = new Set(doc.project.clips.map((c) => c.file_id));
     expect(doc.project.files.filter((f) => f.zenvi_role === "sfx").every((f) => used.has(f.id))).toBe(true);
 
     expect(doc.undoLabels).toHaveLength(4);
-    doc.undo(1);
-    expect(doc.project.clips.filter(isAutoSfxClip)).toHaveLength(firstIds.length);
+    doc.undo(3);
+    expect(doc.project.clips.filter(isAutoSfxClip)).toHaveLength(0);
+    expect(doc.project.clips.find((c) => c.id === "MUSICCLIP1")!.volume).toEqual(bedBefore);
   });
 
-  it("works from given beats and climax where audio cannot be decoded, and says so otherwise", async () => {
-    const doc = editProject();
-    const result = await runTool({ doc, host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", {});
-    expect(result.ok, result.text).toBe(true);
-    expect((result.data as { warnings: string[] }).warnings.join(" ")).toMatch(/cannot analyse audio/);
-    expect(data<{ climax: number | null }>(result).climax).toBeNull();
+  it("reads the genre from the edit, and works from given beats and climax where audio cannot be decoded", async () => {
+    const guessed = data<AutoData>(await runTool({ doc: editProject(), host: withAudio(fakeHost()) }, "auto_sound_design_tool", {}));
+    expect([guessed.genre, guessed.genre_guessed]).toEqual(["editorial", true]);
 
-    const given = await runTool({ doc: editProject(), host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", {
-      beats: Array.from({ length: 40 }, (_, i) => i * 0.5),
-      climax_seconds: "16",
-    });
+    const blind = await runTool({ doc: editProject(), host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", {});
+    expect(blind.ok, blind.text).toBe(true);
+    expect((blind.data as { warnings: string[] }).warnings.join(" ")).toMatch(/cannot analyse audio/);
+    expect(data<AutoData>(blind).climax).toBeNull();
+
+    const given = await runTool({ doc: editProject(), host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { genre: "hype", beats: Array.from({ length: 40 }, (_, i) => i * 0.5), climax_seconds: "16" });
     expect(given.ok, given.text).toBe(true);
-    const d = data<{ climax: number; cues: { recipe: string; at: number }[] }>(given);
+    const d = data<AutoData>(given);
     expect(d.climax).toBe(16);
-    expect(d.cues.some((c) => c.recipe === "impact_boom" && c.at === 16)).toBe(true);
+    expect(d.cues.some((c) => c.layer === "sub" && c.at === 16)).toBe(true);
     expect((given.data as { warnings: string[] }).warnings).toHaveLength(0);
-
-    // Beats alone replace the grid, not the climax the host could not find: the warning stays.
-    const beatsOnly = await runTool({ doc: editProject(), host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { beats: Array.from({ length: 40 }, (_, i) => i * 0.5) });
-    expect(beatsOnly.ok, beatsOnly.text).toBe(true);
-    expect((beatsOnly.data as { warnings: string[] }).warnings.join(" ")).toMatch(/no climax was found/);
   });
 
-  it("keeps the climax from the music when beats are given, and measures the edit by its picture", async () => {
-    const doc = editProject();
-    // Stretch the music bed far past the picture: the climax must still land inside the 20 s edit.
-    doc.transaction("longer bed", (tx) => tx.update(["clips", { id: "MUSICCLIP1" }], { end: 30 }));
-    const result = await runTool({ doc, host: withAudio(fakeHost()) }, "auto_sound_design_tool", { beats: Array.from({ length: 40 }, (_, i) => i * 0.5) });
-    expect(result.ok, result.text).toBe(true);
-    const d = data<{ climax: number; riser: boolean }>(result);
-    expect(d.climax).toBeCloseTo(12, 1);
-    expect(d.riser).toBe(true);
-    const sfxEnd = Math.max(...sfxClips(doc).filter((c) => c.title === "Impact, boom").map((c) => c.position));
-    expect(sfxEnd).toBeLessThan(20);
-  });
-
-  it("reports where each hit really plays, and does not claim a build it did not place", async () => {
-    const doc = editProject();
-    const result = await runTool({ doc, host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { climax_seconds: "0.3", intensity: "hype" });
-    expect(result.ok, result.text).toBe(true);
-    expect((result.data as { summary: string }).summary).not.toMatch(/climax/);
-    expect(data<{ climax: number | null }>(result).climax).toBeNull();
-    for (const c of data<{ cues: { clip_id: string; hit_seconds: number }[] }>(result).cues) {
-      const clip = doc.project.clips.find((x) => x.id === c.clip_id)!;
-      expect(clip.position - clip.start + hitOf(doc, clip)).toBeCloseTo(c.hit_seconds, 6);
-    }
-  });
-
-  it("never plays past the picture: a late climax gets a shorter impact, any tail left over is cut and faded", async () => {
-    // E2E bug: hype with the climax at 8.6 s of a 10 s picture placed a 2.6 s boom that ran 0.6 s into black.
+  it("never plays past the picture: a late climax gets shorter layers, any tail left over is cut and faded", async () => {
     const doc = editProject(10);
-    const result = await runTool({ doc, host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { intensity: "hype", climax_seconds: "8.6" });
+    const result = await runTool({ doc, host: fakeHost({ without: ["audio"] }) }, "auto_sound_design_tool", { genre: "hype", climax_seconds: "8.6" });
     expect(result.ok, result.text).toBe(true);
-    expect(doc.undoLabels).toHaveLength(1);
-    const d = data<{ picture_end: number; cues: { clip_id: string; recipe: string; reason: string; trimmed_seconds?: number }[] }>(result);
-    expect(d.picture_end).toBe(10);
+    const d = data<AutoData>(result);
     for (const clip of sfxClips(doc)) expect(endOf(clip)).toBeLessThanOrEqual(10 + 1e-6);
-    const boom = d.cues.find((c) => c.recipe === "impact_boom")!;
-    expect(boom.reason).toMatch(/shortened to end with the picture/);
-    const boomFile = doc.project.files.find((f) => f.id === doc.project.clips.find((c) => c.id === boom.clip_id)!.file_id)!;
-    expect((boomFile.zenvi_sfx as { params: { duration: number } }).params.duration).toBeCloseTo(1.4, 6);
-    const cut = d.cues.filter((c) => c.trimmed_seconds !== undefined);
-    for (const c of cut) {
+    expect(d.cues.some((c) => /shortened to end with the picture/.test(c.reason))).toBe(true);
+    for (const c of d.cues.filter((x) => x.trimmed_seconds !== undefined)) {
       const points = volumePoints(doc.project.clips.find((x) => x.id === c.clip_id)!);
       expect(points[points.length - 1]!.Y).toBe(0);
     }
-    if (cut.length > 0) expect((result.data as { summary: string }).summary).toMatch(/cut and faded to end with the picture at 10\.00 s/);
   });
 
-  it("changes nothing when no moment is strong enough", async () => {
-    const doc = new ProjectDocument(createProject({ id: "QUIETPROJ1" }));
-    doc.transaction("one shot", (tx) => {
-      addFile(tx, media("/media/aa.mp4", videoInfo("/media/aa.mp4", 30)), { id: "SHOTAAXXXX" });
-      addClip(tx, { fileId: "SHOTAAXXXX", position: 0, layer: tx.project.layers[0]!.number, start: 0, end: 10 });
-      addClip(tx, { fileId: "SHOTAAXXXX", position: 10, layer: tx.project.layers[0]!.number, start: 10, end: 20 });
-    });
+  it("changes nothing when every hit point stays dry, and says so when a rerun only removes the last run", async () => {
+    const doc = quietProject("QUIETPROJ1");
     const host = fakeHost();
-    const before = doc.undoLabels.length;
-    const result = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "subtle" });
-    expect(result.ok, result.text).toBe(true);
-    expect((result.data as { status: string }).status).toBe("unchanged");
-    expect(doc.undoLabels).toHaveLength(before);
+    const dry = await runTool({ doc, host }, "auto_sound_design_tool", { genre: "documentary" });
+    expect(dry.ok, dry.text).toBe(true);
+    expect((dry.data as { status: string }).status).toBe("unchanged");
+    expect(doc.undoLabels).toHaveLength(1);
     expect(host.written.size).toBe(0);
-  });
 
-  it("says so when a rerun places nothing and only removes the last run", async () => {
-    const doc = new ProjectDocument(createProject({ id: "QUIETPROJ2" }));
-    doc.transaction("three shots", (tx) => {
-      const layer = tx.project.layers[0]!.number;
-      for (const name of ["aa", "bb"]) addFile(tx, media(`/media/${name}.mp4`, videoInfo(`/media/${name}.mp4`, 30)), { id: `SHOT${name.toUpperCase()}XXXX` });
-      ["SHOTAAXXXX", "SHOTBBXXXX", "SHOTAAXXXX"].forEach((fileId, i) => addClip(tx, { fileId, position: i, layer, start: 0, end: 1 }));
-    });
-    const host = fakeHost();
-    expect(data<{ cues: unknown[] }>(await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "hype" })).cues.length).toBeGreaterThan(0);
-    const subtle = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "subtle" });
-    expect(subtle.ok, subtle.text).toBe(true);
-    expect((subtle.data as { summary: string }).summary).toMatch(/^Removed the \d+ effects of the last run/);
+    expect(data<AutoData>(await runTool({ doc, host }, "auto_sound_design_tool", { genre: "hype" })).cues.length).toBeGreaterThan(0);
+    const again = await runTool({ doc, host }, "auto_sound_design_tool", { genre: "documentary" });
+    expect((again.data as { summary: string }).summary).toMatch(/^Removed the \d+ effects of the last run/);
     expect(doc.project.clips.filter(isAutoSfxClip)).toHaveLength(0);
   });
 

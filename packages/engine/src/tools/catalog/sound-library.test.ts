@@ -273,7 +273,7 @@ describe("auto_sound_design_tool with a kit", () => {
     await runTool({ doc, host }, "create_sound_kit_tool", { name: "Dark", tone: "dark", seed: 5 });
     const kit = readSoundKit(doc.project)!;
     const result = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "hype" });
-    expect(summary(result)).toMatch(/^Sound-designed the edit \(hype, sound kit 'Dark'\)/);
+    expect(summary(result)).toMatch(/^Sound-designed the edit as .* \(\w+, read from the edit; hype, sound kit 'Dark'\)/);
     const cues = data<{ sources: string; cues: { recipe: string }[] }>(result);
     expect(cues.sources).toBe("kit");
     const allowed = new Set(Object.values(kit.slots).map((e) => (e?.source === "procedural" ? e.recipe : "")));
@@ -299,7 +299,7 @@ describe("auto_sound_design_tool with a kit", () => {
     const host = libraryHost();
     expect(summary(await runTool({ doc, host }, "auto_sound_design_tool", { sources: "kit" }))).toMatch(/^Error: the project has no sound kit/);
     const result = await runTool({ doc, host }, "auto_sound_design_tool", { intensity: "hype", sources: "mixed" });
-    expect(summary(result)).toMatch(/^Sound-designed the edit \(hype, mixed sounds\)/);
+    expect(summary(result)).toMatch(/^Sound-designed the edit as .* \(\w+, read from the edit; hype, mixed sounds\)/);
     expect(data<{ kit: { stored: boolean } }>(result).kit.stored).toBe(false);
     expect(readSoundKit(doc.project)).toBeNull();
     expect(doc.undoLabels).toEqual(["Automatic sound design"]);

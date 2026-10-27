@@ -13,7 +13,7 @@ import type { Voice } from "./layers.js";
 import { sfxRecipe, type SfxRecipe } from "./recipes.js";
 
 /** Bump when any recipe's sound changes, so cached files are rendered again. */
-export const SFX_VERSION = 2;
+export const SFX_VERSION = 3;
 
 /** Peak of every rendered file, dBFS. */
 export const SFX_PEAK_DBFS = -1;
