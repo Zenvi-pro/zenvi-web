@@ -52,6 +52,8 @@ export interface MixCue {
   role: CueRole;
   /** Sample identity (V1 repetition). */
   sample?: string;
+  /** The layered cue it belongs to (transient, body, sub and tail of one hit): one hero for V4. */
+  group?: string;
   /** The clip's timeline start, seconds (to move it by a timing error). */
   position?: number;
 }
@@ -492,7 +494,7 @@ export function scoreMix(input: ScoreInput): MixScore {
     const [dlo, dhi] = DENSITY[genre];
     const density = cues.length / dur;
     put("V3_cues_per_s", density, dlo, dhi, "variety", { text: density > dhi ? "too dense: delete the weakest sweeteners (first those under speech)" : "too sparse: add micros on UI/text events" });
-    const heroes = cues.filter((c) => c.role === "hero");
+    const heroes = cues.filter((c, i) => c.role === "hero" && (c.group === undefined || !cues.slice(0, i).some((o) => o.role === "hero" && o.group === c.group)));
     let gap: number | null = null;
     let pair: [MixCue, MixCue] | null = null;
     for (let i = 1; i < heroes.length; i += 1) {

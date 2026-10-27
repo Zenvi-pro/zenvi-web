@@ -138,7 +138,7 @@ export function cuesOf(project: Project): MixCue[] {
     if (!isSfxClip(clip)) continue;
     const file = clip.file_id ? fileById(project, String(clip.file_id)) : undefined;
     const fileMark = file ? markOf(file) : undefined;
-    const clipMark = (clip.zenvi_sfx ?? {}) as { recipe?: string; role?: unknown; library?: string };
+    const clipMark = (clip.zenvi_sfx ?? {}) as { recipe?: string; role?: unknown; library?: string; cue?: unknown };
     const recipe = clipMark.recipe ?? fileMark?.recipe ?? "";
     const family = sfxRecipe(recipe)?.family ?? "impact";
     const role = clipMark.role === "hero" || clipMark.role === "sweetener" || clipMark.role === "micro" ? clipMark.role : (CUE_ROLE_OF_FAMILY[family] ?? "hero");
@@ -151,6 +151,7 @@ export function cuesOf(project: Project): MixCue[] {
       role,
       sample: clipMark.library ?? (fileMark?.library ? `${fileMark.library.provider}:${fileMark.library.id}` : fileMark?.key ?? String(clip.file_id ?? "")),
       position,
+      ...(typeof clipMark.cue === "string" ? { group: clipMark.cue } : {}),
     });
   }
   return cues.sort((a, b) => a.t - b.t);

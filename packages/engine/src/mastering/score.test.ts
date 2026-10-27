@@ -109,6 +109,14 @@ describe("scoreMix", () => {
     expect(first.args.position_seconds as number).toBeCloseTo(0.5 - 0.08, 1);
   });
 
+  it("counts the layers of one hit as one hero for the hero gap (V4)", () => {
+    const base = atTarget();
+    const layered = [...base.cues!, { id: "tail0", t: base.cues![0]!.t, kind: "tail", role: "hero" as const, group: "cue0" }];
+    layered[0] = { ...layered[0]!, group: "cue0" };
+    expect(scoreMix({ ...base, cues: layered }).metrics.V4_min_hero_gap_s!.value).toBe(scoreMix(base).metrics.V4_min_hero_gap_s!.value);
+    expect(scoreMix({ ...base, cues: layered.map(({ group: _, ...c }) => c) }).metrics.V4_min_hero_gap_s!.value).toBe(0);
+  });
+
   it("speaks the speech windows it measured and stays compact", () => {
     const out = scoreMix(atTarget());
     expect(out.speech.length).toBe(2);
