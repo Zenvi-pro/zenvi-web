@@ -72,7 +72,8 @@ export function shapeVolume(clip: unknown, fps: number, shape: readonly GainPoin
     if (x <= frames[0]!) return sorted[0]!.db;
     for (let i = 1; i < sorted.length; i += 1) {
       if (x <= frames[i]!) {
-        if (sorted[i]!.curve === "constant") return sorted[i - 1]!.db;
+        // A step holds the left level up to the point and takes its own at it (KeyFrame.cpp `GetValue` / `InterpolateBetween`).
+        if (sorted[i]!.curve === "constant") return x < frames[i]! ? sorted[i - 1]!.db : sorted[i]!.db;
         const span = frames[i]! - frames[i - 1]!;
         return span <= 0 ? sorted[i]!.db : sorted[i - 1]!.db + ((sorted[i]!.db - sorted[i - 1]!.db) * (x - frames[i - 1]!)) / span;
       }
