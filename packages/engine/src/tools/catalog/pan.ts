@@ -7,7 +7,8 @@
  * Pan law: constant power, sin/cos of (pan + 1) * pi / 4 on the source's
  * mono sum, times sqrt(2) so the loudness of a centred render equals the
  * unpanned clip (each side is -3 dB re a hard pan). A render that would pass
- * full scale is scaled down and the clip's gain raised by the same amount.
+ * full scale is scaled down and the clip's gain raised by the same amount;
+ * the mark records that raise, so a re-pan or pan 0 takes it back first.
  */
 
 import { z } from "zod";
@@ -126,6 +127,7 @@ export const panTools: CatalogTool[] = [
           const path = await media.writeGenerated(name, encodeWav([left, rightOut], pcm.sampleRate), "audio/wav");
           written.push(path);
           const info = await media.probe(path);
+          if (compensateDb > 0) job.mark.gain_db = compensateDb;
           rendered.push({ ...job, compensateDb, media: { path, info: { ...info, media_type: "audio", has_video: false, has_audio: true }, name: `${String(source.name ?? "audio")} (panned)` } });
         }
       } catch (error) {
@@ -134,10 +136,15 @@ export const panTools: CatalogTool[] = [
       }
 
       call.commit((tx) => {
-        for (const entry of restore) unlinkPanRender(tx, entry.id);
+        for (const entry of restore) {
+          const raised = readPanMark(entry.clip)?.gain_db ?? 0;
+          unlinkPanRender(tx, entry.id);
+          if (raised > 0) applyClipGain(tx, entry.id, -raised);
+        }
         for (const r of rendered) {
+          const delta = r.compensateDb - (readPanMark(r.entry.clip)?.gain_db ?? 0);
           linkPanRender(tx, r.entry.id, r.media, r.mark);
-          if (r.compensateDb > 0) applyClipGain(tx, r.entry.id, r.compensateDb);
+          if (Math.abs(delta) > 1e-6) applyClipGain(tx, r.entry.id, delta);
         }
       }, "Pan");
       const warnings = rendered.filter((r) => (r.mark.pan !== undefined && Math.abs(r.mark.pan) > HERO_MAX_PAN) || (r.mark.points ?? []).some((p) => Math.abs(p.pan) > HERO_MAX_PAN));

@@ -24,6 +24,8 @@ export interface PanMark {
   source_file_id: string;
   pan?: number;
   points?: { t: number; pan: number }[];
+  /** dB the clip was raised because the render was scaled under full scale (pan_tool takes it back on a re-pan or pan 0). */
+  gain_db?: number;
 }
 
 export function readPanMark(clip: Clip): PanMark | undefined {

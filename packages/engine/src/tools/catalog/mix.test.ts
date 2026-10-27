@@ -208,6 +208,29 @@ describe("pan_tool", { timeout: 60_000 }, () => {
     expect((await run(p, "pan_tool", { clip_ids: hit, pan: 0 })).status).toBe("unchanged");
   });
 
+  it("does not stack the peak compensation of a hard pan: a re-pan and pan 0 leave the clip's gain where it was", async () => {
+    const p = mixProject();
+    const hit = p.hits[2]!;
+    p.doc.transaction("hot", (tx) => {
+      const file = tx.project.clips.find((c) => c.id === hit)!.file_id;
+      tx.update(["files", { id: String(file) }], { path: "/media/hot.wav" });
+    });
+    const peak = (pcm: Float32Array[]) => 20 * Math.log10(Math.max(...pcm.map((c) => c.reduce((m, x) => Math.max(m, Math.abs(x)), 0))));
+    const [l0, r0] = sides(await render(p, [hit]));
+    const first = await run(p, "pan_tool", { clip_ids: hit, pan: 1 });
+    const gain = (first.data as { clips: { gainDb: number }[] }).clips[0]!.gainDb;
+    // The fixture's click peaks above -3 dBFS, so a hard pan has to be scaled down and the clip raised.
+    expect(gain).toBeGreaterThan(0.1);
+    const hard = await render(p, [hit]);
+    expect(await run(p, "pan_tool", { clip_ids: hit, pan: 0.9 })).toMatchObject({ status: "applied" });
+    expect(await run(p, "pan_tool", { clip_ids: hit, pan: 1 })).toMatchObject({ status: "applied" });
+    expect(peak(await render(p, [hit]))).toBeCloseTo(peak(hard), 1);
+    expect(await run(p, "pan_tool", { clip_ids: hit, pan: 0 })).toMatchObject({ status: "applied" });
+    const [l2, r2] = sides(await render(p, [hit]));
+    expect(l2).toBeCloseTo(l0!, 2);
+    expect(r2).toBeCloseTo(r0!, 2);
+  });
+
   it("keyframes a travelling pan and refuses clips with picture", async () => {
     const p = mixProject();
     const music = p.music;

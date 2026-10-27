@@ -32,6 +32,8 @@ export const SOURCES: Record<string, Float32Array> = {
   "voice.wav": fixture.voice[0]!,
   "music.wav": fixture.music[0]!,
   "hit.wav": click,
+  /** The click normalised to a 0.95 peak: a hard pan of it would pass full scale. */
+  "hot.wav": click.map((x, _i, a) => (x * 0.95) / a.reduce((m, y) => Math.max(m, Math.abs(y)), 0)),
 };
 
 /** 16-bit PCM WAV (what encodeWav writes) back to float channels. */
