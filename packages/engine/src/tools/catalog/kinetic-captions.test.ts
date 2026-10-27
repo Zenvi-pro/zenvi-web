@@ -169,7 +169,7 @@ describe("kinetic_captions_tool", () => {
 
   it("puts a matte cut-out of the speaker above the captions for behind_subject", async () => {
     const { doc, clipId } = talking(true);
-    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: true });
+    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: "all" });
     expect(r.ok, r.text).toBe(true);
     const cutouts = doc.project.clips.filter((c) => kineticTag(c)?.role === "cutout");
     expect(cutouts).toHaveLength(1);
@@ -186,7 +186,7 @@ describe("kinetic_captions_tool", () => {
     const grade = { id: "GRADE00001", type: "Saturation", class_name: "Saturation" };
     const fade = { Points: [{ co: { X: 1, Y: 0 }, interpolation: 1 }, { co: { X: 15, Y: 1 }, interpolation: 1 }] };
     doc.transaction("grade", (tx) => tx.update(["clips", { id: clipId }], { effects: [grade], alpha: fade }));
-    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: true, timeline_clip_ids: [clipId, clipId] });
+    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: "all", timeline_clip_ids: [clipId, clipId] });
     expect(r.ok, r.text).toBe(true);
     const cut = doc.project.clips.find((c) => kineticTag(c)?.role === "cutout")!;
     expect(doc.project.clips.filter((c) => kineticTag(c)?.role === "cutout")).toHaveLength(1);
@@ -199,7 +199,7 @@ describe("kinetic_captions_tool", () => {
   it("refuses what it cannot do, leaving the project as it was", async () => {
     const { doc } = talking();
     const before = snapshotOf(doc.project);
-    const noMatte = await runTool({ doc, host: host() }, "kinetic_captions_tool", { behind_subject: true });
+    const noMatte = await runTool({ doc, host: host() }, "kinetic_captions_tool", { behind_subject: "all" });
     expect(noMatte.ok).toBe(false);
     expect(noMatte.text).toContain("subject matte");
     const unknown = await runTool({ doc, host: host() }, "kinetic_captions_tool", { timeline_clip_ids: ["NOPE"] });

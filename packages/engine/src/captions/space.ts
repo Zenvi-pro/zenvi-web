@@ -31,6 +31,8 @@ export interface CaptionScene {
   /** The subject's head, shares of the frame (from the matte), when there is one. */
   head?: AvoidBox;
   cost?: CostGrid;
+  /** Share of each cell that is the subject (from the matte): how much of a word behind it would be hidden. */
+  subject?: CostGrid;
 }
 
 /** Grid cells across the frame's long side. */
@@ -91,39 +93,48 @@ export function matteCells(matte: RgbaImage, cols: number, rows: number): number
 }
 
 /**
- * The head in a matte frame, shares of the frame: the subject's extent in a
- * band from its topmost row down 0.9 × the width it has there (a head is
- * about as tall as it is wide), ignoring specks under 0.4 % of the frame.
+ * The head in a matte frame, shares of the frame: the subject's rows from
+ * its topmost one down until they are 0.9 × as tall as they are wide (a
+ * head is about as tall as it is wide), or to where the outline jumps out
+ * (outstretched arms: a row 1.6 × wider than the head so far, once the head
+ * is half as tall as wide); specks under 0.4 % of the frame are no subject.
  */
 export function matteHead(matte: RgbaImage): AvoidBox | null {
   const { width: W, height: H } = matte;
-  const rowsOn: number[] = [];
+  const rows: { x0: number; x1: number; n: number }[] = [];
+  let total = 0;
   for (let y = 0; y < H; y += 1) {
+    let x0 = -1;
+    let x1 = -1;
     let n = 0;
-    for (let x = 0; x < W; x += 1) if (matte.data[(y * W + x) * 4]! >= SUBJECT) n += 1;
-    rowsOn.push(n);
+    for (let x = 0; x < W; x += 1) {
+      if (matte.data[(y * W + x) * 4]! < SUBJECT) continue;
+      if (x0 < 0) x0 = x;
+      x1 = x;
+      n += 1;
+    }
+    rows.push({ x0, x1, n });
+    total += n;
   }
-  const total = rowsOn.reduce((a, b) => a + b, 0);
   if (total < 0.004 * W * H) return null;
   // Top: the first row with a few subject pixels (strands of hair above it do not count).
   const minRow = Math.max(1, Math.round(0.01 * W));
-  const top = rowsOn.findIndex((n) => n >= minRow);
+  const top = rows.findIndex((r) => r.n >= minRow);
   if (top < 0) return null;
-  // Width near the top settles a few rows down; grow the band until it is ~0.9 × that width tall.
   let x0 = W;
   let x1 = -1;
   let bottom = top;
   for (let y = top; y < H; y += 1) {
-    for (let x = 0; x < W; x += 1) {
-      if (matte.data[(y * W + x) * 4]! < SUBJECT) continue;
-      x0 = Math.min(x0, x);
-      x1 = Math.max(x1, x);
-    }
+    const r = rows[y]!;
+    if (r.n === 0) break;
+    const tall = y - top;
+    const sofar = x1 - x0 + 1;
+    if (x1 >= x0 && tall > 0.5 * sofar && r.x1 - r.x0 + 1 > 1.6 * sofar) break;
+    x0 = Math.min(x0, r.x0);
+    x1 = Math.max(x1, r.x1);
     bottom = y;
-    // Square pixels: the band is as tall as the head is wide, about.
-    if (x1 >= x0 && y - top >= 0.9 * (x1 - x0 + 1) && y - top > 0.04 * H) break;
+    if (tall >= 0.9 * (x1 - x0 + 1) && tall > 0.04 * H) break;
   }
-  if (x1 < x0) return null;
   const w = (x1 - x0 + 1) / W;
   const h = (bottom - top + 1) / H;
   return { x: x0 / W + w / 2, y: top / H + h / 2, w, h };

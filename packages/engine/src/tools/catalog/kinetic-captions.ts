@@ -16,7 +16,15 @@
  * `zenvi_matte.source_file_id` is the footage's file, made by the subject
  * matte tools) keys a copy of the footage above the captions: libopenshot's
  * Mask with the matte as `mask_reader`, inverted so white (the subject)
- * stays. Without a matte the option is refused.
+ * stays. all puts every word behind it, "emphasis" only the emphasis words
+ * (on the lowest caption tracks, the cut-out between them and the rest);
+ * both are refused without a matte. "auto" (the default for the styles
+ * with display emphasis words) is "emphasis" when the footage has a matte,
+ * else nothing.
+ *
+ * placement auto reads the shots first (../caption-scenes.ts): the head
+ * from the matte when no avoid box is given, and the calmest of the
+ * style's spots.
  */
 
 import { z } from "zod";
@@ -37,6 +45,7 @@ import { applied, failed, refused } from "../receipt.js";
 import { colorHexAlpha, constantKeyframe, isLocked, projectSize, trackInfo } from "../titles-text.js";
 import { clipTarget, isTalkingFootage, isWordSource, wordsFor, wordsForClip } from "../transcripts.js";
 import { projectFps } from "../frame-time.js";
+import { captionScenes } from "../caption-scenes.js";
 import { isFootage } from "./color-unify.js";
 import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
 
@@ -64,6 +73,8 @@ interface Scope {
   cutouts: boolean;
 }
 
+/** Styles whose emphasis words are display type of their own: behind_subject defaults to auto for them. */
+const DISPLAY_EMPHASIS: ReadonlySet<CaptionStyleId> = new Set(["creator", "stack"]);
 const STYLE_LINES = CAPTION_STYLE_IDS.map((id) => `${id}: ${CAPTION_STYLES[id].summary}.`).join(" ");
 const ANIMATION_LINES = CAPTION_ANIMATION_IDS.map((id) => `${id}: ${CAPTION_ANIMATIONS[id].summary}.`).join(" ");
 const unit = z.number().min(0).max(1);
@@ -95,7 +106,13 @@ const input = z.strictObject({
   text_size: z.number().min(0.015).max(0.2).optional().describe("Connector word size, share of the frame's short side (style default: creator 0.046, karaoke 0.059, stack 0.11); emphasis words keep their ratio to it."),
   y: unit.optional().describe("Vertical centre of the captions, 0 top - 1 bottom (default: the style's own spots). Kept inside the caption safe area (on 9:16 out of the top 12 % and the bottom 20 %) and off the avoid boxes; split ignores it."),
   animation: z.enum(CAPTION_ANIMATION_IDS).optional().describe(`How words enter, instead of the style's own. ${ANIMATION_LINES}`),
-  behind_subject: z.boolean().optional().describe("Put a cut-out of the speaker above the captions so the words pass behind them. Needs the footage's subject matte."),
+  behind_subject: z
+    .enum(["auto", "emphasis", "all", "none"])
+    .optional()
+    .describe(
+      "Words behind the speaker (a cut-out of them above the captions): emphasis the emphasis words (set across the top of the head), all every word, auto (default for creator and stack) emphasis when the footage has a subject matte (generate_subject_matte_tool), else none. emphasis and all need the matte.",
+    ),
+  placement: z.enum(["auto", "style"]).optional().describe("auto (default): look at the shots - keep off the head (from the subject matte when no avoid box is given) and take the calmest, darkest of the style's spots; style: the style's spots in order."),
   language: z.string().max(16).optional().describe("Speech language when the clip has to be transcribed (auto by default)."),
 });
 
@@ -235,8 +252,8 @@ export const kineticCaptionTools: CatalogTool[] = [
     title: "Add kinetic captions",
     description:
       "Animated word-by-word captions from the speech in footage clips (or from script cues when there is no transcribed voice), timed to each word, styled after creator and editorial reels: emphasis words picked automatically (numbers, stressed words) " +
-      "or given, laid out in the safe area for 9:16 or 16:9 and kept off the boxes you give (the speaker's face). Each word is an outlined SVG title clip with keyframes on Captions tracks: " +
-      "native, editable and the same on every Zenvi surface. Size (text_size), height (y) and entrance (animation: pop, slam, slide_up, rise, fade) override the style's. Running it again on the same clips (and range) replaces its captions there. One undo step. For plain subtitles use add_captions_tool.",
+      "or given, laid out in the safe area for 9:16 or 16:9, in each shot's calm negative space and off the speaker's head (the boxes you give, else the subject matte's); with a subject matte the emphasis words go behind the head (creator, stack). Each word is an outlined SVG title clip with keyframes on Captions tracks: " +
+      "native, editable and the same on every Zenvi surface. Size (text_size), height (y) and entrance (animation: pop, slam, slide_up, rise, fade, tilt, typewriter, scramble, letters) override the style's. Running it again on the same clips (and range) replaces its captions there. One undo step. For plain subtitles use add_captions_tool; for a title card add_kinetic_title_tool.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     requires: ["media"],
@@ -279,16 +296,19 @@ export const kineticCaptionTools: CatalogTool[] = [
         }
       }
       const mattes = new Map<string, ProjectFile>();
-      if (args.behind_subject) {
+      const behindArg = args.behind_subject ?? (DISPLAY_EMPHASIS.has(style) ? "auto" : "none");
+      if (behindArg !== "none") {
         for (const clip of clips) {
           const matte = matteOf(project, clip);
-          if (!matte) return refused(TOOL, `Error: behind_subject needs a subject matte of clip ${clip.id}'s footage, and the bin has none; make one with the subject matte tools, or drop behind_subject.`);
-          mattes.set(clip.id, matte);
+          if (matte) mattes.set(clip.id, matte);
+          else if (behindArg !== "auto") return refused(TOOL, `Error: behind_subject needs a subject matte of clip ${clip.id}'s footage, and the bin has none; make one with generate_subject_matte_tool, or drop behind_subject.`);
         }
       }
+      // What goes behind the cut-out: auto is the emphasis words, where there is a matte to cut the speaker out with.
+      const behind: false | true | "emphasis" = behindArg === "auto" ? (mattes.size > 0 ? "emphasis" : false) : behindArg === "all" ? true : behindArg === "none" ? false : "emphasis";
       const ids = new Set(clips.map((c) => c.id));
       const ranged = args.start_seconds !== undefined || args.end_seconds !== undefined;
-      const old = previous(project, { ids, from: args.start_seconds ?? -Infinity, to: args.end_seconds ?? Infinity, cutouts: !ranged || (args.behind_subject ?? false) });
+      const old = previous(project, { ids, from: args.start_seconds ?? -Infinity, to: args.end_seconds ?? Infinity, cutouts: !ranged || behind !== false });
       const locked = old.clips.filter((c) => isLocked(project, c.layer));
       if (locked.length > 0) return refused(TOOL, `Error: earlier captions of these clips are on a locked track (${locked.map((c) => c.id).join(", ")}); unlock it first.`);
 
@@ -303,6 +323,11 @@ export const kineticCaptionTools: CatalogTool[] = [
       const [width, height] = projectSize(project);
       const fpsFraction = projectFps(project);
       const fps = fpsFraction.num / fpsFraction.den;
+      const oldIds = new Set(old.clips.map((c) => c.id));
+      const scenes =
+        (args.placement ?? "auto") === "auto"
+          ? await captionScenes(call, project, words[0]!.start, words[words.length - 1]!.end + 1, (c) => oldIds.has(c.id) || kineticTag(c) !== undefined, (c) => matteOf(project, c))
+          : [];
       let built: KineticCaptionPlan;
       try {
         built = buildKineticCaptions({
@@ -312,7 +337,8 @@ export const kineticCaptionTools: CatalogTool[] = [
           emphasis: emphasisArg(args.emphasis),
           avoid: (args.avoid ?? []) as AvoidBox[],
           ...colours,
-          behind: args.behind_subject ?? false,
+          behind,
+          scenes,
           ...(args.text_size !== undefined ? { size: args.text_size / baseShare(style) } : {}),
           ...(args.y !== undefined ? { y: args.y } : {}),
           ...(args.animation ? { motion: CAPTION_ANIMATIONS[args.animation].motion } : {}),
@@ -329,7 +355,11 @@ export const kineticCaptionTools: CatalogTool[] = [
       const plan = built.plan;
       const end = built.start + plan.frames / fps;
       const clean = withoutPrevious(project, old);
-      const stack = planOverlayStack(clean, built.start, end, plan.tracks + (args.behind_subject ? 1 : 0));
+      // The cut-out goes above the plan's `under` tracks (all of them for true), the other caption tracks above it.
+      const cutout = behind !== false && built.under > 0;
+      const stack = planOverlayStack(clean, built.start, end, plan.tracks + (cutout ? 1 : 0));
+      const cutLayer = cutout ? stack.layers[built.under]! : undefined;
+      const captionLayers = cutout ? stack.layers.filter((_, i) => i !== built.under) : stack.layers;
       const written = await writeDrawings(call, plan, `captions-${style}`);
       if (typeof written === "string") return failed(TOOL, written);
       const groupOf = (name: string) => built.groups[Number(/^g(\d+)/.exec(name)?.[1])]!;
@@ -338,7 +368,7 @@ export const kineticCaptionTools: CatalogTool[] = [
         for (const f of old.files) removeFile(tx, f.id);
         const leftover = old.clips.filter((c) => tx.project.clips.some((x) => x.id === c.id)).map((c) => c.id);
         if (leftover.length > 0) deleteClips(tx, leftover);
-        const placed = placeMotionPlan(tx, plan, written, built.start, fps, stack.layers.slice(0, plan.tracks), `Captions ${style}`, TRACK_LABEL);
+        const placed = placeMotionPlan(tx, plan, written, built.start, fps, captionLayers, `Captions ${style}`, TRACK_LABEL);
         const files = new Set<string>();
         for (const p of placed) {
           const group = groupOf(p.layer.name);
@@ -347,13 +377,13 @@ export const kineticCaptionTools: CatalogTool[] = [
           if (!files.has(p.fileId)) updateFile(tx, p.fileId, { [KINETIC_KEY]: tag } as Partial<ProjectFile>);
           files.add(p.fileId);
         }
-        if (args.behind_subject) ensureTrack(tx, stack.layers[plan.tracks]!, TRACK_LABEL);
+        if (cutLayer !== undefined) ensureTrack(tx, cutLayer, TRACK_LABEL);
         // Free unnamed tracks the captions landed on are named for them.
         for (const number of stack.layers) {
           const layer = tx.project.layers.find((l) => Number(l.number) === number);
           if (layer && !String(layer.label ?? "").trim()) tx.update(["layers", { id: layer.id }], { label: TRACK_LABEL });
         }
-        const cutouts = args.behind_subject ? clips.map((c) => cutoutOf(tx, c, mattes.get(c.id)!, stack.layers[plan.tracks]!, { source_clip_ids: [c.id], style, role: "cutout" })) : [];
+        const cutouts = cutLayer !== undefined ? clips.filter((c) => mattes.has(c.id)).map((c) => cutoutOf(tx, c, mattes.get(c.id)!, cutLayer, { source_clip_ids: [c.id], style, role: "cutout" })) : [];
         return { placed, cutouts, replaced: old.clips.length };
       }, `Add kinetic captions (${style})`);
 
@@ -364,13 +394,15 @@ export const kineticCaptionTools: CatalogTool[] = [
         TOOL,
         `Added ${built.groups.length} ${style} caption group(s) (${words.length} words) at ${built.start.toFixed(2)}-${end.toFixed(2)}s on ${plan.tracks} track(s)` +
           (result.replaced > 0 ? `, replacing ${result.replaced} earlier caption clip(s)` : "") +
-          (result.cutouts.length > 0 ? ", with the speaker cut out above them" : "") +
+          (result.cutouts.length > 0 ? (behind === "emphasis" ? ", the emphasis words behind the speaker" : ", with the speaker cut out above them") : "") +
           ".",
         {
           warnings,
           data: {
             style,
             ...(args.animation ? { animation: args.animation } : {}),
+            behind_subject: result.cutouts.length > 0 ? (behind === "emphasis" ? "emphasis" : "all") : "none",
+            placement: scenes.length > 0 ? { scenes: scenes.length, heads: scenes.filter((s) => s.head).length } : "style",
             text_size: round(args.text_size ?? baseShare(style)),
             words_from: args.cues ? "cues" : "speech",
             start: round(built.start),

@@ -40,7 +40,7 @@ import { Drawing } from "../motion/svg.js";
 import type { Element, Key, MotionFrame, MotionPlan, Pose } from "../motion/types.js";
 import type { FontLibrary } from "../typography/library.js";
 import { inkBox, outlineCommands, typeset, type Box, type TextBlock } from "../typography/typeset.js";
-import { boxCost, type CaptionScene } from "./space.js";
+import { boxCost, type CaptionScene, type CostGrid } from "./space.js";
 import { CAPTION_STYLES, DEFAULT_ACCENT, DEFAULT_INK, type CaptionFace, type CaptionMotion, type CaptionStyle, type CaptionStyleId } from "./styles.js";
 import { groupWords, pickEmphasis, type CaptionGroup, type CaptionWord } from "./words.js";
 
@@ -412,8 +412,25 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
   const toBox = (a: AvoidBox): Box => ({ x: (a.x - a.w / 2) * W - margin, y: (a.y - a.h / 2) * H - margin, width: a.w * W + 2 * margin, height: a.h * H + 2 * margin });
   const given = input.avoid.map(toBox);
   const scenes = [...(input.scenes ?? [])].sort((a, b) => a.from - b.from);
-  const sceneAt = (t: number): CaptionScene | undefined =>
-    scenes.find((s) => t >= s.from - 1e-6 && t < s.to) ?? scenes.reduce<CaptionScene | undefined>((a, s) => (!a || Math.min(Math.abs(s.from - t), Math.abs(s.to - t)) < Math.min(Math.abs(a.from - t), Math.abs(a.to - t)) ? s : a), undefined);
+  /** The scenes a group shows over: its heads merged (a head that moves stays clear all along), its costs averaged, the subject's cover the most it reaches. */
+  const sceneOver = (from: number, to: number): { head?: AvoidBox; cost?: CostGrid; subject?: CostGrid } => {
+    let over = scenes.filter((s) => s.from < to - 1e-6 && s.to > from + 1e-6);
+    if (over.length === 0 && scenes.length > 0) over = [scenes.reduce((a, s) => (Math.min(Math.abs(s.from - from), Math.abs(s.to - from)) < Math.min(Math.abs(a.from - from), Math.abs(a.to - from)) ? s : a))];
+    const heads = over.flatMap((s) => (s.head ? [s.head] : []));
+    const costs = over.flatMap((s) => (s.cost ? [s.cost] : []));
+    const subjects = over.flatMap((s) => (s.subject ? [s.subject] : []));
+    const out: { head?: AvoidBox; cost?: CostGrid; subject?: CostGrid } = {};
+    if (subjects.length > 0) out.subject = { ...subjects[0]!, cells: subjects[0]!.cells.map((_, k) => Math.max(...subjects.map((c) => c.cells[k] ?? 0))) };
+    if (heads.length > 0) {
+      const x0 = Math.min(...heads.map((h) => h.x - h.w / 2));
+      const x1 = Math.max(...heads.map((h) => h.x + h.w / 2));
+      const y0 = Math.min(...heads.map((h) => h.y - h.h / 2));
+      const y1 = Math.max(...heads.map((h) => h.y + h.h / 2));
+      out.head = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 };
+    }
+    if (costs.length > 0) out.cost = { ...costs[0]!, cells: costs[0]!.cells.map((_, k) => costs.reduce((sum, c) => sum + (c.cells[k] ?? 1), 0) / costs.length) };
+    return out;
+  };
   const portrait = H > W * 1.05;
   const own = portrait ? style.spots.portrait : style.spots.landscape;
   const behindAll = input.behind === true;
@@ -434,12 +451,28 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     const from = Math.max(prevEnd, frameOf(g.start) - f0);
     const to = Math.max(from + 1, frameOf(g.stop) - f0);
     prevEnd = to;
-    const scene = sceneAt(g.start);
+    const scene = sceneOver(g.start, g.stop);
     // The head: the first box given, else the shot's (from its matte).
-    const subject = input.avoid[0] ?? scene?.head;
-    const avoid = given.length > 0 ? given : scene?.head ? [toBox(scene.head)] : [];
-    const cost = scene?.cost ? (box: Box) => boxCost(scene.cost!, box, W, H) : undefined;
-    const behindEmphasis = input.behind === "emphasis" && style.reveal === "word" && items.some((i) => i.emphasis);
+    const subject = input.avoid[0] ?? scene.head;
+    const avoid = given.length > 0 ? given : scene.head ? [toBox(scene.head)] : [];
+    const cost = scene.cost ? (box: Box) => boxCost(scene.cost!, box, W, H) : undefined;
+    // The emphasis words alone across the top of the head, the head hiding their lower third, where that reads: at
+    // most a quarter of the word's box behind the subject (the matte's cover; without it, the head's box). Words
+    // behind the head may rise into the top title margin (to 4 % of the frame) on frames without platform UI there:
+    // stock footage keeps little headroom.
+    let behind: { eb: GroupBlock; ex: number; ey: number } | null = null;
+    if (input.behind === "emphasis" && style.reveal === "word" && items.some((i) => i.emphasis)) {
+      const eb = layoutGroup(lib, style, items.filter((i) => i.emphasis), u, 1, style.measure * safeWidth);
+      const headX = subject ? subject.x * W : W / 2;
+      const headTop = subject ? (subject.y - subject.h / 2) * H : BEHIND[portrait ? "portrait" : "landscape"].y * H + 0.15 * eb.height;
+      const ex = Math.min(Math.max(headX - eb.width / 2, safe.left), Math.max(safe.left, safe.right - eb.width));
+      const top = H >= W * 1.5 ? safe.top : 0.04 * H;
+      const ey = Math.min(Math.max(headTop - 0.65 * eb.height, top), Math.max(top, safe.bottom - eb.height));
+      const hidden = Math.max(0, ey + eb.height - headTop) / eb.height;
+      const covered = scene.subject ? boxCost(scene.subject, { x: ex, y: ey, width: eb.width, height: eb.height }, W, H) : (Math.min(subject ? subject.w * W : 0, eb.width) * hidden) / eb.width;
+      if (hidden <= 0.9 && covered <= 0.25) behind = { eb, ex, ey };
+    }
+    const behindEmphasis = behind !== null;
 
     // Lay out and place: split sits either side of the subject, the others at the first clear spot.
     let block: GroupBlock | null = null;
@@ -453,13 +486,9 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
       const hh = (subject.h * H) / 2 + margin;
       return [{ x: sx - hw - b.width / 2, y: sy }, { x: sx + hw + b.width / 2, y: sy }, { x: sx, y: sy + hh + b.height / 2 }, { x: sx, y: sy - hh - b.height / 2 }];
     };
-    if (behindEmphasis) {
-      // The emphasis words alone across the top of the head (the head hides their lower third), the rest clear of both.
-      const eb = layoutGroup(lib, style, items.filter((i) => i.emphasis), u, 1, style.measure * safeWidth);
-      const headX = subject ? subject.x * W : W / 2;
-      const headTop = subject ? (subject.y - subject.h / 2) * H : BEHIND[portrait ? "portrait" : "landscape"].y * H + 0.15 * eb.height;
-      const ex = Math.min(Math.max(headX - eb.width / 2, safe.left), Math.max(safe.left, safe.right - eb.width));
-      const ey = Math.min(Math.max(headTop - 0.65 * eb.height, safe.top), Math.max(safe.top, safe.bottom - eb.height));
+    if (behind) {
+      // The rest of the group clear of the head and of the words behind it.
+      const { eb, ex, ey } = behind;
       for (const w of eb.words) offsets.set(w, { dx: ex, dy: ey });
       const rest = items.filter((i) => !i.emphasis);
       let cb: GroupBlock = { words: [], width: 0, height: 0 };
@@ -580,6 +609,8 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
       const sign = w.index % 2 === 0 ? -1 : 1;
       return w.emphasis ? { rest: sign * tilt.rest, turn: sign * tilt.from } : { rest: 0, turn: sign * tilt.from * 0.5 };
     };
+    // Letters moving one by one take a track each; the words of a group share the letter tracks in turn.
+    const lettersUsed = { under: 0, front: 0 };
     /** The clips of one word: the word, typed, scrambled into, or letter by letter. */
     const wordElements = (w: SetWord, j: number, start: number, end: number, under: boolean): Element[] => {
       const o = offsetOf(w);
@@ -621,10 +652,12 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
       }
       // Stagger: a clip per letter on tracks of their own, each entering `step` after the one before.
       const every = Math.max(1, Math.min(step, Math.floor((span * 0.5) / glyphs.length)));
+      const first = lettersUsed[under ? "under" : "front"];
+      lettersUsed[under ? "under" : "front"] += glyphs.length;
       return glyphs.map((gl, i) => {
         const sw: SetWord = { ...w, block: { ...w.block, glyphs: [gl] } };
         const at = Math.min(end - 3, start + i * every);
-        return drawn(sw, glyphBounds(w.block, gl), o, `${name}l${i}`, (under ? TRACK.underLetters : TRACK.frontLetters) + i, Math.max(start, at), end, turn);
+        return drawn(sw, glyphBounds(w.block, gl), o, `${name}l${i}`, (under ? TRACK.underLetters : TRACK.frontLetters) + first + i, Math.max(start, at), end, turn);
       });
     };
 
