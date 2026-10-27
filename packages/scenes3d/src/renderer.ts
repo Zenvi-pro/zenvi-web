@@ -132,7 +132,7 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
       }
       await mkdir(cache, { recursive: true });
       const framesDir = await mkdtemp(path.join(options.tempDir ?? tmpdir(), "zenvi-scenes3d-"));
-      const partial = path.join(cache, `.${fp}.${process.pid}.partial${path.extname(output)}`);
+      const partial = path.join(cache, `.${fp}.${randomUUID()}.partial${path.extname(output)}`);
       try {
         const job: BlenderJob = {
           id: randomUUID(),

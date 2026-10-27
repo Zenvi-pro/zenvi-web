@@ -266,11 +266,13 @@ def build(job):
     elif move == "hero":
         # A product reveal: it spins in from above, lands and settles while the
         # camera pushes in, then keeps turning slowly so the hold is alive.
-        land = 1 + int(round(1.0 * fps))  # TASTE: big moves 1.0 s
-        settle = land + int(round(0.3 * fps))
+        # Short clips still land inside the movie: the reveal takes at most 55 % of it.
+        land = 1 + min(int(round(1.0 * fps)), max(1, int(round(0.55 * (frames - 1)))))  # TASTE: big moves 1.0 s
+        settle = max(land + 2, min(land + int(round(0.3 * fps)), frames))
+        bounce = land + max(1, min(int(0.12 * fps), (settle - land) // 2))
         motion.animate(cam, "location", [(1, at(-28, elevation + 6, dist * 1.14)), (frames, at(-12, elevation, dist * 0.94))], "smooth")
         motion.animate(pivot, "rotation_euler", [(1, (0, 0, math.radians(-320))), (land, (0, 0, math.radians(-6))), (frames, (0, 0, math.radians(24)))], ["out", "in-out"])
-        motion.animate(pivot, "location", [(1, (0, 0, height * 1.1)), (land, (0, 0, 0)), (land + int(0.12 * fps), (0, 0, height * 0.025)), (settle, (0, 0, 0))], ["out", "out", "in-out"])
+        motion.animate(pivot, "location", [(1, (0, 0, height * 1.1)), (land, (0, 0, 0)), (bounce, (0, 0, height * 0.025)), (settle, (0, 0, 0))], ["out", "out", "in-out"])
         motion.animate(pivot, "scale", [(1, (0.6, 0.6, 0.6)), (land, (1, 1, 1))], "out")
     elif move == "push":
         motion.animate(cam, "location", [(1, at(-24, elevation + 4, dist * 1.45)), (end, at(-12, elevation, dist * 0.9))], "smooth")

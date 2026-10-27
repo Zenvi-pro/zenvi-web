@@ -237,10 +237,10 @@ def glow(threshold=1.0, size=6, strength=0.6):
     raises alpha (its brightness), so it survives being laid over a
     backdrop or a timeline instead of vanishing with the transparent film."""
     scene = bpy.context.scene
+    tree = None
     try:
         tree = bpy.data.node_groups.new("Glow", "CompositorNodeTree")
         tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
-        scene.compositing_node_group = tree
         rl = tree.nodes.new("CompositorNodeRLayers")
         glare = tree.nodes.new("CompositorNodeGlare")
         out = tree.nodes.new("NodeGroupOutput")
@@ -257,13 +257,20 @@ def glow(threshold=1.0, size=6, strength=0.6):
         tree.links.new(bw.outputs[0], top.inputs[0])
         tree.links.new(rl.outputs["Alpha"], top.inputs[1])
         alpha = tree.nodes.new("CompositorNodeSetAlpha")
-        alpha.inputs["Type"].default_value = "Replace Alpha" if "Type" in alpha.inputs else None
+        if "Type" in alpha.inputs:  # Blender 5: a menu socket; before, a node property
+            alpha.inputs["Type"].default_value = "Replace Alpha"
+        else:
+            alpha.mode = "REPLACE_ALPHA"
         tree.links.new(glare.outputs["Image"], alpha.inputs["Image"])
         tree.links.new(top.outputs[0], alpha.inputs["Alpha"])
         tree.links.new(alpha.outputs["Image"], out.inputs[0])
+        # Only a complete group is assigned: a half-built one would render black or without alpha.
+        scene.compositing_node_group = tree
         scene.render.use_compositing = True
     except Exception as error:  # compositor API drift: keep rendering without bloom
         print("zenvi3d: no bloom:", error)
+        if tree is not None:
+            bpy.data.node_groups.remove(tree)
 
 
 def _set(n, socket, attr, value):

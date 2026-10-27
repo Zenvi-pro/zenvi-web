@@ -154,7 +154,8 @@ export class BlenderWorker {
         reject(new Error(`Could not start Blender (${this.options.blender}): ${error.message}`));
         this.stop(new Error(`Blender stopped: ${error.message}`));
       });
-      child.on("exit", (code, signal) => {
+      // "close", not "exit": it fires after stdout/stderr are drained, so the crash tail is in the message.
+      child.on("close", (code, signal) => {
         if (this.child !== child) return;
         const why = `Blender exited (${signal ?? `code ${code}`})${this.tail.length > 0 ? `: ${this.tail.slice(-6).join(" | ")}` : ""}`;
         reject(new Error(why));
