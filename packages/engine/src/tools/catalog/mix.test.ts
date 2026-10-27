@@ -220,3 +220,23 @@ describe("pan_tool", { timeout: 60_000 }, () => {
     expect(late[1]! - late[0]!).toBeGreaterThan(6);
   });
 });
+
+describe("master_audio_tool iterate", { timeout: 120_000 }, () => {
+  it("fixes, re-scores and masters in one undo step, never worse, under the true-peak ceiling", async () => {
+    const p = mixProject({ transcript: true });
+    const before = await score(p);
+    const undo = p.doc.undoLabels.length;
+    const receipt = await run(p, "master_audio_tool", { iterate: true, genre: "saas_ui" });
+    expect(receipt.status).toBe("applied");
+    expect(p.doc.undoLabels.length).toBe(undo + 1);
+    const data = receipt.data as { rawBefore: number; rawAfter: number; rounds: { kept: boolean; fixes: string[] }[] };
+    expect(data.rounds.length).toBeGreaterThan(0);
+    expect(data.rawAfter).toBeGreaterThanOrEqual(data.rawBefore);
+    const after = await score(p);
+    expect(after.rawScore!).toBeGreaterThan(before.rawScore!);
+    expect(after.metrics.L2_true_peak!.value!).toBeLessThanOrEqual(-1);
+    expect(after.gatesFailed).not.toContain("L1_integrated");
+    p.doc.undo();
+    expect((await score(p)).rawScore).toBe(before.rawScore);
+  });
+});
