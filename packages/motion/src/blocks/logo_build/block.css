@@ -1,0 +1,6 @@
+.lbx-stage { position: absolute; inset: 0; }
+.lbx-stage svg, .lbx-trails { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lbx-word { position: absolute; display: flex; flex-direction: column; gap: 18px; white-space: nowrap; }
+.lbx-name { display: block; overflow: hidden; font-family: var(--font-display); color: var(--ink); line-height: 1.05; letter-spacing: -0.035em; padding: 0 0.04em 0.06em; }
+.lbx-name .char { display: inline-block; }
+.lbx-tag { font-family: var(--font-mono); font-size: 36px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-left: 0.2em; }

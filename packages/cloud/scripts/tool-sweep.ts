@@ -407,6 +407,8 @@ const FIXTURES: Record<string, (ctx: Context) => Json> = {
   enhance_file_with_comfyui_tool: (c) => ({ file_id: c.files.a, action: "upscale" }),
   prepare_recording_tool: (c) => ({ sources: ["mic"], timeline_clip_id: c.clips.a }),
   list_project_profiles_tool: () => ({ query: "vertical", fps: 30 }),
+  // Reading a rendered file needs ffmpeg on the person's computer: refused in words in the cloud.
+  review_render_tool: () => ({ path: "sweep.mp4" }),
   // Custom profiles live in Zenvi desktop's profiles folder: refused in the cloud.
   manage_custom_profiles_tool: () => ({ action: "create", name: "Sweep square", width: 1000, height: 1000, fps: 30 }),
   match_color_to_reference_tool: (c) => ({ timeline_clip_id: c.clips.b, referenceClipId: c.clips.a }),
