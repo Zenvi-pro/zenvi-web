@@ -1325,6 +1325,26 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { query: "coffee" }, host: { routes: { "/api/v1/pexels/search": () => ({ error: "Pexels is not configured" }) } }, status: "refused", summary: /^Error: Pexels search failed: Pexels is not configured$/ },
   },
+  gather_stock_footage_tool: {
+    happy: {
+      args: { queries: "coffee pour; latte art", count: "3" },
+      // Without frames: the near-duplicate look is covered in stock-gather.test.ts.
+      host: { routes: { "/api/v1/pexels/search": () => PEXELS }, without: ["frames"] },
+      // Both searches answer the same three videos: the portrait one is left out, the others are imported once each, round-robin.
+      summary: /^Imported 2 clip\(s\) from 2 search\(es\) \(skipped: 2 duplicate, 2 wrong orientation\):\n {2}file_id=\w+ {2}12s {2}1920×1080 {2}'coffee pour'\n {2}file_id=\w+ {2}20s {2}3840×2160 {2}'latte art'$/,
+      check: ({ doc, host, receipt }) => {
+        expect(host.calls.filter((c) => c.startsWith("importUrl"))).toEqual(["importUrl https://cdn.test/11-720.mp4", "importUrl https://cdn.test/12-720.mp4"]);
+        expect(doc.undoLabels.at(-1)).toBe("Gather stock footage (2)");
+        expect(receipt.warnings).toContain("Imported 2 of 3: the queries ran out of distinct clips. Add queries (other subjects, angles, places) for more.");
+      },
+    },
+    failure: {
+      args: { queries: ["coffee"] },
+      host: { routes: { "/api/v1/pexels/search": () => ({ error: "Pexels is not configured" }) } },
+      status: "refused",
+      summary: /^Error: no clip could be imported for 'coffee'\. Search 'coffee' failed: Pexels is not configured/,
+    },
+  },
   search_freesound_music_tool: {
     happy: {
       args: { query: "lofi", count: "2", min_seconds: "20" },
