@@ -28,6 +28,7 @@ const DIRECT_TOOLS = [
   "unify_grade_tool",
   "review_edit_tool",
   "review_render_tool",
+  "swap_shot_tool",
   "add_motion_template_tool",
   "kinetic_captions_tool",
   "list_sfx_tool",

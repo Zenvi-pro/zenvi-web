@@ -45,6 +45,17 @@ add_motion_block_tool {"block": "hud_callouts", "position_seconds": 0.2, "durati
    "cream"`, one accent (`accent: "#2340D6"`), `word_rotator` for "bake.
    crunch. share."; `pop` sounds allowed here.
 
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 4 above (`intensity: "hype"`, `density: "every_cut"`).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
+
 ## Checks
 
 Contact sheet reads as one designed system: one grid, one mono label size,

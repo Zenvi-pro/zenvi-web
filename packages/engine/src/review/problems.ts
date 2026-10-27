@@ -188,7 +188,8 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
         at: uses[0]!.start,
         times: uses.map((s) => s.start).slice(0, 8),
         message: `${uses[0]!.name} shows the same part of its source ${uses.length} times.`,
-        fix: "Use a different part of the clip or another clip for the repeats.",
+        fix: "Use a different part of the clip or another clip for the repeats: swap_shot_tool with each of `swaps`.",
+        shots: uses.slice(1).map((s) => s.index),
       });
     }
   }
@@ -214,7 +215,8 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
         at: soon[0]!.start,
         times: soon.map((s) => s.start).slice(0, 8),
         message: `${soon.length} shots bring a clip back within ${REUSE_GAP_SECONDS} s of its last shot (${names.slice(0, 4).join(", ")}${names.length > 4 ? ", …" : ""}).`,
-        fix: "Import more clips (about one per shot in any 3 s) and rebuild, or move the repeats at least 3 s apart.",
+        fix: "Swap the repeats for unused footage (swap_shot_tool with each of `swaps`), or import more clips (about one per shot in any 3 s) and rebuild.",
+        shots: soon.map((s) => s.index),
       });
     }
   }

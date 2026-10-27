@@ -105,6 +105,25 @@ export interface CaptionStyle {
 
 const POP: CaptionMotion = { enter: 0.2, fromScale: 0.55, fromY: 0, enterEase: "out_strong", exit: 0.1, toScale: 0.94, exitEase: "in" };
 const FADE_RISE: CaptionMotion = { enter: 0.3, fromScale: 1, fromY: 0.012, enterEase: "out", exit: 0.2, toScale: 1, exitEase: "in" };
+const SLIDE_UP: CaptionMotion = { enter: 0.3, fromScale: 1, fromY: 0.03, enterEase: "out_strong", exit: 0.15, toScale: 1, exitEase: "in" };
+
+export const CAPTION_ANIMATION_IDS = ["pop", "slam", "slide_up", "rise", "fade"] as const;
+export type CaptionAnimationId = (typeof CAPTION_ANIMATION_IDS)[number];
+
+/**
+ * Entrances a caption can take instead of its style's own, each the one a
+ * reference reel uses: pop (creator, Dc3mgNJO73W: from small, overshooting
+ * out), slam (hype titles: from big, landing hard in 4 frames, cut away),
+ * slide_up (stack, DekLMhxqrFE: up 3 % of the frame), rise (editorial: a
+ * soft rise and fade), fade (documentary).
+ */
+export const CAPTION_ANIMATIONS: Readonly<Record<CaptionAnimationId, { summary: string; motion: CaptionMotion }>> = {
+  pop: { summary: "scales up from half size with an overshoot", motion: { ...POP, enterEase: "out_back" } },
+  slam: { summary: "lands from 1.8x size in 4 frames, cuts away", motion: { enter: 0.13, fromScale: 1.8, fromY: 0, enterEase: "out_strong", exit: 0, toScale: 1, exitEase: "in" } },
+  slide_up: { summary: "slides up 3 % of the frame", motion: SLIDE_UP },
+  rise: { summary: "rises softly as it fades in", motion: FADE_RISE },
+  fade: { summary: "fades in place", motion: { enter: 0.2, fromScale: 1, fromY: 0, enterEase: "out", exit: 0.15, toScale: 1, exitEase: "in" } },
+};
 
 export const CAPTION_STYLES: Readonly<Record<CaptionStyleId, CaptionStyle>> = {
   creator: {
@@ -191,7 +210,7 @@ export const CAPTION_STYLES: Readonly<Record<CaptionStyleId, CaptionStyle>> = {
     measure: 0.5,
     reveal: "word",
     marker: false,
-    motion: { enter: 0.3, fromScale: 1, fromY: 0.03, enterEase: "out_strong", exit: 0.15, toScale: 1, exitEase: "in" },
+    motion: SLIDE_UP,
     spots: { portrait: [{ x: 0.3, y: 0.5 }, { x: 0.7, y: 0.5 }, { x: 0.3, y: 0.7 }], landscape: [{ x: 0.22, y: 0.5 }, { x: 0.78, y: 0.5 }] },
     punctuation: "strip",
     shadow: true,

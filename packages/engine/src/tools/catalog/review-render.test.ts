@@ -7,6 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 import type { RgbaImage } from "../../render/types.js";
+import { ProjectDocument } from "../../history/document.js";
+import { repeatedCut } from "../test-support/repeated-cut.js";
 import { runTool } from "../registry.js";
 import { EditHarness } from "../test-support/edit-harness.js";
 import { pixelFrameHost } from "../test-support/pixel-host.js";
@@ -82,6 +84,18 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
     expect(tiles.map((t) => t.flag)).toEqual([null, null, "REPEAT of #1", null, "BLACK", "ENDS ON BLACK"]);
     expect(result.images).toHaveLength(1);
     expect(result.images![0]!.mimeType).toBe("image/png");
+  });
+
+  it("hands back the swap that fixes a repeated shot when the render is of the open timeline", async () => {
+    const ed = painted();
+    ed.host.media!.inspectRender = async (path) => ({ ...inspection(path), black: [], frozen: [], cuts: [2, 4, 6].map((time) => ({ time, score: 40 })) });
+    const doc = new ProjectDocument(repeatedCut(["video"]));
+    const receipt = (await runTool({ doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
+    expect(receipt.summary).toContain('- 4.00s FILEAAAAAA.mp4 → FILEXTRA00.mp4 from 1.20s (unused clip): swap_shot_tool {"clip_id":"CLIPA00002","file_id":"FILEXTRA00","start_seconds":1.2}');
+    expect((receipt.data as Row).swaps).toHaveLength(1);
+    // A render of another edit (the harness's 19 s timeline): no swaps, rather than wrong ones.
+    const other = (await runTool({ doc: ed.doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
+    expect((other.data as Row).swaps).toBeNull();
   });
 
   it("is a clean bill when the render is fine, and refuses where there is no ffmpeg", async () => {

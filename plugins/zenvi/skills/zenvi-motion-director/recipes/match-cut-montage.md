@@ -25,8 +25,12 @@ other (dark round → dark round, warm → warm); end on the most iconic one
    circles.
    Look at each candidate (`inspect_media_tool` `fileId`, `overview: true`)
    and drop it unless one clear shape fills the middle: an ear, a label or
-   two circles break the chain. Each shape once or twice, never the same
-   file cycled five times.
+   two circles break the chain. **Each strong shot at most twice**: count the
+   uses per file in the receipt's shots; a file back three or more times
+   means add files (one more search per shape) or lower `duration_seconds`,
+   then rerun with `replace: true`. The tool runs the chain back and forth
+   rather than looping it; still vary `file_ids` so the strongest match
+   (eye, sun) sits at the payoff, not in every pass.
 2. Subjects: give **every** file a box in `subjects`. Circles:
    `detect_subject_tool` (`file_id`, `time`) and keep the candidate that is
    the subject. Poses and heads: read the person's box off
@@ -54,16 +58,27 @@ match_cut_montage_tool {
 
    Its receipt has the beats and the shots; it already aligns every shot
    (`cover: zoom_all`) and puts white flashes on downbeats.
-4. Grade: `apply_look_tool` `look_id: "teal_&_orange_cinema"` (or
-   `"warm_cinema"`), `all_clips: true`, `lut_intensity: 0.6`, `grain_preset:
-   "35mm_fine"` (give `grain_preset` alone: `stack_grain: true` wins and
-   picks 35mm_classic).
-5. Sound: `auto_sound_design_tool` `intensity: "hype"` with the receipt's
-   `beats`. It puts a hit or whoosh on nearly every cut; check with
+4. Grade, on matched plates: `unify_grade_tool` `{"look":
+   "teal_&_orange_cinema", "look_intensity": 0.6}` (or `"warm_cinema"`), so
+   the moon and the cup sit in one world; then grain only: `apply_look_tool`
+   `all_clips: true`, `look_id: "grain:35mm_fine"`.
+5. Sound: `auto_sound_design_tool` `intensity: "hype"`, `density:
+   "every_cut"`, with the receipt's `beats`. It puts a hit or whoosh on nearly every cut; check with
    `get_timeline_state_tool` that the opening pose pair has a
    `whoosh_medium` and the payoff an `impact_boom`.
 6. Optional: a small title on the payoff (`add_title_tool` `font: "Instrument
    Serif"`, `font_style: "italic"`), 2-3 words, never over the subject.
+
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 5 above (`density: "every_cut"`).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
 
 ## Checks
 

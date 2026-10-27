@@ -52,15 +52,18 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
    cut (the first bar line from 2/3 in), `flash_invert` and `glitch`
    alternating on the bar lines after it (`track`, `time`); white flashes
    only where a section starts. Never two accents on neighbouring cuts.
-4. Look: `apply_look_tool` `look_id: "dreamy_cinema"` or `"night_glow"`,
-   `all_clips: true`, `lut_intensity: 0.6`, grain `35mm_gritty`; then a glow:
+4. Look, on matched plates: `unify_grade_tool` `{"look": "dreamy_cinema",
+   "look_intensity": 0.6}` (or `"night_glow"`) first, so a bright still and a
+   dark one stop jumping at 4 frames a shot; then grain only:
+   `apply_look_tool` `all_clips: true`, `look_id: "grain:35mm_gritty"`; then a glow:
    `add_effect_tool` `effect: "Glow"` `scope: "all"` (check the frame: bloom
    on highlights, not a white wash).
 5. End title (1-2 words): `add_title_tool` `text: "THE END"`, `font: "Instrument Serif"` (or `"Anton"` for a harder edit),
    `font_scale: 1.6`, `fade_in_seconds: 0.4`, plus `add_effect_tool` Glow on
    that clip. Or `add_motion_block_tool` `block: "kinetic_headline"` with
    `style: "blur"`, `palette: "dark"`, `display_font: "serif"`.
-6. Sound: `auto_sound_design_tool` `intensity: "hype"`, beats from the
+6. Sound: `auto_sound_design_tool` `intensity: "hype"`, `density:
+   "every_cut"` (a click or hit on every new image), beats from the
    receipt. Then `add_sfx_tool` `recipe: "riser_noise"` ending at the title
    (`align: "peak"`, `at_seconds` = title start) and `impact_boom` on it.
 
@@ -68,6 +71,17 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
    `repeated-footage` (more images, then rerun the cut with `replace: true`)
    and `long-hold` (nothing but the first shot and the end title over
    0.5 s). Call it again until no `high` or `medium` problem is left.
+
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 6 above (`auto_sound_design_tool` `intensity: "hype"`, `density: "every_cut"`).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
 
 ## Checks
 

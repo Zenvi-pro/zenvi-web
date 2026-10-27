@@ -6,7 +6,7 @@
  * are render seconds: the render starts at the link's `source.start` and
  * runs `stretch` times slower when the stack slows down. A clip's
  * informational `duration` is left alone so unlinking restores it exactly.
- * Keyframes count reader frames (see `moveKeyframes`), so they move with
+ * Keyframes count reader frames (see `moveKeyframes` in internal.ts), so they move with
  * the reader too.
  */
 
@@ -14,11 +14,11 @@ import type { Transaction } from "../history/document.js";
 import { FX_LINK_KEY, readFxLink, type FxLink } from "../fx/link.js";
 import { clipsUsingFile } from "../model/query.js";
 import { pyRound } from "../model/rounding.js";
-import type { Clip, Keyframe, ProjectFile } from "../model/types.js";
+import type { Clip, ProjectFile } from "../model/types.js";
 import type { ImportedMedia } from "../tools/types.js";
 import { invalid, requireFile, requireUnlocked } from "./errors.js";
 import { addFile } from "./files.js";
-import { mapKeyframesDeep, patchClip, rateOf, requireEditableClip } from "./internal.js";
+import { moveKeyframes, patchClip, rateOf, requireEditableClip } from "./internal.js";
 
 export interface LinkFxRenderInput {
   clipId: string;
@@ -91,32 +91,6 @@ export function unlinkFxRender(tx: Transaction, fileId: string, stretch: number)
   }
   tx.delete(["files", { id: fileId }]);
   return clips.map((c) => requireEditableClip(tx.project, c.id));
-}
-
-/**
- * A clip's keyframe X is a frame of its reader counted from the reader's
- * first frame (the first one shown is round(start * fps) + 1; zenvi-core
- * editor_tools/clip_props_model.py ClipTime), and a time curve's Y is a
- * reader frame too. Every curve on the clip and its effects goes through
- * `frame` when the reader changes under it; points that land on one frame
- * collapse, last one wins, as libopenshot loads them.
- */
-function moveKeyframes(clip: Clip, frame: (x: number) => number): Partial<Clip> {
-  const move = (kf: Keyframe, values: boolean): Keyframe => {
-    // One point holds its value at every frame (and libopenshot ignores a one-point time curve).
-    if (kf.Points.length < 2) return kf;
-    const points = new Map<number, Keyframe["Points"][number]>();
-    for (const p of kf.Points) {
-      const x = frame(Number(p.co.X));
-      points.set(x, { ...p, co: { ...p.co, X: x, ...(values ? { Y: frame(Number(p.co.Y)) } : {}) } });
-    }
-    return { ...kf, Points: [...points.values()] };
-  };
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(clip)) {
-    if (key !== "reader") out[key] = mapKeyframesDeep(value, (kf) => move(kf, key === "time"));
-  }
-  return out as Partial<Clip>;
 }
 
 /** Source seconds as the 0-based frame keyframes count them in. */
