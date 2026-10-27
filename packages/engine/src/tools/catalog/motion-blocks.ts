@@ -154,11 +154,11 @@ const updateInput = z.strictObject({
  * short names the blocks that do fit (bench round 3: glass_cards at 2.2 s
  * was refused with no way forward).
  */
-function durationProblem(block: { id: string; duration: { min: number; max: number } }, asked: number, all: readonly { id: string; duration: { min: number } }[]): string | null {
+function durationProblem(block: { id: string; duration: { min: number; max: number } }, asked: number, all: readonly { id: string; duration: { min: number; max: number } }[]): string | null {
   const { min, max } = block.duration;
   if (asked > max) return `Error: ${block.id} runs ${min}-${max} s (got ${asked}). Give duration_seconds of at most ${max}.`;
   if (asked >= min) return null;
-  const fits = all.filter((b) => b.id !== block.id && b.duration.min <= asked).map((b) => b.id);
+  const fits = all.filter((b) => b.id !== block.id && b.duration.min <= asked && asked <= b.duration.max).map((b) => b.id);
   return (
     `Error: ${block.id} runs ${min}-${max} s (got ${asked}): its entrances, its action and a beat to read the result need ${min} s at least. ` +
     `Give duration_seconds of ${min} or more${fits.length > 0 ? `, or use a block that fits ${asked} s: ${fits.slice(0, 8).join(", ")}` : ""}.`

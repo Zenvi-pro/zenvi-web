@@ -86,7 +86,12 @@ describe("motion block tools", () => {
   it("says why a block cannot run that short and which blocks fit the slot", async () => {
     const doc = project();
     const motion = fakeMotionHost();
-    motion.blocks = () => [FAKE_MOTION_BLOCK, { ...FAKE_MOTION_BLOCK, id: "counter", duration: { default: 2, min: 1, max: 6 } }];
+    motion.blocks = () => [
+      FAKE_MOTION_BLOCK,
+      { ...FAKE_MOTION_BLOCK, id: "counter", duration: { default: 2, min: 1, max: 6 } },
+      // Starts early enough but cannot run 1.2 s: not offered.
+      { ...FAKE_MOTION_BLOCK, id: "blink", duration: { default: 0.8, min: 0.5, max: 1 } },
+    ];
     const result = await runTool({ doc, host: host(motion) }, "add_motion_block_tool", { block: "kinetic_headline", duration_seconds: 1.2 });
     expect(result.data?.summary).toBe(
       "Error: kinetic_headline runs 1.5-10 s (got 1.2): its entrances, its action and a beat to read the result need 1.5 s at least. Give duration_seconds of 1.5 or more, or use a block that fits 1.2 s: counter.",
