@@ -5,7 +5,7 @@ import { makeTempDir, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig, type ZenviConfig } from "../config.js";
 import { deviceLogin, DEVICE_GRANT } from "./device.js";
-import { Auth } from "./session.js";
+import { Auth, PAT_BACKEND_MESSAGE } from "./session.js";
 import { authFile, readAuth } from "./store.js";
 import { browserLogin } from "./supabase.js";
 
@@ -117,6 +117,50 @@ describe("session refresh", () => {
     expect(await auth.whoami()).toMatchObject({ loggedIn: true, kind: "pat", email: "p@q.r" });
     expect(await auth.logout()).toBe(true);
     expect(await auth.whoami()).toEqual({ loggedIn: false });
+  });
+});
+
+describe("what the sign-in enables", () => {
+  const enabled = (features: Array<{ name: string; enabled: boolean }>) => features.filter((f) => f.enabled).map((f) => f.name);
+
+  it("refuses the backend up front for a personal token, and turns off the AI features", async () => {
+    const cfg = config();
+    const auth = new Auth(cfg);
+    await auth.save({ kind: "pat", token: "zvn_pat_abc", saved_at: "x" });
+    expect(await auth.backendUnavailable()).toBe(PAT_BACKEND_MESSAGE);
+    const features = await auth.features();
+    expect(enabled(features)).toEqual(["Local editing and rendering", "Zenvi Cloud (push, pull, share links)"]);
+    expect(features.find((f) => f.name === "AI voice (text to speech)")?.fix).toMatch(/zenvi login/);
+  });
+
+  it("refuses the backend for a stored session whose token is not a JWT", async () => {
+    const auth = new Auth(config());
+    await auth.save({ kind: "supabase", access_token: "zvn_pat_abc", refresh_token: "r", expires_at: 4_000_000_000, saved_at: "x" });
+    expect(await auth.backendUnavailable()).toMatch(/not a session token/);
+  });
+
+  it("enables everything for a Supabase session", async () => {
+    const auth = new Auth(config());
+    await auth.save({ kind: "supabase", access_token: jwt({ exp: 4_000_000_000 }), refresh_token: "r", saved_at: "x" });
+    expect(await auth.backendUnavailable()).toBeUndefined();
+    expect((await auth.features()).every((f) => f.enabled)).toBe(true);
+  });
+
+  it("an expired session whose refresh was refused turns Cloud and the AI features off", async () => {
+    const cfg = config();
+    await new Auth(cfg).save({ kind: "supabase", access_token: jwt({ exp: 1 }), refresh_token: "bad", saved_at: "x" });
+    handler = (_req, _body, res) => json(res, 400, { error: "invalid_grant" });
+    const features = await new Auth(cfg).features();
+    expect(enabled(features)).toEqual(["Local editing and rendering"]);
+    expect(features.find((f) => f.name === "AI voice (text to speech)")?.fix).toMatch(/expired.*zenvi login/);
+  });
+
+  it("signed out: only local editing is on, and the fix is to log in; the backend is left to answer", async () => {
+    const cfg = config();
+    await new Auth(cfg).logout();
+    const auth = new Auth(cfg);
+    expect(await auth.backendUnavailable()).toBeUndefined();
+    expect(enabled(await auth.features())).toEqual(["Local editing and rendering"]);
   });
 });
 
