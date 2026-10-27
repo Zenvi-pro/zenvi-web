@@ -162,6 +162,10 @@ describe("add_3d_scene_tool", () => {
     expect(requests[4]!.files).toEqual({});
     expect((dataOf(product) as { params: { product: string } }).params.product).toBe("player");
     expect(doc.undoLabels).toEqual(["Add 3D model_showcase", "Add 3D logo_extrude", "Add 3D logo_extrude", "Add 3D card_stack", "Add 3D model_showcase"]);
+    // Clip titles: the file's name, the word, the counter's last figure as it shows.
+    const counter = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "numerals_3d", params: { values: [0, 5], decimals: 1, prefix: "$", suffix: "M" } });
+    const titles = [model, logo, word, counter].map((r) => doc.project.clips.find((c) => c.id === (dataOf(r) as { timeline_clip_id: string }).timeline_clip_id)!.title);
+    expect(titles).toEqual(["3D engine.glb", "3D mark.svg", "3D Zenvi", "3D $5.0M"]);
   });
 
   it("refuses model formats Blender cannot import and a transparent terrain before rendering", async () => {

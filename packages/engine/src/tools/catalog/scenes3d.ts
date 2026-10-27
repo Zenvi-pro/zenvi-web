@@ -178,7 +178,11 @@ function clipTitle(scene: Scene3dId, params: Scene3dParams): string {
   if (typeof p.text === "string") return `3D ${p.text}`;
   const file = typeof p.svg === "string" ? p.svg : typeof p.model === "string" ? p.model : undefined;
   if (file) return `3D ${file.split(/[\\/]/).pop()}`;
-  if (Array.isArray(p.values) && p.values.length > 0) return `3D ${String(p.values[p.values.length - 1])}${typeof p.suffix === "string" ? p.suffix : ""}`;
+  if (Array.isArray(p.values) && p.values.length > 0) {
+    // As the counter shows it (numerals_3d.py formats every value with the same decimals).
+    const last = Number(p.values[p.values.length - 1]).toFixed(Number(p.decimals) || 0);
+    return `3D ${typeof p.prefix === "string" ? p.prefix : ""}${last}${typeof p.suffix === "string" ? p.suffix : ""}`;
+  }
   return SCENE3D_INFO[scene].title;
 }
 
