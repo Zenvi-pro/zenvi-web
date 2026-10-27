@@ -1,5 +1,6 @@
 """model_showcase: the user's 3D model (.glb/.gltf/.obj/.fbx/.stl/.ply),
-centred, standing on the floor and framed, on a turntable or with the
+or a generic product (zenvi3d/products.py), centred, standing on the floor
+and framed, on a turntable or with the
 camera orbiting or pushing in; studio, low-key or table-top staging, in its
 own materials, clay or chrome, or as an x-ray / wireframe."""
 
@@ -9,7 +10,7 @@ import os
 import bpy
 from mathutils import Matrix, Vector
 
-from zenvi3d import camera, core, lights, materials, motion, shapes
+from zenvi3d import camera, core, lights, materials, motion, products, shapes
 
 IMPORTERS = {
     ".glb": lambda f: bpy.ops.import_scene.gltf(filepath=f),
@@ -189,7 +190,11 @@ def override(objects, mat):
 def build(job):
     p = job["params"]
     fps, frames = job["fps"], job["frames"]
-    objects = import_model(job["files"]["model"])
+    if p.get("model"):
+        objects = import_model(job["files"]["model"])
+    else:
+        given = {k: p[k] for k in ("color", "accent") if p.get(k)}
+        objects = products.PRODUCTS[p.get("product", "player")](**given)
     pivot, radius, width, height = normalise(objects)
     dark = core.is_dark(job)
     look = p.get("look", "solid")

@@ -43,7 +43,7 @@ const addInput = z.strictObject({
   params: z
     .record(z.string(), z.unknown())
     .optional()
-    .describe("The scene's params (list_3d_scenes_tool lists each scene's). title_3d needs text; cube_cut needs from_clip_id and to_clip_id; model_showcase needs model (a file path); media are bin file ids (file_id, file_ids)."),
+    .describe("The scene's params (list_3d_scenes_tool lists each scene's). title_3d needs text; cube_cut needs from_clip_id and to_clip_id; model_showcase takes model (a file path; without it a generic product); media are bin file ids (file_id, file_ids)."),
   position_seconds: z.number().min(0).optional().describe("Timeline start, seconds (default 0; cube_cut: centred on the cut)."),
   duration_seconds: z.number().min(0.2).max(15).optional().describe("Length (default per scene, list_3d_scenes_tool defaultSeconds: titles, logos, counters 3 s; cube_cut 0.8 s; burst 2 s; others 3-4 s)."),
   quality: quality.optional(),
@@ -204,7 +204,7 @@ export const scenes3dTools: CatalogTool[] = [
     description:
       "Render a Zenvi 3D scene with Blender and place it on the timeline in one undo step: an extruded chrome/glass title tumbling in, a phone/tablet/laptop playing a bin video while the camera glides, " +
       "cards floating in depth with depth of field, an icon cube that spins and explodes, a 3D cube turn between two clips (cube_cut, placed over their cut), a glass/chrome hero object, a confetti/sparks/shards burst, " +
-      "the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model on a turntable or in x-ray (model_showcase), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack). " +
+      "the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model or a generic music player / speaker on a turntable, landing on a table, or in x-ray (model_showcase), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack). " +
       "Transparent scenes render with alpha (ProRes 4444) and go on the lowest free track above the video; with background dark/light/#rrggbb they are opaque full-frame. " +
       "Use quality=draft (seconds) to check the look with preview_frame, then rerender_3d_scene_tool quality=final. list_3d_scenes_tool lists every param.",
     input: addInput,

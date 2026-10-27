@@ -15,7 +15,7 @@ animation are made by the bpy scripts at render time.
 | `glass_hero` | morphing glass blob, torus, linked rings or sphere cluster in gradient light |
 | `particle_burst` | confetti, glowing sparks (bloom) or glass shards |
 | `logo_extrude` | the user's SVG logo (or a word) extruded and bevelled: chrome, glass, plastic, matte, clay or its own fill colours; tumbles in or its pieces assemble, settles square to the camera |
-| `model_showcase` | the user's `.glb/.gltf/.obj/.fbx/.stl/.ply` centred, stood on the floor, framed; turntable, orbit or push-in; studio, dark or table-top staging; own materials, clay, chrome, x-ray or wireframe |
+| `model_showcase` | the user's `.glb/.gltf/.obj/.fbx/.stl/.ply` (or a generic music player / smart speaker, `zenvi3d/products.py`) centred, stood on the floor, framed; turntable, orbit or push-in; studio, dark or table-top staging; own materials, clay, chrome, x-ray or wireframe |
 | `numerals_3d` | a huge extruded counter whose digits roll like an odometer (motion blur) through a list of values, with prefix and unit suffix |
 | `terrain_glide` | full-frame backdrop: a low camera glide over grass (geometry-node tufts in the wind), sand dunes or snow, toward a low sun, with haze |
 | `card_stack` | cards or paper (bin photos on them) tumble down onto a loose stack with real soft shadows, or land and fan out |

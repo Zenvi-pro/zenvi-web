@@ -156,7 +156,12 @@ describe("add_3d_scene_tool", () => {
     const cards = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "card_stack", params: { file_ids: [IDS.logo, IDS.broll] } });
     expect(cards.ok, cards.text).toBe(true);
     expect(Object.keys(requests[3]!.media)).toEqual(["card0", "card1"]);
-    expect(doc.undoLabels).toEqual(["Add 3D model_showcase", "Add 3D logo_extrude", "Add 3D logo_extrude", "Add 3D card_stack"]);
+    // No model file: the generic product, nothing to resolve.
+    const product = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "model_showcase", params: { stage: "table", land: true } });
+    expect(product.ok, product.text).toBe(true);
+    expect(requests[4]!.files).toEqual({});
+    expect((dataOf(product) as { params: { product: string } }).params.product).toBe("player");
+    expect(doc.undoLabels).toEqual(["Add 3D model_showcase", "Add 3D logo_extrude", "Add 3D logo_extrude", "Add 3D card_stack", "Add 3D model_showcase"]);
   });
 
   it("refuses model formats Blender cannot import and a transparent terrain before rendering", async () => {
@@ -165,8 +170,6 @@ describe("add_3d_scene_tool", () => {
     const usdz = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "model_showcase", params: { model: "chair.usdz" } });
     expect(usdz.ok).toBe(false);
     expect(usdz.text).toContain("Error: model_showcase params: model: give a .glb / .gltf / .obj / .fbx / .stl / .ply file.");
-    const noModel = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "model_showcase", params: {} });
-    expect(noModel.text).toContain("model:");
     const sky = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "terrain_glide", params: { background: "transparent" } });
     expect(sky.ok).toBe(false);
     expect(sky.text).toContain("background:");
