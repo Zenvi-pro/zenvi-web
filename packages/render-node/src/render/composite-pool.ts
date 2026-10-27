@@ -37,11 +37,11 @@ const WORKER_OVERHEAD_BYTES = 96 * 1024 * 1024;
 const WORKER_MEMORY_SHARE = 0.25;
 /** Renders shorter than this composite on the main thread (worker start-up costs more). */
 const MIN_POOL_FRAMES = 60;
-const MAX_THREADS = 4;
+const MAX_THREADS = 8;
 
 /**
  * Worker threads for a render of `frames` frames: `ZENVI_RENDER_THREADS`
- * when set (0 disables the pool), else up to 4, one core left for the main
+ * when set (0 disables the pool), else up to 8, one core left for the main
  * thread, ffmpeg and the encoder. In a container the CPU quota and the
  * memory limit bound it too, so a small one composites on the main thread.
  */

@@ -517,6 +517,37 @@ const api = {
     };
   },
 
+  /**
+   * Fast cuts: 5-frame shots that jump around two files (one with a single
+   * keyframe), so each cut seeks. Returns each exported frame's code and the
+   * source frame the timeline shows there.
+   */
+  async exportCuts() {
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob: await file("codes.webm") });
+    media.register("gop", { kind: "blob", blob: await file("codesgop.webm") });
+    const starts = [40, 3, 25, 50, 10, 33, 18, 45];
+    const shot = 5;
+    const project = makeProject(
+      starts.map((s, k) =>
+        videoClip({ id: `S${k}`, fileId: k % 2 ? "gop" : "codes", path: k % 2 ? "codesgop.webm" : "codes.webm", position: (k * shot) / 30, start: s / 30, end: (s + shot) / 30 }),
+      ),
+    );
+    const frames = starts.length * shot;
+    const blob = await exportProject(project, media, { format: "webm", width: 160, height: 90, fps: { num: 30, den: 1 }, quality: "lossless" }, { engine: testEngine });
+    media.register("out", { kind: "blob", blob, name: "out.webm" });
+    const reader = new FrameProvider({ media });
+    const codes: number[] = [];
+    for (let k = 1; k <= frames; k += 1) {
+      const picture = await reader.frame({ ref: { fileId: "out" }, sourceTime: (k - 1) / 30, width: 160, height: 90, lane: "o", mode: "sequential" });
+      codes.push(picture ? codeOf(picture.image) : -1);
+      picture?.release();
+    }
+    await reader.dispose();
+    media.dispose();
+    return { codes, expected: Array.from({ length: frames }, (_, i) => starts[Math.floor(i / shot)]! + (i % shot)) };
+  },
+
   /** Streaming export into an OPFS file (and reading it back through an `opfs` source). */
   async exportToOpfs(cancel: boolean) {
     const media = new MediaRegistry();

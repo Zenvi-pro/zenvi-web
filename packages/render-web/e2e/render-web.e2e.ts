@@ -141,6 +141,11 @@ test("export produces a playable file of the right length whose frames match the
   }
 });
 
+test("an export of fast cuts shows each shot's exact frames (decoded ahead of the cut)", async ({ page }) => {
+  const result = await page.evaluate(() => window.harness.exportCuts());
+  expect(result.codes).toEqual(result.expected);
+});
+
 test("export streams into an OPFS file, and a cancelled one leaves no partial file", async ({ page }) => {
   const done = await page.evaluate(() => window.harness.exportToOpfs(false));
   expect(done.ok, done.message).toBe(true);

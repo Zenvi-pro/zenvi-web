@@ -235,16 +235,50 @@ export class VideoDecoder {
     }
   }
 
+  private clamp(index: number): number {
+    let target = Math.max(0, Math.floor(index));
+    const count = this.source.frameCount;
+    if (count !== undefined && count > 0 && target >= count) target = count - 1;
+    if (this.endFrame !== undefined && target >= this.endFrame) target = Math.max(0, this.endFrame - 1);
+    return target;
+  }
+
+  /**
+   * Whether `frame(index)` would read forward on the running stream (no
+   * restart): what lets the next clip of the same file take this decoder
+   * over where the last one stopped.
+   */
+  readsForwardTo(index: number): boolean {
+    const target = this.clamp(index);
+    return this.stream !== undefined && !this.stream.done && target >= this.stream.position && target - this.stream.position <= this.maxSkip;
+  }
+
+  /** Drop the recent frames kept for backward steps (a decoder parked between clips needs none). */
+  dropCache(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Start decoding at source frame `index` before it is asked for, so the
+   * ffmpeg start-up and seek overlap other work (a render's next shots).
+   * Does nothing once a stream is running.
+   */
+  prime(index: number): void {
+    if (this.stream || this.options.signal?.aborted) return;
+    this.stream = new VideoFrameStream(this.source, this.clamp(index), this.size, {
+      quality: this.options.quality,
+      signal: this.options.signal,
+    });
+    this.restarts += 1;
+  }
+
   /**
    * RGBA of source frame `index` (0-based at the reader frame rate), clamped
    * to the last decodable frame like libopenshot clamps requested frames.
    */
   async frame(index: number): Promise<RgbaImage> {
     if (this.options.signal?.aborted) throw new AbortedError();
-    let target = Math.max(0, Math.floor(index));
-    const count = this.source.frameCount;
-    if (count !== undefined && count > 0 && target >= count) target = count - 1;
-    if (this.endFrame !== undefined && target >= this.endFrame) target = Math.max(0, this.endFrame - 1);
+    const target = this.clamp(index);
     const cached = this.cache.get(target);
     if (cached) return rgbaView(cached, this.size.width, this.size.height);
 
