@@ -634,7 +634,7 @@ const compress = directTool({
     if (typeof targets === "string") return targets;
     const remove = args.preset === "none";
     const base = COMPRESS_PRESETS[args.preset && args.preset !== "none" ? args.preset : "voice"];
-    if (!args.preset && args.threshold_db === undefined && args.ratio === undefined) return "Error: pass a preset or at least threshold_db and ratio.";
+    if (!args.preset && args.threshold_db === undefined && args.ratio === undefined) return "Error: pass a preset, or threshold_db and / or ratio (the rest default to the voice preset's).";
     const d: Dynamics = {
       threshold_db: args.threshold_db ?? base.threshold_db,
       ratio: args.ratio ?? base.ratio,
