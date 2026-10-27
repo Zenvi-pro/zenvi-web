@@ -7,15 +7,17 @@
  * People and models ask in words ("vertical 1080p 30", "4k 24", "square"), so
  * a request is resolved in this order:
  *   1. an exact profile key or description (a legacy one maps to its current twin);
- *   2. intent words: orientation (vertical/portrait/9:16, square/1:1, 4:5),
+ *   2. a social preset name ("instagram_reel", "tiktok", "shorts", "youtube",
+ *      "square_post": the engine's `socialPreset`) at 30 fps;
+ *   3. intent words: orientation (vertical/portrait/9:16, square/1:1, 4:5),
  *      resolution (4K/UHD/2160p, 1440p, 1080p/FHD, 720p/HD, 480p/SD, or WxH)
  *      and frame rate (24, 25, 29.97, 30, 50, 59.94, 60 …);
- *   3. otherwise an error listing close profiles — never a guess.
+ *   4. otherwise an error listing close profiles — never a guess.
  * Progressive profiles always win; interlaced ones only when asked for
  * ("1080i", "interlaced", or their exact name).
  */
 
-import { type Fraction, findProfile, PROFILES, type Profile } from "@zenvi/engine";
+import { type Fraction, findProfile, PROFILES, type Profile, socialProfile } from "@zenvi/engine";
 
 export const PROJECT_FORMATS = ["landscape_1080p", "landscape_720p", "landscape_4k", "vertical_1080p", "square_1080p"] as const;
 export type ProjectFormat = (typeof PROJECT_FORMATS)[number];
@@ -24,7 +26,7 @@ export type ProjectFormat = (typeof PROJECT_FORMATS)[number];
 export const PROJECT_FPS = [23.976, 24, 25, 29.97, 30, 50, 59.94, 60] as const;
 
 export const PROFILE_SHORTHANDS =
-  'an exact desktop profile name ("FHD Vertical 1080p 30 fps") or words: orientation (vertical, portrait, 9:16, square, 1:1, 4:5, landscape), resolution (4k, 1440p, 1080p, 720p, 480p, or 1920x1080) and frame rate (24, 25, 29.97, 30, 50, 59.94, 60), e.g. "vertical 1080p 30", "square", "4k 24", "720p 60"';
+  'an exact desktop profile name ("FHD Vertical 1080p 30 fps") or words: orientation (vertical, portrait, 9:16, square, 1:1, 4:5, landscape), resolution (4k, 1440p, 1080p, 720p, 480p, or 1920x1080) and frame rate (24, 25, 29.97, 30, 50, 59.94, 60), e.g. "vertical 1080p 30", "square", "4k 24", "720p 60", or a social preset name (instagram_reel, tiktok, youtube_shorts, youtube, square_post)';
 
 const SIZES: Record<ProjectFormat, { width: number; height: number }> = {
   landscape_1080p: { width: 1920, height: 1080 },
@@ -128,6 +130,9 @@ export function resolveProfile(request: string): ProfileChoice {
   if (exact) return { ok: true, profile: current(exact) };
   const format = PROJECT_FORMATS.find((f) => f === text.toLowerCase());
   if (format) return profileFor(format, 30);
+  // Social preset names ("instagram_reel", "shorts", "youtube", "square_post"), at 30 fps.
+  const social = socialProfile(text);
+  if (social) return { ok: true, profile: current(findProfile(social.description) ?? social) };
 
   // "1080p60" / "4k30" are a size and a rate.
   const lower = ` ${text.toLowerCase().replace(/[_,]/g, " ").replace(/(\d{3,4}[pi]|[48]k)(\d{2,3})\b/g, "$1 $2")} `;
