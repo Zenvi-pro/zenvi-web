@@ -4,14 +4,22 @@
  * to a panned stereo WAV and the clip plays that (ops/pan.ts): parity-safe,
  * the desktop plays the same file (zenvi-motion sound/DEPLOY.md S3.5).
  *
- * Pan law: constant power, sin/cos of (pan + 1) * pi / 4 on the source's
- * mono sum, times sqrt(2) so the loudness of a centred render equals the
- * unpanned clip (each side is -3 dB re a hard pan). A render that would pass
+ * Pan law: a constant-power balance, sin/cos of (pan + 1) * pi / 4 on each
+ * channel (a stereo source stays stereo; a mono one is placed), times
+ * sqrt(2) so a centred render equals the unpanned clip (each side is -3 dB
+ * re a hard pan). Keyframed pans follow the clip's `time` curve (speed and
+ * remaps: libopenshot Clip::GetFrame reads source frame `time.GetLong(n)`),
+ * so the pan lands where each source frame is heard; a source frame heard
+ * twice takes the pan of its last showing. A render that would pass
  * full scale is scaled down and the clip's gain raised by the same amount;
  * the mark records that raise, so a re-pan or pan 0 takes it back first.
  */
 
 import { z } from "zod";
+import { CompiledKeyframe } from "../../keyframe/evaluate.js";
+import type { KeyframeLike } from "../../keyframe/points.js";
+import type { Clip } from "../../model/types.js";
+import { fpsFloatOf } from "./common.js";
 import { encodeWav } from "../../io/wav.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { linkPanRender, panSourceFile, readPanMark, unlinkPanRender, type PanMark } from "../../ops/pan.js";
@@ -52,6 +60,31 @@ function panAt(mark: PanMark, t: number): number {
   return pts[pts.length - 1]!.pan;
 }
 
+/**
+ * The pan of each source second. Without a remap a source second plays at
+ * `s - start + position`; with a `time` curve, clip frame k (1-based, the
+ * volume curve's numbering) plays source frame time(k), heard at timeline
+ * `position + (k - 1) / fps - start`.
+ */
+function sourcePans(clip: Clip, mark: PanMark, fps: number, seconds: number): (s: number) => number {
+  const position = Number(clip.position) || 0;
+  const start = Number(clip.start) || 0;
+  if (!mark.points || mark.points.length === 0) return () => mark.pan ?? 0;
+  const time = clip.time as { Points?: unknown[] } | undefined;
+  if (!time?.Points || time.Points.length <= 1) return (s) => panAt(mark, s - start + position);
+  const curve = new CompiledKeyframe(time as KeyframeLike);
+  const frames = Math.ceil(seconds * fps) + 1;
+  const pans = new Float32Array(frames + 1);
+  for (let f = 1; f <= frames; f += 1) pans[f] = panAt(mark, (f - 1) / fps - start + position);
+  const first = Math.round(start * fps) + 1;
+  const last = Math.round((Number(clip.end) || 0) * fps) + 1;
+  for (let k = first; k <= last; k += 1) {
+    const source = curve.long(k);
+    if (source >= 1 && source <= frames) pans[source] = panAt(mark, position + (k - first) / fps);
+  }
+  return (s) => pans[Math.min(frames, Math.max(1, Math.floor(s * fps) + 1))]!;
+}
+
 function sameMark(a: PanMark | undefined, b: PanMark): boolean {
   return Boolean(a) && JSON.stringify({ pan: a!.pan, points: a!.points }) === JSON.stringify({ pan: b.pan, points: b.points });
 }
@@ -63,7 +96,7 @@ export const panTools: CatalogTool[] = [
     description:
       "Pan audio clips (sound effects, music, VO files) left or right, constant or keyframed over time so a whoosh travels with the motion. " +
       "Renders the clip's sound to a panned stereo WAV the clip then plays (libopenshot has no pan), keeping its trim, position and volume; pan 0 puts the original back. " +
-      "Constant-power law, loudness unchanged at centre. Keep heroes within +-0.6 (mono phones). One undo step. Audio-only clips only: split a video's sound off first.",
+      "Constant-power balance (stereo sources stay stereo), loudness unchanged at centre, following speed changes and time remaps. Keep heroes within +-0.6 (mono phones). One undo step. Audio-only clips only: split a video's sound off first.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["audio", "media"],
@@ -74,6 +107,7 @@ export const panTools: CatalogTool[] = [
       if (args.pan === undefined && args.points === undefined) return "Error: pass pan or points.";
       if (args.points && args.points.some((p, i) => i > 0 && p.t <= args.points![i - 1]!.t)) return "Error: points must be in increasing time.";
       const project = call.doc.project;
+      const fps = fpsFloatOf(project);
       const targets = resolveTargets(project, args);
       if (typeof targets === "string") return targets;
       const video = targets.find((t) => !isAudioOnlyMedia(panSourceFile(project, t.clip) ?? {}));
@@ -104,14 +138,12 @@ export const panTools: CatalogTool[] = [
           const n = pcm.samples.length;
           const left = new Float32Array(n);
           const rightOut = new Float32Array(n);
-          const position = Number(job.entry.clip.position) || 0;
-          const start = Number(job.entry.clip.start) || 0;
+          const panOf = sourcePans(job.entry.clip, job.mark, fps, n / pcm.sampleRate);
           let peak = 0;
           for (let i = 0; i < n; i += 1) {
-            const mono = (pcm.samples[i]! + right[i]!) / 2;
-            const theta = ((panAt(job.mark, i / pcm.sampleRate - start + position) + 1) * Math.PI) / 4;
-            left[i] = Math.SQRT2 * mono * Math.cos(theta);
-            rightOut[i] = Math.SQRT2 * mono * Math.sin(theta);
+            const theta = ((panOf(i / pcm.sampleRate) + 1) * Math.PI) / 4;
+            left[i] = Math.SQRT2 * pcm.samples[i]! * Math.cos(theta);
+            rightOut[i] = Math.SQRT2 * right[i]! * Math.sin(theta);
             peak = Math.max(peak, Math.abs(left[i]!), Math.abs(rightOut[i]!));
           }
           let compensateDb = 0;

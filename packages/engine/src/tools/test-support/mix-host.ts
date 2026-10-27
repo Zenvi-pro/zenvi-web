@@ -36,8 +36,13 @@ export const SOURCES: Record<string, Float32Array> = {
   "hot.wav": click.map((x, _i, a) => (x * 0.95) / a.reduce((m, y) => Math.max(m, Math.abs(y)), 0)),
 };
 
+/** Stereo sources: a different tone on each side (440 Hz left, 660 Hz right), 4 s. */
+export const STEREO_SOURCES: Record<string, [Float32Array, Float32Array]> = {
+  "stereo.wav": [440, 660].map((hz) => Float32Array.from({ length: 4 * MIX_RATE }, (_, i) => 0.25 * Math.sin((2 * Math.PI * hz * i) / MIX_RATE))) as [Float32Array, Float32Array],
+};
+
 /** 16-bit PCM WAV (what encodeWav writes) back to float channels. */
-function decodeWav(bytes: Uint8Array): Float32Array[] {
+export function decodeWav(bytes: Uint8Array): Float32Array[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const channels = view.getUint16(22, true);
   const frames = (bytes.byteLength - 44) / (2 * channels);
@@ -50,6 +55,8 @@ function decodeWav(bytes: Uint8Array): Float32Array[] {
 function sourceOf(path: string, host: FakeHost): Float32Array[] {
   const bytes = host.written.get(path);
   if (bytes instanceof Uint8Array) return decodeWav(bytes);
+  const stereo = Object.keys(STEREO_SOURCES).find((k) => path.endsWith(k));
+  if (stereo) return STEREO_SOURCES[stereo]!;
   const key = Object.keys(SOURCES).find((k) => path.endsWith(k));
   if (!key) throw new Error(`no source for ${path}`);
   return [SOURCES[key]!, SOURCES[key]!];

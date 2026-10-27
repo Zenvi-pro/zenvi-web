@@ -11,7 +11,10 @@ import type { MixScore } from "../../mastering/score.js";
 import { parametricEq } from "../../render/audio/parametric-eq.js";
 import { runTool } from "../registry.js";
 import type { ToolReceipt } from "../receipt.js";
-import { MIX_RATE, mixProject, type MixProject } from "../test-support/mix-host.js";
+import { addClip } from "../../ops/clips.js";
+import { addFile } from "../../ops/files.js";
+import { audioInfo, media } from "../test-support/fixture.js";
+import { MIX_RATE, decodeWav, mixProject, type MixProject } from "../test-support/mix-host.js";
 import { measureMix } from "./analyze-mix.js";
 
 async function run(p: MixProject, tool: string, args: Record<string, unknown>): Promise<ToolReceipt> {
@@ -229,6 +232,55 @@ describe("pan_tool", { timeout: 60_000 }, () => {
     const [l2, r2] = sides(await render(p, [hit]));
     expect(l2).toBeCloseTo(l0!, 2);
     expect(r2).toBeCloseTo(r0!, 2);
+  });
+
+  /** A 4 s audio-only clip of `stereo.wav` on track 1, at the timeline start. */
+  function stereoClip(p: MixProject): string {
+    return p.doc.transaction("stereo", (tx) => {
+      const file = addFile(tx, media("/media/stereo.wav", audioInfo("/media/stereo.wav", 4))).id;
+      return addClip(tx, { fileId: file, position: 0, layer: 1_000_000, start: 0, end: 4 }).id;
+    });
+  }
+  /** Energy of `tone` Hz in a channel (a one-bin DFT). */
+  const toneOf = (x: Float32Array, hz: number): number => {
+    let re = 0;
+    let im = 0;
+    for (let i = 0; i < x.length; i += 1) {
+      re += x[i]! * Math.cos((2 * Math.PI * hz * i) / MIX_RATE);
+      im += x[i]! * Math.sin((2 * Math.PI * hz * i) / MIX_RATE);
+    }
+    return Math.hypot(re, im) / x.length;
+  };
+
+  it("balances a stereo source: each side keeps its own channel", async () => {
+    const p = mixProject();
+    const id = stereoClip(p);
+    expect((await run(p, "pan_tool", { clip_ids: id, pan: 0.5 })).status).toBe("applied");
+    const [l, r] = (await render(p, [id])).map((c) => c.subarray(0, 4 * MIX_RATE));
+    const theta = ((0.5 + 1) * Math.PI) / 4;
+    // Left still carries the left tone (attenuated), right the right tone; neither picks up the other side.
+    expect(toneOf(l!, 440) / 0.125).toBeCloseTo(Math.SQRT2 * Math.cos(theta), 1);
+    expect(toneOf(r!, 660) / 0.125).toBeCloseTo(Math.SQRT2 * Math.sin(theta), 1);
+    expect(toneOf(l!, 660)).toBeLessThan(0.002);
+    expect(toneOf(r!, 440)).toBeLessThan(0.002);
+  });
+
+  it("puts a keyframed pan where each source frame is heard under a time remap", async () => {
+    const p = mixProject();
+    const id = stereoClip(p);
+    // Reversed: clip frame 1 plays source frame 121 (4 s at 30 fps), frame 121 plays source frame 1.
+    p.doc.transaction("reverse", (tx) => {
+      tx.update(["clips", { id }], { time: { Points: [{ co: { X: 1, Y: 121 }, interpolation: 1 }, { co: { X: 121, Y: 1 }, interpolation: 1 }] } });
+    });
+    expect((await run(p, "pan_tool", { clip_ids: id, points: [{ t: 0, pan: -1 }, { t: 4, pan: 1 }] })).status).toBe("applied");
+    const clip = p.doc.project.clips.find((c) => c.id === id)!;
+    const path = String(p.doc.project.files.find((f) => f.id === clip.file_id)!.path);
+    const [l, r] = decodeWav(p.host.written.get(path) as Uint8Array);
+    // The source's start is heard last, when the pan is right: its left side is all but gone; its end is heard first, panned left.
+    const head = (x: Float32Array) => x.subarray(0, MIX_RATE / 2);
+    const tail = (x: Float32Array) => x.subarray(3.5 * MIX_RATE, 4 * MIX_RATE);
+    expect(toneOf(head(l!), 440)).toBeLessThan(toneOf(head(r!), 660) / 3);
+    expect(toneOf(tail(r!), 660)).toBeLessThan(toneOf(tail(l!), 440) / 3);
   });
 
   it("keyframes a travelling pan and refuses clips with picture", async () => {
