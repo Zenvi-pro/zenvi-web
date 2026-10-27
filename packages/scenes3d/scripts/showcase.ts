@@ -101,7 +101,7 @@ function setup(scene: Scene3dId, background: string, vertical: boolean): { param
       return background === "dark"
         ? { params: { model: path.join(models, "engine.glb"), look: vertical ? "xray" : "solid", stage: "dark", move: "orbit", background }, slots: {} }
         : vertical
-          ? { params: { product: "player", stage: "table", land: true, move: "push", background }, slots: {} }
+          ? { params: { product: "player", stage: "table", move: "hero", background }, slots: {} }
           : { params: { model: path.join(models, "engine.glb"), stage: "studio", move: "turntable", background }, slots: {} };
     case "numerals_3d":
       return background === "dark" ? { params: { values: [0, 51, 79, 70], suffix: "kt", background }, slots: {} } : { params: { values: [12.5, 98.6], decimals: 1, suffix: "%", style: "plastic", background }, slots: {} };
@@ -110,7 +110,7 @@ function setup(scene: Scene3dId, background: string, vertical: boolean): { param
     case "card_stack":
       return vertical
         ? { params: { file_ids: ["icon0", "fractal", "icon2", "wide", "icon4", "tall"], background }, slots: { card0: "icon0", card1: "fractal", card2: "icon2", card3: "wide", card4: "icon4", card5: "tall" } }
-        : { params: { kind: "paper", animation: "fan", count: 5, background }, slots: {} };
+        : { params: { animation: "fan", count: 5, background }, slots: {} };
   }
 }
 

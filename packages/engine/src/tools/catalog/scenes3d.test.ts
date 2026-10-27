@@ -152,7 +152,7 @@ describe("add_3d_scene_tool", () => {
     expect(requests[1]!.files).toEqual({ svg: "/brand/mark.svg" });
     const word = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "logo_extrude", params: { text: "Zenvi", animation: "assemble" } });
     expect(requests[2]!.files).toEqual({});
-    expect((dataOf(word) as { params: { size: number } }).params.size).toBe(0.6);
+    expect((dataOf(word) as { params: { size: number } }).params.size).toBe(0.7);
     const cards = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "card_stack", params: { file_ids: [IDS.logo, IDS.broll] } });
     expect(cards.ok, cards.text).toBe(true);
     expect(Object.keys(requests[3]!.media)).toEqual(["card0", "card1"]);

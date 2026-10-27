@@ -246,7 +246,7 @@ def build(job):
     # A whole model must stay readable: gentle focus falloff, none on the see-through looks (blur reads as fog there).
     fstop = (1.4 if move == "push" else 2.8) if p.get("dof", True) and job["quality"] == "final" and look == "solid" else None
     cam, aim = camera.camera(lens=50, target=target, dof=fstop)
-    span = 2 * radius if move == "turntable" else max(width, 2 * radius * 0.85)
+    span = 2 * radius if move in ("turntable", "hero") else max(width, 2 * radius * 0.85)
     dist = camera.compose(cam, span, height, float(p.get("size", 0.7)), max_height=0.78)
     end = frames
 
@@ -256,13 +256,22 @@ def build(job):
     elevation = float(p.get("elevation", 14))
     if move == "orbit":
         motion.animate(cam, "location", [(1, at(-40, elevation + 6, dist)), (end, at(30, elevation - 4, dist * 0.96))], "in-out")
+    elif move == "hero":
+        # A product reveal: it spins in from above, lands and settles while the
+        # camera pushes in, then keeps turning slowly so the hold is alive.
+        land = 1 + int(round(1.0 * fps))  # TASTE: big moves 1.0 s
+        settle = land + int(round(0.3 * fps))
+        motion.animate(cam, "location", [(1, at(-28, elevation + 6, dist * 1.14)), (frames, at(-12, elevation, dist * 0.94))], "smooth")
+        motion.animate(pivot, "rotation_euler", [(1, (0, 0, math.radians(-320))), (land, (0, 0, math.radians(-6))), (frames, (0, 0, math.radians(24)))], ["out", "in-out"])
+        motion.animate(pivot, "location", [(1, (0, 0, height * 1.1)), (land, (0, 0, 0)), (land + int(0.12 * fps), (0, 0, height * 0.025)), (settle, (0, 0, 0))], ["out", "out", "in-out"])
+        motion.animate(pivot, "scale", [(1, (0.6, 0.6, 0.6)), (land, (1, 1, 1))], "out")
     elif move == "push":
         motion.animate(cam, "location", [(1, at(-24, elevation + 4, dist * 1.45)), (end, at(-12, elevation, dist * 0.9))], "smooth")
     else:  # turntable
         motion.animate(cam, "location", [(1, at(-18, elevation, dist * 1.02)), (end, at(-18, elevation, dist * 0.97))], "in-out")
         turn = math.radians(float(p.get("turn_degrees", 120)))
         motion.animate(pivot, "rotation_euler", [(1, (0, 0, -turn / 2)), (end, (0, 0, turn / 2))], "linear")
-    if p.get("land"):
+    if p.get("land") and move != "hero":
         # Dropped onto the floor: falls fast, lands, settles (TASTE: enter fast, settle slowly).
         f1 = 1 + int(round(0.55 * fps))
         f2 = f1 + int(round(0.3 * fps))

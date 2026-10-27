@@ -122,3 +122,42 @@ def extent(objects):
     points = [o.matrix_world @ Vector(c) for o in objects for c in o.evaluated_get(graph).bound_box]
     span = [max(p[i] for p in points) - min(p[i] for p in points) for i in range(3)]
     return max(span[0], span[1]), span[2]
+
+
+def fit_points(cam, target, direction, points, size, max_height=1.0):
+    """Distance from `target` along `direction` (toward the camera) at which
+    `points`, as the camera sees them in perspective, span `size` of the
+    safe width and at most `max_height` of the room the safe area leaves
+    around the optical centre. For subjects that are not a flat face toward
+    the camera (a stack seen from above, a fan): their near end looms larger
+    than a bounding box says. Sets the lens shift like compose."""
+    left, right_edge, top, bottom = safe_area()
+    cx, cy = optical_centre()
+    room = 2 * min(cy - top, bottom - cy)
+    hx, hy = visible_half(cam, 1.0)
+    fwd = -Vector(direction).normalized()
+    side = fwd.cross(Vector((0, 0, 1))).normalized()
+    up = side.cross(fwd)
+    target = Vector(target)
+
+    def fits(d):
+        eye = target - fwd * d
+        xs, ys = [], []
+        for p in points:
+            v = Vector(p) - eye
+            z = v.dot(fwd)
+            if z <= 1e-3:
+                return False
+            xs.append(v.dot(side) / z)
+            ys.append(v.dot(up) / z)
+        return (max(xs) - min(xs)) / (2 * hx) <= size * (right_edge - left) and (max(ys) - min(ys)) / (2 * hy) <= max_height * room
+
+    lo, hi = 0.05, 1000.0
+    for _ in range(50):
+        mid = (lo + hi) / 2
+        lo, hi = (lo, mid) if fits(mid) else (mid, hi)
+    r = bpy.context.scene.render
+    longest = max(r.resolution_x, r.resolution_y)
+    cam.data.shift_x = -(cx - 0.5) * r.resolution_x / longest
+    cam.data.shift_y = (cy - 0.5) * r.resolution_y / longest
+    return hi

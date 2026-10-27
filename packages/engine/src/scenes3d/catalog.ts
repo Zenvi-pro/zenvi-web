@@ -133,7 +133,7 @@ export const SCENE3D_PARAMS = {
     depth: z.number().min(0).max(1).default(0.4).describe("Extrusion depth, 0 (thin) to 1 (deep)."),
     bevel: z.number().min(0).max(1).default(0.5).describe("Rounded edge, 0 (sharp) to 1 (soft)."),
     font,
-    size: size(0.6, "logo"),
+    size: size(0.7, "logo"),
     exit: z.boolean().default(false).describe("Shrink away over the last 0.4 s."),
     shadow: z.boolean().default(true).describe("Soft contact shadow under the logo."),
     dof: z.boolean().default(true).describe("Shallow depth of field (pieces arriving from behind are soft)."),
@@ -142,7 +142,7 @@ export const SCENE3D_PARAMS = {
     ...common,
     model: localFile(SCENE3D_MODEL_EXTENSIONS, "The 3D model on this computer: .glb, .gltf, .obj, .fbx (binary), .stl or .ply. It is centred, stood on the floor and framed. Without it: the generic product.").optional(),
     product: z.enum(["player", "speaker"]).default("player").describe("Without model: a generic product built in Blender. player: a minimal portable music player (screen, click wheel); speaker: a fabric smart speaker with a glowing top ring. color sets its body, accent its screen / light."),
-    move: z.enum(["turntable", "orbit", "push"]).default("turntable").describe("turntable: the model turns, the camera holds; orbit: the camera arcs around it; push: a slow dolly in with depth of field."),
+    move: z.enum(["turntable", "orbit", "push", "hero"]).default("turntable").describe("turntable: the model turns, the camera holds; orbit: the camera arcs around it; push: a slow dolly in with depth of field; hero: a product reveal, it spins in from above, lands and keeps turning while the camera pushes in (best for product ads, with stage table or studio)."),
     stage: z.enum(["studio", "dark", "table"]).default("studio").describe("studio: soft three-point light and real floor shadows; dark: low key with strong rim lights; table: on a wooden table top in warm window light."),
     look: z.enum(["solid", "xray", "wireframe"]).default("solid").describe("solid: lit surfaces; xray: see-through glow at the silhouette (fresnel); wireframe: glowing edges over a dark body. xray/wireframe read best on a dark background."),
     material: z.enum(["original", "clay", "chrome", "matte"]).default("original").describe("original keeps the model's materials (glTF/FBX); models without any are clay."),
@@ -174,8 +174,8 @@ export const SCENE3D_PARAMS = {
     background: z.union([z.enum(["dark", "light"]), hex]).default("light").describe("light: day, dark: dusk (when time is not given); a #rrggbb tints the haze and horizon. Never transparent: the sky is part of the picture."),
     surface: z.enum(["grass", "sand", "snow"]).default("grass").describe("grass: tufts swaying in the wind; sand: dunes with wind ripples; snow: soft drifts that glint."),
     time: z.enum(["day", "golden", "dusk"]).optional().describe("Sun and sky: day (high sun, blue sky), golden (low warm sun ahead), dusk (sun on the horizon, deep blue sky)."),
-    speed: z.number().min(0).max(12).default(2.5).describe("Glide speed, metres per second."),
-    camera_height: z.number().min(0.1).max(5).optional().describe("Camera height above the ground, metres (default 0.75 over grass, 0.9 otherwise)."),
+    speed: z.number().min(0).max(12).default(5).describe("Glide speed, metres per second (the camera also drifts 1.6 m across)."),
+    camera_height: z.number().min(0.1).max(5).optional().describe("Camera height above the ground, metres (default 0.65 over grass, just over the tips; 0.6 otherwise)."),
     haze: z.number().min(0).max(1).default(0.4).describe("How quickly the distance fades into the sky."),
     lens: z.number().min(14).max(85).default(28).describe("Focal length, mm (wide is faster)."),
     dof: z.boolean().default(true).describe("Shallow focus a few metres ahead (near blades soft)."),
@@ -189,7 +189,7 @@ export const SCENE3D_PARAMS = {
     colors: z.array(hex).min(1).max(8).optional().describe("Card colours (default accent + a vivid set)."),
     fan_degrees: z.number().min(2).max(30).default(12).describe("fan: angle between cards."),
     elevation: z.number().min(20).max(85).default(52).describe("Camera angle above the table, degrees (85: nearly top-down)."),
-    size: size(0.75, "stack"),
+    size: size(0.66, "stack as it ends (landed or fanned, seen in perspective)"),
     shadow: z.boolean().default(true).describe("Real soft shadows on the floor."),
     dof: z.boolean().default(true).describe("Subtle depth of field."),
   }),
@@ -244,6 +244,36 @@ export type ParsedScene3dParams = { ok: true; params: Scene3dParams } | { ok: fa
 export function parseScene3dParams(scene: Scene3dId, raw: unknown): ParsedScene3dParams {
   const result = SCENE3D_PARAMS[scene].safeParse(raw ?? {});
   if (result.success) return { ok: true, params: result.data as Scene3dParams };
-  const issues = result.error.issues.map((i) => `${i.path.length > 0 ? i.path.join(".") : "params"}: ${i.message}`);
+  const known = Object.keys(SCENE3D_PARAMS[scene].shape);
+  const issues = result.error.issues.map((i) => {
+    const where = i.path.length > 0 ? i.path.join(".") : "params";
+    // Agents guess near names (staging for stage): say which one they meant.
+    const hints = i.code === "unrecognized_keys" ? i.keys.map((k) => closestKey(k, known)).filter((h): h is string => h !== null) : [];
+    return `${where}: ${i.message}${hints.length > 0 ? ` (did you mean ${hints.join(", ")}?)` : ""}`;
+  });
   return { ok: false, error: `${scene} params: ${issues.join("; ")}` };
+}
+
+/** The known key a mistyped or guessed one most likely means: a shared stem of 4+ letters, or at most 2 edits. */
+function closestKey(given: string, known: readonly string[]): string | null {
+  const g = given.toLowerCase();
+  let best: { key: string; cost: number } | null = null;
+  for (const key of known) {
+    const k = key.toLowerCase();
+    let stem = 0;
+    while (stem < Math.min(g.length, k.length) && g[stem] === k[stem]) stem += 1;
+    const cost = stem >= 4 ? 0.5 : editDistance(g, k);
+    if (cost <= 2 && (!best || cost < best.cost)) best = { key, cost };
+  }
+  return best?.key ?? null;
+}
+
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i += 1) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j += 1) next.push(Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)));
+    row = next;
+  }
+  return row[b.length]!;
 }

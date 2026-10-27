@@ -121,6 +121,67 @@ def blade_clump(rng, blades=6):
     return obj
 
 
+def rock(rng, name="Rock"):
+    """A weathered stone about 1 m across: a lumpy, flattened icosphere
+    (instances scale it down to pebbles)."""
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=3, radius=0.5)
+    lumps = [(rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(0.08, 0.2)) for _ in range(7)]
+    for v in bm.verts:
+        n = v.co.normalized()
+        bump = sum(a * max(0.0, n.x * x + n.y * y + n.z * z) ** 3 for x, y, z, a in lumps)
+        v.co = n * (0.5 + bump - 0.1)
+        v.co.z *= 0.55
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    for poly in mesh.polygons:
+        poly.use_smooth = True
+    obj = bpy.data.objects.new(name, mesh)
+    core.link(obj)
+    obj.hide_render = True
+    obj.hide_viewport = True
+    return obj
+
+
+def rock_material(surface, look, density):
+    """Stone: warm grey in sand, dark slate under a cap of snow in snow."""
+    mat = bpy.data.materials.new("RockMat")
+    mat.use_nodes = True
+    tree = mat.node_tree
+    bsdf = tree.nodes["Principled BSDF"]
+    coord = tree.nodes.new("ShaderNodeTexCoord")
+    noise = tree.nodes.new("ShaderNodeTexNoise")
+    noise.inputs["Scale"].default_value = 6.0
+    noise.inputs["Detail"].default_value = 8.0
+    tree.links.new(coord.outputs["Object"], noise.inputs["Vector"])
+    ramp = tree.nodes.new("ShaderNodeValToRGB")
+    a, b = ("#6B5E52", "#9A8B78") if surface != "snow" else ("#3E434B", "#5E646D")
+    ramp.color_ramp.elements[0].color = core.rgb(a, 1.0)
+    ramp.color_ramp.elements[1].color = core.rgb(b, 1.0)
+    tree.links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
+    bump = tree.nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.4
+    tree.links.new(noise.outputs["Fac"], bump.inputs["Height"])
+    tree.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    color = ramp.outputs["Color"]
+    if surface == "snow":
+        geo = tree.nodes.new("ShaderNodeNewGeometry")
+        sep = tree.nodes.new("ShaderNodeSeparateXYZ")
+        tree.links.new(geo.outputs["Normal"], sep.inputs["Vector"])
+        cap = tree.nodes.new("ShaderNodeMix")
+        cap.data_type = "RGBA"
+        tree.links.new(core.map_range(tree, sep.outputs["Z"], 0.45, 0.65), cap.inputs["Factor"])
+        tree.links.new(color, cap.inputs[6])
+        cap.inputs[7].default_value = core.rgb("#EEF2F7", 1.0)
+        color = cap.outputs[2]
+    tree.links.new(color, bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = 0.85
+    out = tree.nodes["Material Output"]
+    tree.links.new(haze(tree, bsdf.outputs[0], look, density), out.inputs["Surface"])
+    return mat
+
+
 def haze(tree, shader, look, density):
     """Mix a surface shader into the sky's horizon colour with distance
     (exponential haze), brighter toward the sun, the same colour the sky
@@ -291,11 +352,12 @@ def grass_material(look, density):
     return mat
 
 
-def scatter(ground, clump, path_end, seed, quality):
-    """Geometry nodes on the ground: dense tufts along the camera's path,
-    sparse bigger ones elsewhere (the haze hides the thinning), random
-    turn, lean and size, swaying in a travelling wind."""
-    ng = bpy.data.node_groups.new("Grass", "GeometryNodeTree")
+def scatter(ground, clump, path_end, seed, dense, sparse, sizes=(0.7, 1.35), tilt=0.12, wind=True, name="Grass"):
+    """Geometry nodes on the ground: `dense` instances per m2 along the
+    camera's path, `sparse` (and bigger) elsewhere (the haze hides the
+    thinning), random turn, lean and size; with `wind` they sway in a
+    travelling gust."""
+    ng = bpy.data.node_groups.new(name, "GeometryNodeTree")
     ng.interface.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
     ng.interface.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
     n = ng.nodes
@@ -330,8 +392,7 @@ def scatter(ground, clump, path_end, seed, quality):
     near_x = m("SUBTRACT", 1.0, ramp01(m("ABSOLUTE", sep.outputs["X"]), 3.0, 7.0))
     near_y = m("MULTIPLY", ramp01(sep.outputs["Y"], -3.0, -1.0), m("SUBTRACT", 1.0, ramp01(sep.outputs["Y"], path_end + 18, path_end + 30)))
     near = m("MULTIPLY", near_x, near_y)
-    dense = 170.0 if quality == "final" else 90.0
-    density = m("ADD", 6.0, m("MULTIPLY", near, dense - 6.0))
+    density = m("ADD", sparse, m("MULTIPLY", near, dense - sparse))
     dist = n.new("GeometryNodeDistributePointsOnFaces")
     dist.distribute_method = "RANDOM"
     dist.inputs["Seed"].default_value = seed
@@ -341,14 +402,14 @@ def scatter(ground, clump, path_end, seed, quality):
     info.inputs["Object"].default_value = clump
     rand_rot = n.new("FunctionNodeRandomValue")
     rand_rot.data_type = "FLOAT_VECTOR"
-    rand_rot.inputs["Min"].default_value = (-0.12, -0.12, 0.0)
-    rand_rot.inputs["Max"].default_value = (0.12, 0.12, 6.283)
+    rand_rot.inputs["Min"].default_value = (-tilt, -tilt, 0.0)
+    rand_rot.inputs["Max"].default_value = (tilt, tilt, 6.283)
     rand_rot.inputs["Seed"].default_value = seed + 1
     # Wind: gusts travel along the field; the tufts lean with them.
     time = n.new("GeometryNodeInputSceneTime")
     phase = m("ADD", m("MULTIPLY", sep.outputs["Y"], 0.45), m("MULTIPLY", time.outputs["Seconds"], -2.2))
     phase = m("ADD", phase, m("MULTIPLY", sep.outputs["X"], 0.2))
-    gust = m("MULTIPLY", m("SINE", phase), 0.13)
+    gust = m("MULTIPLY", m("SINE", phase), 0.13 if wind else 0.0)
     comb = n.new("ShaderNodeCombineXYZ")
     L.new(gust, comb.inputs["X"])
     rot = n.new("ShaderNodeVectorMath")
@@ -359,7 +420,7 @@ def scatter(ground, clump, path_end, seed, quality):
     rand_scale.data_type = "FLOAT"
     for socket in rand_scale.inputs:
         if socket.type == "VALUE" and socket.name in ("Min", "Max"):
-            socket.default_value = 0.7 if socket.name == "Min" else 1.35
+            socket.default_value = sizes[0] if socket.name == "Min" else sizes[1]
     rand_scale.inputs["Seed"].default_value = seed + 2
     scale_out = next(o for o in rand_scale.outputs if o.type == "VALUE")
     scale = m("MULTIPLY", scale_out, m("ADD", 1.0, m("MULTIPLY", m("SUBTRACT", 1.0, near), 0.6)))
@@ -372,7 +433,7 @@ def scatter(ground, clump, path_end, seed, quality):
     L.new(gin.outputs[0], join.inputs[0])
     L.new(inst.outputs[0], join.inputs[0])
     L.new(join.outputs[0], gout.inputs[0])
-    mod = ground.modifiers.new("Grass", "NODES")
+    mod = ground.modifiers.new(name, "NODES")
     mod.node_group = ng
 
 
@@ -409,39 +470,52 @@ def build(job):
     sky_world(look, sun_vec, ambient=1.25 if surface == "snow" else 1.0)
 
     height = Ground(surface, seed)
-    speed = float(p.get("speed", 2.5))
+    speed = float(p.get("speed", 5.0))
     travel = speed * seconds
     ground = ground_mesh(height, travel)
     ground.data.materials.append(ground_material(surface, look, fog))
+    final = job["quality"] == "final"
     if surface == "grass":
         clump = blade_clump(rng)
         clump.data.materials.append(grass_material(look, fog))
-        scatter(ground, clump, travel, seed, job["quality"])
+        scatter(ground, clump, travel, seed, 170.0 if final else 90.0, 6.0)
+    else:
+        # Stones and pebbles along the path: what streams past the lens and gives the glide its parallax.
+        stone = rock(rng)
+        stone.data.materials.append(rock_material(surface, look, fog))
+        scatter(ground, stone, travel, seed + 10, 0.12, 0.01, sizes=(0.08, 0.45), tilt=0.5, wind=False, name="Stones")
+        scatter(ground, stone, travel, seed + 20, 6.0 if final else 3.0, 0.0, sizes=(0.02, 0.07), tilt=1.2, wind=False, name="Pebbles")
 
     # The glide: forward along +Y at camera height above the ground, a slow sway and bank.
-    eye = float(p.get("camera_height", 0.75 if surface == "grass" else 0.9))
+    eye = float(p.get("camera_height", 0.65 if surface == "grass" else 0.6))
     cam, aim = camera.camera(lens=float(p.get("lens", 28)), location=(0, 0, eye))
     cam.constraints.clear()
     cam.data.clip_end = 400
     if p.get("dof", True) and job["quality"] == "final":
         cam.data.dof.use_dof = True
-        cam.data.dof.focus_distance = 4.0
-        cam.data.dof.aperture_fstop = 2.0
+        cam.data.dof.focus_distance = 6.0
+        cam.data.dof.aperture_fstop = 2.8
+
+    # A dolly forward with a slow drift across (1.6 m over the clip) and a
+    # bank into it: near blades and stones stream past, the far field barely
+    # moves, so the travel reads in every frame.
+    drift = 0.8 * (1 if rng.random() < 0.5 else -1)
 
     def pose(f):
         t = (f - 1) / fps
+        u = motion.bezier("in-out", t / max(seconds, 1e-3))
         y = t * speed
-        x = motion.wobble(t, 9.0, 0.35, 0.6)
+        x = -drift + 2 * drift * u
         z = height(x, y) + eye + motion.wobble(t, 5.5, 0.04)
         return (x, y, z)
 
     def turn(f):
         t = (f - 1) / fps
-        pitch = math.radians(90 - 5.0 + motion.wobble(t, 7.0, 0.8))
-        bank = math.radians(motion.wobble(t, 9.0, 1.4, 2.2))
-        yaw = math.radians(motion.wobble(t, 11.0, 3.0, 1.0))
+        pitch = math.radians(90 - 6.0 + motion.wobble(t, 7.0, 0.8))
+        bank = math.radians(-1.5 * drift + motion.wobble(t, 9.0, 1.0, 2.2))
+        yaw = math.radians(-2.5 * drift + motion.wobble(t, 11.0, 2.0, 1.0))
         return (pitch, bank, yaw)
 
     motion.bake(cam, "location", (1, frames), pose, step=2)
     motion.bake(cam, "rotation_euler", (1, frames), turn, step=2)
-    scene.render.motion_blur_shutter = 0.5
+    scene.render.motion_blur_shutter = 0.6
