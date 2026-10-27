@@ -131,6 +131,10 @@ def build(job):
     thick = min(w, h) if len(pieces) > 1 or p.get("svg") else h
     extrude = (0.03 + 0.17 * float(p.get("depth", 0.4))) * thick
     bevel = min(extrude * 0.8, float(p.get("bevel", 0.5)) * 0.045 * thick)
+    # Overlapping fills must not share a front face (z-fighting), but a logo
+    # of many paths must not become a staircase: the layers span at most
+    # about one extrusion. Letters never overlap and stay level.
+    layer = extrude * min(0.35, 1.2 / max(1, len(pieces) - 1)) if p.get("svg") else 0.0
     cache = {}
     for i, (obj, colour) in enumerate(pieces):
         data = obj.data
@@ -145,7 +149,7 @@ def build(job):
         # Stand it up facing the camera (-Y); later SVG paths sit a little in front.
         x, y = obj.location.x, obj.location.y
         obj.rotation_euler = (math.radians(90), 0, 0)
-        obj.location = (x, -i * extrude * 0.35, y)
+        obj.location = (x, -i * layer, y)
     bpy.context.view_layer.update()
     lo, hi = bounds([o for o, _ in pieces])
     width, height = max(hi.x - lo.x, hi.y - lo.y), hi.z - lo.z
@@ -162,8 +166,10 @@ def build(job):
     settle = int(round(0.25 * fps))
     if animation == "assemble" and len(pieces) > 1:
         landed = 1
+        # A logo of many paths still lands within 0.8 s of the first piece's arrival.
+        stagger = min(STAGGER, 0.8 / (len(pieces) - 1))
         for i, (obj, _) in enumerate(pieces):
-            f0 = 1 + int(round(i * STAGGER * fps))
+            f0 = 1 + int(round(i * stagger * fps))
             f1 = f0 + enter
             home = tuple(obj.location)
             angle = rng.uniform(0, 2 * math.pi)
