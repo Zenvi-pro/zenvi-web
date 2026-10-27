@@ -724,6 +724,12 @@ export interface SetKeyframesOptions {
    * are dropped, the rest stay (zenvi-core develop clip_props._merge_curve).
    */
   mode?: "replace" | "merge" | "replace_range";
+  /**
+   * The points are the clip's own curve reshaped (gain, a duck, relative
+   * automation): marks that describe the curve stay (ops/internal.ts
+   * VOLUME_CURVE_MARKS). Default false: a curve written from scratch drops them.
+   */
+  derived?: boolean;
 }
 
 /** Build a JSON point from a `KeyframePointInput` (frame or time resolved against the clip). */
@@ -773,7 +779,7 @@ export function setClipKeyframes(
     const ease = eases[i];
     if (ease) applyEase(curve.Points, curve.Points.findIndex((p) => p.co.X === point.co.X), ease);
   });
-  return patchClip(tx, clipId, { [prop]: curve });
+  return patchClip(tx, clipId, { [prop]: curve }, { volumeDerived: opts.derived === true });
 }
 
 function requireEase(ease: unknown, index: number): readonly [number, number, number, number] {

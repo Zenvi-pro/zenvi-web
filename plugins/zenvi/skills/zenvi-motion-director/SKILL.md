@@ -115,30 +115,21 @@ too quiet and nobody has looked at the file.
    `add_vignette_tool` (cinematic: amount 0.3-0.5) and
    `add_shape_mask_tool` (feathered box or ellipse windows, iris and box
    reveals with `keyframes` on `grow`).
-10. **Sound, last.** When the picture is locked: `spot_sound_tool` shows the
-    cue sheet (every cut, move, block click, card land, emphasis word and 3D
-    landing, and the genre it reads as); `auto_sound_design_tool`
-    (`genre` when the guess is wrong, `intensity`, `beats`, `climax_seconds`)
-    designs from it, then `master_audio_tool`; `add_sfx_tool` for what the
-    sheet cannot see (an in-shot action). Both play real
-    CC0 recordings from Zenvi's kit by default (`kit: "recorded"`; no
-    Freesound search needed, never the same sample twice in a row); keep
-    `kit: "synth"` for tonal risers and sub drops you shape with pitch.
-    Music from `search_freesound_music_tool` is commercial-use by default;
-    `licence: "cc0"` for no credit at all. Music at full level unless
-    there is speech (`duck_tool` puts the voice 10 dB over the bed).
-11. **Mix by the numbers, then master, always last.** `analyze_mix_tool`
-    (`genre` of the recipe) scores the sound 0-100 against the genre's
-    bands (loudness, voice over bed, masking, hit coverage and timing, cue
-    levels by role, repetition) and names each fix as a tool call:
-    `set_audio_gain_tool` (clip, track or stem by dB), `duck_tool`,
-    `automate_volume_tool` (`suck_out` before the climax, `pre_hit_duck`,
-    fades), `eq_tool`, `compress_tool`, `space_tool`, `pan_tool`. Apply the
-    top fixes and score again (at most 3 rounds, stop at 85+ with no gate);
-    `master_audio_tool` `{"preset": "social", "genre": ..., "iterate": true}`
-    does that loop and the mastering (-14 LUFS / -1 dBTP) as one undo step.
-    Any later audio edit means mastering again. An unmastered edit clips on
-    the platforms.
+10. **Sound, last: hand it to the sound designer.** When the picture is
+    locked, load the `zenvi-sound-designer` skill and run its loop with this
+    recipe's genre: `spot_sound_tool` (the cue sheet: every cut, move, block
+    click, card land, emphasis word, 3D landing and the climax),
+    `auto_sound_design_tool` with the genre's palette (`beats`,
+    `climax_seconds` when you have them), at most 5 `add_sfx_tool` for
+    in-shot actions the sheet cannot see, then `master_audio_tool`
+    `{"preset": "social", "genre": ..., "iterate": true}`: the Sound Score's
+    fixes (voice 10 dB over the bed, levels, timing) and the master to -14
+    LUFS / -1 dBTP in one undo step. Read its score: 85+ with no gate is
+    done; otherwise the receipt's top fixes, then master again (at most
+    twice). Music at full level unless there is speech; music from
+    `search_freesound_music_tool` is commercial-use by default.
+11. **Master always last.** Any later audio edit means mastering again. An
+    unmastered edit arrives 2-5 LU quiet and clips on the platforms.
 12. **Verify** (below), fix, verify again. Then `render_video` and
     **review the file**: `review_render_tool` with the path it wrote. One
     fix pass: every `PROBLEM` line, render again, review again, report.

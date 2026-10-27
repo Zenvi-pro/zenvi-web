@@ -52,6 +52,8 @@ export interface MixCue {
   role: CueRole;
   /** Sample identity (V1 repetition). */
   sample?: string;
+  /** The layered cue it belongs to (transient, body, sub and tail of one hit): one hero for V4. */
+  group?: string;
   /** The clip's timeline start, seconds (to move it by a timing error). */
   position?: number;
   /**
@@ -461,11 +463,18 @@ export function scoreMix(input: ScoreInput): MixScore {
     const proms: Partial<Record<CueRole, { cue: MixCue; db: number }[]>> = {};
     const at = (t: number): number => Math.round(t / ENVELOPE_HOP);
     for (const c of cues) {
-      const i0 = Math.max(0, Math.trunc((c.t - 0.1) / ENVELOPE_HOP));
-      const i1 = Math.min(on.length, Math.trunc((c.t + 0.1) / ENVELOPE_HOP));
-      if (i1 <= i0) continue;
-      const peakAt = c.kind.startsWith("whoosh") ? argMax(eSfx, i0, Math.min(i1, eSfx.length)) : argMax(on, i0, i1);
-      errs.push({ cue: c, err: (peakAt * ENVELOPE_HOP - c.t) * 1000 });
+      // A tick or typing run puts cues closer than the ±100 ms search: look only up to halfway to the
+      // neighbouring cues (layers on the same moment are one sound), or every tick reads as early or
+      // late by its neighbour's onset.
+      const near = cues.filter((o) => Math.abs(o.t - c.t) > 0.001 && Math.abs(o.t - c.t) < 0.2);
+      const before = Math.min(0.1, ...near.filter((o) => o.t <= c.t).map((o) => (c.t - o.t) / 2));
+      const after = Math.min(0.1, ...near.filter((o) => o.t >= c.t).map((o) => (o.t - c.t) / 2));
+      const i0 = Math.max(0, Math.trunc((c.t - before) / ENVELOPE_HOP));
+      const i1 = Math.min(on.length, Math.trunc((c.t + after) / ENVELOPE_HOP));
+      if (i1 > i0) {
+        const peakAt = c.kind.startsWith("whoosh") ? argMax(eSfx, i0, Math.min(i1, eSfx.length)) : argMax(on, i0, i1);
+        errs.push({ cue: c, err: (peakAt * ENVELOPE_HOP - c.t) * 1000 });
+      }
       const a = Math.max(0, at(c.t - 0.03));
       const b = Math.min(eSfx.length, at(c.t + 0.12) + 1);
       const local = Array.from(eRest.subarray(Math.max(0, at(c.t - 1)), Math.min(eRest.length, at(c.t + 1))));
@@ -477,11 +486,16 @@ export function scoreMix(input: ScoreInput): MixScore {
     }
     if (errs.length > 0) {
       const frameMs = 1000 / fps + 1;
+      const layers = new Map<string, number>();
+      for (const c of cues) if (c.group !== undefined) layers.set(c.group, (layers.get(c.group) ?? 0) + 1);
+      const layered = (c: MixCue): boolean => c.group !== undefined && (layers.get(c.group) ?? 0) > 1;
       const within = errs.filter((e) => Math.abs(e.err) <= frameMs).length / errs.length;
       const worst = [...errs].sort((a, b) => Math.abs(b.err) - Math.abs(a.err)).filter((e) => Math.abs(e.err) > frameMs).slice(0, 5);
       put("H3_timing_within_1f", within, 0.9, 1, "placement", {
         text: `move the late/early cues by -err: ${worst.map((e) => `${e.cue.id} ${e.err >= 0 ? "+" : ""}${Math.round(e.err)} ms`).join(", ")}`,
-        calls: worst.filter((e) => e.cue.auto && e.cue.position !== undefined).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
+        // One layer of a multi-layer hit is never moved alone: that would pull it off its other layers and its hit
+        // point. A single-layer cue (an auto-designed tick, a whoosh) is moved like any other.
+        calls: worst.filter((e) => e.cue.auto && e.cue.position !== undefined && !layered(e.cue)).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
       }, { medianAbsMs: r1(median(errs.map((e) => Math.abs(e.err)))), worst: worst.map((e) => ({ cue: e.cue.id, errMs: Math.round(e.err) })) });
     }
     for (const role of ["hero", "sweetener", "micro"] as const) {
@@ -501,7 +515,7 @@ export function scoreMix(input: ScoreInput): MixScore {
     const [dlo, dhi] = DENSITY[genre];
     const density = cues.length / dur;
     put("V3_cues_per_s", density, dlo, dhi, "variety", { text: density > dhi ? "too dense: delete the weakest sweeteners (first those under speech)" : "too sparse: add micros on UI/text events" });
-    const heroes = cues.filter((c) => c.role === "hero");
+    const heroes = cues.filter((c, i) => c.role === "hero" && (c.group === undefined || !cues.slice(0, i).some((o) => o.role === "hero" && o.group === c.group)));
     let gap: number | null = null;
     let pair: [MixCue, MixCue] | null = null;
     for (let i = 1; i < heroes.length; i += 1) {

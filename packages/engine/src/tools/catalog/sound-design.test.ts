@@ -12,6 +12,7 @@ import { PALETTES } from "../../sfx/palettes.js";
 import { SFX_RECIPES } from "../../sfx/recipes.js";
 import { curvePoints, evaluateVolumeCurve } from "../audio-mix.js";
 import { runTool } from "../registry.js";
+import { spottedHits } from "./sound-design.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
 import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
 
@@ -280,6 +281,14 @@ describe("spot_sound_tool", () => {
     expect(d.points.every((p) => p.needs_cue)).toBe(true);
     const named = data<{ genre: string; genre_guessed: boolean }>(await runTool({ doc, host: withAudio(fakeHost()) }, "spot_sound_tool", { genre: "documentary" }));
     expect([named.genre, named.genre_guessed]).toEqual(["documentary", false]);
+  });
+
+  it("is the sheet the Sound Score reads: analyze_mix_tool and master_audio_tool score the same hit points", async () => {
+    const doc = editProject();
+    const host = withAudio(fakeHost());
+    const sheet = data<{ points: { t: number; kind: string; needs_cue: boolean }[] }>(await runTool({ doc, host }, "spot_sound_tool", { include_dry: true }));
+    const hits = await spottedHits({ doc, host } as unknown as Parameters<typeof spottedHits>[0]);
+    expect(hits).toEqual(sheet.points.map((p) => ({ t: p.t, kind: p.kind, needsCue: p.needs_cue })));
   });
 });
 

@@ -8,12 +8,13 @@
  */
 
 import { z } from "zod";
-import { MIX_GENRES, formatMixScore, scoreMix, type MixScore } from "../../mastering/score.js";
+import { MIX_GENRES, formatMixScore, scoreMix, type HitPoint, type MixScore } from "../../mastering/score.js";
 import type { Project } from "../../model/types.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { refused, unchanged, type ToolReceipt } from "../receipt.js";
-import { cuesOf, hitPointsOf, mixEntries, renderStems, type MixEntry } from "../mix-roles.js";
+import { cuesOf, hitPointsAt, mixEntries, renderStems, type MixEntry } from "../mix-roles.js";
 import { fpsFloatOf } from "./common.js";
+import { spottedHits } from "./sound-design.js";
 
 const TOOL = "analyze_mix_tool";
 
@@ -22,13 +23,13 @@ const input = z.strictObject({
     .enum(MIX_GENRES)
     .default("general")
     .describe("Sets the target bands (loudness range, cue density, hit coverage): hype, flash_montage, saas_ui, talking_head, match_cut, 3d_product, video_essay, editorial, multiplicity, general."),
-  hit_times: z.array(z.number().min(0)).max(500).optional().describe("Timeline seconds that want a sound. Default: the edit's cuts, transitions, title entrances and flashes."),
+  hit_times: z.array(z.number().min(0)).max(500).optional().describe("Timeline seconds that want a sound. Default: spot_sound_tool's hit points (cuts, transitions, titles, flashes, moves, block and 3D events)."),
   detail: z.enum(["compact", "full"]).default("compact").describe("compact: failing metrics, their fixes and the top 3; full: every metric and every clip's stem."),
 });
 type Input = z.output<typeof input>;
 
-/** Render and score the timeline (shared with master_audio_tool). */
-export async function measureMix(call: ToolCall, project: Project, genre: Input["genre"], hitTimes?: readonly number[]): Promise<{ score: MixScore; entries: MixEntry[] }> {
+/** Render and score the timeline (shared with master_audio_tool); `hits` default to the cue sheet of the edit in `call`. */
+export async function measureMix(call: ToolCall, project: Project, genre: Input["genre"], hits?: readonly HitPoint[]): Promise<{ score: MixScore; entries: MixEntry[] }> {
   const entries = mixEntries(project);
   const renders = await renderStems(call, project, entries);
   const score = scoreMix({
@@ -37,7 +38,7 @@ export async function measureMix(call: ToolCall, project: Project, genre: Input[
     stems: renders.stems,
     genre,
     fps: fpsFloatOf(project),
-    hits: hitPointsOf(project, hitTimes),
+    hits: hits ?? (await spottedHits(call)),
     cues: cuesOf(project),
   });
   return { score, entries };
@@ -83,7 +84,7 @@ export const analyzeMixTools: CatalogTool[] = [
       if (mixEntries(project).length === 0) return refused(TOOL, "No timeline clips with audio: nothing to score.");
       let measured;
       try {
-        measured = await measureMix(call, project, args.genre, args.hit_times);
+        measured = await measureMix(call, project, args.genre, args.hit_times?.length ? hitPointsAt(args.hit_times) : undefined);
       } catch (error) {
         return refused(TOOL, `could not render the timeline audio to measure it: ${error instanceof Error ? error.message : String(error)}`);
       }

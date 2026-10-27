@@ -75,7 +75,7 @@ export function applyBedDips(tx: Transaction, clipId: string, dips: readonly Bed
     return g === 1 ? p : { ...p, co: { ...p.co, Y: Math.round(Number(p.co.Y) * g * 1e6) / 1e6 } };
   });
   const volume: Keyframe = { ...curve, Points: points };
-  patchClip(tx, clipId, { volume } as Partial<Clip>);
+  patchClip(tx, clipId, { volume } as Partial<Clip>, { volumeDerived: true });
   const mark: SfxBedMark = { before, after: structuredClone(volume), dips: [...dips] };
   patchClip(tx, clipId, { [BED_MARK]: mark } as Partial<Clip>);
   return points.length;

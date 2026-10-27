@@ -20,10 +20,11 @@ import type { Project } from "../../model/types.js";
 import type { ToolCall } from "../define.js";
 import { applied, unchanged, type ToolReceipt } from "../receipt.js";
 import { measureMix } from "./analyze-mix.js";
+import { spottedHits } from "./sound-design.js";
 
 export const MAX_ROUNDS = 3;
 export const TARGET_SCORE = 85;
-const PEAK_MARGIN_DB = 0.2;
+export const PEAK_MARGIN_DB = 0.2;
 
 /** Media paths of `before`'s files that none of `keep` still has (hosts delete only paths their writeGenerated returned). */
 export function orphanedPaths(before: Project, keep: readonly Project[]): string[] {
@@ -97,7 +98,9 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     await discardFrom(before, scratch.project);
   };
   const rounds: Round[] = [];
-  const measure = async (): Promise<MixScore> => (await measureMix(call, scratch.project, genre)).score;
+  // The rounds only touch sound, so the picture's cue sheet is spotted once.
+  const hits = await spottedHits(call);
+  const measure = async (): Promise<MixScore> => (await measureMix(call, scratch.project, genre, hits)).score;
   let score = await measure();
   const first = score;
   for (let i = 0; i < MAX_ROUNDS; i += 1) {

@@ -14,7 +14,7 @@ import { checkParams, getBlock } from "@zenvi/motion";
 import { describe, expect, it } from "vitest";
 
 const SKILLS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../plugins/zenvi/skills");
-const CHECKED = ["zenvi-motion-director", "zenvi-reels"];
+const CHECKED = ["zenvi-motion-director", "zenvi-reels", "zenvi-sound-designer"];
 /** Tools `zenvi mcp` adds next to the engine catalog (src/mcp/extra-tools.ts). */
 const MCP_TOOLS = new Set(["open_project_file", "render_video", "preview_frame", "launch_editor", "push_to_cloud", "list_hosts"]);
 
@@ -42,6 +42,10 @@ function examples(markdown: string): { tool: string; args: string }[] {
         }
       }
     }
+  }
+  // Inline calls: `tool_name` `{json}` (the code span may wrap; placeholders like <climax> or ... are not examples).
+  for (const m of markdown.matchAll(/`([a-z0-9_]+_tool)`\s+`(\{[^`]*\})`/g)) {
+    if (!/<|\.\.\.|…/.test(m[2]!)) found.push({ tool: m[1]!, args: m[2]!.replace(/\s*\n\s*/g, " ") });
   }
   return found;
 }
@@ -73,6 +77,11 @@ describe("plugin skills", () => {
         expect(check.ok ? "ok" : check.error).toBe("ok");
       }
     }
+  });
+
+  it("finds the sound designer's inline calls", () => {
+    const sound = files.filter((f) => f.includes("zenvi-sound-designer"));
+    expect(sound.reduce((n, f) => n + examples(readFileSync(f, "utf8")).length, 0)).toBeGreaterThanOrEqual(15);
   });
 
   it("finds the director's examples, and the check can fail", () => {

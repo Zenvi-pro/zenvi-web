@@ -16,7 +16,6 @@ import type { HitPoint, MixCue, CueRole, StemName } from "../mastering/score.js"
 import type { Clip, Project } from "../model/types.js";
 import { TRACK_AUDIO_ROLES, type TrackAudioRole } from "../ops/tracks.js";
 import { isAutoSfxClip, isSfxClip } from "../sfx/moments.js";
-import { soundMoments } from "../sfx/moments.js";
 import { sfxRecipe } from "../sfx/recipes.js";
 import { MUSIC_MIN_DURATION, hasVideoStream, type AudioRole } from "./audio-mix.js";
 import { collectTimelineAudio, type AudioEntry } from "./catalog/audio.js";
@@ -139,7 +138,7 @@ export function cuesOf(project: Project): MixCue[] {
     if (!isSfxClip(clip)) continue;
     const file = clip.file_id ? fileById(project, String(clip.file_id)) : undefined;
     const fileMark = file ? markOf(file) : undefined;
-    const clipMark = (clip.zenvi_sfx ?? {}) as { recipe?: string; role?: unknown; library?: string };
+    const clipMark = (clip.zenvi_sfx ?? {}) as { recipe?: string; role?: unknown; library?: string; cue?: unknown };
     const recipe = clipMark.recipe ?? fileMark?.recipe ?? "";
     const family = sfxRecipe(recipe)?.family ?? "impact";
     const role = clipMark.role === "hero" || clipMark.role === "sweetener" || clipMark.role === "micro" ? clipMark.role : (CUE_ROLE_OF_FAMILY[family] ?? "hero");
@@ -153,15 +152,15 @@ export function cuesOf(project: Project): MixCue[] {
       sample: clipMark.library ?? (fileMark?.library ? `${fileMark.library.provider}:${fileMark.library.id}` : fileMark?.key ?? String(clip.file_id ?? "")),
       position,
       auto: isAutoSfxClip(clip),
+      ...(typeof clipMark.cue === "string" ? { group: clipMark.cue } : {}),
     });
   }
   return cues.sort((a, b) => a.t - b.t);
 }
 
-/** The edit's hit points: cuts, transitions, title entrances and flashes (sfx/moments.ts), or the caller's times. */
-export function hitPointsOf(project: Project, times?: readonly number[]): HitPoint[] {
-  if (times && times.length > 0) return [...times].sort((a, b) => a - b).map((t) => ({ t, kind: "hit", needsCue: true }));
-  return soundMoments(project).map((m) => ({ t: m.time, kind: m.kind, needsCue: true }));
+/** The caller's hit times (analyze_mix_tool hit_times), each wanting a sound. */
+export function hitPointsAt(times: readonly number[]): HitPoint[] {
+  return [...times].sort((a, b) => a - b).map((t) => ({ t, kind: "hit", needsCue: true }));
 }
 
 export interface StemRenders {

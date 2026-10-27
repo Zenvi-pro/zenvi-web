@@ -35,12 +35,13 @@ import { STEM_ROLE_OF, mixRoleOf } from "../mix-roles.js";
 import { MIX_GENRES } from "../../mastering/score.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { measureMix } from "./analyze-mix.js";
-import { iterateMaster } from "./master-loop.js";
+import { iterateMaster, PEAK_MARGIN_DB } from "./master-loop.js";
+import { applyPeakRides, planPeakRides, rideBudget, ridesSummary, type Rides } from "./master-limit.js";
 import { applied, refused, unchanged, type ToolReceipt } from "../receipt.js";
 import { energyVadWindows } from "../speech.js";
 import { lockedTrackError } from "../tracks.js";
 import { collectTimelineAudio, type AudioEntry } from "./audio.js";
-import { idList } from "./common.js";
+import { fpsFloatOf, idList } from "./common.js";
 
 const TOOL = "master_audio_tool";
 
@@ -84,6 +85,10 @@ const input = z.strictObject({
   dry_run: z.boolean().default(false).describe("Measure and plan only: report the loudness before and after, change nothing."),
   genre: z.enum(MIX_GENRES).default("general").describe("The Sound Score's target bands (analyze_mix_tool genre) for score and iterate."),
   score: z.boolean().default(true).describe("Score the mastered mix with analyze_mix_tool's Sound Score (in data.score)."),
+  limit: z
+    .boolean()
+    .default(true)
+    .describe("When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes: the music and ambience under a hit up to 10 dB, else every clip playing there up to 4 dB; a look-ahead limiter the desktop plays too), so the mix gets there."),
   iterate: z
     .boolean()
     .default(false)
@@ -147,6 +152,13 @@ function curvePeak(clip: Clip): number {
 
 const dbToFactor = (db: number): number => 10 ** (db / 20);
 
+function ridesText(r: ReturnType<typeof ridesSummary>): string {
+  return `; peaks ridden down in ${r.frames} frame(s): ${[r.bedMaxDb > 0 ? `the bed under hits up to ${r.bedMaxDb} dB` : "", r.allMaxDb > 0 ? `everything up to ${r.allMaxDb} dB` : ""].filter(Boolean).join(", ")}`;
+}
+
+/** Shortfall at the ceiling worth riding the peaks for, LU; also the least a ridden plan must gain to be kept. */
+const RIDE_ABOVE_LU = 0.5;
+
 export interface ClipGainResult {
   /** Gain actually applied, dB. */
   appliedDb: number;
@@ -184,7 +196,7 @@ export function applyClipGain(tx: Transaction, clipId: string, deltaDb: number):
     const headroom = rest > 0 ? MAX_LEVEL / curvePeak(current) : 1;
     const factor = Math.min(dbToFactor(rest), headroom);
     const points = scaledVolume(current, project.fps, factor);
-    setClipKeyframes(tx, clipId, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
+    setClipKeyframes(tx, clipId, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace", derived: true });
     rest -= 20 * Math.log10(factor);
   }
   return { appliedDb: deltaDb - rest, makeupDb: makeup - before };
@@ -193,6 +205,8 @@ export function applyClipGain(tx: Transaction, clipId: string, deltaDb: number):
 interface Edits {
   /** dB per clip id. */
   gains: ReadonlyMap<string, number>;
+  /** Peak rides on these clips (master-limit.ts), written before the gains. */
+  rides?: { db: Rides; clips: readonly { id: string; bed: boolean }[] };
   /** Beds ducked under these speech windows (timeline s) by `duckDb`. */
   duck?: { db: number; windows: readonly SpeechWindow[]; beds: readonly string[] };
 }
@@ -201,6 +215,7 @@ interface Edits {
 export function applyEdits(tx: Transaction, edits: Edits): Map<string, ClipGainResult> {
   const results = new Map<string, ClipGainResult>();
   const { duck } = edits;
+  if (edits.rides) applyPeakRides(tx, edits.rides.db, edits.rides.clips);
   if (duck && duck.db < 0) {
     for (const id of duck.beds) {
       const clip = tx.project.clips.find((c) => String(c.id) === id)!;
@@ -210,7 +225,7 @@ export function applyEdits(tx: Transaction, edits: Edits): Map<string, ClipGainR
       // The windows are already padded (duckedWindows), so the envelope must not pad them again.
       const points = buildDuckPoints(clip, tx.project.fps, windows, dbToFactor(duck.db), { padBefore: 0, padAfter: 0 });
       if (points.length === 0) continue;
-      setClipKeyframes(tx, id, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
+      setClipKeyframes(tx, id, "volume", points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace", derived: true });
     }
   }
   for (const [id, db] of edits.gains) results.set(id, applyClipGain(tx, id, db));
@@ -268,7 +283,7 @@ export const masteringTools: CatalogTool[] = [
       "Writes clip volume and Compressor makeup gain only (the desktop plays the same mix), one undo step, and returns the before/after loudness. " +
       "Presets: social -14 LUFS / -1 dBTP, broadcast -23, podcast -16. Run it LAST, after the edit, music and sound design are in place; running it again changes nothing. " +
         "iterate=true (with genre) first runs analyze_mix_tool's loop (duck the bed to 10 dB under the voice, fix levels, timing, masking: its top fixes, re-scored, up to 3 rounds) and then masters, all one undo step: the best finishing call. " +
-      "If the mix cannot reach the target without exceeding the true-peak ceiling it stops at the ceiling and says so; exporting with loudness normalisation closes the gap. " +
+      "If the true-peak ceiling stops the mix short of the target, the frames that peak are ridden down (the bed under a hit up to 10 dB, else every clip playing there up to 4 dB; limit=false: stop at the ceiling and say so). " +
       "dry_run=true measures and plans without changing anything. Refuses timelines with no audible audio.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
@@ -304,32 +319,59 @@ export const masteringTools: CatalogTool[] = [
       }
       const unclassified = staged.filter((s) => s.entry.role === "unknown" && !role(s.entry.id, lists) && hasVideoStream(s.entry.clip, s.entry.file) && !hasOwnRole(project, s.entry));
 
-      let stems;
-      try {
-        stems = await Promise.all(
-          STEM_ROLES.map(async (r) => {
-            const clipIds = staged.filter((s) => s.stem === r).map((s) => s.entry.id);
-            return clipIds.length === 0 ? null : { role: r, ...(await renderStem(call, project, clipIds)) };
-          }),
-        );
-      } catch (error) {
-        return `Error: could not render the timeline audio to measure it: ${error instanceof Error ? error.message : String(error)}`;
-      }
-      const present = stems.filter((s): s is NonNullable<typeof s> => s !== null);
-      const sampleRate = present[0]!.sampleRate;
-
       const speech = await speechWindowsOf(call, staged);
       const total = staged.reduce((m, s) => Math.max(m, s.entry.end), 0);
       const padded = duckedWindows({ position: 0, start: 0, end: total }, speech);
-      const plan = planGainStage({
-        sampleRate,
-        stems: present.map((s) => ({ role: s.role, channels: s.channels })),
-        target: base,
-        balance: args.balance,
-        speechWindows: padded,
-        duck: args.duck,
-      });
+      const planOn = async (p: Project) => {
+        const stems = await Promise.all(
+          STEM_ROLES.map(async (r) => {
+            const clipIds = staged.filter((s) => s.stem === r).map((s) => s.entry.id);
+            return clipIds.length === 0 ? null : { role: r, ...(await renderStem(call, p, clipIds)) };
+          }),
+        );
+        const present = stems.filter((s): s is NonNullable<typeof s> => s !== null);
+        const sampleRate = present[0]!.sampleRate;
+        const plan = planGainStage({
+          sampleRate,
+          stems: present.map((s) => ({ role: s.role, channels: s.channels })),
+          target: base,
+          balance: args.balance,
+          speechWindows: padded,
+          duck: args.duck,
+        });
+        return { plan, present, sampleRate };
+      };
+      let planned;
+      try {
+        planned = await planOn(project);
+      } catch (error) {
+        return `Error: could not render the timeline audio to measure it: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      let plan = planned.plan;
       if (!plan) return refused(TOOL, "The timeline mix is silent (nothing above -70 LUFS): nothing to master. Check the clips' volume and that their media has sound.");
+      const first = plan;
+
+      // Short of the target at the ceiling: ride the peaks down (master-limit.ts), then plan again on a copy that has the rides.
+      let rides: Rides | null = null;
+      // The voice too: a talking head's own crest is what stops it short, and a few dB off a plosive for three frames is what any dialogue limiter does.
+      const rideable = staged.filter((st) => !st.locked);
+      const ridden = rideable.map((st) => ({ id: st.entry.id, bed: st.stem === "music" || st.stem === "ambient" }));
+      if (args.limit && plan.limitedBy === "peak" && plan.shortfallLu > RIDE_ABOVE_LU && ridden.length > 0) {
+        const { present, sampleRate } = planned;
+        rides = planPeakRides(present.map((st) => ({ channels: st.channels, gainDb: plan!.roleGainDb[st.role] ?? 0, bed: st.role === "music" || st.role === "ambient" })), sampleRate, fpsFloatOf(project), base.ceilingDbtp, plan.shortfallLu, rideBudget(rideable.map((st) => st.entry.clip)));
+        if (rides) {
+          const scratch = new ProjectDocument(structuredClone(project));
+          scratch.transaction("ride (check)", (tx) => applyPeakRides(tx, rides!, ridden));
+          let again: GainStagePlan | null = null;
+          try {
+            again = (await planOn(scratch.project)).plan;
+          } catch (error) {
+            call.host.log?.(`${TOOL}: peak rides skipped: ${error instanceof Error ? error.message : String(error)}`);
+          }
+          if (again && again.predicted.integrated > plan.predicted.integrated + RIDE_ABOVE_LU) plan = again;
+          else rides = null;
+        }
+      }
 
       const warnings: string[] = [];
       if (unclassified.length > 0) {
@@ -353,13 +395,13 @@ export const masteringTools: CatalogTool[] = [
         }
         return gains;
       };
-      const unmoved = (gains: ReadonlyMap<string, number>): boolean => beds.length === 0 && [...gains.values()].every((db) => Math.abs(db) < NO_CHANGE_DB);
+      const unmoved = (gains: ReadonlyMap<string, number>): boolean => beds.length === 0 && !rides && [...gains.values()].every((db) => Math.abs(db) < NO_CHANGE_DB);
 
-      const before = measuredOf(plan.before.mix);
+      const before = measuredOf(first.before.mix);
       const data: Record<string, unknown> = {
         preset: args.preset,
         target: { lufs: base.targetLufs, truePeakDbtp: base.ceilingDbtp },
-        before: { ...before, stems: Object.fromEntries(Object.entries(plan.before.stems).map(([r, rep]) => [r, measuredOf(rep!)])) },
+        before: { ...before, stems: Object.fromEntries(Object.entries(first.before.stems).map(([r, rep]) => [r, measuredOf(rep!)])) },
         lead: plan.lead,
       };
       const notes: string[] = [];
@@ -381,7 +423,7 @@ export const masteringTools: CatalogTool[] = [
       }
 
       // Verify on a scratch copy of the project, so the final gain accounts for what the clips really sound like with the edit.
-      const edit = (g: Map<string, number>): Edits => ({ gains: g, duck: beds.length > 0 ? { db: plan.duckDb, windows: padded, beds } : undefined });
+      const edit = (g: Map<string, number>): Edits => ({ gains: g, ...(rides ? { rides: { db: rides, clips: ridden } } : {}), duck: beds.length > 0 ? { db: plan.duckDb, windows: padded, beds } : undefined });
       let correction = 0;
       let verified: LoudnessReport | undefined;
       try {
@@ -391,7 +433,9 @@ export const masteringTools: CatalogTool[] = [
         verified = measureLoudness(mix.channels, mix.sampleRate);
         if (verified.integrated !== SILENCE_LUFS) {
           const wanted = plan.predicted.integrated;
-          correction = Math.min(wanted - verified.integrated, base.ceilingDbtp - verified.truePeakDb);
+          // The preset's ceiling keeps iterate's margin: the score's own render differs from this one by keyframe rounding.
+          const ceiling = base.ceilingDbtp - (args.true_peak_dbtp === undefined ? PEAK_MARGIN_DB : 0);
+          correction = Math.min(wanted - verified.integrated, ceiling - verified.truePeakDb);
           if (Math.abs(correction) < CORRECT_ABOVE_DB) correction = 0;
         }
       } catch (error) {
@@ -404,8 +448,13 @@ export const masteringTools: CatalogTool[] = [
         data.after = predicted;
         data.gainsDb = planNumbers(plan);
         data.duckDb = Math.round(plan.duckDb * 100) / 100;
+        if (rides) data.peakRides = ridesSummary(rides, project);
         shortfallNote();
-        return unchanged(TOOL, `Would master ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(predicted.integratedLufs)}, ${fmtPeak(predicted.truePeakDbtp)} (${args.preset}). dry_run: nothing was changed.`, { data, warnings, notes });
+        return unchanged(
+          TOOL,
+          `Would master ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(predicted.integratedLufs)}, ${fmtPeak(predicted.truePeakDbtp)} (${args.preset})${rides ? ridesText(ridesSummary(rides, project)) : ""}. dry_run: nothing was changed.`,
+          { data, warnings, notes },
+        );
       }
 
       const results = call.commit((tx) => applyEdits(tx, edit(finalGains)), "Master audio");
@@ -442,11 +491,13 @@ export const masteringTools: CatalogTool[] = [
       data.gainsDb = planNumbers(plan);
       data.duckDb = Math.round(plan.duckDb * 100) / 100;
       data.limitedBy = plan.limitedBy;
+      if (rides) data.peakRides = ridesSummary(rides, project);
       data.clips = [...results.entries()].map(([id, r]) => ({ id, role: staged.find((s) => s.entry.id === id)?.stem, gainDb: Math.round(r.appliedDb * 100) / 100, makeupDb: Math.round(r.makeupDb * 100) / 100 }));
       return applied(
         TOOL,
         `Mastered (${args.preset}): ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(after.integratedLufs)}, ${fmtPeak(after.truePeakDbtp)}` +
           (plan.duckDb < 0 ? `; beds ducked ${plan.duckDb.toFixed(1)} dB under speech` : "") +
+          (rides ? ridesText(ridesSummary(rides, project)) : "") +
           ".",
         { data, warnings, notes },
       );

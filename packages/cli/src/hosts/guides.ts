@@ -1,17 +1,19 @@
 /**
  * What `zenvi mcp` serves besides tools: resources (`zenvi://hosts`,
  * `zenvi://taste`, `zenvi://handoff`, `zenvi://director` and its genre
- * recipes) and prompts (`taste_motion_design`, `edit_review`,
- * `motion_director`) that carry the taste guide (docs/TASTE.md), its review
- * checklist and the motion-director skill, with the tool names of the host the
- * work happens in.
+ * recipes, `zenvi://sound` and its genre palettes) and prompts
+ * (`taste_motion_design`, `edit_review`, `motion_director`, `sound_designer`)
+ * that carry the taste guide (docs/TASTE.md), its review checklist, the
+ * motion-director and the sound-designer skills, with the tool names of the
+ * host the work happens in.
  */
 
 import { DIRECTOR_RECIPES, DIRECTOR_SKILL } from "./director.gen.js";
 import type { HostsReport } from "./registry.js";
+import { SOUND_PALETTES, SOUND_SKILL } from "./sound.gen.js";
 import { TASTE_MARKDOWN } from "./taste.gen.js";
 
-export { DIRECTOR_RECIPES, DIRECTOR_SKILL, TASTE_MARKDOWN };
+export { DIRECTOR_RECIPES, DIRECTOR_SKILL, SOUND_PALETTES, SOUND_SKILL, TASTE_MARKDOWN };
 
 export interface ResourceInfo {
   uri: string;
@@ -58,6 +60,21 @@ export const RESOURCES: readonly ResourceInfo[] = [
     description: `Motion-director recipe: structure in seconds, shot lengths, transitions, sound, type, colour and the tool calls for a ${genre.replace(/-/g, " ")}.`,
     mimeType: "text/markdown",
   })),
+  {
+    uri: "zenvi://sound",
+    name: "sound",
+    title: "Zenvi sound designer",
+    description:
+      "How to sound-design and mix an edit: the loop spot -> design -> master with the Sound Score -> fix, the reference reels' numbers (loudness, voice over bed, cue levels and timing), the genre map and the stop rule. Genre palettes are zenvi://sound/<genre>.",
+    mimeType: "text/markdown",
+  },
+  ...SOUND_PALETTES.map(({ genre, markdown }) => ({
+    uri: `zenvi://sound/${genre}`,
+    name: `sound-${genre}`,
+    title: markdown.match(/^# (.+)$/m)?.[1] ?? genre,
+    description: `Sound palette: the design call, cues, levels, signature moves and what to avoid for ${genre.replace(/-/g, " ")}.`,
+    mimeType: "text/markdown",
+  })),
 ];
 
 /** The text of a markdown resource (every resource but zenvi://hosts), or undefined. */
@@ -65,7 +82,8 @@ export function guideText(uri: string): string | undefined {
   if (uri === "zenvi://taste") return TASTE_MARKDOWN;
   if (uri === "zenvi://handoff") return HANDOFF_GUIDE;
   if (uri === "zenvi://director") return DIRECTOR_SKILL;
-  return DIRECTOR_RECIPES.find((r) => uri === `zenvi://director/${r.genre}`)?.markdown;
+  if (uri === "zenvi://sound") return SOUND_SKILL;
+  return (DIRECTOR_RECIPES.find((r) => uri === `zenvi://director/${r.genre}`) ?? SOUND_PALETTES.find((r) => uri === `zenvi://sound/${r.genre}`))?.markdown;
 }
 
 export const HANDOFF_GUIDE = `# Zenvi handoffs and linked clips
@@ -209,6 +227,16 @@ export const PROMPTS: readonly PromptInfo[] = [
       { name: "genre", description: `A recipe to include: ${DIRECTOR_RECIPES.map((r) => r.genre).join(", ")} (default: pick from the router).`, required: false },
     ],
   },
+  {
+    name: "sound_designer",
+    title: "Sound-design an edit with Zenvi",
+    description:
+      "Sound-design and mix the open edit with the Zenvi tools the way a professional sound designer would: the cue sheet, the genre's palette, layered and timed cues, the voice over the bed, the Sound Score and a master at -14 LUFS / -1 dBTP.",
+    arguments: [
+      { name: "brief", description: 'What the edit is and anything the sound must do, e.g. "a 20 s SaaS promo; keep it soft".', required: false },
+      { name: "genre", description: `A palette to include: ${SOUND_PALETTES.map((r) => r.genre).join(", ")} (default: from the cue sheet).`, required: false },
+    ],
+  },
 ];
 
 function guide(): string {
@@ -226,6 +254,7 @@ export function promptText(name: string, args: Record<string, string | undefined
   const prompt = PROMPTS.find((p) => p.name === name);
   if (!prompt) throw new Error(`Unknown prompt: ${name}. Prompts: ${PROMPTS.map((p) => p.name).join(", ")}.`);
   if (name === "motion_director") return directorPrompt(args);
+  if (name === "sound_designer") return soundPrompt(args);
   const host = promptHost(args.host, report);
   const tools = HOST_TOOLS[host];
   if (name === "taste_motion_design") {
@@ -283,4 +312,21 @@ function directorPrompt(args: Record<string, string | undefined>): { description
     ...(recipe ? [`--- Recipe (zenvi://director/${recipe.genre}) ---\n\n${recipe.markdown}`] : []),
   ].join("\n");
   return { description: recipe ? `Direct a ${recipe.genre.replace(/-/g, " ")} with Zenvi` : "Direct a video with Zenvi", text };
+}
+
+function soundPrompt(args: Record<string, string | undefined>): { description: string; text: string } {
+  const genre = args.genre?.trim();
+  const palette = genre ? SOUND_PALETTES.find((r) => r.genre === genre) : undefined;
+  if (genre && !palette) throw new Error(`Unknown genre: ${genre}. Genres: ${SOUND_PALETTES.map((r) => r.genre).join(", ")}.`);
+  const brief = args.brief?.trim();
+  const text = [
+    `Sound-design the open edit with the Zenvi tools${brief ? `: ${brief}` : "."}`,
+    "",
+    "Work with the Zenvi sound designer below. The palettes it names as palettes/<file>.md are this server's resources zenvi://sound/<file>; read the one for the genre after spotting" +
+      (palette ? ` (the ${palette.genre} palette is included after the skill).` : "."),
+    "",
+    `--- Zenvi sound designer (zenvi://sound) ---\n\n${SOUND_SKILL}`,
+    ...(palette ? [`--- Palette (zenvi://sound/${palette.genre}) ---\n\n${palette.markdown}`] : []),
+  ].join("\n");
+  return { description: palette ? `Sound-design a ${palette.genre.replace(/-/g, " ")} with Zenvi` : "Sound-design an edit with Zenvi", text };
 }
