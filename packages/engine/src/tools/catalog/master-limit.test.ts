@@ -5,7 +5,7 @@ import { curvePoints } from "../audio-mix.js";
 import { runTool } from "../registry.js";
 import type { ToolReceipt } from "../receipt.js";
 import { MIX_RATE, mixProject, type MixProject } from "../test-support/mix-host.js";
-import { MAX_BED_RIDE_DB, MAX_RIDE_DB, planPeakRides } from "./master-limit.js";
+import { MAX_BED_RIDE_DB, MAX_RIDE_DB, RIDE_MARK, planPeakRides, readRideMark } from "./master-limit.js";
 
 async function loudness(p: MixProject) {
   const pcm = await p.host.audio!.mixPcm!(p.doc.project, {});
@@ -58,6 +58,13 @@ describe("planPeakRides", () => {
     expect(rides.all[peakFrame]).toBeLessThanOrEqual(MAX_RIDE_DB);
     expect(planPeakRides([{ channels: [hit], gainDb: -20, bed: false }], sr, fps, -1, 1)).toBeNull();
   });
+
+  it("rides no deeper than the budget the clips' earlier rides leave", () => {
+    const { bed, hit } = parts(0.95);
+    const stems = [{ channels: [bed], gainDb: 0, bed: true }, { channels: [hit], gainDb: 0, bed: false }];
+    expect(planPeakRides(stems, sr, fps, -1, 6, { bed: MAX_BED_RIDE_DB, all: 1.5 })!.all[peakFrame]).toBeCloseTo(1.5, 6);
+    expect(planPeakRides(stems, sr, fps, -1, 6, { bed: 0, all: 0 })).toBeNull();
+  });
 });
 
 describe("master_audio_tool peak rides", { timeout: 60_000 }, () => {
@@ -76,5 +83,19 @@ describe("master_audio_tool peak rides", { timeout: 60_000 }, () => {
     expect(after.truePeakDb).toBeLessThanOrEqual(-0.9);
     // The clicks carry the rides.
     expect(p.hits.some((id) => curvePoints(p.doc.project.clips.find((c) => c.id === id)).length > 2)).toBe(true);
+  });
+
+  it("does not ride the same peaks again on a second run (the caps hold across runs)", async () => {
+    const p = peaky();
+    expect((await master(p, {})).summary).toMatch(/peaks ridden down/);
+    const hit = p.doc.project.clips.find((c) => c.id === p.hits[0])!;
+    expect(readRideMark(hit).all).toBeGreaterThan(0);
+    expect(readRideMark(hit).all).toBeLessThanOrEqual(MAX_RIDE_DB);
+    const undo = p.doc.undoLabels.length;
+    const again = await master(p, {});
+    expect(again.status).toBe("unchanged");
+    expect(p.doc.undoLabels.length).toBe(undo);
+    p.doc.undo();
+    expect(p.doc.project.clips.find((c) => c.id === p.hits[0])).not.toHaveProperty(RIDE_MARK);
   });
 });

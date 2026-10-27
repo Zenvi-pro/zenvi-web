@@ -36,7 +36,7 @@ import { MIX_GENRES } from "../../mastering/score.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { measureMix } from "./analyze-mix.js";
 import { iterateMaster, PEAK_MARGIN_DB } from "./master-loop.js";
-import { applyPeakRides, planPeakRides, ridesSummary, type Rides } from "./master-limit.js";
+import { applyPeakRides, planPeakRides, rideBudget, ridesSummary, type Rides } from "./master-limit.js";
 import { applied, refused, unchanged, type ToolReceipt } from "../receipt.js";
 import { energyVadWindows } from "../speech.js";
 import { lockedTrackError } from "../tracks.js";
@@ -354,10 +354,11 @@ export const masteringTools: CatalogTool[] = [
       // Short of the target at the ceiling: ride the peaks down (master-limit.ts), then plan again on a copy that has the rides.
       let rides: Rides | null = null;
       // The voice too: a talking head's own crest is what stops it short, and a few dB off a plosive for three frames is what any dialogue limiter does.
-      const ridden = staged.filter((st) => !st.locked).map((st) => ({ id: st.entry.id, bed: st.stem === "music" || st.stem === "ambient" }));
+      const rideable = staged.filter((st) => !st.locked);
+      const ridden = rideable.map((st) => ({ id: st.entry.id, bed: st.stem === "music" || st.stem === "ambient" }));
       if (args.limit && plan.limitedBy === "peak" && plan.shortfallLu > RIDE_ABOVE_LU && ridden.length > 0) {
         const { present, sampleRate } = planned;
-        rides = planPeakRides(present.map((st) => ({ channels: st.channels, gainDb: plan!.roleGainDb[st.role] ?? 0, bed: st.role === "music" || st.role === "ambient" })), sampleRate, fpsFloatOf(project), base.ceilingDbtp, plan.shortfallLu);
+        rides = planPeakRides(present.map((st) => ({ channels: st.channels, gainDb: plan!.roleGainDb[st.role] ?? 0, bed: st.role === "music" || st.role === "ambient" })), sampleRate, fpsFloatOf(project), base.ceilingDbtp, plan.shortfallLu, rideBudget(rideable.map((st) => st.entry.clip)));
         if (rides) {
           const scratch = new ProjectDocument(structuredClone(project));
           scratch.transaction("ride (check)", (tx) => applyPeakRides(tx, rides!, ridden));
@@ -447,8 +448,13 @@ export const masteringTools: CatalogTool[] = [
         data.after = predicted;
         data.gainsDb = planNumbers(plan);
         data.duckDb = Math.round(plan.duckDb * 100) / 100;
+        if (rides) data.peakRides = ridesSummary(rides, project);
         shortfallNote();
-        return unchanged(TOOL, `Would master ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(predicted.integratedLufs)}, ${fmtPeak(predicted.truePeakDbtp)} (${args.preset}). dry_run: nothing was changed.`, { data, warnings, notes });
+        return unchanged(
+          TOOL,
+          `Would master ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(predicted.integratedLufs)}, ${fmtPeak(predicted.truePeakDbtp)} (${args.preset})${rides ? ridesText(ridesSummary(rides, project)) : ""}. dry_run: nothing was changed.`,
+          { data, warnings, notes },
+        );
       }
 
       const results = call.commit((tx) => applyEdits(tx, edit(finalGains)), "Master audio");

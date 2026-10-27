@@ -13,8 +13,9 @@
  */
 
 import type { Transaction } from "../../history/document.js";
-import type { Project } from "../../model/types.js";
+import type { Clip, Project } from "../../model/types.js";
 import { setClipKeyframes } from "../../ops/clips.js";
+import { patchClip } from "../../ops/internal.js";
 import { shapeVolume, type GainPoint } from "../mix-curves.js";
 import { fpsFloatOf } from "./common.js";
 
@@ -29,6 +30,32 @@ const MARGIN_DB = 0.5;
 
 /** A ride eases in and out by at most this much per frame, dB. */
 const SLEW_DB = 2;
+
+const r2 = (x: number): number => Math.round(x * 100) / 100;
+
+/**
+ * Clip key: the deepest rides master_audio_tool has written on the clip, dB.
+ * A second run measures the mix with the first run's rides in it; without the
+ * mark it would ride the same peaks down again, past the caps.
+ */
+export const RIDE_MARK = "zenvi_peak_ride";
+
+/** dB already ridden (a clip's mark), or left to ride (a plan's budget). */
+export interface RideDepth {
+  bed: number;
+  all: number;
+}
+
+export function readRideMark(clip: Clip): RideDepth {
+  const mark = (clip as Record<string, unknown>)[RIDE_MARK] as Partial<RideDepth> | undefined;
+  return { bed: Number(mark?.bed) || 0, all: Number(mark?.all) || 0 };
+}
+
+/** What the caps leave to ride on these clips after the rides already on them. */
+export function rideBudget(clips: readonly Clip[]): RideDepth {
+  const done = clips.map(readRideMark);
+  return { bed: MAX_BED_RIDE_DB - Math.max(0, ...done.map((d) => d.bed)), all: MAX_RIDE_DB - Math.max(0, ...done.map((d) => d.all)) };
+}
 
 export interface RideStem {
   channels: readonly Float32Array[];
@@ -58,16 +85,24 @@ function smooth(need: Float64Array): Float64Array {
  * would pass: the beds under it come down just enough (up to MAX_BED_RIDE_DB),
  * so a hit keeps its transient and stands further out of the bed; where the
  * peak is the hit itself (or there is no bed), every clip comes down by what
- * it passes by, up to MAX_RIDE_DB. Held a frame either side, eased by SLEW_DB
- * a frame. Null when no frame passes.
+ * it passes by, up to MAX_RIDE_DB. `budget` lowers both caps by the rides
+ * already on the clips. Held a frame either side, eased by SLEW_DB a frame.
+ * Null when no frame passes or nothing is left to ride.
  */
-export function planPeakRides(stems: readonly RideStem[], sampleRate: number, fps: number, ceilingDbtp: number, shortfallLu: number): Rides | null {
+export function planPeakRides(
+  stems: readonly RideStem[],
+  sampleRate: number,
+  fps: number,
+  ceilingDbtp: number,
+  shortfallLu: number,
+  budget: RideDepth = { bed: MAX_BED_RIDE_DB, all: MAX_RIDE_DB },
+): Rides | null {
   const n = Math.max(0, ...stems.map((st) => st.channels[0]?.length ?? 0));
   const frame = sampleRate / fps;
   const frames = Math.ceil(n / frame);
   const gains = stems.map((st) => 10 ** ((st.gainDb + shortfallLu) / 20));
   const ceiling = 10 ** ((ceilingDbtp - MARGIN_DB) / 20);
-  const hasBed = stems.some((st) => st.bed);
+  const hasBed = stems.some((st) => st.bed) && budget.bed > 0;
   /** The frame's peak with the beds `bedDb` down. */
   const peakOf = (k: number, bedDb: number): number => {
     const bedGain = 10 ** (-bedDb / 20);
@@ -86,22 +121,22 @@ export function planPeakRides(stems: readonly RideStem[], sampleRate: number, fp
   for (let k = 0; k < frames; k += 1) {
     const peak = peakOf(k, 0);
     if (peak <= ceiling) continue;
-    if (hasBed && peakOf(k, MAX_BED_RIDE_DB) <= ceiling) {
+    if (hasBed && peakOf(k, budget.bed) <= ceiling) {
       let lo = 0;
-      let hi = MAX_BED_RIDE_DB;
+      let hi = budget.bed;
       for (let it = 0; it < 8; it += 1) {
         const mid = (lo + hi) / 2;
         if (peakOf(k, mid) <= ceiling) hi = mid;
         else lo = mid;
       }
       bed[k] = hi;
-    } else all[k] = Math.min(MAX_RIDE_DB, 20 * Math.log10(peak / ceiling));
+    } else all[k] = Math.max(0, Math.min(budget.all, 20 * Math.log10(peak / ceiling)));
   }
   if (!bed.some((d) => d > 0) && !all.some((d) => d > 0)) return null;
   return { bed: smooth(bed), all: smooth(all) };
 }
 
-/** Ride each clip down through the frames it plays in (beds by both rides), on top of its own curve (ducks and fades kept). */
+/** Ride each clip down through the frames it plays in (beds by both rides), on top of its own curve (ducks and fades kept), and mark how deep (RIDE_MARK). */
 export function applyPeakRides(tx: Transaction, rides: Rides, clips: readonly { id: string; bed: boolean }[]): void {
   const fps = fpsFloatOf(tx.project);
   for (const { id, bed } of clips) {
@@ -120,6 +155,10 @@ export function applyPeakRides(tx: Transaction, rides: Rides, clips: readonly { 
     if (points.every((p) => p.db === 0)) continue;
     const shaped = shapeVolume(clip, fps, points, "relative");
     setClipKeyframes(tx, id, "volume", shaped.points.map((p) => ({ frame: p.co.X, value: p.co.Y, interpolation: p.interpolation })), { mode: "replace" });
+    const deepest = (a: Float64Array): number => a.subarray(first, last + 1).reduce((m, d) => Math.max(m, d), 0);
+    const done = readRideMark(clip);
+    const mark: RideDepth = { bed: r2(done.bed + (bed ? deepest(rides.bed) : 0)), all: r2(done.all + deepest(rides.all)) };
+    patchClip(tx, id, { [RIDE_MARK]: mark } as Partial<Clip>);
   }
 }
 
