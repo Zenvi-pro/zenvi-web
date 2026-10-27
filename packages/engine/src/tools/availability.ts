@@ -29,6 +29,7 @@ export type HostMethod =
   | "media.writeGenerated"
   | "media.missing"
   | "media.fetchWebVideo"
+  | "media.inspectRender"
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
@@ -210,6 +211,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
     partialNote: "without Openverse (or the Zenvi backend), downloads and audio decoding only procedural kits are made",
   },
+  review_render_tool: { methods: ["media.inspectRender"] },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],
@@ -367,6 +369,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.writeGenerated",
       "media.missing",
       "media.fetchWebVideo",
+      "media.inspectRender",
       "storage.open",
       "storage.readText",
       "storage.writeText",
@@ -456,6 +459,7 @@ function needName(need: HostCapability | HostMethod): string {
     "media.writeGenerated": "storing generated media",
     "media.missing": "checking for missing media",
     "media.fetchWebVideo": "fetching videos from web pages, which only runs on the person's own computer (the zenvi CLI with yt-dlp)",
+    "media.inspectRender": "reading a rendered file with ffmpeg (the zenvi CLI and local MCP)",
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",

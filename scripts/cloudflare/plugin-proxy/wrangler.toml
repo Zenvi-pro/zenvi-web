@@ -1,0 +1,15 @@
+# Deploy: npx wrangler@4 deploy -c scripts/cloudflare/plugin-proxy/wrangler.toml
+# Needs zenvi.pro proxied (orange cloud) in Cloudflare with SSL/TLS "Full (strict)". See README.md.
+name = "zenvi-plugin-proxy"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+workers_dev = false
+preview_urls = false
+
+routes = [
+  { pattern = "zenvi.pro/plugin", zone_name = "zenvi.pro" },
+  { pattern = "zenvi.pro/.well-known/oauth-protected-resource/plugin", zone_name = "zenvi.pro" },
+]
+
+[vars]
+CLOUD_ORIGIN = "https://zenvi-cloud.whitesky-da3c8402.eastus.azurecontainerapps.io"
