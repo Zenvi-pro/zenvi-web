@@ -4,7 +4,7 @@ import { runTool } from "../tools/registry.js";
 import { fakeHost } from "../tools/test-support/fake-host.js";
 import { repeatedCut } from "../tools/test-support/repeated-cut.js";
 import { L1 } from "../tools/test-support/fixture.js";
-import { addClip } from "../ops/clips.js";
+import { addClip, fadeClip } from "../ops/clips.js";
 import { freeInPoint, swapSuggestions } from "./swaps.js";
 import { reviewTimeline } from "./timeline.js";
 
@@ -44,6 +44,18 @@ describe("swap suggestions", () => {
     const late = await runTool({ doc, host: fakeHost() }, "swap_shot_tool", { clip_id: "CLIPA00001", file_id: "FILEXTRA00", start_seconds: 5 });
     expect(late.data!.summary).toMatch(/^Error: FILEXTRA00\.mp4 is 6\.00 s long; a 2\.00 s shot from 5\.00 s runs past its end/);
     expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("moves the clip's curves with the new in-point, so a fade stays on the same timeline frames", async () => {
+    const doc = new ProjectDocument(repeatedCut(["video"]));
+    doc.transaction("fade", (tx) => fadeClip(tx, "CLIPA00002", { fadeIn: 0.5 }));
+    const xs = (id: string) => doc.project.clips.find((c) => c.id === id)!.alpha.Points.map((p) => p.co.X);
+    const before = xs("CLIPA00002");
+    const fps = doc.project.fps.num / doc.project.fps.den;
+    const r = await runTool({ doc, host: fakeHost() }, "swap_shot_tool", { clip_id: "CLIPA00002", file_id: "FILEXTRA00", start_seconds: 1.2 });
+    expect(r.ok, r.text).toBe(true);
+    expect(xs("CLIPA00002")).toEqual(before.map((x) => x + Math.round(1.2 * fps) - Math.round(1 * fps)));
+    expect(doc.undoLabels).toEqual(["fade", "Swap shot CLIPA00002"]);
   });
 
   it("review_edit_tool lists the swaps for repeated and returning clips, each unused clip offered once", async () => {

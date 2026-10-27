@@ -8,9 +8,10 @@
 
 import { z } from "zod";
 import { trimClip } from "../../ops/clips.js";
-import { patchClip } from "../../ops/internal.js";
+import { moveKeyframes, patchClip, rateOf } from "../../ops/internal.js";
+import { pyRound } from "../../model/rounding.js";
 import { useFileForClip } from "../../ops/overlays.js";
-import { fileLabel, freeInPoint, isFootageFile } from "../../review/swaps.js";
+import { fileLabel, freeInPoint, isFootageFile, isStill } from "../../review/swaps.js";
 import { directTool, type CatalogTool } from "../define.js";
 import { applied, refused } from "../receipt.js";
 import { isLocked } from "../titles-text.js";
@@ -47,7 +48,7 @@ export const swapShotTools: CatalogTool[] = [
       if (!file) return refused(TOOL, `Error: no media-bin file with id='${fileId}'.`);
       if (!isFootageFile(file)) return refused(TOOL, `Error: ${fileLabel(file)} is not a video or image to cut to.`);
       const length = Number(clip.end) - Number(clip.start);
-      const still = file.has_single_image === true || file.media_type === "image";
+      const still = isStill(file);
       const duration = Number(file.duration) || 0;
       let start = args.start_seconds;
       if (start === undefined) {
@@ -69,7 +70,12 @@ export const swapShotTools: CatalogTool[] = [
           // A title that named the old file names the new one.
           if (oldFile && clip.title === oldFile.name) patchClip(tx, clip.id, { title: file.name ?? clip.title });
         }
-        trimClip(tx, clip.id, { start, end: start + length });
+        const trimmed = trimClip(tx, clip.id, { start, end: start + length });
+        // Keyframe X counts reader frames from the source's first (ops/internal.ts moveKeyframes): a new in-point
+        // moves every curve with it, so fades and punch-ins stay on the same timeline frames.
+        const rate = rateOf(tx.project);
+        const delta = pyRound(Number(trimmed.start) * rate) - pyRound(before.start * rate);
+        if (delta !== 0) patchClip(tx, clip.id, moveKeyframes(trimmed, (x) => x + delta));
       }, `Swap shot ${clip.id}`);
       const after = call.doc.project.clips.find((c) => c.id === clip.id)!;
       const graded = (after.effects ?? []).some((e) => e.type === "ColorGrade");

@@ -49,7 +49,8 @@ export function fileLabel(file: ProjectFile): string {
   return String(file.name || String(file.path ?? "").split(/[\\/]/).pop() || file.id);
 }
 
-function isStill(file: ProjectFile): boolean {
+/** A still image: it shows the same picture from any in-point. */
+export function isStill(file: ProjectFile): boolean {
   return getMediaType({ path: file.path, has_video: file.has_video, has_audio: file.has_audio }, String(file.name ?? "")) === "image" || file.has_single_image === true;
 }
 
