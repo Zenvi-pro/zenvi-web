@@ -1,0 +1,3 @@
+.smx-stage { position: absolute; inset: 0; }
+.smx-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.smx-echo { position: absolute; inset: 0; }

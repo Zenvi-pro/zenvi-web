@@ -116,6 +116,7 @@ On top of the catalog:
 | `render_video` | Render to mp4/webm/mov/mkv/gif/mp3/wav/png; returns the path, duration and size. Reports progress. |
 | `launch_editor` | Show the project in the Zenvi desktop app. |
 | `push_to_cloud` | Upload to Zenvi Cloud and return a web editor link (needs `zenvi login`). |
+| `mcp_health` | Who is signed in and which features that sign-in enables (Cloud, AI generation, voice, search), with how to turn on the ones that are off. |
 | `list_hosts` | The hosts (see below), which are connected, which is active, and how to connect or enable the others. |
 | `ae_*`, `premiere_*` | After Effects and Premiere Pro tools through Zenvi Link (listed per `ZENVI_MCP_ADOBE`). |
 | handoff tools | The desktop app's `export_to_*` / `send_to_*` / `import_*` tools for After Effects, Premiere Pro, Remotion and HyperFrames, and the linked-clip tools ([HANDOFF.md](HANDOFF.md)). Listed per `ZENVI_MCP_HANDOFF` (by default when the desktop app is installed or has run here). |

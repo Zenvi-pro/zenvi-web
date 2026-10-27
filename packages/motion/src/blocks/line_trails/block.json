@@ -1,0 +1,22 @@
+{
+  "id": "line_trails",
+  "version": 1,
+  "title": "Line trails",
+  "description": "Generative line art that draws itself: many curves (spiral arms, a precessing orbit rosette, Lissajous ribbons or rose petals) traced by bright heads with fading comet tails, leaving a fine line behind so the figure builds up. Heads accelerate out and settle; tails stretch with speed. Opaque by default, for an editorial interlude, a background behind a numeral or title, or a transition texture.",
+  "tags": ["lines", "trails", "generative", "spiral", "orbit", "lissajous", "background", "editorial"],
+  "duration": { "default": 5, "min": 1.5, "max": 30 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": false,
+  "tokens": { "palette": "cobalt" },
+  "params": {
+    "pattern": { "type": "enum", "options": ["spiral", "orbit", "lissajous", "rose"], "default": "spiral", "description": "spiral: arms winding out from the centre; orbit: an ellipse precessing into a rosette; lissajous: a ribbon of crossing figure loops filling the frame; rose: petal loops." },
+    "count": { "type": "integer", "min": 1, "max": 60, "default": 14, "description": "How many lines." },
+    "turns": { "type": "number", "min": 1, "max": 12, "default": 3, "description": "Density of each figure: spiral and orbit turns, Lissajous frequency, rose petals." },
+    "tail": { "type": "number", "min": 0.02, "max": 1, "default": 0.22, "description": "Comet tail length at full speed, as a fraction of each line." },
+    "trace": { "type": "boolean", "default": true, "description": "Leave a fine line where each head has been, so the figure builds up." },
+    "heads": { "type": "boolean", "default": true, "description": "A bright dot at the head of each line." },
+    "width": { "type": "number", "min": 1, "max": 16, "default": 5, "description": "Line width at the head, px at 1080." },
+    "colors": { "type": "strings", "maxItems": 5, "maxLength": 9, "default": [], "description": "Line colours as #rrggbb, cycling (empty: ink, with every fourth line in the accent)." },
+    "size": { "type": "number", "min": 0.3, "max": 1.4, "default": 1.1, "description": "Figure size relative to the safe area (above 1 runs past it, for a background)." }
+  }
+}

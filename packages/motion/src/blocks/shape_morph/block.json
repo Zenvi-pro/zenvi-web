@@ -1,0 +1,20 @@
+{
+  "id": "shape_morph",
+  "version": 1,
+  "title": "Shape morph",
+  "description": "One bold shape that morphs into the next on every beat: circle to square to star, a glyph into a blob. Each morph squashes, turns and lands with a small settle and an outline ripple; the colour shifts through the palette. Items that are not shape names are traced from the display face (a letter, a digit, a short word). Transparent, for a beat-synced accent or a graphic interlude.",
+  "tags": ["shape", "morph", "geometric", "beat", "graphic", "logo"],
+  "duration": { "default": 4, "min": 1, "max": 20 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "sky", "display": "sans" },
+  "params": {
+    "shapes": { "type": "strings", "minItems": 1, "maxItems": 12, "maxLength": 12, "default": ["circle", "square", "star", "ring", "blob"], "description": "The shapes in order. Names: circle, square, triangle, hexagon, star, burst, blob, plus, pill, ring; anything else is set in the display face and traced (e.g. 'A', '24', 'hi')." },
+    "beat": { "type": "number", "min": 0, "max": 4, "default": 0, "description": "Seconds from one shape to the next (0: spread the shapes over the block's length). Use the music's beat for a synced cut." },
+    "morph": { "type": "number", "min": 0.15, "max": 2, "default": 0.55, "description": "Seconds each morph takes (at most 80 % of the beat)." },
+    "style": { "type": "enum", "options": ["fill", "outline", "duo"], "default": "fill", "description": "fill: solid shape; outline: a thick stroke only; duo: solid shape with an offset outline echo in the ink colour." },
+    "colors": { "type": "strings", "maxItems": 6, "maxLength": 9, "default": [], "description": "Shape colours as #rrggbb, one per shape, cycling (empty: accent, secondary, ink)." },
+    "spin": { "type": "boolean", "default": true, "description": "Turn a quarter on each morph." },
+    "size": { "type": "number", "min": 0.2, "max": 1, "default": 0.74, "description": "Shape size as a fraction of the safe area's shorter side." }
+  }
+}
