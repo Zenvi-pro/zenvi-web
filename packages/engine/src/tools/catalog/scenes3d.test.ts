@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { patchClip } from "../../ops/internal.js";
 import { readBlenderLink } from "../../scenes3d/link.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
@@ -211,9 +212,37 @@ describe("rerender_3d_scene_tool", () => {
     const { host } = scenesHost();
     const added = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "particle_burst" });
     const { file_id: fileId, timeline_clip_id: clipId } = dataOf(added) as { file_id: string; timeline_clip_id: string };
+    // The fixture's logo sits at 2 s on the track the burst lands on; move it out of the way.
+    doc.transaction("move", (tx) => patchClip(tx, IDS.clipLogo, { position: 6 }));
     const result = await runTool({ doc, host }, "rerender_3d_scene_tool", { file_id: fileId, duration_seconds: 3 });
     expect(result.ok, result.text).toBe(true);
     expect(Number(doc.project.clips.find((c) => c.id === clipId)!.end)).toBeCloseTo(3, 6);
+  });
+
+  it("keeps the old length where a longer render would run into the next clip on the track", async () => {
+    const doc = fixtureDoc();
+    const { host } = scenesHost();
+    const added = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "particle_burst" });
+    const { file_id: fileId, timeline_clip_id: clipId } = dataOf(added) as { file_id: string; timeline_clip_id: string };
+    const scene = doc.project.clips.find((c) => c.id === clipId)!;
+    doc.transaction("put", (tx) => patchClip(tx, IDS.clipB, { layer: scene.layer, position: Number(scene.position) + 2 }));
+    const result = await runTool({ doc, host }, "rerender_3d_scene_tool", { file_id: fileId, duration_seconds: 4 });
+    expect(result.ok, result.text).toBe(true);
+    expect(Number(doc.project.clips.find((c) => c.id === clipId)!.end)).toBeCloseTo(2, 6);
+    expect(result.text).toContain(`${IDS.clipB} follows it on the same track`);
+  });
+
+  it("keeps a trimmed clip at least one frame long when the render gets shorter", async () => {
+    const doc = fixtureDoc();
+    const { host } = scenesHost();
+    const added = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "particle_burst" });
+    const { file_id: fileId, timeline_clip_id: clipId } = dataOf(added) as { file_id: string; timeline_clip_id: string };
+    doc.transaction("trim", (tx) => patchClip(tx, clipId, { start: 1.5 }));
+    const result = await runTool({ doc, host }, "rerender_3d_scene_tool", { file_id: fileId, duration_seconds: 1 });
+    expect(result.ok, result.text).toBe(true);
+    const clip = doc.project.clips.find((c) => c.id === clipId)!;
+    expect(Number(clip.end)).toBeCloseTo(1, 6);
+    expect(Number(clip.start)).toBeLessThan(Number(clip.end));
   });
 
   it("refuses a new length for cube_cut, whose clip is centred on the cut", async () => {

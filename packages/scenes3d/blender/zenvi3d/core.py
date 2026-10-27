@@ -49,7 +49,11 @@ def setup(job):
     scene = reset()
     draft = job["quality"] == "draft"
     r = scene.render
-    r.engine = "BLENDER_EEVEE"
+    # EEVEE Next is "BLENDER_EEVEE_NEXT" in Blender 4.2-4.5 and "BLENDER_EEVEE" from 5.0 (MIN_BLENDER is 4.2).
+    try:
+        r.engine = "BLENDER_EEVEE"
+    except TypeError:
+        r.engine = "BLENDER_EEVEE_NEXT"
     r.resolution_x = job["width"]
     r.resolution_y = job["height"]
     r.resolution_percentage = 100

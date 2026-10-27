@@ -25,7 +25,7 @@ import { ZENVI_LINK_KEY, blenderLink, readBlenderLink, type Scene3dQuality, type
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged } from "../receipt.js";
 import type { ImportedMedia, Scene3dMediaInput } from "../types.js";
-import { TextToolError, clipExtent, planOverlayTrack, projectSize, snapToFrame, trackInfo } from "../titles-text.js";
+import { TextToolError, clipExtent, clipsInWindow, planOverlayTrack, projectSize, snapToFrame, trackInfo } from "../titles-text.js";
 
 const LIST = "list_3d_scenes_tool";
 const ADD = "add_3d_scene_tool";
@@ -304,19 +304,32 @@ export const scenes3dTools: CatalogTool[] = [
       }
       const oldSeconds = (oldFrames * fps.den) / fps.num;
       const newSeconds = (frames * fps.den) / fps.num;
-      const changed: string[] = [];
+      const frameSeconds = fps.den / fps.num;
+      const warnings = [...plan.warnings];
+      const patches: { id: string; patch: Partial<Clip> }[] = [];
+      for (const clip of project.clips.filter((c) => String(c.file_id) === String(file.id))) {
+        const showedAll = Math.abs(Number(clip.end) - oldSeconds) < 1e-3 && Number(clip.start) < 1e-3;
+        let patch: Partial<Clip> = {};
+        if (showedAll && Math.abs(newSeconds - oldSeconds) > 1e-6) {
+          // A longer render must not run into the next clip on its track: keep the old length there.
+          const [position] = clipExtent(clip);
+          const blocked = newSeconds > oldSeconds ? clipsInWindow(project, clip.layer, position + oldSeconds, position + newSeconds, new Set([clip.id])) : [];
+          if (blocked.length) warnings.push(`clip ${clip.id} keeps its ${oldSeconds.toFixed(2)}s length: ${blocked[0]!.id} follows it on the same track`);
+          else patch = { end: newSeconds, duration: newSeconds };
+        } else if (Number(clip.end) > newSeconds) {
+          // A trim past the new end keeps at least one frame of the new movie.
+          patch = { start: Math.min(Number(clip.start), Math.max(0, newSeconds - frameSeconds)), end: newSeconds };
+        }
+        patches.push({ id: clip.id, patch });
+      }
       call.commit((tx) => {
         const { path: _path, ...info } = imported.info;
         repointFile(tx, String(file.id), { ...(info as Partial<ProjectFile>), path: imported.path, [ZENVI_LINK_KEY]: blenderLink(link.scene, parsed.params, r, q) });
-        for (const clip of tx.project.clips.filter((c: Clip) => String(c.file_id) === String(file.id))) {
-          const showedAll = Math.abs(Number(clip.end) - oldSeconds) < 1e-3 && Number(clip.start) < 1e-3;
-          if (showedAll && Math.abs(newSeconds - oldSeconds) > 1e-6) patchClip(tx, clip.id, { end: newSeconds, duration: newSeconds });
-          else if (Number(clip.end) > newSeconds) patchClip(tx, clip.id, { end: newSeconds });
-          changed.push(clip.id);
-        }
+        for (const { id, patch } of patches) if (Object.keys(patch).length) patchClip(tx, id, patch);
       }, `Re-render 3D ${link.scene}`);
+      const changed = patches.map((p) => p.id);
       return applied(RERENDER, `Re-rendered ${link.scene} (${q}, ${r.cached ? "from the render cache" : `${r.seconds.toFixed(1)}s`}); ${changed.length} clip(s) updated.`, {
-        warnings: plan.warnings,
+        warnings,
         data: { scene: link.scene, file_id: file.id, timeline_clip_ids: changed, params: parsed.params, render: renderData(r, q) },
       });
     },
