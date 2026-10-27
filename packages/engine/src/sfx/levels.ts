@@ -56,11 +56,11 @@ export function bedLevelAt(env: Float32Array, t: number): number {
 export type LevelRole = "hero" | "sweetener" | "micro";
 
 /**
- * Where each role's 50 ms peak sits over the bed, dB: a little under the
- * middle of its band (DEPLOY.md S4.4), because master_audio_tool lifts the
+ * Where each role's 50 ms peak sits over the bed, dB: the bottom of its
+ * band (DEPLOY.md S4.4), because master_audio_tool lifts the
  * effects lane a few dB to its place under the music afterwards.
  */
-export const PROMINENCE_DB: Readonly<Record<LevelRole, number>> = { hero: 8, sweetener: 2, micro: -4 };
+export const PROMINENCE_DB: Readonly<Record<LevelRole, number>> = { hero: 6, sweetener: 1, micro: -5 };
 
 /** Bed quieter than this is no bed: the cue keeps its designed level. */
 export const NO_BED_DB = -45;

@@ -740,7 +740,11 @@ function hasTiles(project: Project): boolean {
     if (!file || isSfxClip(c) || c[KINETIC_CAPTIONS_KEY] || isAudioOnlyMedia(file) || file.zenvi_link || /\.svg$/i.test(String(file.path ?? ""))) return false;
     return Math.abs(Number(c.scale_x?.Points?.[0]?.co?.Y ?? 1)) < 0.6;
   });
-  return small.some((c) => small.filter((o) => o.position < c.position + (c.end - c.start) && o.position + (o.end - o.start) > c.position).length >= 4);
+  // A grid for a beat is a moment of a hype edit; a third of the edit in tiles is a multiplicity edit.
+  const end = Math.max(0, ...project.clips.map((c) => c.position + (c.end - c.start)));
+  let tiled = 0;
+  for (let t = 0.05; t < end; t += 0.1) if (small.filter((c) => c.position <= t && c.position + (c.end - c.start) > t).length >= 4) tiled += 1;
+  return end > 0 && tiled * 0.1 >= end / 3;
 }
 
 function pointRow(p: HitPoint): Record<string, unknown> {

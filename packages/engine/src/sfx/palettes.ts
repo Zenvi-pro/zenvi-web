@@ -254,6 +254,8 @@ export interface EditTraits {
   tiles: boolean;
   /** Match-cut chains on the timeline. */
   matchCuts: boolean;
+  /** Speed ramps, keyframed moves and motion transitions (whips, zooms): a hype edit's moves, which a flash montage of hard cuts has few of. */
+  moves: number;
   music: boolean;
 }
 
@@ -267,13 +269,13 @@ export function guessPalette(t: EditTraits): PaletteId {
   if (t.uiEvents >= 3) return "saas_ui";
   if (t.matchCuts) return "match_cut";
   if (t.tiles) return "multiplicity";
-  if (t.medianShot < 0.25) return "flash_montage";
+  if (t.medianShot < 0.25) return t.moves >= 4 && t.music ? "hype" : "flash_montage";
   if (t.medianShot < 0.7 && t.music) return "hype";
   return "editorial";
 }
 
 /** Traits from the cue sheet and what the caller knows of the project. */
-export function traitsOf(points: readonly HitPoint[], rest: Omit<EditTraits, "medianShot" | "uiEvents" | "scenes3d" | "captions">): EditTraits {
+export function traitsOf(points: readonly HitPoint[], rest: Omit<EditTraits, "medianShot" | "uiEvents" | "scenes3d" | "captions" | "moves">): EditTraits {
   const cuts = points.filter((p) => p.kind === "cut" || p.kind === "transition").map((p) => p.t);
   const gaps = cuts.slice(1).map((t, i) => t - cuts[i]!).sort((a, b) => a - b);
   return {
@@ -282,5 +284,6 @@ export function traitsOf(points: readonly HitPoint[], rest: Omit<EditTraits, "me
     uiEvents: points.filter((p) => p.kind === "block" && p.role === "ui").length,
     scenes3d: points.filter((p) => p.kind === "scene3d").length,
     captions: points.some((p) => p.kind === "word"),
+    moves: points.filter((p) => p.kind === "ramp" || p.kind === "transition" || p.kind === "move").length,
   };
 }

@@ -3,7 +3,7 @@ import { PALETTES, PALETTE_IDS, guessPalette, traitsOf, type EditTraits } from "
 import { sfxRecipe } from "./recipes.js";
 import type { HitPoint } from "./spot.js";
 
-const base: EditTraits = { duration: 15, medianShot: 1, speech: false, captions: false, uiEvents: 0, scenes3d: 0, tiles: false, matchCuts: false, music: true };
+const base: EditTraits = { duration: 15, medianShot: 1, speech: false, captions: false, uiEvents: 0, scenes3d: 0, tiles: false, matchCuts: false, moves: 0, music: true };
 
 describe("palettes", () => {
   it("names only recipes that exist, and density bands from DEPLOY.md S4.6", () => {
@@ -27,6 +27,7 @@ describe("palettes", () => {
     expect(guessPalette({ ...base, uiEvents: 5 })).toBe("saas_ui");
     expect(guessPalette({ ...base, tiles: true })).toBe("multiplicity");
     expect(guessPalette({ ...base, medianShot: 0.15 })).toBe("flash_montage");
+    expect(guessPalette({ ...base, medianShot: 0.15, moves: 4 })).toBe("hype");
     expect(guessPalette({ ...base, medianShot: 0.45 })).toBe("hype");
     expect(guessPalette({ ...base, medianShot: 0.45, music: false })).toBe("editorial");
   });

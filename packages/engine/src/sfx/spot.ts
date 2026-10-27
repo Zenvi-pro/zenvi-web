@@ -231,7 +231,14 @@ function movePoints(ctx: Context): HitPoint[] {
   return out;
 }
 
-/** Speed-ramp hits: where a ramp brakes from a rush (≥ 1.5x) into slow motion (≤ 0.6x). */
+/**
+ * Speed-ramp hits: where a ramp brakes from a rush (≥ 1.5x) into slow
+ * motion (≤ 0.6x), and the rush out of slow motion past 1.2x (a whoosh
+ * peaking where it is fastest). Speeds are smoothed over 5 frames: the `time` curve holds
+ * whole source frames, so frame-to-frame steps alternate 0, 1, 2.
+ */
+const RUSH = 1.2;
+
 function rampPoints(ctx: Context): HitPoint[] {
   const out: HitPoint[] = [];
   for (const clip of ctx.visual) {
@@ -239,18 +246,33 @@ function rampPoints(ctx: Context): HitPoint[] {
     if (points.length <= 2) continue;
     const first = clipFrameAtTime(clip, clip.position, ctx.project.fps);
     const last = clipFrameAtTime(clip, end(clip), ctx.project.fps);
-    const speeds: number[] = [];
-    for (let f = first; f < last; f += 1) speeds.push(evaluate(clip.time, f + 1, f + 1) - evaluate(clip.time, f, f));
+    const raw: number[] = [];
+    for (let f = first; f < last; f += 1) raw.push(evaluate(clip.time, f + 1, f + 1) - evaluate(clip.time, f, f));
+    const speeds = raw.map((_, i) => {
+      const w = raw.slice(Math.max(0, i - 2), i + 3);
+      return w.reduce((a, b) => a + b, 0) / w.length;
+    });
+    const at = (i: number) => timeOfClipFrame(clip, first + i, ctx.project.fps);
     let fastest = 0;
-    let armed = false;
+    let slowest = Infinity;
+    let slowEnd = -1;
     for (let i = 1; i < speeds.length; i += 1) {
+      const v = speeds[i]!;
       fastest = Math.max(fastest, speeds[i - 1]!);
-      if (fastest >= 1.5) armed = true;
-      if (armed && speeds[i]! <= 0.6 && speeds[i - 1]! > 0.6) {
-        const t = timeOfClipFrame(clip, first + i, ctx.project.fps);
-        out.push(point(t, "ramp", clamp((fastest - speeds[i]!) / 4, 0.4, 1), "impact", { x: screenX(ctx, clip, t), ids: [clip.id], label: `speed ramp brakes (${fastest.toFixed(1)}x to ${speeds[i]!.toFixed(2)}x)` }));
-        armed = false;
+      slowest = Math.min(slowest, speeds[i - 1]!);
+      if (speeds[i - 1]! <= 0.7) slowEnd = i;
+      if (fastest >= 1.5 && v <= 0.6 && speeds[i - 1]! > 0.6) {
+        const t = at(i);
+        out.push(point(t, "ramp", clamp((fastest - v) / 4, 0.4, 1), "impact", { x: screenX(ctx, clip, t), ids: [clip.id], label: `speed ramp brakes (${fastest.toFixed(1)}x to ${v.toFixed(2)}x)` }));
         fastest = 0;
+      }
+      if (slowest <= 0.7 && v >= RUSH && speeds[i - 1]! < RUSH) {
+        // The rush peaks where the speed tops out after the crossing.
+        let k = i;
+        while (k + 1 < speeds.length && speeds[k + 1]! >= speeds[k]!) k += 1;
+        const t = at(k);
+        out.push(point(t, "ramp", clamp((speeds[k]! - slowest) / 4, 0.3, 0.9), "move", { event: "whoosh", x: screenX(ctx, clip, t), lead: Math.max(0.1, t - at(slowEnd)), ids: [clip.id], label: `speed ramp rushes (${slowest.toFixed(2)}x to ${speeds[k]!.toFixed(1)}x)` }));
+        slowest = Infinity;
       }
     }
   }
