@@ -45,7 +45,6 @@ function clamp01(v: number): number {
   return v < 1 ? (v > 0 ? v : 0) : 1;
 }
 
-
 /** `t*t*(3 - 2t)` (the fused `3 - 2t`). */
 function smooth(t: number): number {
   return f32(f32(t * t) * fmaf(t, -2, 3));
