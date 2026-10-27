@@ -1,10 +1,10 @@
 import { createRequire as __zenviCreateRequire } from 'node:module';
 const require = __zenviCreateRequire(import.meta.url);
 
-// ../render-node/src/render/composite-worker.ts
+// packages/render-node/src/render/composite-worker.ts
 import { parentPort } from "node:worker_threads";
 
-// ../engine/src/render/pixels.ts
+// packages/engine/src/render/pixels.ts
 function createPremul(width, height) {
   const w = Math.max(0, Math.trunc(width));
   const h = Math.max(0, Math.trunc(height));
@@ -60,6 +60,10 @@ function unpremulChannel(c, a) {
   if (a === 0) return 0;
   return Math.floor((c * INV_PREMUL_FACTOR[a] + 32768) / 65536);
 }
+var LITTLE_ENDIAN = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+function words(data) {
+  return LITTLE_ENDIAN && data.byteOffset % 4 === 0 && data.length % 4 === 0 ? new Uint32Array(data.buffer, data.byteOffset, data.length / 4) : null;
+}
 function premultiply(src, out) {
   const target = out ?? createPremul(src.width, src.height);
   if (target.width !== src.width || target.height !== src.height) {
@@ -67,6 +71,24 @@ function premultiply(src, out) {
   }
   const s = src.data;
   const d = target.data;
+  const s32 = words(s);
+  const d32 = s32 && words(d);
+  if (s32 && d32) {
+    for (let j = 0; j < s32.length; j += 1) {
+      const v = s32[j];
+      const a = v >>> 24;
+      if (a === 255) d32[j] = v;
+      else if (a === 0) d32[j] = 0;
+      else {
+        const i = j * 4;
+        d[i] = byteMul(s[i], a);
+        d[i + 1] = byteMul(s[i + 1], a);
+        d[i + 2] = byteMul(s[i + 2], a);
+        d[i + 3] = a;
+      }
+    }
+    return target;
+  }
   for (let i = 0; i < s.length; i += 4) {
     const a = s[i + 3];
     if (a === 255) {
@@ -95,6 +117,25 @@ function unpremultiply(src, out) {
   }
   const s = src.data;
   const d = target.data;
+  const s32 = words(s);
+  const d32 = s32 && words(d);
+  if (s32 && d32) {
+    for (let j = 0; j < s32.length; j += 1) {
+      const v = s32[j];
+      const a = v >>> 24;
+      if (a === 255) d32[j] = v;
+      else if (a === 0) d32[j] = 0;
+      else {
+        const i = j * 4;
+        const inv = INV_PREMUL_FACTOR[a];
+        d[i] = Math.floor((s[i] * inv + 32768) / 65536);
+        d[i + 1] = Math.floor((s[i + 1] * inv + 32768) / 65536);
+        d[i + 2] = Math.floor((s[i + 2] * inv + 32768) / 65536);
+        d[i + 3] = a;
+      }
+    }
+    return target;
+  }
   for (let i = 0; i < s.length; i += 4) {
     const a = s[i + 3];
     if (a === 255) {
@@ -118,7 +159,7 @@ function unpremultiply(src, out) {
   return target;
 }
 
-// ../engine/src/model/fma.ts
+// packages/engine/src/model/fma.ts
 var SPLITTER = 134217729;
 function productError(a, b, p) {
   let t = SPLITTER * a;
@@ -130,21 +171,21 @@ function productError(a, b, p) {
   return ah * bh - p + ah * bl + al * bh + al * bl;
 }
 var bits = new Float64Array(1);
-var words = new Uint32Array(bits.buffer);
+var words2 = new Uint32Array(bits.buffer);
 var LOW = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? 0 : 1;
 var HIGH = 1 - LOW;
 function roundToOdd(s, err) {
   if (err === 0 || s === 0) return s;
   bits[0] = s;
-  if ((words[LOW] & 1) === 1) return s;
+  if ((words2[LOW] & 1) === 1) return s;
   const awayFromZero = s > 0 === err > 0;
   if (awayFromZero) {
-    const low = words[LOW] + 1 >>> 0;
-    words[LOW] = low;
-    if (low === 0) words[HIGH] = words[HIGH] + 1 >>> 0;
+    const low = words2[LOW] + 1 >>> 0;
+    words2[LOW] = low;
+    if (low === 0) words2[HIGH] = words2[HIGH] + 1 >>> 0;
   } else {
-    if (words[LOW] === 0) words[HIGH] = words[HIGH] - 1 >>> 0;
-    words[LOW] = words[LOW] - 1 >>> 0;
+    if (words2[LOW] === 0) words2[HIGH] = words2[HIGH] - 1 >>> 0;
+    words2[LOW] = words2[LOW] - 1 >>> 0;
   }
   return bits[0];
 }
@@ -161,7 +202,7 @@ function fma(a, b, c) {
   return th + roundToOdd(s, err);
 }
 
-// ../engine/src/render/qt/fma.ts
+// packages/engine/src/render/qt/fma.ts
 var f64 = new Float64Array(1);
 var u32 = new Uint32Array(f64.buffer);
 var LO = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? 0 : 1;
@@ -270,7 +311,7 @@ function fmaExact(a, b, c) {
   return roundToDouble(pm + cm, pe);
 }
 
-// ../engine/src/render/kernels/params.ts
+// packages/engine/src/render/kernels/params.ts
 function isRecord(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -339,7 +380,7 @@ function readerPath(params, key) {
   return typeof path3 === "string" && path3.length > 0 ? path3 : void 0;
 }
 
-// ../engine/src/render/kernels/analog-tape.ts
+// packages/engine/src/render/kernels/analog-tape.ts
 var f32 = Math.fround;
 var FNV_PRIME = 16777619;
 function utf8(text2) {
@@ -695,7 +736,7 @@ function hash01Tail(h, c) {
   return f32(fnv1aWord(h, c)) / 4294967296;
 }
 
-// ../engine/src/render/qt/smooth-scale.ts
+// packages/engine/src/render/qt/smooth-scale.ts
 function calcPoints(s, d) {
   const p = new Int32Array(d);
   const up = d >= s;
@@ -881,7 +922,7 @@ function smoothScale(src, dw, dh) {
   return out;
 }
 
-// ../engine/src/render/kernels/audio-visualization-analysis.ts
+// packages/engine/src/render/kernels/audio-visualization-analysis.ts
 var f322 = Math.fround;
 function clampf(v, lo, hi) {
   const m = v < hi ? v : hi;
@@ -1024,10 +1065,10 @@ function spectrumBins(audio, bins, gain, smooth2, lowHz, highHz) {
   return result;
 }
 function mt19937Floats(seed, count) {
-  const words2 = 397 + count + 1;
-  const mt = new Uint32Array(words2);
+  const words3 = 397 + count + 1;
+  const mt = new Uint32Array(words3);
   mt[0] = seed >>> 0;
-  for (let i = 1; i < words2; i += 1) {
+  for (let i = 1; i < words3; i += 1) {
     const prev = mt[i - 1];
     mt[i] = Math.imul(1812433253, (prev ^ prev >>> 30) >>> 0) + i >>> 0;
   }
@@ -1044,7 +1085,7 @@ function mt19937Floats(seed, count) {
   return out;
 }
 
-// ../engine/src/render/kernels/audio-visualization-color.ts
+// packages/engine/src/render/kernels/audio-visualization-color.ts
 function rgb8(r, g, b, a = 255) {
   return { r: r * 257, g: g * 257, b: b * 257, a: a * 257 };
 }
@@ -1229,7 +1270,7 @@ function verticalStyleFill(x0, y0, x1, y1, palette, style, alphaScale = 1) {
   return { kind: "linear", x1: x0, y1: y0, x2: x1, y2: y1, stops };
 }
 
-// ../engine/src/render/qt/compose.ts
+// packages/engine/src/render/qt/compose.ts
 var CompositionMode = {
   SourceOver: 0,
   DestinationOver: 1,
@@ -1507,7 +1548,7 @@ function composerFor(mode) {
   return COMPOSERS[mode] ?? sourceOver;
 }
 
-// ../engine/src/render/qt/gray-raster.ts
+// packages/engine/src/render/qt/gray-raster.ts
 function grayRasterize(contours, oddEven, width, height) {
   const outline = contours.filter((c) => c.length >= 4).map((c) => c.map((v) => Math.floor(v * 64 + 0.5)));
   if (outline.length === 0) return null;
@@ -1762,7 +1803,7 @@ function grayRasterize(contours, oddEven, width, height) {
   return { x: minEx, y: minEy, width: countEx, height: countEy, data };
 }
 
-// ../engine/src/render/qt/rasterizer.ts
+// packages/engine/src/render/qt/rasterizer.ts
 function clipBoxFor(width, height) {
   return { left: 0, top: 0, right: width - 1, bottom: height - 1 };
 }
@@ -2309,7 +2350,7 @@ function maskSpans(mask2, sink) {
   }
 }
 
-// ../engine/src/render/kernels/audio-visualization-stroke.ts
+// packages/engine/src/render/kernels/audio-visualization-stroke.ts
 var MOVE_TO = 0;
 var LINE_TO = 1;
 var CURVE_TO = 2;
@@ -3099,7 +3140,7 @@ function flattenPath(path3, device) {
   return contours;
 }
 
-// ../engine/src/render/kernels/audio-visualization-cosmetic.ts
+// packages/engine/src/render/kernels/audio-visualization-cosmetic.ts
 var CAP_BEGIN = 1;
 var CAP_END = 2;
 var NO_DIRECTION = 0;
@@ -3664,7 +3705,7 @@ function splitCubic(pts, base) {
   }
 }
 
-// ../engine/src/render/kernels/audio-visualization-paint.ts
+// packages/engine/src/render/kernels/audio-visualization-paint.ts
 function premultipliedBytes(c) {
   const a = c.a;
   if (a === 65535) return [div257(c.r), div257(c.g), div257(c.b), 255];
@@ -4266,7 +4307,7 @@ var Painter = class {
   }
 };
 
-// ../engine/src/render/kernels/audio-visualization.ts
+// packages/engine/src/render/kernels/audio-visualization.ts
 var WAVEFORM = 0;
 var FILLED_WAVEFORM = 1;
 var BARS = 2;
@@ -4800,7 +4841,7 @@ var audioVisualization = {
   }
 };
 
-// ../engine/src/model/types.ts
+// packages/engine/src/model/types.ts
 var Interpolation = {
   BEZIER: 0,
   LINEAR: 1,
@@ -4811,7 +4852,7 @@ var HandleType = {
   MANUAL: 1
 };
 
-// ../engine/src/model/rounding.ts
+// packages/engine/src/model/rounding.ts
 function roundHalfAway(x) {
   if (!Number.isFinite(x)) return x;
   const a = Math.abs(x);
@@ -4824,7 +4865,7 @@ function truncInt(x) {
   return t === 0 ? 0 : t;
 }
 
-// ../engine/src/keyframe/points.ts
+// packages/engine/src/keyframe/points.ts
 var DEFAULT_HANDLE_LEFT = Object.freeze({ X: 0.5, Y: 1 });
 var DEFAULT_HANDLE_RIGHT = Object.freeze({ X: 0.5, Y: 0 });
 function num2(value) {
@@ -4897,7 +4938,7 @@ function resolvePoints(kf) {
   return out;
 }
 
-// ../engine/src/keyframe/evaluate.ts
+// packages/engine/src/keyframe/evaluate.ts
 var BEZIER_ALLOWED_ERROR = 0.01;
 var BEZIER_MAX_ITERATIONS = 100;
 function linear(left, right, target) {
@@ -4964,7 +5005,7 @@ function evaluate(kf, frame, fallback) {
   return valueAtResolved(resolvePoints(kf), truncInt(frame));
 }
 
-// ../engine/src/render/plan/effect-params.ts
+// packages/engine/src/render/plan/effect-params.ts
 function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -5037,7 +5078,7 @@ var DENOISE_RESPONSE_NODES = Object.freeze([
   { id: 2, x: 1, y: 0.2, interpolation: 1 }
 ]);
 
-// ../engine/src/render/kernels/beat-sync.ts
+// packages/engine/src/render/kernels/beat-sync.ts
 var f323 = Math.fround;
 var TWO_PI_F2 = f323(2 * f323(Math.PI));
 var ONE_24TH = f323(1 / 24);
@@ -5153,7 +5194,7 @@ var beatSync = {
   }
 };
 
-// ../engine/src/render/qt/blit.ts
+// packages/engine/src/render/qt/blit.ts
 function blendPixel(d, di, s, si, constAlpha255) {
   if (constAlpha255 === 255) {
     const sa = s[si + 3];
@@ -5335,7 +5376,7 @@ function fastScaled(src, w, h) {
   return out;
 }
 
-// ../engine/src/render/qt/rect.ts
+// packages/engine/src/render/qt/rect.ts
 function qrect(x, y, w, h) {
   return { x1: x, y1: y, x2: x + w - 1, y2: y + h - 1 };
 }
@@ -5374,7 +5415,7 @@ function intersected(a, b) {
   return { x1: Math.max(l1, l2), x2: Math.min(r1, r2), y1: Math.max(t1, t2), y2: Math.min(b1, b2) };
 }
 
-// ../engine/src/render/kernels/blur.ts
+// packages/engine/src/render/kernels/blur.ts
 var f324 = Math.fround;
 function clampMargin(v) {
   return v < 0 ? 0 : v > 1 ? 1 : v;
@@ -5517,7 +5558,7 @@ var pixelate = {
   }
 };
 
-// ../engine/src/render/kernels/text-layout.ts
+// packages/engine/src/render/kernels/text-layout.ts
 var F64 = new Float64Array(1);
 var U64 = new BigUint64Array(F64.buffer);
 function decompose2(x) {
@@ -5897,7 +5938,7 @@ var approximateMetrics = {
   }
 };
 
-// ../engine/src/render/kernels/caption.ts
+// packages/engine/src/render/kernels/caption.ts
 var CAPTION_DEFAULT_TEXT = "00:00:00:000 --> 00:10:00:000\nEdit this caption with our caption editor";
 var CUE_PATTERN = /(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})[\t\n\v\f\r ]*-->[\t\n\v\f\r ]*(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})([\s\S]*?)([^\n]*?)(?=\d{2}:\d{2,3}|\n?$)/gu;
 function groupValue(g) {
@@ -5993,16 +6034,16 @@ function layoutCaption(params, width, height, frame, fps, measure) {
     for (const line2 of cue.lines) {
       fadeIn = fadeInValue > 0 ? f3219(f3219(frame) - f3219(first)) / fadeInValue : 1;
       fadeOut = fadeOutValue > 0 ? 1 - (f3219(frame) - (f3219(last) - fadeOutValue)) / fadeOutValue : -1;
-      let words2 = line2.split(" ");
+      let words3 = line2.split(" ");
       let useSpaces = true;
-      if (line2.length > 20 && words2.length === 1) {
-        words2 = ["", ...line2.split(""), ""];
+      if (line2.length > 20 && words3.length === 1) {
+        words3 = ["", ...line2.split(""), ""];
         useSpaces = false;
       }
-      while (words2.length > 0) {
+      while (words3.length > 0) {
         let displayed = false;
-        for (let wordIndex = words2.length; wordIndex > 0; wordIndex -= 1) {
-          const part = words2.slice(0, wordIndex);
+        for (let wordIndex = words3.length; wordIndex > 0; wordIndex -= 1) {
+          const part = words3.slice(0, wordIndex);
           if (measureWidth(part.join(" ")) <= captionAreaWidth) {
             const text2 = useSpaces ? part.join(" ") : part.join("");
             const x = Math.trunc(leftMarginX);
@@ -6010,7 +6051,7 @@ function layoutCaption(params, width, height, frame, fps, measure) {
             const ink = text2.length > 0 ? measure.inkBounds(text2, font) : { x: 0, y: 0, width: 0, height: 0 };
             const bounds2 = pathBounds(ink, text2, x, y);
             lines.push({ text: text2, x, y, ink, bounds: bounds2 });
-            words2 = words2.slice(wordIndex);
+            words3 = words3.slice(wordIndex);
             displayed = true;
             currentY += lineHeight;
             if (bounds2.width > maxTextWidth) maxTextWidth = bounds2.width;
@@ -6074,7 +6115,7 @@ var caption = {
   }
 };
 
-// ../engine/src/render/kernels/chroma-key.ts
+// packages/engine/src/render/kernels/chroma-key.ts
 var f325 = Math.fround;
 var INV_ALPHA = (() => {
   const t = new Float32Array(256);
@@ -6170,7 +6211,7 @@ var chromaKey = {
   }
 };
 
-// ../engine/src/render/kernels/color-basic.ts
+// packages/engine/src/render/kernels/color-basic.ts
 var f326 = Math.fround;
 var INV_255 = f326(1 / 255);
 var INV_ALPHA2 = (() => {
@@ -6335,7 +6376,7 @@ var negate = {
   }
 };
 
-// ../engine/src/render/kernels/cube-lut.ts
+// packages/engine/src/render/kernels/cube-lut.ts
 function isQtSpace(code) {
   if (code === 32 || code >= 9 && code <= 13) return true;
   if (code < 133) return false;
@@ -6462,9 +6503,10 @@ function cachedCubeLut(text2) {
   return lut;
 }
 
-// ../engine/src/render/kernels/color-map.ts
+// packages/engine/src/render/kernels/color-map.ts
 var f327 = Math.fround;
 var INV_2552 = f327(1 / 255);
+var MEMO_BITS = 16;
 function fmaf2(a, b, c) {
   return f327(a * b + c);
 }
@@ -6479,15 +6521,6 @@ function constrainByte(v) {
 function normalizeToDomain(value, min, range) {
   const v = range <= 0 ? value : f327(f327(value - min) / range);
   return v < 0 ? 0 : v > 1 ? 1 : v;
-}
-function trilinear(t, i000, i100, i010, i110, i001, i101, i011, i111, dr, odr, dg, odg, db, odb) {
-  const c00 = fmaf2(t[i000], odr, f327(t[i100] * dr));
-  const c01 = fmaf2(t[i001], odr, f327(t[i101] * dr));
-  const c10 = fmaf2(t[i010], odr, f327(t[i110] * dr));
-  const c11 = fmaf2(t[i011], odr, f327(t[i111] * dr));
-  const c0 = fmaf2(c00, odg, f327(c10 * dg));
-  const c1 = fmaf2(c01, odg, f327(c11 * dg));
-  return fmaf2(c0, odb, f327(c1 * db));
 }
 function sample1d(t, size, value, channel) {
   const count = t.length;
@@ -6517,9 +6550,25 @@ function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB)
   const last = n - 1;
   const is3d = lut.kind === "3d";
   const d = image.data;
+  const memoRgb = new Int32Array(1 << MEMO_BITS).fill(-1);
+  const memoOut = new Int32Array(1 << MEMO_BITS);
   for (let i = 0; i < d.length; i += 4) {
-    const alpha = f327(d[i + 3] / 255);
-    if (alpha === 0) continue;
+    const A = d[i + 3];
+    if (A === 0) continue;
+    let rgb = -1;
+    let slot = 0;
+    if (A === 255) {
+      rgb = d[i] << 16 | d[i + 1] << 8 | d[i + 2];
+      slot = Math.imul(rgb, 2654435761) >>> 32 - MEMO_BITS;
+      if (memoRgb[slot] === rgb) {
+        const out = memoOut[slot];
+        d[i] = out >>> 16;
+        d[i + 1] = out >>> 8 & 255;
+        d[i + 2] = out & 255;
+        continue;
+      }
+    }
+    const alpha = f327(A / 255);
     const rn = f327(f327(d[i] / alpha) * INV_2552);
     const gn = f327(f327(d[i + 1] / alpha) * INV_2552);
     const bn = f327(f327(d[i + 2] / alpha) * INV_2552);
@@ -6557,17 +6606,36 @@ function applyCubeLut(image, lut, intensity, intensityR, intensityG, intensityB)
       const i101 = (b1g0 + r1) * 3;
       const i011 = (b1g1 + r0) * 3;
       const i111 = (b1g1 + r1) * 3;
-      lr = trilinear(t, i000, i100, i010, i110, i001, i101, i011, i111, dr, odr, dg, odg, db, odb);
-      lg = trilinear(t, i000 + 1, i100 + 1, i010 + 1, i110 + 1, i001 + 1, i101 + 1, i011 + 1, i111 + 1, dr, odr, dg, odg, db, odb);
-      lb = trilinear(t, i000 + 2, i100 + 2, i010 + 2, i110 + 2, i001 + 2, i101 + 2, i011 + 2, i111 + 2, dr, odr, dg, odg, db, odb);
+      let c00 = f327(t[i000] * odr + f327(t[i100] * dr));
+      let c01 = f327(t[i001] * odr + f327(t[i101] * dr));
+      let c10 = f327(t[i010] * odr + f327(t[i110] * dr));
+      let c11 = f327(t[i011] * odr + f327(t[i111] * dr));
+      lr = f327(f327(c00 * odg + f327(c10 * dg)) * odb + f327(f327(c01 * odg + f327(c11 * dg)) * db));
+      c00 = f327(t[i000 + 1] * odr + f327(t[i100 + 1] * dr));
+      c01 = f327(t[i001 + 1] * odr + f327(t[i101 + 1] * dr));
+      c10 = f327(t[i010 + 1] * odr + f327(t[i110 + 1] * dr));
+      c11 = f327(t[i011 + 1] * odr + f327(t[i111 + 1] * dr));
+      lg = f327(f327(c00 * odg + f327(c10 * dg)) * odb + f327(f327(c01 * odg + f327(c11 * dg)) * db));
+      c00 = f327(t[i000 + 2] * odr + f327(t[i100 + 2] * dr));
+      c01 = f327(t[i001 + 2] * odr + f327(t[i101 + 2] * dr));
+      c10 = f327(t[i010 + 2] * odr + f327(t[i110 + 2] * dr));
+      c11 = f327(t[i011 + 2] * odr + f327(t[i111 + 2] * dr));
+      lb = f327(f327(c00 * odg + f327(c10 * dg)) * odb + f327(f327(c01 * odg + f327(c11 * dg)) * db));
     } else {
       lr = sample1d(t, n, rd, 0);
       lg = sample1d(t, n, gd, 1);
       lb = sample1d(t, n, bd, 2);
     }
-    d[i] = constrainByte(f327(f327(alpha * fmaf2(lr, tR, f327(rn * keepR))) * 255));
-    d[i + 1] = constrainByte(f327(f327(alpha * fmaf2(lg, tG, f327(gn * keepG))) * 255));
-    d[i + 2] = constrainByte(f327(f327(alpha * fmaf2(lb, tB, f327(bn * keepB))) * 255));
+    const r8 = constrainByte(f327(f327(alpha * fmaf2(lr, tR, f327(rn * keepR))) * 255));
+    const g8 = constrainByte(f327(f327(alpha * fmaf2(lg, tG, f327(gn * keepG))) * 255));
+    const b8 = constrainByte(f327(f327(alpha * fmaf2(lb, tB, f327(bn * keepB))) * 255));
+    d[i] = r8;
+    d[i + 1] = g8;
+    d[i + 2] = b8;
+    if (A === 255) {
+      memoRgb[slot] = rgb;
+      memoOut[slot] = r8 << 16 | g8 << 8 | b8;
+    }
   }
 }
 function lutForPath(ctx, path3) {
@@ -6592,7 +6660,7 @@ var colorMap = {
   }
 };
 
-// ../engine/src/render/kernels/color-grade.ts
+// packages/engine/src/render/kernels/color-grade.ts
 var f328 = Math.fround;
 var INV_2553 = f328(1 / 255);
 var EPSILON = f328(1e-5);
@@ -6622,7 +6690,7 @@ function luma(r, g, b) {
 function sampleCurve2(lut, v) {
   return lut[Math.trunc(f328(v * 255 + 0.5))];
 }
-var MEMO_BITS = 16;
+var MEMO_BITS2 = 16;
 var INV_ALPHA3 = (() => {
   const t = new Float32Array(256);
   for (let i = 1; i < 256; i += 1) t[i] = f328(255 / i);
@@ -6938,8 +7006,8 @@ var colorGrade = {
     const [hR, hG, hB] = useWheels ? wheelBias(record(wheels, "highlights")) : NO_BIAS;
     const minusTint = -tint2;
     const d = image.data;
-    const memoRgb = new Int32Array(1 << MEMO_BITS).fill(-1);
-    const memoOut = new Int32Array(1 << MEMO_BITS);
+    const memoRgb = new Int32Array(1 << MEMO_BITS2).fill(-1);
+    const memoOut = new Int32Array(1 << MEMO_BITS2);
     for (let i = 0; i < d.length; i += 4) {
       const A = d[i + 3];
       if (A === 0) continue;
@@ -6950,7 +7018,7 @@ var colorGrade = {
       let slot = 0;
       if (A === 255) {
         rgb = d[i] << 16 | d[i + 1] << 8 | d[i + 2];
-        slot = Math.imul(rgb, 2654435761) >>> 32 - MEMO_BITS;
+        slot = Math.imul(rgb, 2654435761) >>> 32 - MEMO_BITS2;
         if (memoRgb[slot] === rgb) {
           const out = memoOut[slot];
           d[i] = out >>> 16;
@@ -7051,7 +7119,7 @@ var colorGrade = {
   }
 };
 
-// ../engine/src/render/kernels/denoise.ts
+// packages/engine/src/render/kernels/denoise.ts
 var f329 = Math.fround;
 var INV_2554 = f329(1 / 255);
 var INV_255_THIRD = f329(INV_2554 / 3);
@@ -7335,7 +7403,7 @@ var denoiseImage = {
   }
 };
 
-// ../engine/src/render/kernels/image-cache.ts
+// packages/engine/src/render/kernels/image-cache.ts
 var cache = /* @__PURE__ */ new WeakMap();
 function cached(source2, key, make) {
   let bySize = cache.get(source2);
@@ -7365,7 +7433,7 @@ function scaledPremul(source2, width, height, delivered) {
   });
 }
 
-// ../engine/src/render/kernels/displace.ts
+// packages/engine/src/render/kernels/displace.ts
 var f3210 = Math.fround;
 var MIN_CONTRAST_DIVISOR = f3210(1e-5);
 function displaceMapPath(params) {
@@ -7445,7 +7513,7 @@ function displaceKernel(image, params, ctx) {
 }
 var displace = { type: "Displace", supported: true, run: displaceKernel };
 
-// ../engine/src/render/kernels/effect-mask.ts
+// packages/engine/src/render/kernels/effect-mask.ts
 var f3211 = Math.fround;
 function blendWithMask(original, effected, mask2, invert) {
   const o = original.data;
@@ -7478,7 +7546,7 @@ function blendVaryStrength(original, effected, mask2, invert) {
   }
 }
 
-// ../engine/src/render/kernels/film-grain.ts
+// packages/engine/src/render/kernels/film-grain.ts
 var f3212 = Math.fround;
 var INV_2555 = f3212(1 / 255);
 var EPSILON2 = f3212(1e-5);
@@ -7501,11 +7569,6 @@ function fmaf4(a, b, c) {
 }
 function clamp014(v) {
   return v < 1 ? v > 0 ? v : 0 : 1;
-}
-function clampByte4(v) {
-  if (v <= 0) return 0;
-  if (v >= 255) return 255;
-  return Math.trunc(f3212(v + 0.5));
 }
 function smooth(t) {
   return f3212(f3212(t * t) * fmaf4(t, -2, 3));
@@ -7582,6 +7645,7 @@ var filmGrain = {
     const useVariation = colorAmount > EPSILON2 && colorVariation > EPSILON2;
     const numTimes = useTemporal ? 2 : 1;
     const numSalts = useVariation ? 4 : 1;
+    const allStages = useTemporal && useSoft && useClump && useVariation;
     const buckets = [time0, time1];
     const width = image.width;
     const height = image.height;
@@ -7616,41 +7680,117 @@ var filmGrain = {
       }
     }
     const lastX = width - 1;
-    const fineNoise = new Float32Array((fineIxOf[lastX] + 1) * 8);
-    const fineStamp = new Int32Array(fineIxOf[lastX] + 1).fill(-1);
-    const softTop = new Float32Array((softIxOf[lastX] + 2) * 8);
-    const softBottom = new Float32Array((softIxOf[lastX] + 2) * 8);
-    const softStamp = new Int32Array(softIxOf[lastX] + 2).fill(-1);
-    const clumpTop = new Float32Array((clumpIxOf[lastX] + 2) * 4);
-    const clumpBottom = new Float32Array((clumpIxOf[lastX] + 2) * 4);
-    const clumpStamp = new Int32Array(clumpIxOf[lastX] + 2).fill(-1);
-    const softCol0 = new Float32Array(8);
-    const softCol1 = new Float32Array(8);
-    const clumpCol0 = new Float32Array(4);
-    const clumpCol1 = new Float32Array(4);
-    const grains = new Float32Array(4);
+    const fineCols = fineIxOf[lastX] + 1;
+    const softCols = softIxOf[lastX] + 2;
+    const clumpCols = clumpIxOf[lastX] + 2;
+    const fineNoise = new Float32Array(fineCols * 8);
+    const softTop = new Float32Array(softCols * 8);
+    const softBottom = new Float32Array(softCols * 8);
+    const softRow = new Float32Array(softCols * 8);
+    const softStep = new Float32Array(softCols * 8);
+    const clumpTop = new Float32Array(clumpCols * 4);
+    const clumpBottom = new Float32Array(clumpCols * 4);
+    const clumpRow = new Float32Array(clumpCols * 4);
+    const clumpStep = new Float32Array(clumpCols * 4);
+    const grainRows = new Float32Array(numSalts * width);
+    let fineRowIy = -1;
+    let softRowIy = -1;
+    let clumpRowIy = -1;
     const d = image.data;
     for (let y = 0; y < height; y += 1) {
       const refY = f3212(y * scaleY);
       const fineIy = Math.trunc(f3212(refY * fineFrequency));
-      let softIy0 = 0;
-      let softSy = 0;
+      if (fineIy !== fineRowIy) {
+        fineRowIy = fineIy;
+        for (let c = 0; c < fineCols; c += 1) {
+          for (let t = 0; t < numTimes; t += 1) {
+            for (let s = 0; s < numSalts; s += 1) fineNoise[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, fineIy, buckets[t], SALTS[s]);
+          }
+        }
+      }
       if (useSoft) {
         const sry = f3212(refY * softFrequency);
-        softIy0 = Math.trunc(sry);
-        softSy = smooth(f3212(sry - softIy0));
+        const softIy0 = Math.trunc(sry);
+        const softSy = smooth(f3212(sry - softIy0));
+        if (softIy0 !== softRowIy) {
+          softRowIy = softIy0;
+          for (let c = 0; c < softCols; c += 1) {
+            for (let t = 0; t < numTimes; t += 1) {
+              for (let s = 0; s < numSalts; s += 1) {
+                const salt = (SALTS[s] ^ SOFT_XOR) >>> 0;
+                softTop[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0, buckets[t], salt);
+                softBottom[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0 + 1, buckets[t], salt);
+              }
+            }
+          }
+        }
+        for (let k = 0; k < softRow.length; k += 1) {
+          const n00 = softTop[k];
+          softRow[k] = f3212(f3212(softBottom[k] - n00) * softSy + n00);
+        }
+        for (let k = 0; k + 8 < softRow.length; k += 1) softStep[k] = f3212(softRow[k + 8] - softRow[k]);
       }
-      let clumpIy0 = 0;
-      let clumpSy = 0;
       if (useClump) {
         const cry = f3212(refY * clumpFrequency);
-        clumpIy0 = Math.trunc(cry);
-        clumpSy = smooth(f3212(cry - clumpIy0));
+        const clumpIy0 = Math.trunc(cry);
+        const clumpSy = smooth(f3212(cry - clumpIy0));
+        if (clumpIy0 !== clumpRowIy) {
+          clumpRowIy = clumpIy0;
+          for (let c = 0; c < clumpCols; c += 1) {
+            for (let s = 0; s < numSalts; s += 1) {
+              const salt = (SALTS[s] ^ CLUMP_XOR) >>> 0;
+              clumpTop[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0, time0, salt);
+              clumpBottom[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0 + 1, time0, salt);
+            }
+          }
+        }
+        for (let k = 0; k < clumpRow.length; k += 1) {
+          const n00 = clumpTop[k];
+          clumpRow[k] = f3212(f3212(clumpBottom[k] - n00) * clumpSy + n00);
+        }
+        for (let k = 0; k + 4 < clumpRow.length; k += 1) clumpStep[k] = f3212(clumpRow[k + 4] - clumpRow[k]);
       }
-      let cachedFineIx = -1;
-      let fineAt = 0;
-      let cachedSoftIx0 = -1;
-      let cachedClumpIx0 = -1;
+      if (allStages) {
+        for (let x = 0; x < width; x += 1) {
+          const fine = fineIxOf[x] * 8;
+          const soft = softIxOf[x] * 8;
+          const at = clumpIxOf[x] * 4;
+          const softSx = softSxOf[x];
+          const clumpSx = clumpSxOf[x];
+          for (let s = 0; s < 4; s += 1) {
+            let g0 = fineNoise[fine + s];
+            let g1 = fineNoise[fine + 4 + s];
+            g0 = f3212(f3212(f3212(softStep[soft + s] * softSx + softRow[soft + s]) - g0) * softness + g0);
+            g1 = f3212(f3212(f3212(softStep[soft + 4 + s] * softSx + softRow[soft + 4 + s]) - g1) * softness + g1);
+            const cluster = f3212(clumpStep[at + s] * clumpSx + clumpRow[at + s]);
+            const target = f3212(Math.abs(cluster) * CLUSTER_SCALE + CLUSTER_BASE);
+            const grain = f3212(f3212(f3212(g1 - g0) * smoothMix + g0) * f3212(f3212(target - 1) * clump + 1));
+            grainRows[x * 4 + s] = grain;
+          }
+        }
+      } else {
+        for (let s = 0; s < numSalts; s += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const fine = fineIxOf[x] * 8 + s;
+            let g0 = fineNoise[fine];
+            let g1 = useTemporal ? fineNoise[fine + 4] : 0;
+            if (useSoft) {
+              const soft = softIxOf[x] * 8 + s;
+              const softSx = softSxOf[x];
+              g0 = f3212(f3212(f3212(softStep[soft] * softSx + softRow[soft]) - g0) * softness + g0);
+              if (useTemporal) g1 = f3212(f3212(f3212(softStep[soft + 4] * softSx + softRow[soft + 4]) - g1) * softness + g1);
+            }
+            let grain = useTemporal ? f3212(f3212(g1 - g0) * smoothMix + g0) : g0;
+            if (useClump) {
+              const at = clumpIxOf[x] * 4 + s;
+              const cluster = f3212(clumpStep[at] * clumpSxOf[x] + clumpRow[at]);
+              const target = f3212(Math.abs(cluster) * CLUSTER_SCALE + CLUSTER_BASE);
+              grain = f3212(grain * f3212(f3212(target - 1) * clump + 1));
+            }
+            grainRows[x * numSalts + s] = grain;
+          }
+        }
+      }
       for (let x = 0; x < width; x += 1) {
         const i = (y * width + x) * 4;
         const A = d[i + 3];
@@ -7668,131 +7808,50 @@ var filmGrain = {
           G = f3212(f3212(d[i + 1] * inv) * INV_2555);
           B = f3212(f3212(d[i + 2] * inv) * INV_2555);
         }
-        const L = fmaf4(LUMA_B3, B, fmaf4(R, LUMA_R3, f3212(LUMA_G3 * G)));
+        const L = f3212(LUMA_B3 * B + f3212(R * LUMA_R3 + f3212(LUMA_G3 * G)));
         const dark = f3212(1 - L);
         const centered = f3212(Math.abs(f3212(L - 0.5)) * 2);
-        const midtone = clamp014(f3212(1 - centered * centered));
-        const tone = fmaf4(f3212(L * L), highlightStrength, fmaf4(f3212(dark * dark), shadowStrength, f3212(midtoneStrength * midtone)));
+        const m = f3212(1 - centered * centered);
+        const midtone = m < 1 ? m > 0 ? m : 0 : 1;
+        const tone = f3212(f3212(L * L) * highlightStrength + f3212(f3212(dark * dark) * shadowStrength + f3212(midtoneStrength * midtone)));
         if (tone <= EPSILON2) continue;
-        const fineIx = fineIxOf[x];
-        if (fineIx !== cachedFineIx) {
-          cachedFineIx = fineIx;
-          fineAt = fineIx * 8;
-          if (fineStamp[fineIx] !== fineIy) {
-            fineStamp[fineIx] = fineIy;
-            for (let t = 0; t < numTimes; t += 1) {
-              for (let s = 0; s < numSalts; s += 1) fineNoise[fineAt + t * 4 + s] = hashSigned(baseSeed, fineIx, fineIy, buckets[t], SALTS[s]);
-            }
-          }
-        }
-        let softSx = 0;
-        if (useSoft) {
-          const softIx0 = softIxOf[x];
-          if (softIx0 !== cachedSoftIx0) {
-            cachedSoftIx0 = softIx0;
-            for (let c = softIx0; c <= softIx0 + 1; c += 1) {
-              if (softStamp[c] === softIy0) continue;
-              softStamp[c] = softIy0;
-              for (let t = 0; t < numTimes; t += 1) {
-                for (let s = 0; s < numSalts; s += 1) {
-                  const salt = (SALTS[s] ^ SOFT_XOR) >>> 0;
-                  softTop[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0, buckets[t], salt);
-                  softBottom[c * 8 + t * 4 + s] = hashSigned(baseSeed, c, softIy0 + 1, buckets[t], salt);
-                }
-              }
-            }
-            const at0 = softIx0 * 8;
-            const at1 = at0 + 8;
-            for (let t = 0; t < numTimes; t += 1) {
-              for (let s = 0; s < numSalts; s += 1) {
-                const k = t * 4 + s;
-                const n00 = softTop[at0 + k];
-                const n10 = softTop[at1 + k];
-                softCol0[k] = fmaf4(f3212(softBottom[at0 + k] - n00), softSy, n00);
-                softCol1[k] = fmaf4(f3212(softBottom[at1 + k] - n10), softSy, n10);
-              }
-            }
-          }
-          softSx = softSxOf[x];
-        }
-        let clumpSx = 0;
-        if (useClump) {
-          const clumpIx0 = clumpIxOf[x];
-          if (clumpIx0 !== cachedClumpIx0) {
-            cachedClumpIx0 = clumpIx0;
-            for (let c = clumpIx0; c <= clumpIx0 + 1; c += 1) {
-              if (clumpStamp[c] === clumpIy0) continue;
-              clumpStamp[c] = clumpIy0;
-              for (let s = 0; s < numSalts; s += 1) {
-                const salt = (SALTS[s] ^ CLUMP_XOR) >>> 0;
-                clumpTop[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0, time0, salt);
-                clumpBottom[c * 4 + s] = hashSigned(baseSeed, c, clumpIy0 + 1, time0, salt);
-              }
-            }
-            const at0 = clumpIx0 * 4;
-            const at1 = at0 + 4;
-            for (let s = 0; s < numSalts; s += 1) {
-              const n00 = clumpTop[at0 + s];
-              const n10 = clumpTop[at1 + s];
-              clumpCol0[s] = fmaf4(f3212(clumpBottom[at0 + s] - n00), clumpSy, n00);
-              clumpCol1[s] = fmaf4(f3212(clumpBottom[at1 + s] - n10), clumpSy, n10);
-            }
-          }
-          clumpSx = clumpSxOf[x];
-        }
-        for (let s = 0; s < numSalts; s += 1) {
-          let g0 = fineNoise[fineAt + s];
-          if (useSoft) {
-            const soft0 = fmaf4(f3212(softCol1[s] - softCol0[s]), softSx, softCol0[s]);
-            g0 = fmaf4(f3212(soft0 - g0), softness, g0);
-          }
-          let grain = g0;
-          if (useTemporal) {
-            let g1 = fineNoise[fineAt + 4 + s];
-            if (useSoft) {
-              const soft1 = fmaf4(f3212(softCol1[4 + s] - softCol0[4 + s]), softSx, softCol0[4 + s]);
-              g1 = fmaf4(f3212(soft1 - g1), softness, g1);
-            }
-            grain = fmaf4(f3212(g1 - g0), smoothMix, g0);
-          }
-          if (useClump) {
-            const cluster = fmaf4(f3212(clumpCol1[s] - clumpCol0[s]), clumpSx, clumpCol0[s]);
-            const target = fmaf4(Math.abs(cluster), CLUSTER_SCALE, CLUSTER_BASE);
-            grain = f3212(grain * fmaf4(f3212(target - 1), clump, 1));
-          }
-          grains[s] = grain;
-        }
         const strength = f3212(tone * intensityScale);
-        const lumaGrain = grains[0];
+        const at = x * numSalts;
+        const lumaGrain = grainRows[at];
         if (useVariation) {
-          const redGrain = fmaf4(f3212(grains[1] - lumaGrain), colorVariation, lumaGrain);
-          const greenGrain = fmaf4(f3212(grains[2] - lumaGrain), colorVariation, lumaGrain);
-          const blueGrain = fmaf4(f3212(grains[3] - lumaGrain), colorVariation, lumaGrain);
-          R = clamp014(fmaf4(fmaf4(f3212(redGrain - lumaGrain), colorAmount, lumaGrain), strength, R));
-          G = clamp014(fmaf4(fmaf4(f3212(greenGrain - lumaGrain), colorAmount, lumaGrain), strength, G));
-          B = clamp014(fmaf4(fmaf4(f3212(blueGrain - lumaGrain), colorAmount, lumaGrain), strength, B));
+          const redGrain = f3212(f3212(grainRows[at + 1] - lumaGrain) * colorVariation + lumaGrain);
+          const greenGrain = f3212(f3212(grainRows[at + 2] - lumaGrain) * colorVariation + lumaGrain);
+          const blueGrain = f3212(f3212(grainRows[at + 3] - lumaGrain) * colorVariation + lumaGrain);
+          R = f3212(f3212(f3212(redGrain - lumaGrain) * colorAmount + lumaGrain) * strength + R);
+          G = f3212(f3212(f3212(greenGrain - lumaGrain) * colorAmount + lumaGrain) * strength + G);
+          B = f3212(f3212(f3212(blueGrain - lumaGrain) * colorAmount + lumaGrain) * strength + B);
         } else {
           const delta = f3212(lumaGrain * strength);
-          R = clamp014(f3212(R + delta));
-          G = clamp014(f3212(G + delta));
-          B = clamp014(f3212(B + delta));
+          R = f3212(R + delta);
+          G = f3212(G + delta);
+          B = f3212(B + delta);
         }
-        if (A === 255) {
-          d[i] = clampByte4(f3212(R * 255));
-          d[i + 1] = clampByte4(f3212(G * 255));
-          d[i + 2] = clampByte4(f3212(B * 255));
-        } else {
+        R = R < 1 ? R > 0 ? R : 0 : 1;
+        G = G < 1 ? G > 0 ? G : 0 : 1;
+        B = B < 1 ? B > 0 ? B : 0 : 1;
+        let r = f3212(R * 255);
+        let g = f3212(G * 255);
+        let b = f3212(B * 255);
+        if (A !== 255) {
           const ap = f3212(A * INV_2555);
-          d[i] = clampByte4(f3212(ap * f3212(R * 255)));
-          d[i + 1] = clampByte4(f3212(ap * f3212(G * 255)));
-          d[i + 2] = clampByte4(f3212(ap * f3212(B * 255)));
+          r = f3212(ap * r);
+          g = f3212(ap * g);
+          b = f3212(ap * b);
         }
+        d[i] = r <= 0 ? 0 : r >= 255 ? 255 : Math.trunc(f3212(r + 0.5));
+        d[i + 1] = g <= 0 ? 0 : g >= 255 ? 255 : Math.trunc(f3212(g + 0.5));
+        d[i + 2] = b <= 0 ? 0 : b >= 255 ? 255 : Math.trunc(f3212(b + 0.5));
       }
     }
   }
 };
 
-// ../engine/src/render/kernels/geometry.ts
+// packages/engine/src/render/kernels/geometry.ts
 var f3213 = Math.fround;
 function cropRects(params, W, H) {
   const left = num(params, "left", 0);
@@ -8018,7 +8077,7 @@ var bars = {
   }
 };
 
-// ../engine/src/render/qt/transform.ts
+// packages/engine/src/render/qt/transform.ts
 var TxNone = 0;
 var TxTranslate = 1;
 var TxScale = 2;
@@ -8350,7 +8409,7 @@ function scaleIsUniform(t) {
   return type === TxRotate && fuzzyCompare3(xScale2, yScale2);
 }
 
-// ../engine/src/render/kernels/lens-flare.ts
+// packages/engine/src/render/kernels/lens-flare.ts
 var f3214 = Math.fround;
 var USHRT_MAX = 65535;
 function fromRgbF(r, g, b, a) {
@@ -8612,7 +8671,7 @@ function lensFlareKernel(image, params) {
 }
 var lensFlare = { type: "LensFlare", supported: true, run: lensFlareKernel };
 
-// ../engine/src/render/kernels/mask.ts
+// packages/engine/src/render/kernels/mask.ts
 var f3215 = Math.fround;
 var MUL_LUT = (() => {
   const t = new Uint8Array(256 * 256);
@@ -8671,7 +8730,7 @@ var mask = {
   }
 };
 
-// ../engine/src/render/kernels/shadow-glow.ts
+// packages/engine/src/render/kernels/shadow-glow.ts
 var f3216 = Math.fround;
 var DEG_TO_RAD_F = f3216(Math.PI / 180);
 function clampf3(v, lo, hi) {
@@ -8824,7 +8883,7 @@ function glowKernel(image, params) {
 var shadow = { type: "Shadow", supported: true, run: shadowKernel };
 var glow = { type: "Glow", supported: true, run: glowKernel };
 
-// ../engine/src/render/qt/convert.ts
+// packages/engine/src/render/qt/convert.ts
 var f3217 = Math.fround;
 var F322 = new Float32Array(1);
 var U322 = new Uint32Array(F322.buffer);
@@ -8887,7 +8946,7 @@ function unpremultiplyNeon(image) {
   return out;
 }
 
-// ../engine/src/render/kernels/sharpen.ts
+// packages/engine/src/render/kernels/sharpen.ts
 var f3218 = Math.fround;
 function boxesForGauss(sigma) {
   const n = 3;
@@ -9052,7 +9111,7 @@ var sharpen = {
   }
 };
 
-// ../engine/src/render/kernels/spherical.ts
+// packages/engine/src/render/kernels/spherical.ts
 var DEG = Math.PI / 180;
 var HALF_PI = Math.PI / 2;
 var TWO_PI3 = 2 * Math.PI;
@@ -9383,7 +9442,7 @@ function sphericalKernel(image, params, ctx) {
 }
 var sphericalProjection = { type: "SphericalProjection", supported: true, sequential: true, run: sphericalKernel };
 
-// ../engine/src/render/kernels/timer.ts
+// packages/engine/src/render/kernels/timer.ts
 var TimerMode = { CountUp: 0, CountDown: 1, Clock: 2, Timecode: 3, FrameNumber: 4 };
 var TimerTimeSource = { Clip: 0, Source: 1 };
 var TimerFormat = { MmSs: 0, HhMmSs: 1, HhMmSsMs: 2, Timecode: 3, Frames: 4 };
@@ -9611,7 +9670,7 @@ var timer = {
   }
 };
 
-// ../engine/src/render/kernels/registry.ts
+// packages/engine/src/render/kernels/registry.ts
 function unsupported(type) {
   return { type, supported: false, run: () => void 0 };
 }
@@ -9674,7 +9733,7 @@ function processEffect(image, effect, ctx) {
   return out;
 }
 
-// ../engine/src/render/qt/path.ts
+// packages/engine/src/render/qt/path.ts
 var MoveTo = 0;
 var LineTo = 1;
 var CurveTo = 2;
@@ -9903,7 +9962,7 @@ function outlineContours(path3, transform) {
   });
 }
 
-// ../engine/src/render/qt/spans.ts
+// packages/engine/src/render/qt/spans.ts
 var SPAN_BATCH = 256;
 var CLIPPED_BATCH = 256;
 function div2552(x) {
@@ -10048,7 +10107,7 @@ function handleSpans(spans, constAlpha, fetch2, process2) {
   }
 }
 
-// ../engine/src/render/qt/draw-image.ts
+// packages/engine/src/render/qt/draw-image.ts
 var FIXED = 65536;
 var HALF = 32768;
 function setupMatrix(t) {
@@ -10313,7 +10372,7 @@ function roundedRectClip(w, h, radius, transform, width, height) {
   return ClipData.fromMask(grayRasterize(outlineContours(path3, transform), true, width, height));
 }
 
-// ../engine/src/render/cpu/compositor.ts
+// packages/engine/src/render/cpu/compositor.ts
 function createCompositorState() {
   return { effects: /* @__PURE__ */ new Map() };
 }
@@ -10378,7 +10437,9 @@ function applyMasks(image, masks, images) {
 function drawLayer(canvas, plan, layer, index, sources) {
   let image = sourceImage(layer, sources.layers[index]);
   if (!image) return;
-  const images = sources.images ?? EMPTY_IMAGES;
+  const shared3 = sources.images ?? EMPTY_IMAGES;
+  const own = sources.layerImages?.[index];
+  const images = own?.size ? new Map([...shared3, ...own]) : shared3;
   const request = layer.audio;
   const audio = request?.silent ? { sampleRate: request.sampleRate, channels: Array.from({ length: request.channels }, () => new Float32Array(request.samples)) } : sources.audio?.[index] ?? null;
   const extras = { images, texts: sources.texts, text: sources.text, state: sources.state, audio };
@@ -10423,10 +10484,10 @@ function compositeFrame(plan, sources, out) {
   return unpremultiply(canvas, out);
 }
 
-// ../render-node/src/svg/text.ts
+// packages/render-node/src/svg/text.ts
 import { readFileSync } from "node:fs";
 
-// ../../node_modules/@resvg/resvg-wasm/index.mjs
+// node_modules/@resvg/resvg-wasm/index.mjs
 var wasm;
 var heap = new Array(128).fill(void 0);
 heap.push(void 0, null, true, false);
@@ -11005,13 +11066,13 @@ function isCustomFontsOptions(value) {
   return Object.prototype.hasOwnProperty.call(value, "fontBuffers");
 }
 
-// ../render-node/src/svg/fonts.ts
+// packages/render-node/src/svg/fonts.ts
 import { existsSync as existsSync2 } from "node:fs";
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path2 from "node:path";
 
-// ../render-node/src/resources.ts
+// packages/render-node/src/resources.ts
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -11042,7 +11103,7 @@ function bundledFontsDir() {
   return path.join(packageRoot(), "fonts");
 }
 
-// ../render-node/src/svg/fonts.ts
+// packages/render-node/src/svg/fonts.ts
 function cacheDir(env = process.env) {
   const override = env.ZENVI_CACHE_DIR?.trim();
   if (override) return override;
@@ -11352,7 +11413,7 @@ function resolveFonts(index, familyLists) {
   return { files: [...files], fallbackFor, sansSerif, serif, monospace };
 }
 
-// ../render-node/src/svg/opentype.ts
+// packages/render-node/src/svg/opentype.ts
 function tableDirectory(view, faceOffset) {
   const numTables = view.getUint16(faceOffset + 4);
   const tables = {};
@@ -11519,7 +11580,7 @@ function parseOpenType(bytes, faceOffset = 0) {
   };
 }
 
-// ../render-node/src/svg/rasterize.ts
+// packages/render-node/src/svg/rasterize.ts
 import { readFile as readFile2, stat as stat2 } from "node:fs/promises";
 var ready;
 function initResvg() {
@@ -11531,7 +11592,7 @@ function initResvg() {
 }
 var MAX_IMAGE_BYTES = 64 * 1024 * 1024;
 
-// ../render-node/src/svg/text.ts
+// packages/render-node/src/svg/text.ts
 var STYLE_WORDS = /(bold|italic|oblique|light|thin|black|heavy|medium|semibold|demibold|condensed|narrow|extra|ultra)/i;
 function esc(text2) {
   return text2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -11740,7 +11801,7 @@ function nodeTextRasterizer() {
   return shared2;
 }
 
-// ../render-node/src/render/composite-worker.ts
+// packages/render-node/src/render/composite-worker.ts
 var cache2 = /* @__PURE__ */ new Map();
 var state = createCompositorState();
 var text;
@@ -11757,6 +11818,7 @@ async function handle(request) {
   const image = compositeFrame(request.plan, {
     layers: request.layers.map((l) => l ? resolveImage(l) : null),
     images: new Map(request.images.map(([path3, wire]) => [path3, resolveImage(wire)])),
+    layerImages: request.layerImages.map((own) => own ? new Map(own.map(([path3, wire]) => [path3, resolveImage(wire)])) : null),
     texts: new Map(request.texts),
     audio: request.audio,
     text: rasterizer,

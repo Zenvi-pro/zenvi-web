@@ -1,0 +1,47 @@
+/* Shared block styles. Sizes are design px: the frame's shorter side is 1080. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+body { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-kerning: normal; }
+.block { font-family: var(--font-sans); color: var(--ink); }
+.block img { display: block; }
+/* A centred absolutely positioned element; animate it with xPercent/yPercent -50 kept in its tweens. */
+.abs { position: absolute; }
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 24px 60px rgba(10, 12, 20, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.is-dark .glass { border-color: rgba(255, 255, 255, 0.14); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.card { background: var(--surface); border-radius: var(--radius); box-shadow: 0 2px 6px rgba(10, 12, 20, 0.06), 0 24px 64px rgba(10, 12, 20, 0.14); }
+.is-dark .card { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 24px 64px rgba(0, 0, 0, 0.45); border: 1.5px solid var(--line); }
+.mono { font-family: var(--font-mono); }
+.label { font-family: var(--font-mono); font-size: 22px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The pointer used by UI blocks (ui.ts pointer); it presses around its tip. */
+.cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; transform-origin: 21% 12.5%; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3)); z-index: 50; }
+/* Over video (alpha) type gets a soft halo of the palette's paper: TASTE.md §4, never bare text over busy footage. */
+.is-alpha .kh-text, .is-alpha .wr, .is-alpha .ct-number, .is-alpha .ts-line, .is-alpha .hud-label, .is-alpha .hud-title, .is-alpha .lt-rule ~ .lt-mask .lt-role, .is-alpha .lt:not(.is-bar) .lt-name {
+  text-shadow: 0 0 28px color-mix(in srgb, var(--paper) 55%, transparent), 0 1px 4px color-mix(in srgb, var(--paper) 45%, transparent);
+}
+
+.lg-stage { position: absolute; inset: 0; }
+.lg-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lg-glass { position: absolute; overflow: hidden; color: var(--ink); filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.28)); }
+.lg-lens { position: absolute; left: 0; top: 0; }
+/* The lit edge: a hairline that is brighter where it faces the light (top left). */
+.lg-rim { position: absolute; inset: 0; border-radius: inherit; padding: 2px; background: linear-gradient(150deg, rgba(255,255,255,0.85), rgba(255,255,255,0.12) 38%, rgba(255,255,255,0.05) 62%, rgba(255,255,255,0.45)); -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.lg-sweep { position: absolute; inset: 0; border-radius: inherit; padding: 3px; -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); overflow: hidden; }
+.lg-sweep i { position: absolute; top: -50%; bottom: -50%; width: 30%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent); transform-origin: center; }
+.lg-row { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 26px; padding: 0 28px 0 34px; }
+.lg-icon { width: 46px; height: 46px; flex: none; color: var(--ink); opacity: 0.9; }
+.lg-icon .icon, .lg-send .icon, .lg-check .icon { display: block; width: 100%; height: 100%; }
+.lg-text { flex: 1; min-width: 0; font-size: 42px; font-weight: 480; letter-spacing: -0.015em; white-space: nowrap; overflow: hidden; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25); }
+.lg-caret { display: inline-block; width: 3px; height: 1.1em; margin-left: 3px; vertical-align: -0.16em; background: var(--ink); border-radius: 2px; }
+.lg-send { width: 88px; height: 88px; flex: none; border-radius: 50%; background: var(--ink); color: var(--paper); padding: 24px; }
+.lg-results { position: absolute; left: 34px; right: 34px; display: flex; flex-direction: column; gap: 26px; }
+.lg-result { display: flex; align-items: center; gap: 22px; font-size: 36px; font-weight: 500; letter-spacing: -0.01em; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.25); }
+.lg-check { width: 44px; height: 44px; flex: none; border-radius: 50%; background: var(--accent); color: #fff; padding: 10px; }
+.lg-divider { position: absolute; left: 34px; right: 34px; height: 1.5px; background: rgba(255,255,255,0.22); }
+.lg-icon svg, .lg-send svg, .lg-check svg { display: block; width: 100%; height: 100%; }

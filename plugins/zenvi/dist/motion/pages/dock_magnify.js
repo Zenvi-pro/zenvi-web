@@ -1,0 +1,888 @@
+(() => {
+  // packages/motion/src/runtime/easing.ts
+  function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+    const sampleX = (s) => ((ax * s + bx) * s + cx) * s;
+    const sampleY = (s) => ((ay * s + by) * s + cy) * s;
+    const slopeX = (s) => (3 * ax * s + 2 * bx) * s + cx;
+    const solve = (x) => {
+      let s = x;
+      for (let i = 0; i < 8; i += 1) {
+        const err = sampleX(s) - x;
+        if (Math.abs(err) < 1e-7) return s;
+        const d = slopeX(s);
+        if (Math.abs(d) < 1e-6) break;
+        s -= err / d;
+      }
+      let lo = 0;
+      let hi = 1;
+      s = x;
+      for (let i = 0; i < 40; i += 1) {
+        const v = sampleX(s);
+        if (Math.abs(v - x) < 1e-7) return s;
+        if (v < x) lo = s;
+        else hi = s;
+        s = (lo + hi) / 2;
+      }
+      return s;
+    };
+    return (t) => {
+      if (t <= 0) return 0;
+      if (t >= 1) return 1;
+      return sampleY(solve(t));
+    };
+  }
+  function spring(options = {}) {
+    const k = options.stiffness ?? 170;
+    const c = options.damping ?? 18;
+    const m = options.mass ?? 1;
+    const w0 = Math.sqrt(k / m);
+    const zeta = c / (2 * Math.sqrt(k * m));
+    const raw = (tau) => {
+      if (zeta < 1) {
+        const wd = w0 * Math.sqrt(1 - zeta * zeta);
+        return 1 - Math.exp(-zeta * w0 * tau) * (Math.cos(wd * tau) + zeta * w0 / wd * Math.sin(wd * tau));
+      }
+      return 1 - Math.exp(-w0 * tau) * (1 + w0 * tau);
+    };
+    const settle = Math.log(1e3) / (Math.min(zeta, 1) * w0);
+    return (t) => {
+      if (t <= 0) return 0;
+      if (t >= 1) return 1;
+      return raw(t * settle);
+    };
+  }
+  var backOut = (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    const c1 = 1.3;
+    const u = t - 1;
+    return 1 + (c1 + 1) * u * u * u + c1 * u * u;
+  };
+  var EASES = {
+    smooth: cubicBezier(0.33, 0, 0.2, 1),
+    out: cubicBezier(0.16, 1, 0.3, 1),
+    entrance: cubicBezier(0.16, 1, 0.3, 1),
+    in: cubicBezier(0.7, 0, 0.84, 0),
+    exit: cubicBezier(0.7, 0, 0.84, 0),
+    "in-out": cubicBezier(0.65, 0, 0.35, 1),
+    snap: cubicBezier(0.2, 0, 0, 1),
+    linear: (t) => Math.min(1, Math.max(0, t)),
+    hold: (t) => t >= 1 ? 1 : 0,
+    "back-out": backOut,
+    spring: spring()
+  };
+  function resolveEase(ease) {
+    if (ease === void 0) return EASES.smooth;
+    if (typeof ease === "function") return ease;
+    const named = EASES[ease];
+    if (!named) throw new Error(`unknown easing ${String(ease)}`);
+    return named;
+  }
+
+  // packages/motion/src/runtime/rng.ts
+  function hashInts(...values) {
+    let h = 2654435769;
+    for (const v of values) {
+      h = Math.imul(h ^ (v | 0), 2246822507);
+      h ^= h >>> 13;
+      h = Math.imul(h, 3266489909);
+      h ^= h >>> 16;
+    }
+    return h >>> 0;
+  }
+  function random01(seed, ...values) {
+    return hashInts(seed, ...values) / 4294967296;
+  }
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = a + 1831565813 >>> 0;
+      let t = a;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // packages/motion/src/runtime/effects.ts
+  function frameUrl(video, n) {
+    const i = Math.max(0, Math.min(video.frames - 1, n));
+    return video.pattern.replace("{n}", String(i + 1).padStart(5, "0"));
+  }
+  function videoTrack(img, video, pending, start = 0) {
+    return (t) => {
+      const url = frameUrl(video, Math.floor(Math.max(0, t - start) * video.fps + 1e-6));
+      if (img.getAttribute("src") === url) return;
+      img.setAttribute("src", url);
+      if (typeof img.decode === "function") {
+        const p = img.decode().catch(() => void 0);
+        pending.add(p);
+        void p.finally(() => pending.delete(p));
+      }
+    };
+  }
+
+  // packages/motion/src/runtime/interpolate.ts
+  var NUMBER = /-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi;
+  var HEX = /#([0-9a-f]{3,8})\b/gi;
+  function hexToRgba(hex) {
+    let h = hex.slice(1);
+    if (h.length === 3 || h.length === 4) h = [...h].map((c) => c + c).join("");
+    const n = (i) => parseInt(h.slice(i, i + 2), 16);
+    const a = h.length === 8 ? n(6) / 255 : 1;
+    return `rgba(${n(0)}, ${n(2)}, ${n(4)}, ${a})`;
+  }
+  function normalizeColors(text) {
+    return text.replace(HEX, (m) => [4, 5, 7, 9].includes(m.length) ? hexToRgba(m) : m).replace(/\brgb\(([^)]*)\)/g, "rgba($1, 1)");
+  }
+  function parse(text) {
+    const parts = [];
+    const numbers = [];
+    let last = 0;
+    for (const m of text.matchAll(NUMBER)) {
+      parts.push(text.slice(last, m.index));
+      numbers.push(Number(m[0]));
+      last = m.index + m[0].length;
+    }
+    parts.push(text.slice(last));
+    return { parts, numbers };
+  }
+  function format(n) {
+    return String(Math.round(n * 1e4) / 1e4);
+  }
+  function interpolate(a, b, p) {
+    if (typeof a === "number" && typeof b === "number") return a + (b - a) * p;
+    const sa = normalizeColors(String(a));
+    const sb = normalizeColors(String(b));
+    const pa = parse(sa);
+    const pb = parse(sb);
+    const same = pa.numbers.length === pb.numbers.length && pa.parts.every((part, i) => part.replace(/\s+/g, "") === pb.parts[i].replace(/\s+/g, ""));
+    if (!same) return p >= 1 ? b : a;
+    let out2 = pb.parts[0];
+    for (let i = 0; i < pa.numbers.length; i += 1) {
+      let v = pa.numbers[i] + (pb.numbers[i] - pa.numbers[i]) * p;
+      const inColor = /rgba\($|rgba\([^)]*$/.test(out2);
+      if (inColor) {
+        const channel = (out2.slice(out2.lastIndexOf("rgba(")).match(/,/g) ?? []).length;
+        v = channel < 3 ? Math.round(Math.min(255, Math.max(0, v))) : Math.min(1, Math.max(0, v));
+      }
+      out2 += format(v) + pb.parts[i + 1];
+    }
+    return out2;
+  }
+
+  // packages/motion/src/tokens.ts
+  var PALETTES = {
+    light: { paper: "#F7F7F5", ink: "#0B0B0F", surface: "#FFFFFF", muted: "#6E6E78", line: "rgba(11,11,15,0.10)", accent: "#FF5A36", secondary: "#2F6BFF", glass: "rgba(255,255,255,0.55)", dark: false },
+    dark: { paper: "#0B0B0F", ink: "#F7F7F5", surface: "#17171D", muted: "#9696A2", line: "rgba(247,247,245,0.14)", accent: "#FF5A36", secondary: "#2F6BFF", glass: "rgba(23,23,29,0.55)", dark: true },
+    cream: { paper: "#F2ECE1", ink: "#1C1915", surface: "#FBF8F2", muted: "#7A7166", line: "rgba(28,25,21,0.12)", accent: "#FF6A1A", secondary: "#2E5E4E", glass: "rgba(251,248,242,0.6)", dark: false },
+    forest: { paper: "#0D2620", ink: "#ECF3EF", surface: "#143229", muted: "#8FB3A5", line: "rgba(236,243,239,0.14)", accent: "#6BE39B", secondary: "#F2C14E", glass: "rgba(20,50,41,0.5)", dark: true },
+    mono: { paper: "#050506", ink: "#FFFFFF", surface: "#111114", muted: "#8A8A93", line: "rgba(255,255,255,0.22)", accent: "#D7FF3A", secondary: "#FFFFFF", glass: "rgba(17,17,20,0.6)", dark: true },
+    sky: { paper: "#EAF1FB", ink: "#0E1726", surface: "#FFFFFF", muted: "#5D6B80", line: "rgba(14,23,38,0.10)", accent: "#3D7BFF", secondary: "#FF7AB6", glass: "rgba(255,255,255,0.45)", dark: false },
+    ember: { paper: "#140D09", ink: "#FFF3E6", surface: "#22160F", muted: "#B39883", line: "rgba(255,243,230,0.14)", accent: "#FF8A1F", secondary: "#FFD25E", glass: "rgba(34,22,15,0.55)", dark: true },
+    night: { paper: "#06061A", ink: "#EEF0FF", surface: "#12122E", muted: "#8E90B8", line: "rgba(238,240,255,0.14)", accent: "#6C5CFF", secondary: "#FFC23D", glass: "rgba(18,18,46,0.5)", dark: true },
+    tide: { paper: "#0A2A33", ink: "#E8F6F5", surface: "#113A45", muted: "#86B5B4", line: "rgba(232,246,245,0.14)", accent: "#FF6A4D", secondary: "#7FE0D2", glass: "rgba(17,58,69,0.5)", dark: true },
+    cherry: { paper: "#1A0507", ink: "#FFF1F0", surface: "#2A0A0E", muted: "#C79A9E", line: "rgba(255,241,240,0.16)", accent: "#F2364A", secondary: "#FFB4BC", glass: "rgba(42,10,14,0.5)", dark: true },
+    porcelain: { paper: "#E7EBEF", ink: "#101820", surface: "#FFFFFF", muted: "#5F6B78", line: "rgba(16,24,32,0.10)", accent: "#E5484D", secondary: "#2F6BFF", glass: "rgba(255,255,255,0.5)", dark: false },
+    lilac: { paper: "#ECE8F6", ink: "#17132A", surface: "#FFFFFF", muted: "#6B6585", line: "rgba(23,19,42,0.10)", accent: "#7A5CFF", secondary: "#FF8FB1", glass: "rgba(255,255,255,0.5)", dark: false },
+    cobalt: { paper: "#1838D8", ink: "#F4F6FF", surface: "#2546E4", muted: "#AEBBF7", line: "rgba(244,246,255,0.2)", accent: "#FFD23F", secondary: "#FF8FB1", glass: "rgba(24,56,216,0.5)", dark: true },
+    sage: { paper: "#D8E0D4", ink: "#14201A", surface: "#F3F6F0", muted: "#5B6B61", line: "rgba(20,32,26,0.14)", accent: "#E2502C", secondary: "#2C5BD8", glass: "rgba(243,246,240,0.55)", dark: false },
+    graphite: { paper: "#26282C", ink: "#F1F0EC", surface: "#313338", muted: "#9A9CA3", line: "rgba(241,240,236,0.14)", accent: "#FF9F43", secondary: "#7FB2FF", glass: "rgba(38,40,44,0.6)", dark: true }
+  };
+  var PALETTE_NAMES = Object.keys(PALETTES);
+  var FONT_STACKS = {
+    sans: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+    serif: "'Instrument Serif', Georgia, serif",
+    mono: "'JetBrains Mono', ui-monospace, Menlo, monospace",
+    display: "'Anton', 'Inter', Impact, sans-serif"
+  };
+  var FONT_ROLES = Object.keys(FONT_STACKS);
+  var FONT_FACES = [
+    { family: "Inter", file: "Inter-Variable.woff2", weight: "100 900", style: "normal" },
+    { family: "Inter", file: "Inter-Variable-Italic.woff2", weight: "100 900", style: "italic" },
+    { family: "Instrument Serif", file: "InstrumentSerif-Regular.woff2", weight: "400", style: "normal" },
+    { family: "Instrument Serif", file: "InstrumentSerif-Italic.woff2", weight: "400", style: "italic" },
+    { family: "JetBrains Mono", file: "JetBrainsMono-Variable.woff2", weight: "100 800", style: "normal" },
+    { family: "Anton", file: "Anton-Regular.woff2", weight: "400", style: "normal" }
+  ];
+  function withAccent(palette, accent) {
+    return accent ? { ...palette, accent } : palette;
+  }
+
+  // packages/motion/src/runtime/timeline.ts
+  var TRANSFORM_PROPS = ["xPercent", "yPercent", "x", "y", "z", "rotateX", "rotateY", "rotate", "skewX", "skewY", "scale", "scaleX", "scaleY"];
+  var TRANSFORM_SET = new Set(TRANSFORM_PROPS);
+  var IDENTITY = { scale: 1, scaleX: 1, scaleY: 1, opacity: 1 };
+  var PX = /* @__PURE__ */ new Set(["width", "height", "left", "top", "right", "bottom", "borderRadius", "fontSize", "letterSpacing", "padding", "margin", "gap", "strokeWidth", "outlineWidth"]);
+  function toList(targets) {
+    if (!targets) return [];
+    if (Array.isArray(targets)) return [...targets];
+    if (typeof targets.forEach === "function" && typeof targets.length === "number" && !(targets instanceof Element)) {
+      return Array.from(targets);
+    }
+    return [targets];
+  }
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
+    const from = s.from ?? "start";
+    const order = [...Array(count).keys()];
+    if (from === "random") {
+      const keys = order.map((i) => random01(s.seed ?? 1, i));
+      const ranked = [...order].sort((a, b) => keys[a] - keys[b]);
+      const out2 = new Array(count);
+      ranked.forEach((i, rank) => out2[i] = rank * s.each);
+      return out2;
+    }
+    return order.map((i) => {
+      if (from === "end") return (count - 1 - i) * s.each;
+      if (from === "center") return Math.abs(i - (count - 1) / 2) * s.each;
+      return i * s.each;
+    });
+  }
+  function isElement(target) {
+    return typeof target.setAttribute === "function" && typeof target.tagName === "string";
+  }
+  function cssValue(prop, value) {
+    return typeof value === "number" && PX.has(prop) ? `${value}px` : String(value);
+  }
+  function kebab(prop) {
+    return prop.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+  }
+  var Timeline = class {
+    tweens = /* @__PURE__ */ new Map();
+    tracks = [];
+    events = [];
+    order = 0;
+    end = 0;
+    /** Seconds the timeline runs: the end of its last tween, or longer when `extend` asked for it. */
+    get duration() {
+      return this.end;
+    }
+    /** Make the timeline at least `seconds` long (a hold after the last tween). */
+    extend(seconds) {
+      this.end = Math.max(this.end, seconds);
+      return this;
+    }
+    /** Animate from each property's value at `at` (its previous tween's end, else its rest value) to `props`. */
+    to(targets, props, options) {
+      return this.add(targets, void 0, props, options);
+    }
+    fromTo(targets, from, to, options) {
+      return this.add(targets, from, to, options);
+    }
+    /** Jump to `props` at `at` (a zero-length tween). */
+    set(targets, props, at) {
+      return this.add(targets, void 0, props, { at, duration: 0, ease: "hold" });
+    }
+    /** Run `track(t)` on every seek, after the tweens (typing, counters, particles). */
+    track(track, until = 0) {
+      this.tracks.push(track);
+      this.end = Math.max(this.end, until);
+      return this;
+    }
+    /** Record a picture event: something on screen the ear expects to hear (not drawn; the sound design reads it). */
+    cue(at, kind, options = {}) {
+      const event = { t: at, kind, weight: options.weight ?? 0.5, x: options.x ?? 0.5, y: options.y ?? 0.5 };
+      if (options.until !== void 0 && options.until > at) event.until = options.until;
+      if (options.rate !== void 0 && options.rate > 0) event.rate = options.rate;
+      this.events.push(event);
+      return this;
+    }
+    /** The picture events, by time (ties keep the order they were cued in). */
+    get cues() {
+      return this.events.map((e) => ({ ...e })).sort((a, b) => a.t - b.t);
+    }
+    add(targets, from, to, options) {
+      const list = toList(targets);
+      const duration = Math.max(0, options.duration ?? 0.6);
+      const ease = resolveEase(options.ease);
+      const offsets = staggerOffsets(list.length, options.stagger);
+      list.forEach((target, i) => {
+        const at = options.at + offsets[i];
+        let tweens = this.tweens.get(target);
+        if (!tweens) {
+          tweens = [];
+          this.tweens.set(target, tweens);
+        }
+        for (const [prop, value] of Object.entries(to)) {
+          tweens.push({ prop, from: from?.[prop], to: value, at, duration, ease, order: this.order++ });
+        }
+        this.end = Math.max(this.end, at + duration);
+      });
+      return this;
+    }
+    /** Every animated property of `target` at time `t`. */
+    valuesAt(target, t) {
+      const out2 = /* @__PURE__ */ new Map();
+      const byProp = /* @__PURE__ */ new Map();
+      for (const tween of this.tweens.get(target) ?? []) {
+        let list = byProp.get(tween.prop);
+        if (!list) {
+          list = [];
+          byProp.set(tween.prop, list);
+        }
+        list.push(tween);
+      }
+      for (const [prop, list] of byProp) {
+        list.sort((a, b) => a.at - b.at || a.order - b.order);
+        const rest = list[0].from ?? IDENTITY[prop] ?? (TRANSFORM_SET.has(prop) || prop === "blur" ? 0 : void 0);
+        let value = rest;
+        for (const tween of list) {
+          if (tween.at > t) break;
+          const from = tween.from ?? value ?? tween.to;
+          const p = tween.duration <= 0 ? 1 : Math.min(1, (t - tween.at) / tween.duration);
+          value = interpolate(from, tween.to, tween.ease(p));
+        }
+        if (value !== void 0) out2.set(prop, value);
+      }
+      return out2;
+    }
+    /** Put every target in its state at time `t` (seconds), then run the tracks. */
+    seek(t) {
+      for (const target of this.tweens.keys()) apply(target, this.valuesAt(target, t));
+      for (const track of this.tracks) track(t);
+    }
+  };
+  function apply(target, values) {
+    if (!isElement(target)) {
+      for (const [prop, value] of values) target[prop] = value;
+      return;
+    }
+    const el = target;
+    let transform = false;
+    for (const [prop, value] of values) {
+      if (TRANSFORM_SET.has(prop)) transform = true;
+      else if (prop === "opacity") el.style.opacity = String(value);
+      else if (prop === "blur") el.style.filter = Number(value) > 0.01 ? `blur(${value}px)` : "";
+      else if (prop.startsWith("--")) el.style.setProperty(prop, String(value));
+      else if (prop.startsWith("attr:")) el.setAttribute(prop.slice(5), String(value));
+      else el.style.setProperty(kebab(prop), cssValue(prop, value));
+    }
+    if (transform) el.style.transform = composeTransform(values);
+  }
+  function composeTransform(values) {
+    const n = (prop, fallback) => {
+      const v = values.get(prop);
+      return v === void 0 ? fallback : Number(v);
+    };
+    const parts = [];
+    const xp = n("xPercent", 0);
+    const yp = n("yPercent", 0);
+    if (xp !== 0 || yp !== 0) parts.push(`translate(${xp}%, ${yp}%)`);
+    const x = n("x", 0);
+    const y = n("y", 0);
+    const z = n("z", 0);
+    if (x !== 0 || y !== 0 || z !== 0) parts.push(`translate3d(${x}px, ${y}px, ${z}px)`);
+    for (const [prop, fn] of [["rotateX", "rotateX"], ["rotateY", "rotateY"], ["rotate", "rotate"], ["skewX", "skewX"], ["skewY", "skewY"]]) {
+      const v = n(prop, 0);
+      if (v !== 0) parts.push(`${fn}(${v}deg)`);
+    }
+    const s = n("scale", 1);
+    const sx = n("scaleX", 1) * s;
+    const sy = n("scaleY", 1) * s;
+    if (sx !== 1 || sy !== 1) parts.push(`scale(${sx}, ${sy})`);
+    return parts.join(" ") || "none";
+  }
+
+  // packages/motion/src/runtime/page.ts
+  function safeArea(width, height) {
+    if (height > width * 1.2) return { top: Math.round(height * 0.12), bottom: Math.round(height * 0.2), left: Math.round(width * 0.1), right: Math.round(width * 0.1) };
+    return { top: Math.round(height * 0.1), bottom: Math.round(height * 0.1), left: Math.round(width * 0.1), right: Math.round(width * 0.1) };
+  }
+  var EXIT_SECONDS = 0.4;
+  var placedCues = /* @__PURE__ */ new WeakMap();
+  var clamp01 = (v) => Math.min(1, Math.max(0, v));
+  var round = (v, places) => Math.round(v * 10 ** places) / 10 ** places;
+  function isElement2(place) {
+    return typeof place.getBoundingClientRect === "function";
+  }
+  function createContext(doc, config) {
+    const p = config.params;
+    const base = withAccent(PALETTES[p.palette ?? "light"] ?? PALETTES.light, typeof p.accent === "string" ? p.accent : void 0);
+    const palette = { ...base, ...typeof p.paper === "string" ? { paper: p.paper } : {}, ...typeof p.ink === "string" ? { ink: p.ink } : {} };
+    const root = doc.createElement("div");
+    root.id = "block";
+    root.className = `block block-${config.block}${palette.dark ? " is-dark" : ""}${config.height > config.width * 1.2 ? " is-portrait" : ""}${config.alpha ? " is-alpha" : ""}`;
+    const display = p.display_font ?? "sans";
+    const radius = typeof p.radius === "number" ? p.radius : 28;
+    const vars = {
+      "--paper": palette.paper,
+      "--ink": palette.ink,
+      "--surface": palette.surface,
+      "--muted": palette.muted,
+      "--line": palette.line,
+      "--accent": palette.accent,
+      "--secondary": palette.secondary,
+      "--glass": palette.glass,
+      "--radius": `${radius}px`,
+      "--font-sans": FONT_STACKS.sans,
+      "--font-serif": FONT_STACKS.serif,
+      "--font-mono": FONT_STACKS.mono,
+      "--font-display": FONT_STACKS[display],
+      "--w": `${config.width}px`,
+      "--h": `${config.height}px`
+    };
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+    Object.assign(root.style, { position: "absolute", left: "0", top: "0", width: `${config.width}px`, height: `${config.height}px`, overflow: "hidden" });
+    if (!config.alpha) root.style.background = palette.paper;
+    doc.body.append(root);
+    const tl = new Timeline().extend(config.seconds);
+    const pending = /* @__PURE__ */ new Set();
+    const ctx = {
+      ...config,
+      doc,
+      root,
+      tl,
+      palette,
+      display,
+      radius,
+      seed: typeof p.seed === "number" ? p.seed : 1,
+      safe: safeArea(config.width, config.height),
+      portrait: config.height > config.width * 1.2,
+      ownExit: false,
+      pending,
+      el(tag, className, parent, text) {
+        const e = doc.createElement(tag);
+        if (className) e.className = className;
+        if (text !== void 0) e.textContent = text;
+        (parent === void 0 ? root : parent)?.append(e);
+        return e;
+      },
+      mediaImg(name, className, parent) {
+        const ref = config.media[name];
+        if (!ref) return null;
+        const img = ctx.el("img", className, parent ?? root);
+        img.alt = "";
+        if (ref.kind === "image") img.src = ref.url;
+        else tl.track(videoTrack(img, ref, pending));
+        return img;
+      },
+      cue(at, kind, options = {}) {
+        if (!(at >= 0 && at < config.seconds)) return;
+        const opts = options.until === void 0 ? options : { ...options, until: Math.min(options.until, config.seconds) };
+        if (opts.at && isElement2(opts.at)) {
+          placedCues.get(ctx)?.push({ at, kind, el: opts.at, options: opts });
+          return;
+        }
+        cueOn(tl, at, kind, opts, opts.at ? { x: opts.at.x / config.width, y: opts.at.y / config.height } : void 0);
+      }
+    };
+    placedCues.set(ctx, []);
+    return ctx;
+  }
+  function cueOn(tl, at, kind, options, place) {
+    tl.cue(round(at, 3), kind, {
+      weight: round(clamp01(options.weight ?? 0.5), 2),
+      x: place ? round(clamp01(place.x), 3) : 0.5,
+      y: place ? round(clamp01(place.y), 3) : 0.5,
+      ...options.until !== void 0 ? { until: round(options.until, 3) } : {},
+      // The contract's ceiling (sfx/events.ts readPictureEvents): past 30/s a run is a texture, not strikes.
+      ...options.rate !== void 0 ? { rate: round(Math.min(30, options.rate), 2) } : {}
+    });
+  }
+  function pictureEvents(ctx) {
+    const placed = placedCues.get(ctx)?.splice(0) ?? [];
+    placed.sort((a, b) => a.at - b.at);
+    let seeked;
+    for (const cue of placed) {
+      if (seeked !== cue.at) ctx.tl.seek(cue.at);
+      seeked = cue.at;
+      const frame = ctx.root.getBoundingClientRect();
+      const r = cue.el.getBoundingClientRect();
+      const place = frame.width > 0 && frame.height > 0 ? { x: (r.left + r.width / 2 - frame.left) / frame.width, y: (r.top + r.height / 2 - frame.top) / frame.height } : void 0;
+      cueOn(ctx.tl, cue.at, cue.kind, cue.options, place);
+    }
+    return ctx.tl.cues.filter((e) => e.t < ctx.seconds);
+  }
+  function waitImages(doc) {
+    return Promise.all(Array.from(doc.images).map((img) => img.decode().catch(() => void 0)));
+  }
+  function defineBlock(build2) {
+    const config = window.__ZENVI_BLOCK__;
+    if (!config) throw new Error("no __ZENVI_BLOCK__ config on the page");
+    let resolveReady;
+    let rejectReady;
+    const ready = new Promise((res, rej) => {
+      resolveReady = res;
+      rejectReady = rej;
+    });
+    const api = {
+      ready,
+      duration: config.seconds,
+      async seek() {
+        await ready;
+      }
+    };
+    window.__zenvi = api;
+    void (async () => {
+      await Promise.all(FONT_FACES.map((f2) => document.fonts.load(`${f2.style} ${f2.weight.split(" ")[0]} 48px '${f2.family}'`)));
+      const ctx = createContext(document, config);
+      await build2(ctx);
+      await document.fonts.ready;
+      api.events = pictureEvents(ctx);
+      if (config.params.exit !== false && !ctx.ownExit) {
+        ctx.tl.to(ctx.root, { opacity: 0, y: -24, blur: 8 }, { at: Math.max(0, config.seconds - EXIT_SECONDS), duration: EXIT_SECONDS, ease: "exit" });
+      }
+      const seek = async (t) => {
+        ctx.tl.seek(Math.min(t, config.seconds));
+        await waitImages(document);
+        while (ctx.pending.size > 0) await Promise.all([...ctx.pending]);
+      };
+      await seek(0);
+      api.seek = seek;
+      window.__hf = { duration: config.seconds, seek: (t) => void seek(t) };
+      resolveReady();
+    })().catch((error) => {
+      api.error = error instanceof Error ? `${error.message}
+${error.stack ?? ""}` : String(error);
+      rejectReady(error);
+    });
+  }
+
+  // packages/motion/src/blocks/art.ts
+  var ART_THEMES = [
+    { sky: ["#2B1B4A", "#E8577A", "#FFB36B"], sun: "#FFE7B0", land: ["#9A3F6A", "#5E2257", "#331341", "#170A26"] },
+    { sky: ["#6FB6F2", "#D6EEFF"], sun: "#FFF8DD", land: ["#B4DD7A", "#78B84D", "#438D3C", "#21582A"] },
+    { sky: ["#0B2340", "#3E7CB1", "#BFE3F2"], sun: "#F4FBFF", land: ["#A9D2E6", "#6FA3C8", "#3B6E99", "#1C3F66"] },
+    { sky: ["#F09A5B", "#F9D9A8"], sun: "#FFF4E0", land: ["#E3925A", "#C2683C", "#924329", "#55261A"] },
+    { sky: ["#0A0630", "#3B0F70", "#FF3D81"], sun: "#FFD1E8", land: ["#6A1F99", "#41106E", "#24084B", "#110328"] },
+    { sky: ["#BDEFE0", "#F0FFF9"], sun: "#FFFFFF", land: ["#86DBBC", "#43B597", "#1F8570", "#0E4F46"] },
+    { sky: ["#FF7A5C", "#FFC9A3"], sun: "#FFF0D6", land: ["#F05A4F", "#B83147", "#7A1C3C", "#3D0D27"] },
+    { sky: ["#1B1F3B", "#4C5FD7", "#9FD3FF"], sun: "#FFFFFF", land: ["#5A6FE0", "#3445B5", "#1E2A7D", "#0E1446"] }
+  ];
+  function artTheme(n) {
+    const k = ART_THEMES.length;
+    return ART_THEMES[(Math.trunc(n) % k + k) % k];
+  }
+  var f = (n) => n.toFixed(1);
+  function ridge(w, h, base, amp, rnd, jag = false) {
+    const waves = [0, 1, 2].map((k) => ({ freq: (1.2 + rnd() * 1.6) * (k + 1) * Math.PI / w, phase: rnd() * Math.PI * 2, amp: amp / (k + 1.3) }));
+    const steps = jag ? 14 : 48;
+    const pts = [];
+    for (let i = 0; i <= steps; i += 1) {
+      const x = w * i / steps;
+      let y = base;
+      for (const wv of waves) y += Math.sin(x * wv.freq + wv.phase) * wv.amp;
+      if (jag) y += (rnd() - 0.5) * amp * 1.4;
+      pts.push(`${i === 0 ? "M" : "L"}${f(x)},${f(y)}`);
+    }
+    return `${pts.join(" ")} L${f(w)},${f(h)} L0,${f(h)} Z`;
+  }
+  function skyGradient(id, sky) {
+    const stops = sky.map((c, i) => `<stop offset="${sky.length === 1 ? 0 : i / (sky.length - 1)}" stop-color="${c}"/>`).join("");
+    return `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${stops}</linearGradient>`;
+  }
+  function landscape(kind, w, h, theme, rnd) {
+    const sunX = w * (0.25 + rnd() * 0.5);
+    const sunY = h * (kind === "sea" ? 0.5 : 0.3 + rnd() * 0.12);
+    const sunR = Math.min(w, h) * (0.09 + rnd() * 0.05);
+    let body = `<rect width="${w}" height="${h}" fill="url(#sky)"/>`;
+    body += `<circle cx="${f(sunX)}" cy="${f(sunY)}" r="${f(sunR * 2.6)}" fill="${theme.sun}" opacity="0.18"/>`;
+    body += `<circle cx="${f(sunX)}" cy="${f(sunY)}" r="${f(sunR)}" fill="${theme.sun}"/>`;
+    if (kind === "sea") {
+      const horizon = h * 0.55;
+      body += `<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${theme.land[1]}"/><stop offset="1" stop-color="${theme.land[3]}"/></linearGradient>`;
+      body += `<rect y="${f(horizon)}" width="${w}" height="${f(h - horizon)}" fill="url(#sea)"/>`;
+      for (let i = 0; i < 9; i += 1) {
+        const y = horizon + (h - horizon) * ((i + 0.5) / 9) ** 1.6;
+        const half = sunR * (0.4 + i * 0.22);
+        body += `<rect x="${f(sunX - half)}" y="${f(y)}" width="${f(half * 2)}" height="${f(3 + i * 1.5)}" rx="2" fill="${theme.sun}" opacity="${f(0.75 - i * 0.07)}"/>`;
+      }
+      body += `<path d="${ridge(w, h, h * 0.86, h * 0.03, rnd)}" fill="${theme.land[3]}"/>`;
+      return body;
+    }
+    const layers = theme.land.length;
+    theme.land.forEach((color, i) => {
+      const base = h * (0.5 + i / layers * 0.38);
+      const amp = h * (kind === "peaks" ? 0.12 - i * 0.02 : kind === "dunes" ? 0.05 : 0.06 - i * 8e-3);
+      body += `<path d="${ridge(w, h, base, amp, rnd, kind === "peaks" && i < 2)}" fill="${color}"/>`;
+    });
+    return body;
+  }
+  function orb(w, h, theme, rnd) {
+    const r = Math.min(w, h) * (0.28 + rnd() * 0.06);
+    const cx = w * (0.45 + rnd() * 0.1);
+    const cy = h * (0.46 + rnd() * 0.06);
+    return `<radialGradient id="orb" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="${theme.sun}"/><stop offset="0.45" stop-color="${theme.sky[theme.sky.length - 1]}"/><stop offset="1" stop-color="${theme.land[1]}"/></radialGradient><rect width="${w}" height="${h}" fill="url(#sky)"/><ellipse cx="${f(cx + r * 0.15)}" cy="${f(cy + r * 1.08)}" rx="${f(r * 0.9)}" ry="${f(r * 0.14)}" fill="${theme.land[3]}" opacity="0.35"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="url(#orb)"/>`;
+  }
+  function bloom(w, h, theme, rnd) {
+    const cx = w / 2;
+    const cy = h * 0.48;
+    const R = Math.min(w, h) * 0.36;
+    const petals = 7 + Math.floor(rnd() * 5);
+    let body = `<rect width="${w}" height="${h}" fill="url(#sky)"/>`;
+    for (let ring = 0; ring < 2; ring += 1) {
+      for (let i = 0; i < petals; i += 1) {
+        const a = i / petals * 360 + ring * (180 / petals);
+        const len = R * (ring === 0 ? 1 : 0.62);
+        body += `<ellipse cx="${f(cx)}" cy="${f(cy - len / 2)}" rx="${f(len * 0.22)}" ry="${f(len / 2)}" fill="${theme.land[ring]}" opacity="0.92" transform="rotate(${f(a)} ${f(cx)} ${f(cy)})"/>`;
+      }
+    }
+    body += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(R * 0.18)}" fill="${theme.sun}"/>`;
+    return body;
+  }
+  function mascot(w, h, theme, rnd) {
+    const cx = w / 2;
+    const cy = h * 0.56;
+    const R = Math.min(w, h) * 0.3;
+    const body = theme.land[0];
+    const shade = theme.land[2];
+    const pts = [];
+    const bumps = rnd() * Math.PI * 2;
+    for (let i = 0; i <= 40; i += 1) {
+      const a = i / 40 * Math.PI * 2;
+      const rr = R * (1 + 0.035 * Math.sin(a * 3 + bumps));
+      pts.push(`${i === 0 ? "M" : "L"}${f(cx + Math.cos(a) * rr * 1.05)},${f(cy + Math.sin(a) * rr * (a > 0 && a < Math.PI ? 0.88 : 1))}`);
+    }
+    const eye = (dx) => `<ellipse cx="${f(cx + dx)}" cy="${f(cy - R * 0.12)}" rx="${f(R * 0.15)}" ry="${f(R * 0.19)}" fill="#fff"/><circle cx="${f(cx + dx + R * 0.03)}" cy="${f(cy - R * 0.09)}" r="${f(R * 0.085)}" fill="#14101E"/><circle cx="${f(cx + dx + R * 0.06)}" cy="${f(cy - R * 0.14)}" r="${f(R * 0.03)}" fill="#fff"/>`;
+    return `<radialGradient id="body" cx="0.38" cy="0.3" r="0.85"><stop offset="0" stop-color="${theme.sun}"/><stop offset="0.35" stop-color="${body}"/><stop offset="1" stop-color="${shade}"/></radialGradient><rect width="${w}" height="${h}" fill="url(#sky)"/><ellipse cx="${f(cx)}" cy="${f(cy + R * 0.98)}" rx="${f(R * 0.85)}" ry="${f(R * 0.12)}" fill="${theme.land[3]}" opacity="0.3"/><path d="M${f(cx + R * 0.1)},${f(cy - R * 0.92)} Q${f(cx + R * 0.25)},${f(cy - R * 1.3)} ${f(cx + R * 0.42)},${f(cy - R * 1.42)}" stroke="${shade}" stroke-width="${f(R * 0.06)}" fill="none" stroke-linecap="round"/><circle cx="${f(cx + R * 0.44)}" cy="${f(cy - R * 1.46)}" r="${f(R * 0.12)}" fill="${theme.sun}"/><path d="${pts.join(" ")} Z" fill="url(#body)"/>` + eye(-R * 0.32) + eye(R * 0.32) + `<ellipse cx="${f(cx - R * 0.55)}" cy="${f(cy + R * 0.18)}" rx="${f(R * 0.12)}" ry="${f(R * 0.07)}" fill="${theme.sky[0]}" opacity="0.5"/><ellipse cx="${f(cx + R * 0.55)}" cy="${f(cy + R * 0.18)}" rx="${f(R * 0.12)}" ry="${f(R * 0.07)}" fill="${theme.sky[0]}" opacity="0.5"/><path d="M${f(cx - R * 0.14)},${f(cy + R * 0.2)} Q${f(cx)},${f(cy + R * 0.34)} ${f(cx + R * 0.14)},${f(cy + R * 0.2)}" stroke="#14101E" stroke-width="${f(R * 0.045)}" fill="none" stroke-linecap="round"/>`;
+  }
+  function artSvg(kind, theme, w, h, seed) {
+    const rnd = mulberry32(seed);
+    const scene = kind === "orb" ? orb(w, h, theme, rnd) : kind === "bloom" ? bloom(w, h, theme, rnd) : kind === "mascot" ? mascot(w, h, theme, rnd) : landscape(kind, w, h, theme, rnd);
+    const grain = `<filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="${seed % 1e3}" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.09 0"/></filter>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs>${skyGradient("sky", theme.sky)}${grain}</defs>${scene}<rect width="${w}" height="${h}" filter="url(#grain)"/></svg>`;
+  }
+  function artUrl(kind, theme, w, h, seed) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(artSvg(kind, theme, Math.round(w), Math.round(h), seed))}`;
+  }
+  async function artImage(doc, kind, theme, w, h, seed) {
+    const svg = artUrl(kind, theme, w, h, seed);
+    const img = doc.createElement("img");
+    img.src = svg;
+    const canvas = doc.createElement("canvas");
+    canvas.width = Math.round(w);
+    canvas.height = Math.round(h);
+    const g = canvas.getContext("2d");
+    if (!g) return svg;
+    try {
+      await img.decode();
+    } catch {
+      return svg;
+    }
+    g.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob2 = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    return blob2 ? URL.createObjectURL(blob2) : svg;
+  }
+
+  // packages/motion/src/blocks/ui.ts
+  var ICONS = {
+    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
+    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
+    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
+    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
+    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
+    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
+    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
+    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
+    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
+    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
+    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
+    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
+    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
+    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
+    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+  };
+  function icon(ctx, name, className, parent) {
+    const el = ctx.el("span", `icon ${className}`, parent);
+    el.innerHTML = ICONS[name];
+    return el;
+  }
+  function pointer(ctx, from, at, size = 64) {
+    const el = ctx.el("div", "cursor");
+    el.innerHTML = ICONS.pointer;
+    const ringSize = Math.round(size * 1.3);
+    if (size !== 64) Object.assign(el.style, { width: `${size}px`, height: `${size}px` });
+    const ring = ctx.el("div", "cursor-ring");
+    Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: `${ringSize}px`, height: `${ringSize}px`, marginLeft: `${-ringSize / 2}px`, marginTop: `${-ringSize / 2}px`, borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
+    const tip = (x, y) => ({ x: x - Math.round(size * 6 / 28), y: y - Math.round(size * 3.5 / 28) });
+    let last = from;
+    ctx.tl.fromTo(el, { ...tip(from.x, from.y), opacity: 0, scale: 0.8 }, { ...tip(from.x, from.y), opacity: 1, scale: 1 }, { at, duration: 0.3, ease: "out" });
+    return {
+      el,
+      moveTo(x, y, start, duration = 0.7) {
+        ctx.tl.to(el, tip(x, y), { at: start, duration, ease: "in-out" });
+        last = { x, y };
+      },
+      click(when, sound = "click") {
+        if (sound) ctx.cue(when, sound, { weight: 0.35, at: last });
+        ctx.tl.to(el, { scale: 0.86 }, { at: when, duration: 0.08, ease: "out" });
+        ctx.tl.to(el, { scale: 1 }, { at: when + 0.08, duration: 0.22, ease: "out" });
+        const p = last;
+        ctx.tl.set(ring, { x: p.x, y: p.y }, when);
+        ctx.tl.fromTo(ring, { scale: 0.3, opacity: 0.9 }, { scale: 1.4, opacity: 0 }, { at: when, duration: 0.5, ease: "out" });
+      }
+    };
+  }
+
+  // packages/motion/src/blocks/dock_magnify/block.ts
+  var HEX2 = /^#[0-9a-f]{6}$/i;
+  var GLYPHS = ["film", "wave", "pen", "play", "grid", "chat", "sun", "bolt", "layers"];
+  var FILLS = ["#FF7A45", "#2FC0A8", "#FFB020", "#3D7BFF", "#FF5C8A", "#2E2A3D", "#45B649", "#FF4F3B", "#5A6FE0"];
+  var MAGNIFY = 1.75;
+  var SPREAD = 1.25;
+  var clamp012 = (u) => Math.min(1, Math.max(0, u));
+  var smooth = (u) => {
+    const x = clamp012(u);
+    return x * x * (3 - 2 * x);
+  };
+  var out = (u) => 1 - (1 - clamp012(u)) ** 3;
+  async function build(ctx) {
+    const { tl, params: p, width: W, height: H, palette, safe } = ctx;
+    const S = ctx.seconds;
+    const scale = Math.min(W, H) / 1080;
+    const apps = p.apps;
+    const n = apps.length;
+    const target = Math.min(n - 1, Number(p.target));
+    const given = p.colors;
+    const fill = (i) => i === target ? palette.accent : HEX2.test(given[i] ?? "") ? given[i] : FILLS[i % FILLS.length];
+    const face = (i) => `linear-gradient(160deg, color-mix(in srgb, ${fill(i)} 78%, #fff), ${fill(i)} 45%, color-mix(in srgb, ${fill(i)} 80%, #000))`;
+    const glyph = (i) => GLYPHS[i % GLYPHS.length];
+    const open = p.open !== false;
+    const stage = ctx.el("div", "dm-stage");
+    const bg = ctx.el("img", "dm-bg", stage);
+    bg.alt = "";
+    const ref = ctx.media.background;
+    if (ref?.kind === "image") bg.src = ref.url;
+    else if (ref) tl.track(videoTrack(bg, ref, ctx.pending));
+    else bg.src = await artImage(ctx.doc, String(p.scene), artTheme(ctx.seed + 2), W, H, ctx.seed);
+    const gapK = 0.18;
+    const padK = 0.2;
+    const B = Math.min(118 * scale, W * (ctx.portrait ? 0.72 : 0.56) / (n + (n - 1) * gapK + 2 * padK));
+    const gap = B * gapK;
+    const pad = B * padK;
+    const bottom = ctx.portrait ? H - safe.bottom : H - 64 * scale;
+    const cx = W / 2;
+    const restLeft = cx - (n * B + (n - 1) * gap) / 2;
+    const rest = apps.map((_, i) => restLeft + i * (B + gap) + B / 2);
+    const sigma = SPREAD * (B + gap);
+    const dock = ctx.el("div", "dm-dock");
+    const els = apps.map((name2, i) => {
+      const el = ctx.el("div", "dm-app");
+      Object.assign(el.style, { width: `${B}px`, height: `${B}px` });
+      const f2 = ctx.el("div", "dm-face", el);
+      f2.style.background = face(i);
+      icon(ctx, glyph(i), "", f2);
+      el.setAttribute("aria-label", name2);
+      return el;
+    });
+    const dot = ctx.el("div", "dm-dot");
+    const tip = ctx.el("div", "dm-tip", ctx.root, apps[target]);
+    const riseAt = 0.1;
+    const glideAt = 0.75;
+    const hoverAt = Math.min(2.1, Math.max(1.6, S * 0.45));
+    const clickAt = hoverAt + 0.45;
+    const launchAt = clickAt + 0.3;
+    const iconY = bottom - pad - B * 0.32;
+    const ptr = pointer(ctx, { x: rest[0] - B * 1.6, y: iconY - B * 3.2 }, glideAt - 0.3);
+    ptr.moveTo(rest[0], iconY, glideAt, 0.5);
+    ptr.moveTo(rest[target], iconY, glideAt + 0.55, hoverAt - glideAt - 0.55);
+    ptr.click(clickAt);
+    const pointerX = (t) => Number(tl.valuesAt(ptr.el, t).get("x") ?? 0) + 14;
+    const inDock = (t) => smooth((t - (glideAt + 0.25)) / 0.35);
+    const sizesAt = (t) => {
+      const f2 = inDock(t);
+      const x = pointerX(t);
+      return rest.map((r) => B * (1 + (MAGNIFY - 1) * f2 * Math.exp(-((x - r) ** 2) / (2 * sigma * sigma))));
+    };
+    const press = (t) => {
+      const u = (t - clickAt) / 0.3;
+      if (u < 0 || u > 1) return 1;
+      return u < 0.3 ? 1 - 0.12 * (u / 0.3) : 1 - 0.12 * (1 - out((u - 0.3) / 0.7));
+    };
+    const hop = (t) => {
+      if (open) return 0;
+      const u = (t - launchAt) / 0.9;
+      return u < 0 || u > 1 ? 0 : Math.abs(Math.sin(u * Math.PI * 2)) * (1 - u) * B * 0.45;
+    };
+    const layout = (t) => {
+      const sizes = sizesAt(t);
+      const total = sizes.reduce((a, s) => a + s, 0) + (n - 1) * gap;
+      let x = cx - total / 2;
+      return sizes.map((size2) => {
+        const slot2 = { left: x, size: size2 };
+        x += size2 + gap;
+        return slot2;
+      });
+    };
+    const rise = (t) => (1 - out((t - riseAt) / 0.7)) * B * 2.2;
+    tl.fromTo(dock, { opacity: 0 }, { opacity: 1 }, { at: riseAt, duration: 0.4, ease: "smooth" });
+    ctx.cue(riseAt, "pop", { weight: 0.4, at: { x: cx, y: bottom - B / 2 } });
+    let under = -1;
+    for (let t = glideAt + 0.25; t <= hoverAt; t += 1 / 60) {
+      const x = pointerX(t);
+      const i = rest.reduce((best, r, k) => Math.abs(r - x) < Math.abs(rest[best] - x) ? k : best, 0);
+      if (i !== under && Math.abs(rest[i] - x) < (B + gap) / 2) {
+        ctx.cue(t, "pop", { weight: 0.2, at: { x: rest[i], y: iconY } });
+        under = i;
+      }
+    }
+    tl.track((t) => {
+      const slots = layout(t);
+      const dy = rise(t);
+      const first = slots[0];
+      const last = slots[n - 1];
+      Object.assign(dock.style, { left: `${first.left - pad}px`, top: `${bottom - B - 2 * pad + dy}px`, width: `${last.left + last.size - first.left + 2 * pad}px`, height: `${B + 2 * pad}px` });
+      slots.forEach((slot2, i) => {
+        const k = slot2.size / B * (i === target ? press(t) : 1);
+        const el = els[i];
+        el.style.left = `${slot2.left + (slot2.size - B) / 2}px`;
+        el.style.top = `${bottom - pad - B + dy - (i === target ? hop(t) : 0)}px`;
+        el.style.transform = `scale(${k.toFixed(4)})`;
+        const gone = !open || t < launchAt ? 1 : i === target ? 0 : 1 - smooth((t - launchAt - 0.2) / 0.3);
+        el.style.opacity = String(clamp012((t - riseAt - i * 0.04) / 0.3) * gone);
+      });
+      const s = slots[target];
+      Object.assign(dot.style, { left: `${s.left + s.size / 2 - 4 * scale}px`, top: `${bottom - pad * 0.45 + dy}px`, transform: `scale(${scale})` });
+      tip.style.left = `${s.left + s.size / 2}px`;
+      tip.style.top = `${bottom - pad - s.size - 26 * scale + dy}px`;
+    });
+    tl.set(dot, { opacity: 0 }, 0);
+    tl.fromTo(dot, { opacity: 0 }, { opacity: 1 }, { at: clickAt + 0.15, duration: 0.2, ease: "smooth" });
+    tl.fromTo(tip, { xPercent: -50, yPercent: -100, opacity: 0, y: 10 }, { xPercent: -50, yPercent: -100, opacity: 1, y: 0 }, { at: hoverAt - 0.1, duration: 0.3, ease: "out" });
+    tl.to(tip, { opacity: 0 }, { at: clickAt + 0.1, duration: 0.2, ease: "smooth" });
+    tl.fromTo(stage, { scale: 1.05 }, { scale: 1 }, { at: 0, duration: S, ease: "out" });
+    if (!open) {
+      ctx.cue(launchAt, "pop", { weight: 0.3, at: els[target] });
+      return;
+    }
+    ctx.ownExit = true;
+    const slot = layout(launchAt)[target];
+    const size = slot.size;
+    const lcx = slot.left + size / 2;
+    const lcy = bottom - pad - size / 2;
+    const launch = ctx.el("div", "dm-launch");
+    Object.assign(launch.style, { left: `${lcx - size / 2}px`, top: `${lcy - size / 2}px`, width: `${size}px`, height: `${size}px`, background: face(target) });
+    const cover = 1.3 * Math.hypot(W, H) / size;
+    tl.set(launch, { opacity: 0 }, 0);
+    tl.set(launch, { opacity: 1 }, launchAt);
+    tl.fromTo(launch, { x: 0, y: 0, scale: 1 }, { x: W / 2 - lcx, y: H / 2 - lcy, scale: cover }, { at: launchAt, duration: 0.7, ease: "in" });
+    ctx.cue(launchAt, "whoosh", { weight: 0.6, at: { x: lcx, y: lcy } });
+    tl.to([dock, dot, ptr.el], { opacity: 0 }, { at: launchAt + 0.2, duration: 0.3, ease: "smooth" });
+    tl.to(stage, { blur: 14 }, { at: launchAt, duration: 0.6, ease: "in" });
+    const end = ctx.el("div", "dm-end");
+    const g = ctx.el("div", "dm-glyph", end);
+    g.innerHTML = ICONS[glyph(target)];
+    Object.assign(g.style, { width: `${260 * scale}px`, height: `${260 * scale}px` });
+    const name = ctx.el("div", "dm-name", end, apps[target]);
+    name.style.fontSize = `${120 * scale}px`;
+    tl.fromTo(g, { scale: 0.6, opacity: 0, blur: 10 }, { scale: 1, opacity: 1, blur: 0 }, { at: launchAt + 0.5, duration: 0.6, ease: "out" });
+    ctx.cue(launchAt + 0.5, "reveal", { weight: 0.8, at: g });
+    tl.fromTo(name, { y: 30 * scale, opacity: 0 }, { y: 0, opacity: 1 }, { at: launchAt + 0.62, duration: 0.6, ease: "out" });
+  }
+
+  // packages/motion/src/blocks/dock_magnify/dock_magnify-entry.ts
+  defineBlock(build);
+})();
