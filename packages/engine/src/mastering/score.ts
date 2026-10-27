@@ -283,14 +283,14 @@ export function scoreMix(input: ScoreInput): MixScore {
       : { text: `too wide (${loud.range.toFixed(1)} LU): compress the voice, lift the quiet sections`, calls: stems.voice ? [{ tool: "compress_tool", args: { role: "voice", preset: "voice" } }] : [] },
   );
   {
-    // PLR too high: a cue's spike is trimmed; a stem's own crest (TTS consonants, a dry drum) is compressed.
+    // PLR too high: a cue's spike is trimmed, a voice's own crest (TTS consonants) compressed. A bed compressor would
+    // pull the whole mix down without lowering peaks that are usually the hits summing on it.
     const culprit = metrics.L2_true_peak?.culprit as { cue?: string; stem?: StemName } | undefined;
-    const preset: Record<StemName, string> = { voice: "voice", music: "glue", ambience: "glue", sfx: "punch" };
     const spike = culprit?.cue
       ? { text: `one spike sets the peak (PLR ${(TP - I).toFixed(1)} dB): trim cue ${culprit.cue}`, calls: [{ tool: "set_audio_gain_tool", args: { clip_ids: [culprit.cue], gain_db: r1(-Math.min(6, TP - I - 13)) } }] }
-      : culprit?.stem
-        ? { text: `the ${culprit.stem} peaks far over its loudness (PLR ${(TP - I).toFixed(1)} dB): compress it`, calls: [{ tool: "compress_tool", args: { role: culprit.stem, preset: preset[culprit.stem] } }] }
-        : { text: `one spike sets the peak (PLR ${(TP - I).toFixed(1)} dB): trim it` };
+      : culprit?.stem === "voice"
+        ? { text: `the voice peaks far over its loudness (PLR ${(TP - I).toFixed(1)} dB): compress it`, calls: [{ tool: "compress_tool", args: { role: "voice", preset: "voice" } }] }
+        : { text: `the ${culprit?.stem ?? "mix"} peaks far over its loudness (PLR ${(TP - I).toFixed(1)} dB): the export limiter (render loudness=social) closes the gap` };
     put("L6_plr", TP - I, 9, 15, "loudness", TP - I < 9 ? { text: "over-limited: back off the limiter / bed compression" } : spike);
   }
   let clipped = 0;

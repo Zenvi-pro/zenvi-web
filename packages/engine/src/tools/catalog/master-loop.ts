@@ -23,6 +23,12 @@ export const MAX_ROUNDS = 3;
 export const TARGET_SCORE = 85;
 const PEAK_MARGIN_DB = 0.2;
 
+/** `a` scores higher than `b`: the capped score, then the raw score. */
+function isBetter(a: MixScore, b: MixScore): boolean {
+  const capped = (a.score ?? 0) - (b.score ?? 0);
+  return capped !== 0 ? capped > 0 : (a.rawScore ?? 0) > (b.rawScore ?? 0);
+}
+
 /** Gates the loop must clear itself; L1 (loudness) is what the master step after it fixes. */
 const blocking = (s: MixScore): string[] => s.gatesFailed.filter((g) => g !== "L1_integrated");
 
@@ -56,7 +62,8 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
   const scratch = new ProjectDocument(structuredClone(call.doc.project));
   const run = async (doc: ProjectDocument, name: string, args: Record<string, unknown>) => (await runTool({ doc, host: call.host, signal: call.signal }, name, args)).data;
   const rounds: Round[] = [];
-  let score = (await measureMix(call, scratch.project, genre)).score;
+  const measure = async (): Promise<MixScore> => (await measureMix(call, scratch.project, genre)).score;
+  let score = await measure();
   const first = score;
   for (let i = 0; i < MAX_ROUNDS; i += 1) {
     if ((score.score ?? 0) >= TARGET_SCORE && blocking(score).length === 0) break;
@@ -70,8 +77,9 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
         if (receipt && (receipt.status === "applied" || receipt.status === "unchanged")) done.push(`${fix.metric}: ${c.tool} ${JSON.stringify(c.args)}`);
       }
     }
-    const next = (await measureMix(call, scratch.project, genre)).score;
-    const better = (next.rawScore ?? 0) >= (score.rawScore ?? 0);
+    const next = await measure();
+    // A round is kept only when it raises the score: a level change that scores the same only moves the mix around.
+    const better = isBetter(next, score);
     rounds.push({ before: score.rawScore, after: next.rawScore, fixes: done, kept: better });
     if (!better) {
       scratch.transaction("revert round", (tx) => applyProjectState(tx, saved));
@@ -85,32 +93,43 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
   const ceiling = (typeof masterArgs.true_peak_dbtp === "number" ? masterArgs.true_peak_dbtp : -1) - PEAK_MARGIN_DB;
   const masterCall = { ...masterArgs, iterate: false, score: false, true_peak_dbtp: ceiling, ...(fixed ? { balance: "keep", duck: false } : {}) };
   let mastered = await run(scratch, tool, masterCall);
-  // Peak-limited short of the target: the loudest cue sets the peak (METRICS.md L2): lower it and master again.
+  let final = await measure();
+  // Peak-limited short of the target: the cue that makes the peak (METRICS.md L2) is lowered once, or a voice whose own
+  // crest does is compressed once, then the mix is mastered again; a step that does not raise the score is undone.
+  // Stems summing into the peak are left to the export limiter (render loudness=social): per-clip sample limiters on
+  // the timeline raise the inter-sample peaks they are meant to catch.
   const trimmed: string[] = [];
-  const compressed = new Set<string>();
+  const tried = new Set<string>();
   for (let k = 0; k < MAX_ROUNDS && mastered; k += 1) {
     const md = (mastered.data ?? {}) as { limitedBy?: string; target?: { lufs: number }; after?: { integratedLufs: number | null } };
     const shortfall = (md.target?.lufs ?? -14) - (md.after?.integratedLufs ?? -14);
     if (md.limitedBy !== "peak" || shortfall <= 0.5) break;
-    // A hot cue is trimmed; a stem whose own crest sets the peak is compressed once (a voice's consonants, a dry drum).
-    // Stems summing into the peak are left to the export limiter (render loudness=social): per-clip sample limiters on
-    // the timeline raise the inter-sample peaks they are meant to catch.
-    const culprit = (await measureMix(call, scratch.project, genre)).score.metrics.L2_true_peak?.culprit as { cue?: string; stem?: string } | undefined;
-    if (culprit?.cue) {
+    const culprit = final.metrics.L2_true_peak?.culprit as { cue?: string; stem?: string } | undefined;
+    const key = culprit?.cue ?? culprit?.stem;
+    if (!key || tried.has(key)) break;
+    tried.add(key);
+    const saved = structuredClone(scratch.project);
+    let step: string;
+    if (culprit!.cue) {
       const db = -Math.min(6, Math.round((shortfall + 1) * 10) / 10);
-      await run(scratch, "set_audio_gain_tool", { clip_ids: [culprit.cue], gain_db: db });
-      trimmed.push(`${culprit.cue} ${db} dB`);
-    } else if (culprit?.stem && !compressed.has(culprit.stem)) {
-      compressed.add(culprit.stem);
-      const preset = culprit.stem === "voice" ? "voice" : culprit.stem === "sfx" ? "punch" : "glue";
-      const receipt = await run(scratch, "compress_tool", { role: culprit.stem, preset });
-      if (receipt?.status !== "applied") break;
-      trimmed.push(`${culprit.stem} compressed (${preset})`);
+      await run(scratch, "set_audio_gain_tool", { clip_ids: [culprit!.cue], gain_db: db });
+      step = `${culprit!.cue} ${db} dB`;
+    } else if (culprit!.stem === "voice") {
+      if ((await run(scratch, "compress_tool", { role: "voice", preset: "voice" }))?.status !== "applied") break;
+      step = "voice compressed";
     } else break;
-    mastered = await run(scratch, tool, masterCall);
+    const remastered = await run(scratch, tool, masterCall);
+    const next = await measure();
+    if (!isBetter(next, final)) {
+      scratch.transaction("revert peak step", (tx) => applyProjectState(tx, saved));
+      break;
+    }
+    trimmed.push(step);
+    mastered = remastered;
+    final = next;
   }
   const changed = JSON.stringify(scratch.project) !== JSON.stringify(call.doc.project);
-  const final = changed ? (await measureMix(call, scratch.project, genre)).score : first;
+  if (!changed) final = first;
   const data = {
     genre,
     scoreBefore: first.score,
@@ -128,7 +147,7 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     `${trimmed.length ? `, peaks: ${trimmed.join(", ")}` : ""}, then ${mastered?.summary ?? "mastering failed"}`;
   if (!changed) return unchanged(tool, `${summary} Nothing changed.`, { data });
   // DEPLOY.md S3.6: no mix comes out worse than it went in.
-  if ((final.score ?? 0) < (first.score ?? 0)) return unchanged(tool, `${summary} That scores lower than before, so nothing was changed.`, { data });
+  if (isBetter(first, final)) return unchanged(tool, `${summary} That scores lower than before, so nothing was changed.`, { data });
   call.commit((tx) => applyProjectState(tx, scratch.project), "Master audio (iterate)");
   return applied(tool, summary, { data, warnings: mastered?.warnings ?? [], notes: mastered?.notes ?? [] });
 }
