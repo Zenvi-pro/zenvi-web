@@ -14,6 +14,9 @@ import type { SoundMoment } from "./plan.js";
 /** `zenvi_role` of sound-effect files and the clips that play them. */
 export const SFX_ROLE = "sfx";
 
+/** Tag on kinetic caption clips (tools/catalog/kinetic-captions.ts KINETIC_KEY): their words are spotted one by one (sfx/spot.ts), not as titles. */
+export const KINETIC_CAPTIONS_KEY = "zenvi_kinetic_captions";
+
 /** What a sound-effect clip records about itself (`clip.zenvi_sfx`). */
 export interface SfxClipMark {
   recipe: string;
@@ -22,6 +25,10 @@ export interface SfxClipMark {
   reason?: string;
   /** Library sounds: `provider:id` of the sound it plays. */
   library?: string;
+  /** auto_sound_design_tool: its job in the mix, which layer of its cue it is, and the cue it belongs to (layers of one hit share it). */
+  role?: "hero" | "sweetener" | "micro" | "bed";
+  layer?: string;
+  cue?: string;
 }
 
 /** True for a clip a sound-design tool placed. */
@@ -78,6 +85,7 @@ export function soundMoments(project: Project, grid: BeatGrid | null = null): So
   const shots: Clip[] = [];
   for (const clip of visual) {
     const file = files.get(String(clip.file_id));
+    if (clip[KINETIC_CAPTIONS_KEY]) continue;
     if (isFlash(file, clip)) flashes.push(clip.position);
     else if (isGraphic(file, clip)) titles.push(clip.position);
     else shots.push(clip);
