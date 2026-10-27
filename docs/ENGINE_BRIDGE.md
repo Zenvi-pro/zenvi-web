@@ -77,7 +77,7 @@ time. Python's `NaN` / `Infinity` tokens are tolerated (the engine's
 
 | Method | Params | Result |
 | --- | --- | --- |
-| `hello` | — | `{ protocol: 1, engine_version }` |
+| `hello` | — | `{ protocol: 2, engine_version }` |
 | `tools` | — | `{ tools: [{ name, title, description, inputSchema, annotations?, available, missing? }] }` |
 | `run` | `{ tool, args, project, project_file, surface?, backend_token? }` | the answer below |
 | `shutdown` | — | `null`, then exit |
@@ -88,7 +88,7 @@ carries the token.
 
 ```jsonc
 {
-  "protocol": 1, "engine_version": "0.1.0",
+  "protocol": 2, "engine_version": "0.1.0",
   "ok": true,
   "text": "{\"contract\":3,\"status\":\"applied\",…}",   // the tool's result, a contract-3 receipt
   "receipt": { … },                                       // the same, parsed
@@ -96,7 +96,8 @@ carries the token.
   "actions": [                                            // desktop UpdateManager calls, in order
     { "type": "insert", "key": ["layers"], "value": { "id": "…", "number": 2000000, … } },
     { "type": "insert", "key": ["files"],  "value": { "id": "…", "path": "/…/promo_assets/title/end_card-end-name.svg", … } },
-    { "type": "update", "key": ["clips", { "id": "C1" }], "value": { "position": 4 } }
+    { "type": "update", "key": ["clips", { "id": "C1" }], "value": { "position": 4 } },
+    { "type": "update_untracked", "key": ["playhead_position"], "value": 2 }  // no undo step
   ],
   "files": ["/…/promo_assets/title/end_card-end-name.svg"],   // written by this call
   "images": [ { "mimeType": "image/png", "data": "…" } ],      // when the tool returns frames
@@ -113,7 +114,7 @@ result. Its rules differ from the engine's in four ways:
 
 | Desktop `_set` behaviour | Translation |
 | --- | --- |
-| string key parts and match fields are lower-cased before lookup | a change under an upper-case key (`…/alpha/Points`) is sent as an update of the nearest addressable field above it |
+| string key parts and match fields are lower-cased before lookup | a change under a field stored with an upper-case name (`…/alpha/Points`, however the engine spelled it: engine lookups ignore case) is sent as an update of the nearest addressable field above it, carrying the field under its stored name |
 | an update with a non-object value writes the **root** key of that name (`self._data[my_key] = values`) | a nested scalar or list is sent as `update(parent, { name: value })` |
 | object updates always merge (`obj.update`), `objects` maps merged per id | an engine `replace` (`Transaction.replace`, now flagged on `ChangeEvent.replaced`) that drops fields, or a merge that would merge `objects` differently, is sent as the parent update with the resulting value; a replaced top-level list item as delete + insert |
 | inserts append to top-level lists only | a nested insert is sent as the parent update with the new list |
@@ -124,6 +125,15 @@ a root `fps` change (the desktop rescales clips itself when fps changes; the
 engine already did), replacing a root object with fewer fields. The tests
 check every rule against a TypeScript transcription of `_set`, and zenvi-core
 checks the real `_set` end to end.
+
+Untracked changes (`ProjectDocument.setUntracked`, reported on the
+ChangeEvent as `untracked: key`) are translated by `toDesktopUntracked` with
+the same rules and sent as `update_untracked`, which the desktop applies with
+`UpdateManager.update_untracked`: no undo step. Today they are the
+transcription cache in `files[].ai_metadata`, `playhead_position` (seeking
+with no preview) and `export_overrides`. The desktop has no untracked insert
+or delete, so a change that needs one (clearing a stored export override) is
+refused, as is `clearHistory`.
 
 ## 4. Process model and performance
 
@@ -240,6 +250,12 @@ reported in `files`.
   `ZENVI_NODE` (default `node` on PATH) in a development checkout.
 
 ## 10. Open questions and follow-ups
+
+- **Known gaps** (refused with an `Error:` answer, never reported as done):
+  clearing a stored export override (needs an untracked delete), and a
+  translation the desktop cannot address at all. An untracked change of a
+  failed call (a transcription cached before the tool failed later) is not
+  forwarded, so the next call transcribes again.
 
 - **Unsaved projects**: the desktop keeps their generated files in
   `~/.openshot_qt/{title,…}` and moves them on first save; the bridge host

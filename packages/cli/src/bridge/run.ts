@@ -8,9 +8,11 @@
  * (tools that need them answer that they are unavailable). Files a tool
  * writes go to the project's `<name>_assets` folder and are listed in the
  * answer; when the call fails or changes nothing they are removed again.
+ * Untracked changes (cached transcripts, the saved playhead, export
+ * overrides) are answered as `update_untracked` calls, outside the undo step.
  */
 
-import { rm } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import {
   DesktopActionError,
@@ -20,22 +22,28 @@ import {
   projectAssetsDir,
   replaceNonFiniteTokens,
   toDesktopActions,
+  toDesktopUntracked,
   type ChangeEvent,
   type DesktopAction,
   type ImportedMedia,
   type MediaHost,
+  type MotionHost,
   type Project,
   type ToolHost,
   type ToolImage,
   type ToolSurface,
 } from "@zenvi/engine";
 import { parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
+import { createMotionHost } from "@zenvi/motion/node";
 import { createNodeHost, isInside, loadRoots, localPath, type NodeHostOptions } from "@zenvi/render-node";
 import type { Registry } from "../engine/registry.js";
 import { VERSION } from "../version.js";
 
-/** Bumped when a request or answer field changes meaning; the desktop refuses a CLI it does not speak. */
-export const BRIDGE_PROTOCOL = 1;
+/**
+ * Bumped when a request or answer field changes meaning; the desktop refuses a CLI it does not speak.
+ * 2: `update_untracked` actions.
+ */
+export const BRIDGE_PROTOCOL = 2;
 
 export interface BridgeRequest {
   tool: string;
@@ -57,7 +65,7 @@ export interface BridgeAnswer {
   receipt?: ToolReceipt;
   /** Undo label for the transaction. */
   label?: string;
-  /** Desktop UpdateManager calls, in order; empty when nothing changed. */
+  /** Desktop UpdateManager calls, in order (`update_untracked` outside the undo step); empty when nothing changed. */
   actions: DesktopAction[];
   /** Files the call wrote, absolute. */
   files: string[];
@@ -97,7 +105,25 @@ export function bridgeHost(projectFile: string, written: string[], options: Omit
     ...(media.importPath ? { importPath: async (p) => noteCopy(localPath(p), await media.importPath!(p)) } : {}),
     ...(media.importUrl ? { importUrl: async (u, o) => noteCopy(/^file:/i.test(u) ? localPath(u) : undefined, await media.importUrl!(u, o)) } : {}),
   };
-  return { ...base, media: bridged };
+  const motion = createMotionHost({ projectFile: () => projectFile, resolveMedia: base.resolveMedia, env: options.env });
+  const tracked = trackMotionRenders(motion, path.join(assets, "links", "zenvi-motion"), note);
+  return { ...base, media: bridged, motion: tracked };
+}
+
+/**
+ * Zenvi Motion renders land in `<assets>/links/zenvi-motion` (`dir`). A render that reused a file
+ * already there (an earlier call's, maybe in the bin) wrote nothing: only new files belong to the call.
+ */
+export function trackMotionRenders(motion: MotionHost, dir: string, note: (p: string) => unknown): MotionHost {
+  return {
+    ...motion,
+    render: async (request, signal) => {
+      const before = new Set(await readdir(dir).catch(() => [] as string[]));
+      const render = await motion.render(request, signal);
+      if (!before.has(path.basename(render.media.path))) note(render.media.path);
+      return render;
+    },
+  };
 }
 
 function elapsed(since: number): number {
@@ -165,7 +191,12 @@ export async function runBridgeCall(request: BridgeRequest, options: RunBridgeOp
   start = performance.now();
   let actions: DesktopAction[] = [];
   try {
-    for (const event of events) if (event.source === "apply") actions.push(...toDesktopActions(event.previous, event.actions, event.replaced));
+    for (const event of events) {
+      if (event.source === "apply") actions.push(...toDesktopActions(event.previous, event.actions, event.replaced));
+      else if (event.untracked) actions.push(...toDesktopUntracked(event.previous, event.project, event.untracked));
+      // The only untracked change without a key: ProjectDocument.clearHistory.
+      else throw new DesktopActionError("the desktop keeps its own undo history", ["history"]);
+    }
   } catch (error) {
     await discard();
     if (!(error instanceof DesktopActionError)) throw error;

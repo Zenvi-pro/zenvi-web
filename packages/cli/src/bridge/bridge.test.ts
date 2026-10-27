@@ -7,7 +7,7 @@ import { makeImage, makeTempDir, removeDir } from "@zenvi/render-node/test-suppo
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { engineRegistry } from "../engine/registry.js";
 import { testEnv, zenvi } from "../test-support/harness.js";
-import { BRIDGE_PROTOCOL, bridgeHost, runBridgeCall, type BridgeAnswer } from "./run.js";
+import { BRIDGE_PROTOCOL, bridgeHost, runBridgeCall, trackMotionRenders, type BridgeAnswer } from "./run.js";
 import { bridgeTools, serveBridge } from "./server.js";
 
 const registry = engineRegistry();
@@ -90,12 +90,56 @@ describe("runBridgeCall", () => {
     expect(broken.text).toMatch(/could not be read/);
   });
 
+  it("answers an untracked change as update_untracked, and refuses one the desktop cannot apply untracked", async () => {
+    const run = (tool: string, args: Record<string, unknown>, project = snapshot()) => runBridgeCall({ tool, args, project, project_file: projectFile }, { registry });
+    const seek = await run("seek_playhead_tool", { seconds: 2 });
+    expect(seek.ok, seek.text).toBe(true);
+    expect(seek.actions).toEqual([{ type: "update_untracked", key: ["playhead_position"], value: 2 }]);
+    expect(seek.label).toBeUndefined();
+
+    const stored = await run("set_export_setting_tool", { key: "quality", value: "high" });
+    expect(stored.ok, stored.text).toBe(true);
+    expect(stored.actions).toEqual([{ type: "update_untracked", key: ["export_overrides"], value: { quality: "high" } }]);
+
+    // Clearing removes a key, which an untracked merge cannot do: refused, not reported as done.
+    const cleared = await run("set_export_setting_tool", { key: "quality", clear: true }, { ...snapshot(), export_overrides: { quality: "high", preset: "GIF" } });
+    expect(cleared).toMatchObject({ ok: false, actions: [] });
+    expect(cleared.text).toMatch(/cannot apply/);
+  });
+
   it("lists tools with what the bridge host lacks", () => {
     const tools = bridgeTools(registry);
     expect(tools.find((t) => t.name === "add_motion_template_tool")).toMatchObject({ available: true });
+    // Zenvi Motion blocks render on the bridge host (headless Chrome), like in the CLI.
+    expect(tools.find((t) => t.name === "add_motion_block_tool")).toMatchObject({ available: true });
     // The desktop saves and exports itself.
     const exportTool = tools.find((t) => t.missing?.includes("exporter"));
     expect(exportTool?.available).toBe(false);
+  });
+});
+
+describe("trackMotionRenders", () => {
+  it("counts a new motion render as written by the call, not one reused from the links folder", async () => {
+    const dir = path.join(work, "tracked_assets", "links", "zenvi-motion");
+    await mkdir(dir, { recursive: true });
+    await writeFile(path.join(dir, "counter-0123.mp4"), "earlier render");
+    const written: string[] = [];
+    let next = "counter-0123.mp4";
+    // Stands in for Chrome: the wrapper only decides what the call wrote.
+    const inner = {
+      blocks: () => [],
+      check: () => ({ ok: true as const, params: {} }),
+      render: async () => {
+        await writeFile(path.join(dir, next), "render");
+        return { media: { path: path.join(dir, next) } } as never;
+      },
+    };
+    const motion = trackMotionRenders(inner, dir, (p) => written.push(p));
+    await motion.render({} as never);
+    expect(written).toEqual([]);
+    next = "counter-4567.mp4";
+    await motion.render({} as never);
+    expect(written).toEqual([path.join(dir, "counter-4567.mp4")]);
   });
 });
 

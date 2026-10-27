@@ -73,6 +73,30 @@ export function resolveKey(root: Record<string, unknown>, path: KeyPath): Resolv
   return { parent, slot, value };
 }
 
+/**
+ * `path` spelled the way `root` stores it: each string part and match field
+ * as the key it resolves to (lookups are case-insensitive). `undefined` when
+ * any part is missing.
+ */
+export function storedKey(root: Record<string, unknown>, path: KeyPath): KeyPath | undefined {
+  const out: KeyPath = [];
+  let value: unknown = root;
+  for (const part of path) {
+    if (typeof part === "string") {
+      const key = isRecord(value) ? findKey(value, part) : undefined;
+      if (key === undefined) return undefined;
+      out.push(key);
+      value = (value as Record<string, unknown>)[key];
+    } else {
+      const item = Array.isArray(value) ? value.find((i) => matches(i, part)) : undefined;
+      if (item === undefined) return undefined;
+      out.push(Object.fromEntries(Object.entries(part).map(([k, v]) => [findKey(item as Record<string, unknown>, k)!, v])));
+      value = item;
+    }
+  }
+  return out;
+}
+
 /** Read the value at `path`, or `undefined`. */
 export function getAt(root: Record<string, unknown>, path: KeyPath): unknown {
   return resolveKey(root, path)?.value;
