@@ -16,6 +16,7 @@ import { encoderNames } from "../ffmpeg/capabilities.js";
 import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderContactSheet } from "../render/contact-sheet.js";
+import { inspectRender } from "../render/inspect-render.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
 import { installedFontFamilies } from "../svg/fonts.js";
@@ -116,6 +117,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
       collect: (files) => collectMedia(files, collectOptions()),
       reclaimable: (files) => reclaimableMedia(files, collectOptions()),
       removeCopies: (paths) => removeMediaCopies(paths, collectOptions()),
+      inspectRender: (p, o) => inspectRender(exportPath(p), { ...o, signal: o.signal ?? options.signal }),
     },
     exporter: {
       delivery: "files",
