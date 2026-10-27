@@ -161005,14 +161005,14 @@ async function mapLimit2(items, limit, fn, signal) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return out;
 }
-async function profileClipDense(call, clip2, maxSamples) {
+async function profileClipDense(call, clip2, maxSamples, opts = {}) {
   const rate2 = fps(call.doc.project);
   const duration3 = clipDurationSeconds(clip2);
   let n = sampleCountForDuration(duration3);
   if (maxSamples !== void 0) n = Math.max(1, Math.min(Math.trunc(maxSamples), n));
   const frames2 = sampleLocalFrames(duration3, rate2, n);
   const solo = { ...clip2, position: 0 };
-  const pick2 = previewIndex(frames2.length);
+  const pick2 = opts.preview === false ? -1 : previewIndex(frames2.length);
   const rendered = await mapLimit2(frames2, RENDER_CONCURRENCY, (localFrame2, i) => renderClipIsolated(call, solo, localFrame2, i === pick2), call.signal);
   const scopes = rendered.filter((r) => r !== null && Boolean(r.scopes.present)).map((r) => r.scopes);
   const preview = rendered[pick2]?.preview ?? null;
@@ -166290,6 +166290,22 @@ function subjectsOf(call, args, warnings) {
   }
   return [...clips].sort((a2, b2) => (Number(a2.position) || 0) - (Number(b2.position) || 0));
 }
+function shotKey(clip2) {
+  const effects = (clip2.effects ?? []).map((e) => {
+    const { id: _id, ...rest } = e;
+    return rest;
+  });
+  return `${String(clip2.file_id)}\0${JSON.stringify(effects)}`;
+}
+function groupShots(clips) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const clip2 of clips) {
+    const key3 = shotKey(clip2);
+    groups.set(key3, [...groups.get(key3) ?? [], clip2]);
+  }
+  const length = (c) => (Number(c.end) || 0) - (Number(c.start) || 0);
+  return [...groups.values()].map((members2) => ({ measured: members2.reduce((a2, b2) => length(b2) > length(a2) ? b2 : a2), members: members2 }));
+}
 function gradeKnobs(grade) {
   const knobs = {};
   for (const key3 of SCALAR_KEYS) {
@@ -166328,7 +166344,7 @@ async function unifyClip(call, clip2, pack, target2, opts) {
     const changes = Object.fromEntries(Object.keys(next).filter((k) => next[k] !== knobs[k]).map((k) => [k, next[k]]));
     if (Object.keys(changes).length === 0) break;
     const tried = mergedGradeEffects(effects, changes, opts.create).effects;
-    const measured = (await profileClipDense(call, { ...clip2, effects: tried }, opts.samples)).profile;
+    const measured = (await profileClipDense(call, { ...clip2, effects: tried }, opts.samples, { preview: false })).profile;
     passes += 1;
     if (!measured.present) break;
     if (passClips(current, measured, goal) || bandScore(measured, goal) >= bandScore(current, goal) - 1e-6) {
@@ -166377,7 +166393,7 @@ var init_color_unify2 = __esm({
       directTool({
         name: TOOL6,
         title: "Unify grade",
-        description: "Grade continuity for a whole cut: measures every footage clip's exposure, white balance and contrast on frames across it, corrects each clip's ColorGrade toward one target (a reference clip/file, or the clips' median look in a neutral band) until it sits within tolerance (saturation is reported, not matched), then optionally lays one LUT look over all of them. Use after cutting and before the look, so bright daylight and near-black shots stop jumping on the cut. One undo step; the receipt lists before/after stats per clip.",
+        description: "Grade continuity for a whole cut: measures every footage clip's exposure, white balance and contrast on frames across it, corrects each clip's ColorGrade toward one target (a reference clip/file, or the clips' median look in a neutral band) until it sits within tolerance (saturation is reported, not matched), then optionally lays one LUT look over all of them. Clips cut from the same file with the same effects are measured once (the longest) and share its correction. Use after cutting and before the look, so bright daylight and near-black shots stop jumping on the cut. One undo step; the receipt lists before/after stats per clip.",
         input: input7,
         annotations: {
           readOnlyHint: false,
@@ -166404,7 +166420,7 @@ var init_color_unify2 = __esm({
             const ref = project.clips.find((c) => c.id === args.reference_clip_id);
             if (!ref) return refused(TOOL6, `Error: reference clip ${args.reference_clip_id} not found`);
             subjects = subjects.filter((c) => c.id !== ref.id);
-            refPack = await profileClipDense(call, ref, args.samples ?? DEFAULT_SAMPLES);
+            refPack = await profileClipDense(call, ref, args.samples ?? DEFAULT_SAMPLES, { preview: false });
             reference = { kind: "clip", timeline_clip_id: ref.id };
           } else if (args.reference_file_id) {
             const file4 = project.files.find((f4) => String(f4.id) === args.reference_file_id);
@@ -166423,10 +166439,11 @@ var init_color_unify2 = __esm({
           if (!refPack && subjects.length < 2 && !lut)
             return refused(TOOL6, "Error: unifying needs two or more clips, or a reference_clip_id / reference_file_id to match");
           const samples = args.samples ?? DEFAULT_SAMPLES;
+          const shots = groupShots(subjects);
           const packs = [];
-          for (const clip2 of subjects) {
+          for (const shot of shots) {
             if (call.signal?.aborted) return refused(TOOL6, "Error: cancelled; nothing changed");
-            packs.push(await profileClipDense(call, clip2, samples));
+            packs.push(await profileClipDense(call, shot.measured, samples, { preview: false }));
           }
           const target2 = refPack ? refPack.profile : unifyTarget(packs.map((p) => p.profile));
           if (!refPack) {
@@ -166434,21 +166451,32 @@ var init_color_unify2 = __esm({
               packs.map((p) => p.profile),
               target2
             );
-            if (closest >= 0) reference.closest_clip_id = subjects[closest].id;
+            if (closest >= 0) reference.closest_clip_id = shots[closest].measured.id;
           }
           const create = effectFactory(project);
           const outcomes = [];
-          for (const [i, clip2] of subjects.entries()) {
+          const measuredOn = /* @__PURE__ */ new Map();
+          for (const [i, shot] of shots.entries()) {
             if (call.signal?.aborted) return refused(TOOL6, "Error: cancelled; nothing changed");
-            outcomes.push(
-              await unifyClip(call, clip2, packs[i], target2, {
-                strength: args.strength ?? 1,
-                samples,
-                maxIterations: args.max_iterations ?? 4,
-                create
-              })
-            );
+            const outcome = await unifyClip(call, shot.measured, packs[i], target2, {
+              strength: args.strength ?? 1,
+              samples,
+              maxIterations: args.max_iterations ?? 4,
+              create
+            });
+            const from2 = knobsOf(shot.measured.effects ?? []);
+            const to = knobsOf(outcome.effects);
+            const changes = Object.fromEntries(Object.keys(to).filter((k) => to[k] !== from2[k]).map((k) => [k, to[k]]));
+            for (const clip2 of shot.members) {
+              if (clip2 === shot.measured) outcomes.push(outcome);
+              else {
+                measuredOn.set(clip2.id, shot.measured.id);
+                const effects = Object.keys(changes).length > 0 ? mergedGradeEffects([...clip2.effects ?? []], changes, create).effects : [...clip2.effects ?? []];
+                outcomes.push({ ...outcome, clip: clip2, effects });
+              }
+            }
           }
+          outcomes.sort((a2, b2) => subjects.indexOf(a2.clip) - subjects.indexOf(b2.clip));
           const lookIds = new Set(lut ? subjects.map((c) => c.id) : []);
           if (lut && args.reference_clip_id && filterUnlocked(project, [args.reference_clip_id], []).length > 0) lookIds.add(args.reference_clip_id);
           const finalEffects = new Map(outcomes.map((o) => [o.clip.id, o.effects]));
@@ -166474,6 +166502,8 @@ var init_color_unify2 = __esm({
               gap_after: unifyGap(o.after, target2),
               out_of_band: outOfBand(o.after, target2)
             };
+            const measured = measuredOn.get(o.clip.id);
+            if (measured) row.measured_on = measured;
             const grade = findColorGrade(finalEffects.get(o.clip.id) ?? []);
             row.grade = grade ? gradeKnobs(grade) : null;
             return row;
