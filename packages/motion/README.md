@@ -7,7 +7,7 @@ or H.264, at any size. The engine's `list_motion_blocks_tool`,
 timeline as linked media (`zenvi_link`, kind `zenvi-motion`).
 
 ```
-src/runtime/   the page-side animation runtime (no GSAP): timeline, easings, text, effects
+src/runtime/   the page-side animation runtime (no GSAP): timeline, easings, text, effects, morphs, traced outlines, trails
 src/blocks/    one folder per block: block.json + block.ts (+ block.css); base.css, ui.ts shared
 src/params.ts  block.json schema, shared token params, checking/coercion
 src/tokens.ts  palettes, font roles, the bundled faces (fonts/, SIL OFL 1.1)

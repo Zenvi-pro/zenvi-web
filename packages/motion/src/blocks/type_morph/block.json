@@ -1,0 +1,21 @@
+{
+  "id": "type_morph",
+  "version": 1,
+  "title": "Type morph",
+  "description": "One word melting into the next: the letters' outlines (traced from the display face) flow into the next word's letters in a sweep from left to right, splitting and merging as the letter counts differ, with counters opening and closing. The first word grows out of dots. Big and centred; transparent, for brand words, a three-beat promise ('make. shape. move.') or a title.",
+  "tags": ["type", "morph", "kinetic", "liquid", "title", "brand"],
+  "duration": { "default": 4, "min": 1.2, "max": 20 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "cream", "display": "sans" },
+  "params": {
+    "words": { "type": "strings", "minItems": 1, "maxItems": 8, "maxLength": 18, "default": ["make", "shape", "move"], "description": "The words in order, each morphing into the next." },
+    "beat": { "type": "number", "min": 0, "max": 6, "default": 0, "description": "Seconds from one word to the next (0: spread the words over the block's length)." },
+    "morph": { "type": "number", "min": 0.2, "max": 2, "default": 0.7, "description": "Seconds each morph takes (at most 80 % of the beat)." },
+    "sweep": { "type": "number", "min": 0, "max": 0.8, "default": 0.45, "description": "How far the morph travels across the word: 0 morphs every letter at once, higher letters change left to right." },
+    "weight": { "type": "integer", "min": 300, "max": 900, "default": 800, "description": "Font weight for sans and mono (the display and serif faces have one weight)." },
+    "style": { "type": "enum", "options": ["fill", "outline"], "default": "fill", "description": "fill: solid letters; outline: stroked outlines only." },
+    "color": { "type": "enum", "options": ["ink", "accent"], "default": "ink", "description": "Letter colour: the palette's ink or accent." },
+    "max_size": { "type": "number", "min": 60, "max": 500, "default": 360, "description": "Largest font size, px at 1080 (all words share one size, shrunk to fit the safe width)." }
+  }
+}
