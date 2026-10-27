@@ -24,6 +24,7 @@ const DIRECT_TOOLS = [
   "align_match_cut_tool",
   "detect_subject_tool",
   "match_cut_montage_tool",
+  "review_render_tool",
   "add_motion_template_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",

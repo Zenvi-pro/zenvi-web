@@ -33,6 +33,7 @@ export * from "./reels/plan.js";
 export * from "./matchcut/fit.js";
 export * from "./matchcut/circles.js";
 export * from "./matchcut/montage.js";
+export * from "./review/render.js";
 export * from "./motion/index.js";
 export * from "./stock/stock.js";
 export * from "./web-video/web-video.js";
