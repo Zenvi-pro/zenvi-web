@@ -28,6 +28,8 @@ export interface BlenderJob {
   quality: Scene3dQuality;
   output_dir: string;
   media: Record<string, JobMedia>;
+  /** Local files the scene imports (an SVG logo, a 3D model), by slot, resolved. */
+  files: Record<string, string>;
   font: string | null;
   /** Only these frames (contact sheets); the whole range when absent. */
   stills?: number[];

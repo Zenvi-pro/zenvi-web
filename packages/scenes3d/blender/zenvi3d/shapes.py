@@ -5,8 +5,9 @@ import math
 
 import bmesh
 import bpy
+from mathutils import Vector
 
-from .core import link
+from .core import link, rgb
 
 
 def _mesh_object(name, bm, material=None):
@@ -175,3 +176,138 @@ def shadow_blob(name, width, depth, strength=0.55, location=(0, 0, 0)):
     obj.location = location
     obj.visible_shadow = False
     return obj
+
+
+def shadow_catcher(name, size, sun_obj, strength=0.7, location=(0, 0, 0), tint="#000000"):
+    """A floor that shows only the shadows on it: a white diffuse floor as
+    seen (Shader to RGB), divided by what an open floor gets, is the light
+    that reaches each point; one minus that is the shadow, drawn as alpha.
+    The world's light fills shadows and darkens corners (ambient
+    occlusion), like a real floor. Light the floor with the sun only
+    (lights.exclude the others), then calibrate_catcher once the world is
+    set: it measures the open floor."""
+    bpy.context.view_layer.update()
+    down = sun_obj.matrix_world.to_3x3() @ Vector((0, 0, -1))
+    open_floor = sun_obj.data.energy * max(0.05, -down.z) / math.pi  # the sun's share; calibrate_catcher adds the world's
+    mat = bpy.data.materials.new(name + "Mat")
+    mat.use_nodes = True
+    tree = mat.node_tree
+    tree.nodes.clear()
+    out = tree.nodes.new("ShaderNodeOutputMaterial")
+    diffuse = tree.nodes.new("ShaderNodeBsdfDiffuse")
+    diffuse.inputs["Color"].default_value = (1, 1, 1, 1)
+    seen = tree.nodes.new("ShaderNodeShaderToRGB")
+    tree.links.new(diffuse.outputs[0], seen.inputs[0])
+    bw = tree.nodes.new("ShaderNodeRGBToBW")
+    tree.links.new(seen.outputs["Color"], bw.inputs[0])
+    lit = tree.nodes.new("ShaderNodeMath")
+    lit.operation = "DIVIDE"
+    lit.use_clamp = True
+    lit.name = "OpenFloor"
+    lit.inputs[1].default_value = open_floor
+    tree.links.new(bw.outputs[0], lit.inputs[0])
+    shade = tree.nodes.new("ShaderNodeMath")
+    shade.operation = "MULTIPLY_ADD"  # (1 - lit) * strength = lit * -strength + strength
+    shade.inputs[1].default_value = -strength
+    shade.inputs[2].default_value = strength
+    tree.links.new(lit.outputs[0], shade.inputs[0])
+    # Fade at the floor's edge so it never shows a border.
+    coord = tree.nodes.new("ShaderNodeTexCoord")
+    grad = tree.nodes.new("ShaderNodeTexGradient")
+    grad.gradient_type = "SPHERICAL"
+    tree.links.new(coord.outputs["Object"], grad.inputs["Vector"])
+    edge = tree.nodes.new("ShaderNodeMath")
+    edge.operation = "MULTIPLY"
+    tree.links.new(shade.outputs[0], edge.inputs[0])
+    soft = tree.nodes.new("ShaderNodeMapRange")
+    soft.inputs["From Min"].default_value = 0.5  # the inscribed circle's rim
+    soft.inputs["From Max"].default_value = 0.8
+    soft.interpolation_type = "SMOOTHSTEP"
+    tree.links.new(grad.outputs["Fac"], soft.inputs["Value"])
+    tree.links.new(soft.outputs["Result"], edge.inputs[1])
+    dark = tree.nodes.new("ShaderNodeEmission")
+    dark.inputs["Color"].default_value = rgb(tint, 1.0)
+    dark.inputs["Strength"].default_value = 1.0
+    clear = tree.nodes.new("ShaderNodeBsdfTransparent")
+    mix = tree.nodes.new("ShaderNodeMixShader")
+    tree.links.new(edge.outputs[0], mix.inputs["Fac"])
+    tree.links.new(clear.outputs[0], mix.inputs[1])
+    tree.links.new(dark.outputs[0], mix.inputs[2])
+    tree.links.new(mix.outputs[0], out.inputs["Surface"])
+    mat.surface_render_method = "BLENDED"
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=0.5)
+    obj = _mesh_object(name, bm, mat)
+    obj.scale = (size, size, 1)
+    obj.location = location
+    obj.visible_shadow = False
+    return obj
+
+
+def calibrate_catcher(catcher):
+    """Measure what the open floor receives (sun and world) with a tiny
+    render looking straight down at it, everything else hidden, and set it
+    as the catcher's divisor: the studio world is too uneven to compute."""
+    scene = bpy.context.scene
+    mat = catcher.data.materials[0]
+    divisor = mat.node_tree.nodes["OpenFloor"]
+    probe = bpy.data.materials.new("FloorProbe")
+    probe.use_nodes = True
+    tree = probe.node_tree
+    tree.nodes.clear()
+    out = tree.nodes.new("ShaderNodeOutputMaterial")
+    diffuse = tree.nodes.new("ShaderNodeBsdfDiffuse")
+    diffuse.inputs["Color"].default_value = (1, 1, 1, 1)
+    seen = tree.nodes.new("ShaderNodeShaderToRGB")
+    em = tree.nodes.new("ShaderNodeEmission")
+    tree.links.new(diffuse.outputs[0], seen.inputs[0])
+    tree.links.new(seen.outputs["Color"], em.inputs["Color"])
+    tree.links.new(em.outputs[0], out.inputs["Surface"])
+    cam_data = bpy.data.cameras.new("Probe")
+    cam_data.type = "ORTHO"
+    cam_data.ortho_scale = 0.05 * max(catcher.scale.x, 1e-3)
+    cam = bpy.data.objects.new("Probe", cam_data)
+    cam.location = catcher.location + Vector((0, 0, 2.0))
+    link(cam)
+    r = scene.render
+    saved = (r.resolution_x, r.resolution_y, r.resolution_percentage, r.filepath, r.image_settings.file_format, r.image_settings.color_mode, r.image_settings.color_depth,
+             r.use_motion_blur, scene.eevee.taa_render_samples, scene.camera, scene.view_settings.view_transform, scene.view_settings.look, r.use_compositing, r.film_transparent)
+    hidden = [o for o in scene.objects if o.type in ("MESH", "CURVE", "FONT") and o is not catcher and not o.hide_render]
+    for o in hidden:
+        o.hide_render = True
+    catcher.data.materials[0] = probe
+    path = r.filepath.rsplit("/", 1)[0] + "/floor-probe.exr"
+    try:
+        r.resolution_x = r.resolution_y = 4
+        r.resolution_percentage = 100
+        r.image_settings.file_format = "OPEN_EXR"
+        r.image_settings.color_mode = "RGB"
+        r.image_settings.color_depth = "32"
+        r.use_motion_blur = False
+        r.use_compositing = False
+        r.film_transparent = False
+        scene.eevee.taa_render_samples = 4
+        scene.camera = cam
+        scene.view_settings.view_transform = "Standard"
+        scene.view_settings.look = "None"
+        r.filepath = path
+        scene.frame_set(scene.frame_start)
+        bpy.ops.render.render(write_still=True)
+        img = bpy.data.images.load(path)
+        px = img.pixels[:]
+        lum = sum(0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2] for i in range(0, len(px), 4)) / (len(px) // 4)
+        bpy.data.images.remove(img)
+        if lum > 1e-4:
+            divisor.inputs[1].default_value = lum
+    finally:
+        catcher.data.materials[0] = mat
+        for o in hidden:
+            o.hide_render = False
+        (r.resolution_x, r.resolution_y, r.resolution_percentage, r.filepath, r.image_settings.file_format, r.image_settings.color_mode, r.image_settings.color_depth,
+         r.use_motion_blur, scene.eevee.taa_render_samples, scene.camera, scene.view_settings.view_transform, scene.view_settings.look, r.use_compositing, r.film_transparent) = saved
+        bpy.data.objects.remove(cam)
+        try:
+            import os
+            os.remove(path)
+        except OSError:
+            pass

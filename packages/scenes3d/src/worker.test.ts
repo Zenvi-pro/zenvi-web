@@ -41,7 +41,7 @@ async function fakeWorker(env: NodeJS.ProcessEnv = {}): Promise<{ worker: Blende
   return { worker, spawned: () => count };
 }
 
-const job = (scene: string, frames = 3): BlenderJob => ({ id: `${scene}-${Math.random()}`, scene: scene as BlenderJob["scene"], params: {} as BlenderJob["params"], width: 8, height: 8, fps: 30, frames, quality: "draft", output_dir: "/tmp/x", media: {}, font: null });
+const job = (scene: string, frames = 3): BlenderJob => ({ id: `${scene}-${Math.random()}`, scene: scene as BlenderJob["scene"], params: {} as BlenderJob["params"], width: 8, height: 8, fps: 30, frames, quality: "draft", output_dir: "/tmp/x", media: {}, files: {}, font: null });
 
 describe("parseWorkerLine", () => {
   it("reads the worker's events and ignores Blender's own output", () => {

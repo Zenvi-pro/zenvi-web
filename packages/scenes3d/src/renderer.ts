@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Scene3dCodec, Scene3dHost, Scene3dRender, Scene3dRenderRequest } from "@zenvi/engine";
+import { SCENE3D_FONT_SCENES, type Scene3dCodec, type Scene3dHost, type Scene3dRender, type Scene3dRenderRequest, type Scene3dId } from "@zenvi/engine";
 import { encodeArgs, renderSize, type BlenderJob, type JobMedia } from "./job.js";
 import { fileStamp, fingerprint, scriptsHash } from "./fingerprint.js";
 import { scriptsDir as defaultScriptsDir } from "./paths.js";
@@ -73,8 +73,8 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
   const cache = path.join(options.cacheDir, "scenes3d");
   const ffmpeg = options.ffmpeg ?? "ffmpeg";
 
-  const font = async (params: Record<string, unknown>, scene: string): Promise<string | null> => {
-    if (scene !== "title_3d") return null;
+  const font = async (params: Record<string, unknown>, scene: Scene3dId): Promise<string | null> => {
+    if (!SCENE3D_FONT_SCENES.includes(scene)) return null;
     const given = typeof params.font === "string" ? params.font.trim() : undefined;
     if (given && isPathLike(given)) {
       if (!existsSync(given)) throw new Error(`font file ${given} does not exist`);
@@ -98,6 +98,14 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         media[slot] = { file, kind: m.kind, width: m.width, height: m.height, fps: m.fps, frames: m.frames, start: m.start };
         stamps[slot] = { stamp: await fileStamp(file), start: m.start, kind: m.kind };
       }
+      const files: Record<string, string> = {};
+      const fileStamps: Record<string, unknown> = {};
+      for (const [slot, given] of Object.entries(request.files ?? {})) {
+        const file = options.resolveMedia(given);
+        if (!existsSync(file)) throw new Error(`the ${slot} file ${given} does not exist${file !== given ? ` (${file})` : ""}`);
+        files[slot] = file;
+        fileStamps[slot] = await fileStamp(file);
+      }
       const params = request.params as Record<string, unknown>;
       const fontFile = await font(params, request.scene);
       const transparent = params.background === "transparent";
@@ -111,6 +119,7 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         frames: request.frames,
         quality: request.quality,
         media: stamps,
+        files: Object.keys(fileStamps).length > 0 ? fileStamps : undefined,
         font: fontFile ? await fileStamp(fontFile) : null,
         scripts: await scriptsHash(scripts),
       });
@@ -135,6 +144,7 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
           quality: request.quality,
           output_dir: framesDir,
           media,
+          files,
           font: fontFile,
         };
         request.onProgress?.(0, "starting Blender");

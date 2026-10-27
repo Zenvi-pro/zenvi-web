@@ -53,7 +53,20 @@ describe("list_3d_scenes_tool", () => {
     expect(result.ok, result.text).toBe(true);
     const data = dataOf(result) as { available: boolean; scenes: { id: string; params: { properties: Record<string, unknown> } }[] };
     expect(data.available).toBe(true);
-    expect(data.scenes.map((s) => s.id)).toEqual(["title_3d", "device_mockup", "floating_cards", "icon_cube", "cube_cut", "glass_hero", "particle_burst"]);
+    expect(data.scenes.map((s) => s.id)).toEqual([
+      "title_3d",
+      "device_mockup",
+      "floating_cards",
+      "icon_cube",
+      "cube_cut",
+      "glass_hero",
+      "particle_burst",
+      "logo_extrude",
+      "model_showcase",
+      "numerals_3d",
+      "terrain_glide",
+      "card_stack",
+    ]);
     expect(Object.keys(data.scenes[0]!.params.properties)).toContain("text");
     const elsewhere = await runTool({ doc: fixtureDoc(), host: fakeHost() }, "list_3d_scenes_tool", {});
     expect((dataOf(elsewhere) as { available: boolean }).available).toBe(false);
@@ -125,6 +138,51 @@ describe("add_3d_scene_tool", () => {
     expect(result.text).toContain("Blender exited (code 1)");
     expect(doc.undoLabels).toEqual([]);
     expect(doc.project.files).toHaveLength(before);
+  });
+
+  it("passes a model or SVG file to the renderer by slot, and bin pictures to the card stack", async () => {
+    const doc = fixtureDoc();
+    const { host, requests } = scenesHost();
+    const model = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "model_showcase", params: { model: "models/engine.glb", look: "xray", background: "dark" } });
+    expect(model.ok, model.text).toBe(true);
+    expect(requests[0]!.files).toEqual({ model: "models/engine.glb" });
+    expect(model.text).toContain("Added model_showcase");
+    const logo = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "logo_extrude", params: { svg: "/brand/mark.svg" } });
+    expect(logo.ok, logo.text).toBe(true);
+    expect(requests[1]!.files).toEqual({ svg: "/brand/mark.svg" });
+    const word = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "logo_extrude", params: { text: "Zenvi", animation: "assemble" } });
+    expect(requests[2]!.files).toEqual({});
+    expect((dataOf(word) as { params: { size: number } }).params.size).toBe(0.6);
+    const cards = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "card_stack", params: { file_ids: [IDS.logo, IDS.broll] } });
+    expect(cards.ok, cards.text).toBe(true);
+    expect(Object.keys(requests[3]!.media)).toEqual(["card0", "card1"]);
+    expect(doc.undoLabels).toEqual(["Add 3D model_showcase", "Add 3D logo_extrude", "Add 3D logo_extrude", "Add 3D card_stack"]);
+  });
+
+  it("refuses model formats Blender cannot import and a transparent terrain before rendering", async () => {
+    const doc = fixtureDoc();
+    const { host, requests } = scenesHost();
+    const usdz = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "model_showcase", params: { model: "chair.usdz" } });
+    expect(usdz.ok).toBe(false);
+    expect(usdz.text).toContain("Error: model_showcase params: model: give a .glb / .gltf / .obj / .fbx / .stl / .ply file.");
+    const noModel = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "model_showcase", params: {} });
+    expect(noModel.text).toContain("model:");
+    const sky = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "terrain_glide", params: { background: "transparent" } });
+    expect(sky.ok).toBe(false);
+    expect(sky.text).toContain("background:");
+    const counter = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "numerals_3d", params: { values: [-3] } });
+    expect(counter.text).toContain("values.0:");
+    expect(requests).toHaveLength(0);
+    expect(doc.undoLabels).toEqual([]);
+  });
+
+  it("a model Blender cannot read is a clear error and adds nothing", async () => {
+    const doc = fixtureDoc();
+    const { host } = scenesHost("ValueError: Blender could not import broken.fbx: ASCII FBX files are not supported");
+    const result = await runTool({ doc, host }, "add_3d_scene_tool", { scene: "model_showcase", params: { model: "/tmp/broken.fbx" } });
+    expect(result.ok).toBe(false);
+    expect(result.text).toContain("Error: the model_showcase render failed: ValueError: Blender could not import broken.fbx: ASCII FBX files are not supported");
+    expect(doc.undoLabels).toEqual([]);
   });
 
   it("puts cube_cut over the cut, with each side's footage where it is at the start and end", async () => {

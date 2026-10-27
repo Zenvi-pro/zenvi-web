@@ -47,3 +47,28 @@ def gradient(colors, scale=1.0, energy=1.0, back=1.0):
 def orbit_point(radius, azimuth_deg, elevation_deg, center=(0, 0, 0)):
     a, e = math.radians(azimuth_deg), math.radians(elevation_deg)
     return (center[0] + radius * math.cos(e) * math.sin(a), center[1] - radius * math.cos(e) * math.cos(a), center[2] + radius * math.sin(e))
+
+
+def sun(name, elevation_deg, azimuth_deg, strength=3.0, angle_deg=6.0, color="#FFFFFF"):
+    """A sun from (azimuth, elevation) (azimuth 0: from behind the camera,
+    positive: from the right). `angle_deg` softens its shadows."""
+    data = bpy.data.lights.new(name, "SUN")
+    data.energy = strength
+    data.angle = math.radians(angle_deg)
+    data.color = rgb(color)
+    obj = bpy.data.objects.new(name, data)
+    source = Vector(orbit_point(1.0, azimuth_deg, elevation_deg))
+    obj.rotation_euler = (-source).to_track_quat("-Z", "Y").to_euler()
+    link(obj)
+    return obj
+
+
+def exclude(light_objects, receivers):
+    """Light linking: these lights do not light (or shadow) `receivers`."""
+    coll = bpy.data.collections.new("NotLit")
+    for obj in receivers:
+        coll.objects.link(obj)
+    for light in light_objects:
+        light.light_linking.receiver_collection = coll
+    for item in coll.collection_objects:
+        item.light_linking.link_state = "EXCLUDE"

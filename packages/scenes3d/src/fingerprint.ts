@@ -1,7 +1,8 @@
 /**
  * Render cache keys: sha256 over everything that changes the pixels —
  * scene id, params, render size, fps, frames, quality, each media file's
- * identity (path, size, mtime) and where it starts, the font file, and a
+ * identity (path, size, mtime) and where it starts, imported files (an SVG,
+ * a model) and the font file by the same identity, and a
  * hash of every bpy script (an edited scene re-renders).
  */
 
@@ -65,6 +66,8 @@ export interface FingerprintInput {
   frames: number;
   quality: string;
   media: Record<string, { stamp: unknown; start: number; kind: string }>;
+  /** Imported files by slot (absent before files existed: old keys stay valid). */
+  files?: Record<string, unknown>;
   font: unknown;
   scripts: string;
 }
