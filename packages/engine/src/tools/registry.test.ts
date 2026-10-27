@@ -55,6 +55,7 @@ const DIRECT_TOOLS = [
   "create_sound_kit_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
+  "gather_stock_footage_tool",
   "generate_subject_matte_tool",
   "text_behind_subject_tool",
   "replace_background_tool",

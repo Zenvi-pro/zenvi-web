@@ -45,11 +45,12 @@ importing (`set_project_setting_tool`: 1080×1920 for 9:16, 1080×1080 for
   their order; the last file closes the reel, so put the payoff (the goal,
   the reveal, the product) last.
 - Stock: the cloud connector's `create_reel` searches stock for you.
-  Otherwise `search_pexels_videos_tool` (one search per beat of the story,
-  e.g. "barista pouring espresso close up") gives video ids and MP4 links
-  sized for the frame; add each with `import_stock_media_tool`
-  (`source: "pexels"`, `video_id`, `link`). Pexels footage is free to use;
-  say where it came from.
+  Otherwise `gather_stock_footage_tool` with one query per beat of the story
+  (e.g. "barista pouring espresso close up") and `count` (a reel wants one
+  clip per ~1 s) imports the best distinct clips in one call;
+  `search_pexels_videos_tool` + `import_stock_media_tool` (`source:
+  "pexels"`, `video_id`, `link`) pick one specific shot. Pexels footage is
+  free to use; say where it came from.
 - One music track: an audio file in the bin (`search_freesound_music_tool`
   with `min_seconds` a little over the reel's length, then
   `import_stock_media_tool` with `source: "freesound"`, `sound_id`,

@@ -19,8 +19,10 @@ other (dark round → dark round, warm → warm); end on the most iconic one
 
 ## Tools
 
-1. Assets: 12-16 clips, one search per shape ("coffee cup top view", "full
-   moon night sky", "human eye close up macro"...). Prefer centred, single,
+1. Assets: **source count 12-16 clips** in one call, a query per shape:
+   `gather_stock_footage_tool` `{"queries": ["coffee cup top view", "full
+   moon night sky", "human eye close up macro", ...], "count": 16,
+   "min_seconds": 3}`. Prefer centred, single,
    round subjects filling 20-50 % of the frame height; skip clips with two
    circles.
    Look at each candidate (`inspect_media_tool` `fileId`, `overview: true`)
@@ -47,7 +49,8 @@ match_cut_montage_tool {
   "duration_seconds": 15,
   "min_frames": 3, "max_frames": 8,
   "flash": true, "zoom_drift": 0.04,
-  "target": {"x": 0.5, "y": 0.5, "size": 0.4}
+  "target": {"x": 0.5, "y": 0.5, "size": 0.4},
+  "strict_variety": true
 }
 ```
 
@@ -57,7 +60,14 @@ match_cut_montage_tool {
    the pose pair first and the circles after.
 
    Its receipt has the beats and the shots; it already aligns every shot
-   (`cover: zoom_all`) and puts white flashes on downbeats.
+   (`cover: zoom_all`), puts white flashes on downbeats and a motion
+   transition once a bar between them (`transitions: "punch"`, the default:
+   a crash zoom about the subject, a glitch, and a zoom-through into the
+   subject on the last cut; `data.transitions` lists them). The music's
+   tempo is known? Pass `bpm` (and `offset_seconds`, where the first beat
+   is) instead of letting it track. `strict_variety` refuses when a file
+   would come back within 3 s and says how many more to gather: gather
+   them and rerun.
 4. Grade, on matched plates: `unify_grade_tool` `{"look":
    "teal_&_orange_cinema", "look_intensity": 0.6}` (or `"warm_cinema"`), so
    the moon and the cup sit in one world; then grain only: `apply_look_tool`
@@ -96,7 +106,9 @@ within ±10 % from shot to shot. If one drifts, fix its box and rerun with
 ## Pitfalls
 
 - Holding chain shots 1-2 s: it becomes a slideshow of round things.
-- Motion transitions between match cuts: the hard cut is the effect. At most
-  `flash_white` on downbeats (the tool does it).
+- More motion transitions between match cuts: the hard cut is the effect.
+  The tool's punches (once a bar, about the aligned subject) are the most the
+  chain takes; do not run apply_motion_transitions_tool on top. `transitions:
+  "none"` for a pure hard-cut chain.
 - Music used as sound effects; use the SFX tools, keep the music bed whole.
 - Different grades per shot: the match only works when the frames rhyme.

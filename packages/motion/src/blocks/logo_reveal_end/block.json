@@ -45,7 +45,7 @@
     },
     "cta": {
       "type": "string",
-      "maxLength": 32,
+      "maxLength": 48,
       "default": "Start your first cut",
       "description": "The call to action on the pill under the lockup (empty: none)."
     },

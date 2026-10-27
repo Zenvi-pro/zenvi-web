@@ -32,6 +32,8 @@ export function build(ctx: BlockContext): void {
   if (word) word.style.fontSize = `${stacked ? 150 : 168}px`;
   const cta = p.cta ? ctx.el("div", "lr-cta", wrap, String(p.cta)) : null;
   if (cta) cta.style.color = onColor(palette.accent);
+  // The pill does not wrap: past 32 characters the type shrinks to keep it the width 32 take at 36 px.
+  if (cta && String(p.cta).length > 32) cta.style.fontSize = `${Math.round((36 * 32) / String(p.cta).length)}px`;
   const url = p.url ? ctx.el("div", "lr-url", wrap, String(p.url)) : null;
 
   // Fit the lockup to the safe width, then centre it a little above the middle.

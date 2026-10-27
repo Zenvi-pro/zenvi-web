@@ -23,7 +23,9 @@ eyes), and inside a group keep the shape centred.
 
 ## Tools
 
-1. Assets: 20-30 clips/stills over 8-10 searches plus 2-4 AI stills
+1. Assets: **source count 20-30 clips/stills**: one
+   `gather_stock_footage_tool` call with 8-10 queries (`"count": 24`,
+   `"min_seconds": 2`), plus 2-4 AI stills
    (`generate_image_and_add_to_timeline_tool` writes to the timeline; move or
    delete the clip after, the file stays in the bin).
 2. Cut: `match_cut_montage_tool` with `min_frames: 3`, `max_frames: 5`,
@@ -42,16 +44,19 @@ eyes), and inside a group keep the shape centred.
 match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane>", "<eye>", "<fern>"],
   "subjects": [{"file_id": "<shell>", "box": {"x": 0, "y": 0, "w": 1, "h": 1}}, {"file_id": "<galaxy>", "box": {"x": 0, "y": 0, "w": 1, "h": 1}}],
   "target": {"x": 0.5, "y": 0.5, "size": 1.333},
-  "music_file_id": "<track>", "duration_seconds": 12, "min_frames": 3, "max_frames": 5, "flash": true, "zoom_drift": 0.06}
+  "music_file_id": "<track>", "duration_seconds": 12, "min_frames": 3, "max_frames": 5, "flash": true, "zoom_drift": 0.06,
+  "transitions": "flash"}
 ```
 
    (one subjects entry per file). Without a shape idea, `build_reel_tool`
    `style: "hype"` is the fallback (1/4-beat bursts after the drop, its own
    flashes, glitch and negative hits, display titles: skip steps 3 and 5).
-3. Accents: `apply_motion_transition_tool` `preset: "glitch"` on the drop
-   cut (the first bar line from 2/3 in), `flash_invert` and `glitch`
-   alternating on the bar lines after it (`track`, `time`); white flashes
-   only where a section starts. Never two accents on neighbouring cuts.
+3. Accents: `transitions: "flash"` (step 2) already puts `flash_invert`,
+   `glitch` and a punch once a bar between the white flashes, on the shots'
+   own track, never on neighbouring cuts, and flies into the last image;
+   `data.transitions` lists them. The white flash frames sit on a track of
+   their own: one more accent by hand goes on the **shots'** track
+   (`data.tracks.video`), `apply_motion_transition_tool` `track`, `time`.
 4. Look, on matched plates: `unify_grade_tool` `{"look": "dreamy_cinema",
    "look_intensity": 0.6}` (or `"night_glow"`) first, so a bright still and a
    dark one stop jumping at 4 frames a shot; then grain only:

@@ -149,6 +149,22 @@ const updateInput = z.strictObject({
   draft: z.boolean().optional().describe("Half-size preview render (false for the final)."),
 });
 
+/**
+ * Why a block cannot run `asked` seconds, as an `Error:` line, or null. Too
+ * short names the blocks that do fit (bench round 3: glass_cards at 2.2 s
+ * was refused with no way forward).
+ */
+function durationProblem(block: { id: string; duration: { min: number; max: number } }, asked: number, all: readonly { id: string; duration: { min: number; max: number } }[]): string | null {
+  const { min, max } = block.duration;
+  if (asked > max) return `Error: ${block.id} runs ${min}-${max} s (got ${asked}). Give duration_seconds of at most ${max}.`;
+  if (asked >= min) return null;
+  const fits = all.filter((b) => b.id !== block.id && b.duration.min <= asked && asked <= b.duration.max).map((b) => b.id);
+  return (
+    `Error: ${block.id} runs ${min}-${max} s (got ${asked}): its entrances, its action and a beat to read the result need ${min} s at least. ` +
+    `Give duration_seconds of ${min} or more${fits.length > 0 ? `, or use a block that fits ${asked} s: ${fits.slice(0, 8).join(", ")}` : ""}.`
+  );
+}
+
 export const motionBlockTools: CatalogTool[] = [
   directTool({
     name: LIST,
@@ -226,9 +242,8 @@ export const motionBlockTools: CatalogTool[] = [
       const checked = motion.check(block.id, raw);
       if (!checked.ok) return refused(ADD, errorText(checked.error));
       const asked = args.duration_seconds ?? block.duration.default;
-      if (asked < block.duration.min || asked > block.duration.max) {
-        return refused(ADD, `Error: ${block.id} runs ${block.duration.min}-${block.duration.max} s (got ${asked}).`);
-      }
+      const long = durationProblem(block, asked, motion.blocks());
+      if (long) return refused(ADD, long);
       // Whole frames: the render has round(seconds × fps) frames, and the clip must not outrun them.
       const seconds = snapToFrame(project, asked);
       const media = mediaPaths(project, block, checked.params);
@@ -295,9 +310,8 @@ export const motionBlockTools: CatalogTool[] = [
       const checked = motion.check(block.id, merged);
       if (!checked.ok) return refused(UPDATE, errorText(checked.error));
       const asked = args.duration_seconds ?? (current.seconds || block.duration.default);
-      if (asked < block.duration.min || asked > block.duration.max) {
-        return refused(UPDATE, `Error: ${block.id} runs ${block.duration.min}-${block.duration.max} s (got ${asked}).`);
-      }
+      const long = durationProblem(block, asked, motion.blocks());
+      if (long) return refused(UPDATE, long);
       const seconds = snapToFrame(project, asked);
       // A shorter block cuts every clip's end to it (writeFile); a clip trimmed to start past that would be empty.
       const emptied = clipsUsingFile(project, String(file.id)).find((c) => Number(c.start) >= seconds);

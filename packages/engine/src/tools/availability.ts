@@ -105,6 +105,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   open_project_tool: { methods: ["storage.open"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
   import_video_url_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
+  gather_stock_footage_tool: { methods: ["media.importUrl"] },
   import_stock_media_tool: { methods: ["media.importUrl"], optional: ["stock", "media.importPath"], partialNote: "search needs stock search; local_path needs local file access" },
   place_motion_graphic_tool: { optional: ["media.importUrl"], partialNote: "url= needs URL downloads; file_id works" },
   fetch_motion_graphics_video_tool: { methods: ["media.importUrl"] },

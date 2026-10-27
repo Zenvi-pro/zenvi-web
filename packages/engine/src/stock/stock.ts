@@ -59,6 +59,26 @@ export function stockRelevance(video: PexelsVideo, query: string): number {
   return words.reduce((score, w, i) => (slug.some((s) => sameStem(w, s)) ? score + words.length - i : score), 0);
 }
 
+/** A Pexels page's slug words ("woman-running-on-a-trail-7348382" → woma, runn, trail), as stems. */
+function slugStems(video: PexelsVideo): string[] {
+  return stems(/\/video\/([^/]*)/.exec(video.url ?? "")?.[1] ?? "");
+}
+
+/**
+ * Two results that are likely takes of one shoot: the same contributor, and
+ * pages whose words mostly agree (Pexels contributors upload a shoot as many
+ * near-identical clips) or, without words, the same size and length.
+ */
+export function sameShoot(a: PexelsVideo, b: PexelsVideo): boolean {
+  if (a.id === b.id) return true;
+  if (!a.user_name || a.user_name !== b.user_name) return false;
+  const wa = slugStems(a);
+  const wb = slugStems(b);
+  if (wa.length === 0 || wb.length === 0) return a.width === b.width && a.height === b.height && Math.abs(a.duration - b.duration) <= 1;
+  const shared = wa.filter((w) => wb.some((v) => sameStem(w, v))).length;
+  return shared / Math.min(wa.length, wb.length) >= 0.6;
+}
+
 /**
  * A stock video that suits the frame: long enough, not used yet, the one whose page best matches the search (Pexels'
  * deeper results drift: "trail runner" also brings plain mountains), then the frame's orientation, then Pexels' order.

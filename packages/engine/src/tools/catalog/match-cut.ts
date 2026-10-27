@@ -9,7 +9,8 @@
  *   iris, moon, cup, vinyl, lens, eclipse), ready for the other two.
  * - match_cut_montage_tool: the whole edit in one call: shots of 3-8 frames
  *   on the music's hits and beats (matchcut/montage.ts), every shot aligned,
- *   white flashes on downbeats, a small zoom drift per shot, the music bed.
+ *   white flashes on downbeats, a motion transition once a bar between them
+ *   (transitions/motion/montage.ts), a small zoom drift per shot, the music bed.
  *
  * The montage is its own tool rather than a build_reel_tool style: it cuts
  * in frames on onsets (build_reel cuts in beats, 6 frames at least), takes a
@@ -21,16 +22,21 @@ import type { Transaction } from "../../history/document.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { Interpolation, ScaleMode, type Clip, type ProjectFile } from "../../model/types.js";
 import { SOFT_ZOOM, alignMatchCut, type AlignClipInput, type AlignResult, type CoverMode } from "../../ops/match-cut.js";
-import { addClip, deleteClips, setClipKeyframes, setClipProperty } from "../../ops/clips.js";
+import { addClip, deleteClips, retimeClipTo, setClipKeyframes, setClipProperty } from "../../ops/clips.js";
+import { applyFittedMotionTransition, type MotionTransitionResult } from "../../ops/motion-transitions.js";
 import { addTitleClip } from "../../ops/titles.js";
 import { addTrack } from "../../ops/tracks.js";
 import { removeTransition } from "../../ops/transitions.js";
 import { boxAt, subjectOnCanvas, type CanvasSubject, type FitMode, type SubjectBox } from "../../matchcut/fit.js";
 import { planMontage, type MontageMusic, type MontagePlan } from "../../matchcut/montage.js";
+import { REUSE_GAP_SECONDS } from "../../reels/plan.js";
 import { flashSvg } from "../../reels/typography.js";
+import { MONTAGE_TRANSITIONS, planMontageTransitions, type MontageCut, type MontageRule } from "../../transitions/motion/montage.js";
+import { beatOverrideProblem, beatOverrideShape, explicitBeats } from "../beat-override.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
+import { varietyProblem } from "../variety.js";
 import { detectSubjects, SUBJECT_KINDS, type DetectedSubject, type FrameSubjects } from "../subjects.js";
 import type { ImportedMedia } from "../types.js";
 import { placeMusicBed } from "./music-bed.js";
@@ -111,15 +117,15 @@ const montageInput = z.strictObject({
         file_id: z.string().min(1),
         box: boxSchema,
         time: z.number().min(0).optional().describe("Source seconds the box was measured at: the file's shots start here (every return replays this moment unless end_box follows the subject). Default: a third into the file."),
-        end_box: boxSchema.optional(),
-        end_time: z.number().min(0).optional(),
+        end_box: boxSchema.optional().describe("The subject again later in the source, to follow it as it drifts."),
+        end_time: z.number().min(0).optional().describe("Source seconds of end_box (default: the end of the file)."),
       }),
     )
     .max(60)
     .optional()
     .describe("Subject boxes per file. Files without one are searched for a circle at each shot's first frame (detect_subject_tool), or kept centred when this surface cannot read frames."),
   music_file_id: z.string().optional().describe("Music in the media bin to cut to. Default: the longest audio file in the bin."),
-  beats: z.array(z.number().min(0)).max(4000).optional().describe("Beat times of the music, seconds, instead of analysing it here."),
+  ...beatOverrideShape,
   duration_seconds: z.number().min(2).max(60).optional().describe("Target length, seconds (default: one pass through the files, at least 8 s). Ends on a downbeat."),
   target: targetSchema.optional().describe("Where every subject lands. Default: the frame's centre, at the size the first file shows its subject."),
   fit: fitSchema,
@@ -128,6 +134,17 @@ const montageInput = z.strictObject({
   max_frames: z.number().int().min(2).max(24).optional().describe("Longest body shot, frames (default 8)."),
   flash: z.boolean().optional().describe("A white flash frame on cuts that land on a downbeat (default true)."),
   zoom_drift: z.number().min(0).max(0.3).optional().describe("Each shot zooms in by this fraction about its subject (default 0.04)."),
+  transitions: z
+    .enum(MONTAGE_TRANSITIONS)
+    .optional()
+    .describe(
+      "Motion transitions on the cuts, once a bar between the flashed downbeats, in the same undo step: auto (default) = punch: crash zoom about the subject and glitch, the last cut flying into the subject; " +
+        "flash (a flash montage): inverted frames, glitches and punches; whip: whips in one direction, landing on a pull-back; none: hard cuts and flashes only.",
+    ),
+  strict_variety: z
+    .boolean()
+    .optional()
+    .describe(`Refuse (nothing changes) when the files are too few for the pace and a file comes back within ${REUSE_GAP_SECONDS} s; the error says how many more to import. Default false: a warning.`),
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (in the same undo step)."),
 });
 
@@ -276,6 +293,8 @@ interface ShotSource {
   /** Source window, seconds. */
   start: number;
   end: number;
+  /** A file shorter than its shot plays its whole window slowed to fill it, at this speed (< 1). */
+  slow?: number;
   box: SubjectBox;
   later?: { box: SubjectBox; time: number };
   /** Where the box came from. */
@@ -294,18 +313,24 @@ const CENTRED: SubjectBox = { x: 0.3, y: 0.3, w: 0.4, h: 0.4 };
  * moment. Files with an end box are followed instead: each return shows a
  * later moment and the box is interpolated there.
  */
-function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>, followed: ReadonlySet<string>): Array<{ start: number; end: number }> {
+function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>, followed: ReadonlySet<string>, fps: number): Array<{ start: number; end: number; slow?: number }> {
   const cursor = new Map<string, number>();
   return plan.shots.map((shot) => {
     const id = ids[shot.clip]!;
     const file = files.get(id)!;
-    const length = shot.end - shot.start;
+    const length = shot.frames / fps;
     if (visualKind(file) === "image") return { start: 0, end: length };
     const [a, b] = usableRange(file);
+    // Shorter than the shot (a held opening on a slow tempo): the whole file, slowed to fill it, rather than black after its last frame.
+    const first = Math.ceil(a * fps - 1e-6) / fps;
+    const last = Math.floor(b * fps + 1e-6) / fps;
+    if (last - first < length - 1e-6 && last > first) return { start: first, end: last, slow: (last - first) / length };
     const room = Math.max(0, b - a - length);
     let start = cursor.get(id) ?? times.get(id) ?? a + room * 0.3;
     if (start + length > b + 1e-6) start = a;
     start = Math.max(0, Math.min(start, Math.max(a, b - length)));
+    // On the frame grid: a window between frames rounds to one frame more or less than the shot (a black frame or an overlap on the cut).
+    start = Math.max(0, Math.floor(start * fps + 0.5) / fps);
     cursor.set(id, followed.has(id) ? start + length + 0.25 : start);
     return { start, end: start + length };
   });
@@ -324,8 +349,10 @@ const montageTool = directTool({
   description:
     "Cut a full-circle match-cut montage in one step from media-bin files that share a shape or pose (eye, moon, cup, vinyl, lens): " +
     "shots of 3-8 frames on the music's hits and beats with a held first and last shot, every shot aligned so the subject sits at the same place and size, " +
-    "white flashes on downbeats, a small zoom per shot and the music bed. One undo step; data.sfx_cues lists the cut times for sound design. " +
-    "Give subject boxes per file (detect_subject_tool) or let it find circles.",
+    "white flashes on downbeats, a motion transition once a bar between them (transitions: punch by default, flash for a flash montage, whip, none), a small zoom per shot and the music bed. " +
+    "One undo step; data.sfx_cues lists the cut times for sound design, data.transitions the moves (auto_sound_design_tool hears both). " +
+    "Give subject boxes per file (detect_subject_tool) or let it find circles; for a flash montage of unrelated images give each a full-frame box {x:0,y:0,w:1,h:1}. " +
+    "Warns (strict_variety: refuses) when the files are too few for the pace and says how many more to import.",
   input: montageInput,
   annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   requires: ["media"],
@@ -343,9 +370,11 @@ const montageTool = directTool({
     const given = new Map<string, NonNullable<MontageArgs["subjects"]>[number]>();
     for (const s of args.subjects ?? []) {
       if (!ids.includes(s.file_id)) return refused(MONTAGE, `Error: subjects names ${s.file_id}, which is not in file_ids.`);
-      if ((s.end_box === undefined) !== (s.end_time === undefined)) return refused(MONTAGE, `Error: ${s.file_id}: give end_box and end_time together.`);
+      if (s.end_time !== undefined && !s.end_box) return refused(MONTAGE, `Error: ${s.file_id}: end_time is where end_box was measured; give end_box with it.`);
       given.set(s.file_id, s);
     }
+    const problem = beatOverrideProblem(args);
+    if (problem) return refused(MONTAGE, problem);
     const minFrames = args.min_frames ?? 3;
     const maxFrames = args.max_frames ?? 8;
     if (maxFrames < minFrames) return refused(MONTAGE, "Error: max_frames must be at least min_frames.");
@@ -358,16 +387,18 @@ const montageTool = directTool({
       music = project.files.filter((f) => isAudioOnlyMedia(f) && !ids.includes(String(f.id))).sort((a, b) => (Number(b.duration) || 0) - (Number(a.duration) || 0))[0];
     }
 
-    // The music's beats and hits: given, tracked here, or none (cut to 120 BPM).
+    // The music's beats and hits: given (beats, or bpm + offset_seconds), tracked here (at the given bpm, if any), or none (cut to bpm, else 120 BPM).
     const warnings: string[] = [];
     let beats: MontageMusic | null = null;
+    const instead = `${args.bpm ?? 120} BPM`;
     if (music) {
       const length = Number(music.duration) || 0;
-      if (args.beats && args.beats.length >= 2) {
-        beats = { ...musicFromBeats(args.beats, length), onsets: [] };
+      const explicit = explicitBeats(args, length);
+      if (explicit) {
+        beats = { ...musicFromBeats(explicit.beats, length, args.bpm), onsets: [] };
       } else if (canTrackBeats(call)) {
-        const tracked = await beatsOfFile(call, music);
-        if (typeof tracked === "string") warnings.push(`${tracked} Cut to 120 BPM instead.`);
+        const tracked = await beatsOfFile(call, music, args.bpm ? { bpm: args.bpm } : {});
+        if (typeof tracked === "string") warnings.push(`${tracked} Cut to ${instead} instead.`);
         else if (tracked.beats.length >= 2) {
           beats = {
             bpm: tracked.bpm,
@@ -377,15 +408,28 @@ const montageTool = directTool({
             onsets: tracked.onsets,
             duration: Math.max(length, tracked.duration),
           };
-        } else warnings.push("No steady beat in the music: cut to 120 BPM instead.");
-      } else warnings.push("This surface cannot analyse audio: the cuts follow 120 BPM, not the music.");
+        } else warnings.push(`No steady beat in the music: cut to ${instead} instead.`);
+      } else if (args.bpm) {
+        beats = { ...musicFromBeats(explicitBeats({ bpm: args.bpm, offset_seconds: 0 }, length)!.beats, length, args.bpm), onsets: [] };
+        warnings.push(`This surface cannot analyse audio: the grid is ${args.bpm} BPM from the start of the music (pass offset_seconds if the first beat is later).`);
+      } else warnings.push("This surface cannot analyse audio: the cuts follow 120 BPM, not the music (pass bpm and offset_seconds).");
+    } else if (args.beats || args.offset_seconds !== undefined) {
+      warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow bpm (default 120).");
     }
 
     const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);
     const frameRate = Number.isFinite(fps) && fps > 0 ? fps : 30;
     let plan: MontagePlan;
     try {
-      plan = planMontage({ clips: ids.length, fps: frameRate, music: beats, minFrames, maxFrames, ...(args.duration_seconds !== undefined ? { seconds: args.duration_seconds } : {}) });
+      plan = planMontage({
+        clips: ids.length,
+        fps: frameRate,
+        music: beats,
+        minFrames,
+        maxFrames,
+        ...(args.duration_seconds !== undefined ? { seconds: args.duration_seconds } : {}),
+        ...(!beats && args.bpm ? { fallbackBpm: args.bpm } : {}),
+      });
     } catch (error) {
       return failed(MONTAGE, `Error: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -393,11 +437,19 @@ const montageTool = directTool({
     // Every shot's source window and subject box, before anything is recorded.
     const boxTimes = new Map([...given].filter(([, s]) => s.time !== undefined).map(([id, s]) => [id, s.time!]));
     const followed = new Set([...given].filter(([, g]) => g.end_box !== undefined).map(([id]) => id));
-    const windows = sourceWindows(plan, ids, files, boxTimes, followed);
+    const windows = sourceWindows(plan, ids, files, boxTimes, followed, frameRate);
     const firstStart = new Map<string, number>();
     for (const [i, shot] of plan.shots.entries()) if (!firstStart.has(ids[shot.clip]!)) firstStart.set(ids[shot.clip]!, windows[i]!.start);
     const unused = ids.filter((id) => !firstStart.has(id));
     if (unused.length > 0) warnings.push(`${unused.length} file(s) did not fit in ${round(plan.duration, 2)} s: ${unused.join(", ")}. Give a longer duration_seconds.`);
+    const variety = varietyProblem(plan.shots.map((shot) => ({ fileId: ids[shot.clip]!, start: shot.start, end: shot.end })));
+    if (variety && args.strict_variety) return refused(MONTAGE, `Error: ${variety}`);
+    if (variety) warnings.push(variety);
+    const slowed = new Map<string, number>();
+    windows.forEach((w, i) => {
+      if (w.slow) slowed.set(ids[plan.shots[i]!.clip]!, Math.min(slowed.get(ids[plan.shots[i]!.clip]!) ?? 1, w.slow));
+    });
+    for (const [id, speed] of slowed) warnings.push(`${displayName(files.get(id)!)} is shorter than its shot: it plays slowed to ${Math.round(speed * 100)} % to fill it.`);
     // Each file is looked at once, at its first shot: its circle (unless given) and whether its edges are black.
     const looked = new Map<string, FrameSubjects | null>();
     let cannotLook = false;
@@ -417,7 +469,8 @@ const montageTool = directTool({
       const darkEdges = looked.get(id)?.darkEdges ?? false;
       const s = given.get(id);
       if (s) {
-        const later = laterBox(s);
+        // end_box alone: the subject as the file ends.
+        const later = laterBox(s.end_box && s.end_time === undefined ? { ...s, end_time: usableRange(file)[1] } : s);
         // A box without a time was measured where the file's first shot starts; it is followed from there.
         const box = boxAt(s.box, s.time ?? firstStart.get(id)!, later, w.start);
         sources.push({ fileId: id, kind, ...w, box, ...(later ? { later } : {}), from: "given", darkEdges });
@@ -454,6 +507,17 @@ const montageTool = directTool({
 
     const fit: FitMode = args.fit ?? "position_scale";
     const cover: CoverMode = args.cover ?? "zoom_all";
+    const rule: MontageRule | null = args.transitions === "none" ? null : args.transitions === undefined || args.transitions === "auto" ? "punch" : args.transitions;
+    const halfFrame = 0.5 / frameRate;
+    const cuts: MontageCut[] = plan.shots.slice(1).map((shot, i) => ({
+      time: shot.start,
+      onDownbeat: shot.onDownbeat,
+      onBeat: plan.beats.some((b) => Math.abs(b - shot.start) <= halfFrame),
+      flashed: flashShots.has(i + 1),
+      outFrames: plan.shots[i]!.frames,
+      inFrames: shot.frames,
+    }));
+    const planned = rule ? planMontageTransitions(rule, cuts, 60 / plan.bpm, frameRate) : [];
     const built = call.commit((tx) => {
       if (tx.project.clips.length > 0) {
         for (const t of [...tx.project.effects]) removeTransition(tx, String(t.id));
@@ -464,7 +528,8 @@ const montageTool = directTool({
       const clips = plan.shots.map((shot, i) => {
         const src = sources[i]!;
         const file = files.get(src.fileId)!;
-        const clip = addClip(tx, { fileId: src.fileId, position: shot.start, layer: track.video, start: src.start, end: src.end });
+        const added = addClip(tx, { fileId: src.fileId, position: shot.start, layer: track.video, start: src.start, end: src.end });
+        const clip = src.slow ? retimeClipTo(tx, added.id, { duration: shot.frames / frameRate }) : added;
         // Fill the frame like build_reel: a different aspect is cropped, not letterboxed.
         if (aspectOf(file) !== null) setClipProperty(tx, clip.id, "scale", ScaleMode.CROP);
         if (file.has_audio) setClipProperty(tx, clip.id, "volume", 0);
@@ -486,7 +551,20 @@ const montageTool = directTool({
         }),
         { target, fit, cover, zoomDrift: args.zoom_drift ?? 0.04 },
       );
-      return { clips, alignment, tracks: track, requested: target };
+      // After the alignment: a transition's frames ride on the aligned curves; a zoom-through flies into the subject.
+      const focus = { x: alignment.target.cx, y: alignment.target.cy };
+      const transitions = planned.flatMap((t): MotionTransitionResult[] => {
+        const done = applyFittedMotionTransition(tx, {
+          outClipId: String(clips[t.cut]!.id),
+          inClipId: String(clips[t.cut + 1]!.id),
+          preset: t.preset,
+          frames: t.frames,
+          direction: "auto",
+          ...(t.preset === "zoom_through" ? { focus } : {}),
+        });
+        return done ? [done] : [];
+      });
+      return { clips, alignment, tracks: track, requested: target, transitions };
     }, "Match-cut montage");
 
     const { rows, warnings: alignWarnings } = alignmentReport(built.alignment);
@@ -507,11 +585,17 @@ const montageTool = directTool({
       cover_zoom: rows[i]!.cover_zoom,
     }));
     const flashes = [...flashShots].map((i) => round(plan.shots[i]!.start));
-    const sfx = plan.shots.slice(1).map((shot) => ({ time: round(shot.start), kind: shot.role === "close" ? "hold" : "cut", accent: shot.onDownbeat || flashShots.has(plan.shots.indexOf(shot)) }));
+    const sfx = plan.shots.slice(1).map((shot, i) => ({
+      time: round(shot.start),
+      kind: shot.role === "close" ? "hold" : "cut",
+      accent: shot.onDownbeat || flashShots.has(i + 1) || built.transitions.some((r) => Math.abs(r.cut - shot.start) <= halfFrame),
+    }));
     const body = plan.shots.filter((s) => s.role === "body");
     return applied(
       MONTAGE,
-      `Cut a match-cut montage: ${plan.shots.length} shots (${body.length} of ${minFrames}-${maxFrames} frames) at ${Math.round(plan.bpm)} BPM, ${round(plan.duration, 2)} s, every subject at (${round(built.alignment.target.cx, 3)}, ${round(built.alignment.target.cy, 3)}), ${round(built.alignment.target.size, 3)} of the frame tall${flashes.length ? `, ${flashes.length} flash frame(s)` : ""}.`,
+      `Cut a match-cut montage: ${plan.shots.length} shots (${body.length} of ${minFrames}-${maxFrames} frames) at ${Math.round(plan.bpm)} BPM, ${round(plan.duration, 2)} s, every subject at (${round(built.alignment.target.cx, 3)}, ${round(built.alignment.target.cy, 3)}), ${round(built.alignment.target.size, 3)} of the frame tall${flashes.length ? `, ${flashes.length} flash frame(s)` : ""}${
+        built.transitions.length ? `, ${built.transitions.length} motion transition(s) (${built.transitions.map((r) => `${r.preset}@${r.cut.toFixed(2)}s`).join(", ")})` : ""
+      }.`,
       {
         warnings: [...new Set(warnings)],
         data: {
@@ -522,6 +606,7 @@ const montageTool = directTool({
           target: fromTarget(built.alignment.target),
           shots,
           flashes,
+          transitions: built.transitions.map((r) => ({ id: r.id, preset: r.preset, direction: r.direction, cut: r.cut, frames: r.frames })),
           // Where a whoosh/hit/click belongs: every cut (accent = on a downbeat or a flash) and the end hold.
           sfx_cues: sfx,
           beats: plan.beats,

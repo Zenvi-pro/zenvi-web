@@ -21,7 +21,7 @@ is the rules every genre shares. Do not plan before you have read it.
 | Ask sounds like | Recipe | Core tools |
 | --- | --- | --- |
 | shapes or poses that line up across cuts | `recipes/match-cut-montage.md` | match_cut_montage_tool, detect_subject_tool |
-| a new image every few frames, "evolution of" | `recipes/flash-montage.md` | match_cut_montage_tool / add_clip_to_timeline_tool, flash presets |
+| a new image every few frames, "evolution of" | `recipes/flash-montage.md` | gather_stock_footage_tool, match_cut_montage_tool transitions=flash |
 | person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, kinetic_captions_tool (cues, text_size, y, animation), text_behind_subject_tool |
 | app, AI tool, SaaS launch | `recipes/saas-ui-promo.md` | add_motion_block_tool (glass_cards, prompt_bar, kinetic_headline, counter, word_rotator) |
 | one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
@@ -50,22 +50,33 @@ too quiet and nobody has looked at the file.
    Every row has a sound. Times snap to frames; music edits snap to beats.
 3. **Project.** `open_project_file`, then `set_project_setting_tool`
    (`width`, `height`, `fps`) before importing anything.
-4. **Assets.** Search once per story beat (`search_pexels_videos_tool` with
-   `orientation`, `import_stock_media_tool`), one music track
+4. **Assets.** One `gather_stock_footage_tool` call with a query per story
+   beat or shape (`queries: [...]`, `count`, `orientation`, `min_seconds`):
+   it searches them all, dedupes and imports the best distinct clips, one
+   line each. Use `search_pexels_videos_tool` + `import_stock_media_tool`
+   only to pick one specific shot. One music track
    (`search_freesound_music_tool` with `min_seconds` above the length), AI
    stills only for what stock cannot show. Too few assets is the commonest
    cause of a slideshow: get 1.5x the shots the plan needs. Count before
-   cutting: a hype or montage edit needs **one distinct source clip per
-   ~1.5 s of runtime** (15 s → 10+ clips), and no clip may come back within
-   3 s. Short? Search again with other words, or generate AI shots, before
-   you cut; never loop five clips to fill the length.
+   cutting: the recipe gives a **source count** for its genre (a montage at
+   3-4 cuts a second: 12-16 clips; hype: one per ~1 s; otherwise one per
+   ~1.5 s), and no clip may come back within 3 s. The montage tools warn
+   when one does and say how many more to import; `strict_variety: true`
+   makes them refuse instead. Short? Gather again with other words, or
+   generate AI shots, before you cut; never loop five clips to fill the length.
 5. **Cut.** The genre tool first (`match_cut_montage_tool`, `build_reel_tool`,
    `add_motion_template_tool template=grid`), otherwise
    `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
    (`data.beats`) or `detect_beats_tool` and reuse them everywhere below.
 6. **Transitions, on by default** where the genre moves between shots
-   (hype, trailer, SaaS, 3D ad, documentary, showreel: the recipe says which):
-   one call on the final cut, `apply_motion_transitions_tool` `track`,
+   (hype, trailer, SaaS, 3D ad, documentary, showreel: the recipe says which).
+   The genre tools already put them on their cuts in the same undo step:
+   `build_reel_tool` (hype/highlight), `match_cut_montage_tool`
+   (`transitions: "punch"` default, `"flash"` for a flash montage, `"whip"`,
+   `"none"`), `add_motion_template_tool template=grid` with `steps` (a whip on
+   each re-cut). Read the receipt's `data.transitions`; do not stack another
+   pass on top. For cuts you made by hand: one call on the final cut,
+   `apply_motion_transitions_tool` `track`,
    `style: "hype"` or `"cinematic"`, `direction: "left"` (they are keyframes
    on the clips); `apply_motion_transition_tool` for one cut. Two or three
    presets per piece, repeated; one direction. A cut list of hard cuts plus

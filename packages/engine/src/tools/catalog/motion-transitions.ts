@@ -128,6 +128,8 @@ function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionIn
   }
   if (args.track === undefined || args.time === undefined) throw new ToolError("give clip1_id (and optionally clip2_id), or track and time");
   const layer = resolveLayer(project, args.track);
+  // A montage's flash frames sit apart on a track of their own: point at the track its shots are cut on.
+  if (trackCuts(project, layer).length === 0) throw new ToolError(`no cuts on ${trackName(project, layer)}: no clips play back to back there.${cutsElsewhere(project, layer)}`);
   const cut = cutNear(project, layer, args.time);
   return { outClipId: cut.outClip.id, inClipId: cut.inClip.id };
 }
