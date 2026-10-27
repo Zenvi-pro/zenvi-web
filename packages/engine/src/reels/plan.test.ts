@@ -86,7 +86,7 @@ describe("planReel", () => {
   });
 
   it("counts a short clip played whole (slowed) as shown, so rested clips with unseen moments go first", () => {
-    const plan = planReel({ style: REEL_STYLES.cinematic, media: [clip("tiny", 1.1), ..."abcde".split("").map((id) => clip(id, 8)), clip("pay", 8)], seconds: 30, frameRate: 30 });
+    const plan = planReel({ style: REEL_STYLES.cinematic, media: [clip("tiny", 1.1), ..."abcde".split("").map((id) => clip(id, 8)), clip("pay", 8)], music: null, seconds: 30, frameRate: 30 });
     const tiny = plan.shots.filter((s) => s.fileId === "tiny");
     // Played whole once it is shown; it does not come back for another part of the same 1.1 s while the others have fresh moments.
     expect(tiny.length).toBeLessThanOrEqual(2);
