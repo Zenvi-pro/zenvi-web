@@ -16,6 +16,8 @@ set -euo pipefail
 out="${1:?usage: scripts/sfx-library-demo.sh <out-dir>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 zenvi() { (cd "$out" && npx --prefix "$root" tsx "$root/packages/cli/src/bin.ts" -p demo.zvn "$@"); }
+mkdir -p "$out"
+out="$(cd "$out" && pwd)"
 
 "$root/scripts/sfx-demo.sh" "$out" hype
 cd "$out"
