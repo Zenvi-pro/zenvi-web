@@ -85,6 +85,20 @@ describe("planSpeedRamp / applySpeedRamp", () => {
     for (let i = 1; i < plan.speeds.length - 1; i += 1) expect(Math.abs(plan.speeds[i]! - plan.speeds[i - 1]!)).toBeLessThan(0.5);
   });
 
+  it("the last frame's leftover footage is not a speed: it does not set the slowest moment or the speed range", () => {
+    let leftovers = 0;
+    // Out points one frame apart: the footage left for the last frame sweeps 0-2.5 source frames.
+    for (let frame = 0; frame < 3 * FPS; frame += 1) {
+      const plan = planSpeedRamp(docWithClip(2, 7 + frame / FPS).project, "CLIP000001", { preset: "velocity", hitAt: 3, slow: 0.6 });
+      const curve = plan.speeds.slice(0, -1);
+      if (plan.speeds.at(-1)! < Math.min(...curve) - 1e-6) leftovers += 1;
+      expect(plan.minSpeed).toBeCloseTo(Math.min(...curve), 9);
+      expect(plan.maxSpeed).toBeCloseTo(Math.max(...curve), 9);
+      expect(Math.abs(1 + plan.slowestAt - 3)).toBeLessThanOrEqual(1 / FPS);
+    }
+    expect(leftovers).toBeGreaterThan(0);
+  });
+
   it("the frame planner shows the planned source frame on every timeline frame, and plays exactly the clip's length", () => {
     const doc = docWithClip();
     const plan = ramp(doc, { preset: "velocity", hitAt: 3 });
