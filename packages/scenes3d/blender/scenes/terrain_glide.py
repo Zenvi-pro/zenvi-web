@@ -27,7 +27,7 @@ SURFACES = {
     "sand": ("#C8955A", "#DDAF76", 0.85),
     "snow": ("#E4EAF3", "#F3F6FA", 0.55),
 }
-LENGTH = 140.0  # metres of field ahead of the start
+AHEAD = 130.0  # metres of field beyond the end of the glide (the haze ends the view before it)
 HALF_WIDTH = 60.0
 
 
@@ -58,8 +58,9 @@ class Ground:
         return h * self.amp * (0.08 + 0.92 * away)
 
 
-def ground_mesh(height, step_near=0.25, step_far=1.0):
-    """A grid over the field, finer near the path."""
+def ground_mesh(height, travel, step_near=0.25, step_far=1.0):
+    """A grid over the field, finer near the path; it runs AHEAD past the
+    `travel` metres the camera glides, so fast or long glides never reach its end."""
     def axis(lo, hi, fine_lo, fine_hi, fine, coarse):
         out, v = [], lo
         while v < hi:
@@ -69,7 +70,7 @@ def ground_mesh(height, step_near=0.25, step_far=1.0):
         return out
 
     xs = axis(-HALF_WIDTH, HALF_WIDTH, -10, 10, step_near, step_far)
-    ys = axis(-10, LENGTH, -10, 45, step_near, step_far)
+    ys = axis(-10, max(140.0, travel + AHEAD), -10, max(45.0, travel + 35), step_near, step_far)
     bm = bmesh.new()
     grid = [[bm.verts.new((x, y, height(x, y))) for x in xs] for y in ys]
     for j in range(len(ys) - 1):
@@ -409,10 +410,10 @@ def build(job):
     sky_world(look, sun_vec, ambient=1.25 if surface == "snow" else 1.0)
 
     height = Ground(surface, seed)
-    ground = ground_mesh(height)
-    ground.data.materials.append(ground_material(surface, look, fog))
     speed = float(p.get("speed", 2.5))
     travel = speed * seconds
+    ground = ground_mesh(height, travel)
+    ground.data.materials.append(ground_material(surface, look, fog))
     if surface == "grass":
         clump = blade_clump(rng)
         clump.data.materials.append(grass_material(look, fog))

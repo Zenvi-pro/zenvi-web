@@ -145,3 +145,26 @@ describe.skipIf(!blender || !hasFfmpeg)("Blender smoke", () => {
     }
   });
 });
+
+describe.skipIf(!blender || !hasFfmpeg)("Blender smoke: terrain_glide", () => {
+  /** Mean RGB of the bottom-centre of one frame (the ground just ahead of the camera). */
+  function groundColour(file: string, frame: number): [number, number, number] {
+    const out = execFileSync("ffmpeg", ["-v", "error", "-i", file, "-vf", `select=eq(n\\,${frame}),crop=iw/3:ih/4:iw/3:ih*3/4,scale=1:1:flags=area`, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]);
+    return [out[0]!, out[1]!, out[2]!];
+  }
+
+  it("the field runs past the end of the fastest, longest glide (180 m), so the ground never gives way to sky", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "zenvi-scenes3d-smoke-"));
+    const renderer = createScene3dRenderer({ blender: blender!, cacheDir: root, tempDir: root, resolveMedia: (p) => p });
+    try {
+      const parsed = parseScene3dParams("terrain_glide", { surface: "sand", speed: 12, haze: 0 });
+      if (!parsed.ok) throw new Error(parsed.error);
+      // 4 fps: 60 frames are a 15 s glide.
+      const r = await renderer.render({ scene: "terrain_glide", params: parsed.params, width: 192, height: 108, fps: { num: 4, den: 1 }, frames: 60, quality: "draft", media: {} });
+      const [red, , blue] = groundColour(r.path, 59);
+      expect(red - blue, "warm sand, not the blue-grey sky").toBeGreaterThan(20);
+    } finally {
+      renderer.close();
+    }
+  });
+});
