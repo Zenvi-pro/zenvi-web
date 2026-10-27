@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseMusicStart, cutBeats, MIN_SHOT_SECONDS, planReel, type MusicBeats, type ReelMedia } from "./plan.js";
+import { chooseMusicStart, cutBeats, MIN_SHOT_SECONDS, planReel, planReelGrid, type MusicBeats, type ReelMedia } from "./plan.js";
 import { REEL_STYLE_IDS, REEL_STYLES } from "./styles.js";
 
 /** 120 BPM from 1 s for 60 s; quiet for the first 8 bars, loud after. */
@@ -48,7 +48,9 @@ describe("planReel", () => {
   it("cuts a hype reel on the beat grid, ending on a downbeat, with faster cuts in the climax", () => {
     const plan = planReel({ style: REEL_STYLES.hype, media: ["a", "b", "c", "d", "payoff"].map((id) => clip(id)), music: music(), seconds: 15 });
     expect(plan.musicStart).toBe(17);
-    expect(plan.duration).toBeLessThanOrEqual(15);
+    // 15 s is not on a bar line at 120 BPM: the reel runs to the next one, 16 s, and says so.
+    expect(plan.duration).toBe(16);
+    expect(plan.lengthNote).toBe("16.00s, ends on a bar line at 120 BPM: the first one at or after the 15s asked for");
     expect(plan.downbeats.some((d) => Math.abs(d - plan.duration) < 1e-3)).toBe(true);
     expectContiguous(plan.shots, plan.duration);
     // Every cut on a beat or half-beat of the 120 BPM grid (0.25 s steps).
@@ -115,5 +117,33 @@ describe("reel styles", () => {
       const families = REEL_STYLES[id].looks.map((look) => look.split(".")[0]);
       expect(new Set(families).size, id).toBe(families.length);
     }
+  });
+});
+
+describe("planReelGrid length", () => {
+  /** A steady track: `bpm`, a downbeat every 4 beats from 0, `seconds` long. */
+  const steady = (bpm: number, seconds: number): MusicBeats => {
+    const beats: number[] = [];
+    for (let t = 0; t < seconds; t += 60 / bpm) beats.push(Math.round(t * 1000) / 1000);
+    return { bpm, beats, downbeats: beats.filter((_, i) => i % 4 === 0), duration: seconds };
+  };
+
+  it("rounds 10 s at 140 BPM up to the next bar line (10.29 s, not 8.57 s) and says why", () => {
+    // W25a E2E bug 4: duration_seconds 10 gave an 8.6 s reel with no word about it.
+    const grid = planReelGrid({ music: steady(140, 60), seconds: 10, fallbackBpm: 120 });
+    expect(grid.duration).toBeCloseTo(10.286, 2);
+    expect(grid.lengthNote).toBe("10.29s, ends on a bar line at 140 BPM: the first one at or after the 10s asked for");
+  });
+
+  it("keeps a length that is already on a bar line", () => {
+    const grid = planReelGrid({ music: null, seconds: 8, fallbackBpm: 120 });
+    expect(grid.duration).toBe(8);
+    expect(grid.lengthNote).toBe("8.00s, ends on a bar line at 120 BPM, as asked");
+  });
+
+  it("takes the nearest bar line when the music ends before the next one", () => {
+    const grid = planReelGrid({ music: steady(120, 9.5), seconds: 9, fallbackBpm: 120 });
+    expect(grid.duration).toBe(8);
+    expect(grid.lengthNote).toMatch(/^8\.00s, ends on a bar line at 120 BPM: the (nearest one to|music runs out before) the 9s asked for$/);
   });
 });

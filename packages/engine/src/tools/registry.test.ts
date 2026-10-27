@@ -22,6 +22,7 @@ const DIRECT_TOOLS = [
   "probe_media_tool",
   "build_reel_tool",
   "unify_grade_tool",
+  "review_render_tool",
   "add_motion_template_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",

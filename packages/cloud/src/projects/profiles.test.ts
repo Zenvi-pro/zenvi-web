@@ -55,6 +55,14 @@ describe("resolveProfile", () => {
     if (!nonsense.ok) expect(nonsense.suggestions).toContain("FHD 1080p 30 fps");
     expect(resolveProfile("square 29.97").ok).toBe(false);
   });
+
+  it("takes social preset names agents use (W25a E2E bug 9)", () => {
+    for (const name of ["instagram_reel", "reels", "tiktok", "youtube_short", "shorts"]) {
+      expect(pick(name), name).toBe("FHD Vertical 1080p 30 fps 1080x1920 30/1 p");
+    }
+    expect(pick("youtube")).toBe("FHD 1080p 30 fps 1920x1080 30/1 p");
+    expect(pick("square_post")).toMatch(/ 1080x1080 30\/1 p$/);
+  });
 });
 
 describe("profileFor", () => {

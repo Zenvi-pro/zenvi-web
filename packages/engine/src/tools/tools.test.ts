@@ -991,7 +991,8 @@ const SPECS: Record<string, Spec> = {
   build_reel_tool: {
     happy: {
       args: { style: "cinematic", replace: "true", duration_seconds: "8", hook: "Camera day" },
-      summary: /^Built a cinematic montage reel: \d+ shots cut to 96 BPM, [\d.]+ seconds, landscape 16:9\.$/,
+      // 8 s at 96 BPM (2.5 s bars) rounds up to the bar line at 10 s, and the summary says so.
+      summary: /^Built a cinematic montage reel: \d+ shots cut to 96 BPM, 10 seconds, landscape 16:9\. Length 10\.00s, ends on a bar line at 96 BPM: the first one at or after the 8s asked for\.$/,
       check: ({ doc }) => expect(doc.project.clips.some((c) => c.id === IDS.clipA)).toBe(false),
     },
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
@@ -1000,6 +1001,14 @@ const SPECS: Record<string, Spec> = {
   unify_grade_tool: {
     happy: { args: { timeline_clip_ids: [IDS.clipA, IDS.clipB], dry_run: true }, summary: /^Dry run: \d+ of 2 clip\(s\) brought within the band/ },
     failure: { args: { timeline_clip_ids: [IDS.clipA], reference_clip_id: "NOPE" }, status: "refused", summary: /^Error: reference clip NOPE not found$/ },
+  },
+  review_render_tool: {
+    happy: {
+      args: { path: "/out/reel.mp4" },
+      summary: /^Reviewed \/out\/reel\.mp4 \(8\.00s, 1280x720\): 0 problem\(s\), 0 warning\(s\)\. 2 shot\(s\)/,
+      check: ({ host }) => expect(host.calls).toContain("inspectRender /out/reel.mp4"),
+    },
+    failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for review_render_tool/ },
   },
   add_motion_template_tool: {
     happy: {
