@@ -20,6 +20,7 @@ import type { Clip, Project, ProjectFile } from "../model/types.js";
 import { evaluate } from "../keyframe/evaluate.js";
 import { readMotionEvents } from "../links/zenvi-link.js";
 import { listProjectMotionTransitions } from "../ops/motion-transitions.js";
+import { remappedClipFrame } from "../render/plan/frame-plan.js";
 import { readScene3dEvents } from "../scenes3d/events.js";
 import { fpsFloat } from "../timeline/time.js";
 import { clipFrameAtTime, timeOfClipFrame } from "../timeline/windows.js";
@@ -279,7 +280,32 @@ function rampPoints(ctx: Context): HitPoint[] {
   return out;
 }
 
-/** Motion block and 3D scene events, mapped from the block's own clock onto the timeline. */
+/**
+ * The timeline seconds at which a clip shows source time `seconds`, through
+ * its `time` curve when it has one (a speed ramp, a freeze, a reverse:
+ * libopenshot shows source frame `time.GetLong(n)` on clip frame n,
+ * Clip.cpp:749-765, frame-plan.ts remappedClipFrame): every output frame
+ * where the shown source frame reaches the event's, forwards or backwards.
+ * A rush that skips past it still fires on the frame that passes it; a
+ * reverse plays it again; a stretch that never shows it gives nothing.
+ */
+function showsSourceAt(ctx: Context, clip: Clip, seconds: number): number[] {
+  const fps = ctx.fps;
+  const first = clipFrameAtTime(clip, clip.position, ctx.project.fps, false);
+  const last = clipFrameAtTime(clip, end(clip), ctx.project.fps, false) - 1;
+  const target = seconds * fps + 1;
+  const out: number[] = [];
+  let prev = remappedClipFrame(clip, first);
+  if (Math.abs(prev - target) < 0.5) out.push(clip.position);
+  for (let n = first + 1; n <= last; n += 1) {
+    const cur = remappedClipFrame(clip, n);
+    if ((prev < target && cur >= target) || (prev > target && cur <= target)) out.push(timeOfClipFrame(clip, n, ctx.project.fps));
+    prev = cur;
+  }
+  return out;
+}
+
+/** Motion block and 3D scene events, mapped from the block's own clock onto the timeline through the clip's trim and time curve. */
 function eventPoints(ctx: Context, given: SpotInput["events"]): HitPoint[] {
   const out: HitPoint[] = [];
   for (const clip of ctx.visual) {
@@ -291,12 +317,14 @@ function eventPoints(ctx: Context, given: SpotInput["events"]): HitPoint[] {
     const kind: HitKind = scene ? "scene3d" : "block";
     const name = String(file.name ?? file.id);
     for (const e of events) {
-      if (e.t < clip.start - 1e-6 || e.t >= clip.end) continue;
-      const t = clip.position + (e.t - clip.start);
-      // The block's own x, moved by the clip's position on the canvas.
-      const x = clamp(2 * (e.x - 0.5) + screenX(ctx, clip, t), -1, 1);
-      const run = e.until !== undefined ? { until: clip.position + (Math.min(e.until, clip.end) - clip.start), rate: e.rate ?? 10 } : {};
-      out.push(point(t, kind, e.weight, EVENT_ROLE[e.kind], { event: e.kind, x, ids: [clip.id], label: `${name}: ${e.kind}`, ...run }));
+      for (const t of showsSourceAt(ctx, clip, e.t)) {
+        // The block's own x, moved by the clip's position on the canvas.
+        const x = clamp(2 * (e.x - 0.5) + screenX(ctx, clip, t), -1, 1);
+        // A run ends where its end is shown next (or with the clip).
+        const until = e.until !== undefined ? (showsSourceAt(ctx, clip, e.until).find((u) => u > t) ?? end(clip)) : undefined;
+        const run = until !== undefined ? { until, rate: e.rate ?? 10 } : {};
+        out.push(point(t, kind, e.weight, EVENT_ROLE[e.kind], { event: e.kind, x, ids: [clip.id], label: `${name}: ${e.kind}`, ...run }));
+      }
     }
   }
   return out;

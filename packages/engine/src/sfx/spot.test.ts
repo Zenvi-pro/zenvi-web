@@ -113,6 +113,28 @@ describe("spotHitPoints", () => {
     expect(block[1]!.weight).toBe(1);
   });
 
+  it("maps block events through the clip's time curve: slowed, reversed, and never shown", () => {
+    const events = [
+      { t: 0.5, kind: "toggle", weight: 0.4, x: 0.5, y: 0.5 },
+      { t: 1.5, kind: "click", weight: 0.4, x: 0.5, y: 0.5 },
+    ];
+    // 2 s on the timeline (frames 1-60) showing source frames 1-31 at half speed, or 61 down to 1 reversed.
+    const ramped = (curve: [number, number][]) =>
+      project((tx, layer) => {
+        const clip = addClip(tx, { fileId: "SHOTBBXXXX", position: 0, layer, start: 0, end: 2 });
+        tx.update(["clips", { id: clip.id }], { time: { Points: curve.map(([x, y]) => openshotPoint(x, y, Interpolation.LINEAR)) } } as Partial<Clip>);
+        updateFile(tx, "SHOTBBXXXX", { zenvi_link: { kind: "zenvi-motion", motion: { block: "toggle_panel", events } } });
+      });
+    const blockTimes = (doc: ProjectDocument) => spotHitPoints(doc.project).filter((p) => p.kind === "block").map((p) => [p.t, p.event]);
+    // Half speed: source 0.5 s (frame 16) first shows on clip frame 30 (GetLong(15.5) = 16), 29 frames in; 1.5 s is never reached.
+    expect(blockTimes(ramped([[1, 1], [61, 31]]))).toEqual([[29 / 30, "toggle"]]);
+    // Reversed: source 1.5 s (frame 46) shows on clip frame 16, 0.5 s in, and 0.5 s (frame 16) on frame 46.
+    expect(blockTimes(ramped([[1, 61], [61, 1]]))).toEqual([
+      [0.5, "click"],
+      [1.5, "toggle"],
+    ]);
+  });
+
   it("gives one cue to one event, and keeps heroes 250 ms apart", () => {
     const doc = project((tx, layer) => {
       [0, 2, 2.1].forEach((at, i) => addClip(tx, { fileId: shot(i), position: at, layer, start: 0, end: i === 2 ? 2 : at === 0 ? 2 : 0.1 }));
