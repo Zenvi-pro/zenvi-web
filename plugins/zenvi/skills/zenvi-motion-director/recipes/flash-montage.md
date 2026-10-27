@@ -45,7 +45,7 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
   "subjects": [{"file_id": "<shell>", "box": {"x": 0, "y": 0, "w": 1, "h": 1}}, {"file_id": "<galaxy>", "box": {"x": 0, "y": 0, "w": 1, "h": 1}}],
   "target": {"x": 0.5, "y": 0.5, "size": 1.333},
   "music_file_id": "<track>", "duration_seconds": 12, "min_frames": 3, "max_frames": 5, "flash": true, "zoom_drift": 0.06,
-  "transitions": "flash", "bpm": 160}
+  "transitions": "flash"}
 ```
 
    (one subjects entry per file). Without a shape idea, `build_reel_tool`
