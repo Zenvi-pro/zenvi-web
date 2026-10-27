@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseMusicStart, cutBeats, dropBeat, MIN_SHOT_SECONDS, planReel, planReelGrid, REUSE_GAP_SECONDS, type MusicBeats, type ReelMedia } from "./plan.js";
+import { chooseMusicStart, cutBeats, dropBeat, freshFrom, MIN_SHOT_SECONDS, planReel, planReelGrid, REUSE_GAP_SECONDS, type MusicBeats, type ReelMedia } from "./plan.js";
 import { REEL_STYLE_IDS, REEL_STYLES } from "./styles.js";
 
 /** 120 BPM from 1 s for 60 s; quiet for the first 8 bars, loud after. */
@@ -70,6 +70,19 @@ describe("planReel", () => {
     const windows = plan.shots.map((s) => s.sourceStart);
     expect(new Set(windows).size).toBe(windows.length);
     for (const shot of plan.shots) expect(shot.sourceEnd - shot.sourceStart).toBeCloseTo(shot.end - shot.start, 6);
+  });
+
+  it("shows a moment of a clip not seen yet before it repeats one, wrapping past the end to the unseen start", () => {
+    const plan = planReel({ style: REEL_STYLES.hype, media: "abcde".split("").map((id) => clip(id, 8)), music: music(), seconds: 15, frameRate: 30 });
+    const byFile = new Map<string, [number, number][]>();
+    for (const s of plan.shots) byFile.set(s.fileId, [...(byFile.get(s.fileId) ?? []), [s.sourceStart, s.sourceEnd]]);
+    // Four body clips over ~55 shots: each comes back a dozen times.
+    expect(plan.shots.length).toBeGreaterThan(40);
+    for (const [, stretches] of byFile) {
+      for (const [i, [a, b]] of stretches.entries()) for (const [c, d] of stretches.slice(i + 1)) expect(Math.min(b, d) - Math.max(a, c)).toBeLessThanOrEqual(1e-6);
+    }
+    expect(freshFrom({ start: 0, end: 4 }, 1, 3.5, [[1.2, 2.2], [2.5, 3.5]])).toBe(0);
+    expect(freshFrom({ start: 0, end: 4 }, 1, 3.5, [[0, 1.2], [1.2, 2.2], [2.5, 3.5]])).toBeNull();
   });
 
   it("splits a shot on the beat, or slows a clip, instead of leaving a gap when clips are short", () => {

@@ -304,6 +304,14 @@ export function planReel(input: PlanInput): ReelPlan {
   // A clip's first use starts a third of the way in: stock and phone footage often opens on a rack focus or a shake.
   const nextFrom = (m: ReelMedia, seconds: number) => cursors.get(m.fileId) ?? m.start + Math.max(0, (m.end - m.start - seconds) * 0.3);
   const fits = (m: ReelMedia, seconds: number) => m.kind === "image" || m.end - m.start >= seconds * MIN_SPEED - EPS;
+  // Source stretches each clip has shown: a clip that comes back shows a moment not seen yet while it has one.
+  const shown = new Map<string, [number, number][]>();
+  const fresh = (m: ReelMedia, seconds: number): number | null => {
+    if (m.kind === "image") return m.start;
+    // Too short for the slot (it plays slowed down whole): fresh until it has been on.
+    if (m.end - m.start < seconds - EPS) return shown.has(m.fileId) ? null : m.start;
+    return freshFrom(m, seconds, nextFrom(m, seconds), shown.get(m.fileId) ?? []);
+  };
   // The last item is the payoff: it closes the reel (when there are enough items to tell a story).
   const payoff = media.length >= 3 ? media[media.length - 1]! : null;
   const body = payoff ? media.slice(0, -1) : media;
@@ -320,18 +328,24 @@ export function planReel(input: PlanInput): ReelPlan {
     let chosen: ReelMedia | undefined;
     if (isLast && payoff && fits(payoff, seconds)) chosen = payoff;
     if (!chosen) {
-      // Story order, skipping clips seen in the last few seconds; with none rested, the one seen longest ago.
+      // Story order, skipping clips seen in the last few seconds and, while a rested one has a moment not shown yet, the
+      // rested ones that have shown everything; with none rested, the one seen longest ago.
+      const seen = (j: number) => lastSeen.get(body[(rotation + j) % body.length]!.fileId) ?? -Infinity;
+      const rested = (j: number) => seen(j) <= slot.start - REUSE_GAP_SECONDS + EPS;
       let pick = -1;
+      let exhausted = -1;
       for (let j = 0; j < body.length; j += 1) {
         const m = body[(rotation + j) % body.length]!;
         if (!fits(m, seconds)) continue;
-        const seen = lastSeen.get(m.fileId) ?? -Infinity;
-        if (seen <= slot.start - REUSE_GAP_SECONDS + EPS) {
-          pick = j;
-          break;
-        }
-        if (pick < 0 || seen < lastSeen.get(body[(rotation + pick) % body.length]!.fileId)! - EPS) pick = j;
+        if (rested(j)) {
+          if (fresh(m, seconds) !== null) {
+            pick = j;
+            break;
+          }
+          if (exhausted < 0) exhausted = j;
+        } else if (pick < 0 || seen(j) < seen(pick) - EPS) pick = j;
       }
+      if (exhausted >= 0 && !(pick >= 0 && rested(pick))) pick = exhausted;
       if (pick >= 0) {
         chosen = body[(rotation + pick) % body.length]!;
         rotation = (rotation + pick + 1) % body.length;
@@ -353,12 +367,14 @@ export function planReel(input: PlanInput): ReelPlan {
     if (chosen.kind === "video") {
       const length = chosen.end - chosen.start;
       if (length >= seconds - EPS) {
-        sourceStart = nextFrom(chosen, seconds);
+        // A moment not shown yet (from the cursor on, else from the top), else the cursor's, wrapping to the start.
+        sourceStart = fresh(chosen, seconds) ?? nextFrom(chosen, seconds);
         if (sourceStart + seconds > chosen.end + EPS) sourceStart = chosen.start;
         // On the frame grid too: an in-point and an out-point rounded to frames on their own can lose a frame.
         sourceStart = onFrame(sourceStart);
         if (sourceStart + seconds > chosen.end + EPS) sourceStart = Math.max(chosen.start, onFrame(chosen.end - seconds - (fps ? 0.5 / fps : 0)));
         sourceEnd = sourceStart + seconds;
+        shown.set(chosen.fileId, [...(shown.get(chosen.fileId) ?? []), [sourceStart, sourceEnd]]);
         // Next time this clip comes back, show a later moment.
         cursors.set(chosen.fileId, sourceEnd + Math.min(0.5, seconds / 4));
       } else {
@@ -399,6 +415,18 @@ export function planReel(input: PlanInput): ReelPlan {
 }
 
 /** How many shots bring a clip back within `REUSE_GAP_SECONDS`, and how many clips the busiest stretch needs. */
+/**
+ * The earliest in-point at or after `from` (else at or after the clip's own
+ * start) of a `seconds`-long stretch of `m` that overlaps no `shown` stretch;
+ * null when no such stretch is left. The earliest such start is `from`, the
+ * clip's start or the end of a shown stretch.
+ */
+export function freshFrom(m: Pick<ReelMedia, "start" | "end">, seconds: number, from: number, shown: readonly [number, number][]): number | null {
+  const fits = (s: number) => s >= m.start - EPS && s + seconds <= m.end + EPS && shown.every(([a, b]) => s + seconds <= a + EPS || s >= b - EPS);
+  const ends = shown.map(([, b]) => b).sort((a, b) => a - b);
+  return [from, ...ends.filter((e) => e >= from), m.start, ...ends].find(fits) ?? null;
+}
+
 export function reuseStats(shots: readonly Pick<PlannedShot, "fileId" | "start" | "end">[]): { closeRepeats: number; clipsNeeded: number } {
   let closeRepeats = 0;
   let clipsNeeded = 0;
