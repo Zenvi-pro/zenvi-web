@@ -11,7 +11,8 @@
  * from ffmpeg's lavfi sources. With --real it uses real footage instead
  * (showcase_real.*): the Wikimedia Commons clips (CC0 / public domain /
  * CC BY) listed with their licences in motion-transitions-footage.json,
- * downloaded at run time and never committed.
+ * downloaded at run time and never committed; their credits are written to
+ * <out-dir>/showcase_real_credits.txt.
  */
 
 import { spawnSync } from "node:child_process";
@@ -76,9 +77,20 @@ function check(result: ToolResult, what: string): void {
 
 interface Footage {
   name: string;
+  title: string;
   url: string;
+  page: string;
   license: string;
+  author: string;
   start: number;
+}
+
+const LICENSE_URLS: Record<string, string> = { "CC BY 3.0": "https://creativecommons.org/licenses/by/3.0/", CC0: "https://creativecommons.org/publicdomain/zero/1.0/" };
+
+/** CC BY needs the credit to travel with the video, so it goes next to it rather than only in the repo's sidecar. */
+function writeCredits(clips: Footage[]): void {
+  const lines = clips.map((c) => [c.title, `  by ${c.author}, ${c.page}`, `  ${c.license}${LICENSE_URLS[c.license] ? ` (${LICENSE_URLS[c.license]})` : ""}`, "  Changed: cut to 5 s, scaled and cropped to 1280x720 at 30 fps, sound removed, motion transitions added."].join("\n"));
+  writeFileSync(path.join(out, `${NAME}_credits.txt`), `Footage in ${NAME}.mp4 (Wikimedia Commons):\n\n${lines.join("\n\n")}\n`);
 }
 
 /** The real clips: downloaded once into their own folder, cut to 5 s at 1280×720, 30 fps (fill, centre crop). */
@@ -98,6 +110,7 @@ async function realFootage(): Promise<string[]> {
     ffmpeg(["-ss", String(clip.start), "-t", "5", "-i", source, "-an", "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},format=yuv420p`, "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", file]);
     files.push(file);
   }
+  writeCredits(sidecar.clips);
   return files;
 }
 
