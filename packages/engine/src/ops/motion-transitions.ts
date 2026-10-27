@@ -32,7 +32,7 @@ import {
   type TransformChannel,
 } from "../transitions/motion/presets.js";
 import { spliceFrames, unspliceKeyframe, curveValueAt } from "../transitions/motion/splice.js";
-import { OpError, invalid, requireUnlocked } from "./errors.js";
+import { OpError, invalid, isOpError, requireUnlocked } from "./errors.js";
 import { ids, rateOf } from "./internal.js";
 
 /** The unknown clip key holding the records. */
@@ -437,6 +437,25 @@ export function applyMotionTransition(tx: Transaction, input: MotionTransitionIn
   const { clips, result } = planMotionTransitionEdit(tx.project, input);
   for (const clip of clips) tx.replace(["clips", { id: clip.id }], clip);
   return result;
+}
+
+/**
+ * Apply a transition an edit tool chose itself (a reel's or a montage's
+ * accents), shortened a frame at a time from `input.frames` until both clips
+ * can take it; null, with nothing recorded, when they cannot.
+ */
+export function applyFittedMotionTransition(tx: Transaction, input: MotionTransitionInput & { frames: number }): MotionTransitionResult | null {
+  for (let frames = input.frames; frames >= 2; frames -= 1) {
+    const fitted = { ...input, frames };
+    try {
+      planMotionTransitionEdit(tx.project, fitted);
+    } catch (error) {
+      if (isOpError(error)) continue;
+      throw error;
+    }
+    return applyMotionTransition(tx, fitted);
+  }
+  return null;
 }
 
 /** Remove a motion transition from both its clips. Returns the clip ids changed. */

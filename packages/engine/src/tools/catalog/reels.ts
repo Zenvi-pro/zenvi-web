@@ -24,7 +24,7 @@ import { addClip, deleteClips, setClipKeyframes, setClipProperty, setClipSpeed }
 import { addEffect, setClipEffects, updateEffectValues } from "../../ops/effects.js";
 import { isOpError } from "../../ops/errors.js";
 import { rateOf } from "../../ops/internal.js";
-import { applyMotionTransition, planMotionTransitionEdit, type MotionTransitionResult, type TransitionSfxCue } from "../../ops/motion-transitions.js";
+import { applyFittedMotionTransition, type TransitionSfxCue } from "../../ops/motion-transitions.js";
 import { applySpeedRamp, planSpeedRamp } from "../../ops/speed-ramp.js";
 import { openshotPoint } from "../../keyframe/edit.js";
 import { applyLookPreset } from "../../ops/look.js";
@@ -32,7 +32,7 @@ import { applyClipPreset } from "../../ops/presets.js";
 import { addTitleClip } from "../../ops/titles.js";
 import { addTrack } from "../../ops/tracks.js";
 import { removeTransition } from "../../ops/transitions.js";
-import { planAccents, type AccentTransition } from "../../reels/accents.js";
+import { planAccents } from "../../reels/accents.js";
 import { DAYLIGHT_LUMA, daylightShare, hasNightWords, lookTarget, orderByFit } from "../../reels/grade.js";
 import { REUSE_GAP_SECONDS, planReel, type MusicBeats, type PlannedShot, type ReelMedia, type ReelPlan } from "../../reels/plan.js";
 import { REEL_STYLE_IDS, REEL_STYLES, type ReelTypography } from "../../reels/styles.js";
@@ -47,6 +47,7 @@ import { beatsOfFile, canTrackBeats, octaveNearStyle, tempoReport, weakGridWarni
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { loadFamilies, missingGlyphWarnings } from "../fonts.js";
 import { applied, failed, refused } from "../receipt.js";
+import { varietyProblem } from "../variety.js";
 import { ColorValueError } from "../color-agent.js";
 import { effectFactory, mergedGradeEffects } from "./color-agent.js";
 import { gradeFootage, gradeReport, measureFootage, resolveReelLook, type ReelGrade } from "./reel-grade.js";
@@ -103,6 +104,10 @@ const input = z.strictObject({
     .describe("Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial)."),
   ...beatOverrideShape,
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (they are removed in the same undo step)."),
+  strict_variety: z
+    .boolean()
+    .optional()
+    .describe(`Refuse (nothing changes) when the files are too few for the pace and a file comes back within ${REUSE_GAP_SECONDS} s; the error says how many more to import. Default false: a warning.`),
   grade: z
     .string()
     .min(1)
@@ -263,21 +268,6 @@ function windUp(tx: Transaction, clipId: string, shot: PlannedShot, volume: numb
     if (isOpError(error)) return null;
     throw error;
   }
-}
-
-/** One accent's motion transition, shortened a frame at a time until both clips can take it; null when they cannot. */
-function accentTransition(tx: Transaction, outClipId: string, inClipId: string, accent: AccentTransition): MotionTransitionResult | null {
-  for (let frames = accent.frames; frames >= 2; frames -= 1) {
-    const input = { outClipId, inClipId, preset: accent.preset, frames, direction: "auto" as const };
-    try {
-      planMotionTransitionEdit(tx.project, input);
-    } catch (error) {
-      if (isOpError(error)) continue;
-      throw error;
-    }
-    return applyMotionTransition(tx, input);
-  }
-  return null;
 }
 
 export const reelTools: CatalogTool[] = [
@@ -442,13 +432,9 @@ export const reelTools: CatalogTool[] = [
 
       const accents = planAccents(style, plan, Number.isFinite(rate) && rate > 0 ? rate : 30);
       const flashes = new Set(accents.flashes);
-      // Counted from the shots, not file_ids: a clip that fits no shot is given but never on screen.
-      const used = new Set(plan.shots.map((s) => s.fileId)).size;
-      if (plan.closeRepeats > 0 && used < plan.clipsNeeded) {
-        warnings.push(
-          `${plan.closeRepeats} shot(s) bring a clip back within ${REUSE_GAP_SECONDS} s: this pace needs about ${plan.clipsNeeded} different clips and the reel uses ${used}. Import more and rebuild with replace=true.`,
-        );
-      }
+      const variety = varietyProblem(plan.shots);
+      if (variety && args.strict_variety) return refused(TOOL, `Error: ${variety}`);
+      if (variety) warnings.push(variety);
 
       // Title images (written through the host before the edit is recorded).
       const prepared: Prepared = { labels: new Map() };
@@ -543,7 +529,7 @@ export const reelTools: CatalogTool[] = [
         const rampVolume = rampShot && files.get(rampShot.fileId)?.has_audio ? style.clipVolume : 0;
         const ramp = accents.ramp !== null ? windUp(tx, shotClips[accents.ramp]!, rampShot!, rampVolume) : null;
         const transitions = accents.transitions.flatMap((t) => {
-          const done = accentTransition(tx, shotClips[t.shot - 1]!, shotClips[t.shot]!, t);
+          const done = applyFittedMotionTransition(tx, { outClipId: shotClips[t.shot - 1]!, inClipId: shotClips[t.shot]!, preset: t.preset, frames: t.frames, direction: "auto" });
           return done ? [done] : [];
         });
 

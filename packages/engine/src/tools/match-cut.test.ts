@@ -5,12 +5,13 @@ import { ProjectDocument } from "../history/document.js";
 import { subjectOnCanvas } from "../matchcut/fit.js";
 import { Interpolation, type Project } from "../model/types.js";
 import { addClip, addFile, setClipKeyframes } from "../ops/index.js";
+import { listProjectMotionTransitions } from "../ops/motion-transitions.js";
 import { clipKeyframe } from "../render/plan/transform.js";
 import type { RgbaImage } from "../render/types.js";
 import { runTool } from "./registry.js";
 import { hasDarkEdges } from "./subjects.js";
 import { fakeHost } from "./test-support/fake-host.js";
-import { media, videoInfo } from "./test-support/fixture.js";
+import { audioInfo, media, videoInfo } from "./test-support/fixture.js";
 import { pixelFrameHost, type Painter } from "./test-support/pixel-host.js";
 import type { ToolHost } from "./types.js";
 
@@ -228,6 +229,7 @@ describe("match_cut_montage_tool", () => {
     const data = result.data?.data as {
       shots: { clip_id: string; file_id: string; start: number; frames: number; subject_from: string }[];
       flashes: number[];
+      transitions: { cut: number }[];
       sfx_cues: { time: number; kind: string; accent: boolean }[];
       target: { size: number };
     };
@@ -240,9 +242,9 @@ describe("match_cut_montage_tool", () => {
     expect(data.shots.every((s) => s.subject_from === "detected")).toBe(true);
     expect(data.sfx_cues.map((c) => c.time)).toEqual(data.shots.slice(1).map((s) => s.start));
     expect(data.flashes.length).toBeGreaterThan(0);
-    // Every cut frame without a flash: the subject at the target (±2 px; the drift zooms in after it).
-    const flashed = new Set(data.flashes);
-    for (const shot of data.shots.filter((s) => !flashed.has(s.start)).slice(0, 6)) {
+    // Every cut frame without a flash or a motion transition: the subject at the target (±2 px; the drift zooms in after it).
+    const accented = new Set([...data.flashes, ...data.transitions.map((t) => t.cut)].map((t) => Math.round(t * 30)));
+    for (const shot of data.shots.filter((s) => !accented.has(Math.round(s.start * 30))).slice(0, 6)) {
       const seen = measure(await frameAt(host, doc.project, Math.round(shot.start * 30) + 1));
       expect(Math.abs(seen.x - 640), shot.clip_id).toBeLessThanOrEqual(2);
       expect(Math.abs(seen.y - 360), shot.clip_id).toBeLessThanOrEqual(2);
@@ -268,7 +270,7 @@ describe("match_cut_montage_tool", () => {
       return { x: (d.x - d.r) / W, y: (d.y - d.r) / H, w: (2 * d.r) / W, h: (2 * d.r) / H };
     };
     const host: ToolHost = { ...fakeHost(), frames: pixelFrameHost(drifting) };
-    const args = { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 6, flash: false, zoom_drift: 0, target: { x: 0.5, y: 0.5, size: 0.4 } };
+    const args = { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 6, flash: false, transitions: "none", zoom_drift: 0, target: { x: 0.5, y: 0.5, size: 0.4 } };
     type Shots = { shots: { file_id: string; start: number; source_start: number }[] };
     const fresh = () => {
       const base = project();
@@ -297,6 +299,66 @@ describe("match_cut_montage_tool", () => {
     // 4 s at 120 BPM: the opening hold runs to the 2 s downbeat and the end hold starts there.
     const result = await runTool({ doc: new ProjectDocument(base), host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 4 });
     expect(result.data?.warnings?.join(" ")).toMatch(/2 file\(s\) did not fit in 4 s: F1, F2/);
+  });
+
+  it("puts motion transitions on the shot track by default, once a bar between the flashes, landing on a zoom-through, in the one undo step", async () => {
+    const base = project();
+    base.clips = [];
+    const doc = new ProjectDocument(base);
+    doc.transaction("music", (tx) => void addFile(tx, media("/m/beat.mp3", audioInfo("/m/beat.mp3", 30)), { id: "MUSIC" }));
+    const ids = ["F0", "F1", "F2", "F3"];
+    const result = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 8, bpm: 120, offset_seconds: 0.5 });
+    expect(result.data?.status, result.data?.summary).toBe("applied");
+    expect(doc.undoLabels).toEqual(["music", "Match-cut montage"]);
+    const data = result.data?.data as { bpm: number; shots: { clip_id: string; start: number }[]; flashes: number[]; transitions: { preset: string; cut: number }[] };
+    expect(data.bpm).toBe(120);
+    expect(data.transitions.length).toBeGreaterThan(1);
+    expect(data.transitions[data.transitions.length - 1]).toMatchObject({ preset: "zoom_through", cut: data.shots[data.shots.length - 1]!.start });
+    for (const t of data.transitions.slice(0, -1)) expect(["zoom_in", "glitch"]).toContain(t.preset);
+    // Never on a flashed cut, never on two cuts in a row: accents are half a bar apart at least.
+    const flashed = new Set(data.flashes);
+    const indices = data.transitions.map((t) => data.shots.findIndex((s) => Math.abs(s.start - t.cut) < 1e-3));
+    for (const t of data.transitions.slice(0, -1)) expect(flashed.has(t.cut)).toBe(false);
+    for (let i = 1; i < indices.length; i += 1) expect(indices[i]! - indices[i - 1]!).toBeGreaterThan(1);
+    // On the shots' own track, where the transition tools see them.
+    const onTimeline = listProjectMotionTransitions(doc.project);
+    expect(onTimeline).toHaveLength(data.transitions.length);
+    expect(new Set(onTimeline.map((r) => r.layer))).toEqual(new Set([doc.project.clips.find((c) => c.id === data.shots[0]!.clip_id)!.layer]));
+
+    const flash = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 8, bpm: 120, offset_seconds: 0.5, transitions: "flash", replace: true });
+    const presets = (flash.data?.data as { transitions: { preset: string }[] }).transitions.map((t) => t.preset);
+    expect(presets).toContain("flash_invert");
+    for (const p of presets.slice(0, -1)) expect(["flash_invert", "glitch", "zoom_in"]).toContain(p);
+
+    const none = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 8, transitions: "none", replace: true });
+    expect((none.data?.data as { transitions: unknown[] }).transitions).toEqual([]);
+    expect(listProjectMotionTransitions(doc.project)).toEqual([]);
+  });
+
+  it("warns when the files are too few for the pace and refuses with strict_variety, saying how many more", async () => {
+    const base = project();
+    base.clips = [];
+    const doc = new ProjectDocument(base);
+    const args = { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 8 };
+    const strict = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", { ...args, strict_variety: true });
+    expect(strict.data?.summary).toMatch(/^Error: \d+ shot\(s\) bring a file back within 3 s: this pace needs about \d+ different files and the cut uses 4\. Import \d+ more \(gather_stock_footage_tool/);
+    expect(doc.undoLabels).toEqual([]);
+    const loose = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", args);
+    expect(loose.data?.status).toBe("applied");
+    expect(loose.data?.warnings?.join(" ")).toMatch(/bring a file back within 3 s/);
+  });
+
+  it("follows end_box to the end of the file when end_time is left out, and refuses end_time alone", async () => {
+    const box = { x: 0.4, y: 0.4, w: 0.2, h: 0.2 };
+    const fresh = () => {
+      const base = project();
+      base.clips = [];
+      return new ProjectDocument(base);
+    };
+    const alone = await runTool({ doc: fresh(), host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1"], subjects: [{ file_id: "F1", box, end_time: 5 }] });
+    expect(alone.data?.summary).toMatch(/^Error: F1: end_time is where end_box was measured/);
+    const followed = await runTool({ doc: fresh(), host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1"], subjects: [{ file_id: "F1", box, end_box: { ...box, x: 0.6 } }] });
+    expect(followed.data?.status, followed.data?.summary).toBe("applied");
   });
 
   it("refuses an occupied timeline unless replace is set", async () => {
