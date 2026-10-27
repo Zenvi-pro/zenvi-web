@@ -59,6 +59,11 @@ interface DecoderEntry {
   warming: boolean;
   /** When it was parked (its clips ended), for the parking limit. */
   parkedAt?: number;
+  /**
+   * Settles once the last frame asked of it is served. Clips sharing it take turns: `frame` reads one stream, and a
+   * clip hidden for a frame (has_video, a zero-size crop) can show again next to the clip it handed its decoder to.
+   */
+  turn: Promise<unknown>;
 }
 
 /** Decoders `warm` may have started and not yet drawn, at most (each holds an ffmpeg child and a few frames). */
@@ -140,7 +145,7 @@ export class SourceManager {
   }
 
   private newEntry(layer: LayerPlan, source: VideoSource, lastFrame: number, warming: boolean): DecoderEntry {
-    const entry: DecoderEntry = { decoder: this.openDecoder(layer, source), fileKey: this.fileKey(layer, source), clips: new Set([layer.clipId]), lastFrame, warming };
+    const entry: DecoderEntry = { decoder: this.openDecoder(layer, source), fileKey: this.fileKey(layer, source), clips: new Set([layer.clipId]), lastFrame, warming, turn: Promise.resolve() };
     entry.decoder.then(
       (d) => (entry.ready = d),
       () => undefined,
@@ -187,7 +192,10 @@ export class SourceManager {
     }
     entry.lastFrame = Math.max(entry.lastFrame, this.frameCounter);
     entry.warming = false;
-    return (await entry.decoder).frame(sourceIndex(source));
+    const decoder = await entry.decoder;
+    const picture = entry.turn.then(() => decoder.frame(sourceIndex(source)));
+    entry.turn = picture.catch(() => undefined);
+    return picture;
   }
 
   /**

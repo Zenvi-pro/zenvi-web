@@ -231,4 +231,26 @@ describe("SourceManager", () => {
     }
     expect(liveChildCount()).toBe(before);
   });
+
+  it("clips sharing a decoder take turns on its stream when they show in the same frame", async () => {
+    const project = { files: [{ id: "F", path: numbered, fps: { num: 30, den: 1 }, video_length: 60 }] } as unknown as Project;
+    const sources = new SourceManager(project, { resolveMedia: (p) => p });
+    const layer = (clipId: string, k: number) => ({ clipId, drawWidth: 64, drawHeight: 48, masks: [], effects: [], source: { kind: "video", fileId: "F", path: numbered, frame: k + 1, time: k / 30 } });
+    const both = (a: number, b: number): FramePlan => ({ ...plan(null), layers: [layer("A", a), layer("B", b)] }) as unknown as FramePlan;
+    try {
+      // B's first frame is one A is hidden in (a has_video keyframe), so B is handed A's decoder; then A shows again.
+      for (let k = 0; k < 10; k += 1) {
+        if (k === 6) sources.warm(plan("B", 12), 4);
+        await sources.prepare(plan("A", k));
+      }
+      const shown: number[][] = [];
+      for (let k = 0; k < 8; k += 1) {
+        const prepared = await sources.prepare(both(30 + k, 12 + k));
+        shown.push(prepared.layers.map((image) => frameNumber(image!)));
+      }
+      expect(shown).toEqual(Array.from({ length: 8 }, (_, k) => [30 + k, 12 + k]));
+    } finally {
+      await sources.close();
+    }
+  });
 });
