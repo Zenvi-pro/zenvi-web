@@ -161,6 +161,19 @@ describe("apply_look_tool", { timeout: 30_000 }, () => {
     expect(listed.map((l) => l.id)).toContain("solarize");
   });
 
+  it("forgets a generated look's file once another LUT replaces it, so the next clip gets the look's own file", async () => {
+    const ed = painted();
+    const f = ed.addFile("video");
+    const a = ed.addClip(f, { position: 0, end: 5 });
+    const b = ed.addClip(f, { position: 5, end: 10 });
+    await json(ed, "apply_look_tool", { clipIds: `["${a}"]`, lookId: "solarize" });
+    const solarized = (findColorGrade(ed.clip(a)!.effects ?? []) as Effect).lut_path as string;
+    await json(ed, "apply_look_tool", { clipIds: `["${a}"]`, lookId: "teal_cinema" });
+    expect((findColorGrade(ed.clip(a)!.effects ?? []) as Effect).lut_path).not.toBe(solarized);
+    await json(ed, "apply_look_tool", { clipIds: `["${b}"]`, lookId: "solarize" });
+    expect((findColorGrade(ed.clip(b)!.effects ?? []) as Effect).lut_path).toMatch(/look-solarize-[0-9a-f]{8}\.cube$/);
+  });
+
   it("applies a soft preset under one undo step and keeps the other effects", async () => {
     const ed = painted();
     const f = ed.addFile("video");
