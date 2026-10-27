@@ -56,6 +56,38 @@ describe("planSoundDesign", () => {
     expect(transition.params.duration).toBeCloseTo(0.7, 5);
   });
 
+  it("every_cut: a sound on every cut of a fast hype edit, varied, none twice in a row", () => {
+    // A hype pace: a cut every quarter second, a whip, a title slam and a section flash off the cuts.
+    const moments: SoundMoment[] = [];
+    for (let t = 0.25; t < 12; t += 0.25) moments.push({ kind: "cut", time: t, strength: Math.round(t * 4) % 8 === 0 ? 0.9 : 0.5, before: 0.25, after: 0.25 });
+    moments.push({ kind: "transition", time: 4.1, strength: 0.6, duration: 0.2 });
+    moments.push({ kind: "title", time: 0.6, strength: 0.45 });
+    moments.push({ kind: "flash", time: 7.9, strength: 0.75 });
+    const plan = planSoundDesign(input({ moments, duration: 12, climax: 9, intensity: "hype", density: "every_cut" }));
+    const cuts = moments.filter((m) => m.kind === "cut");
+    const covered = cuts.filter((m) => plan.cues.some((c) => Math.abs(c.at - m.time) < 1e-6));
+    // The cut on the climax carries its impact; every other cut has its own sound.
+    expect(covered.length).toBe(cuts.length);
+    const auto = planSoundDesign(input({ moments, duration: 12, climax: 9, intensity: "hype" }));
+    expect(auto.cues.length).toBeLessThan(plan.cues.length);
+    const line = plan.cues.filter((c) => c.recipe !== "sub_drop").sort((a, b) => a.at - b.at);
+    for (let i = 1; i < line.length; i += 1) expect(line[i]!.recipe, `${line[i]!.at}`).not.toBe(line[i - 1]!.recipe);
+    expect(sfxRecipe(plan.cues.find((c) => Math.abs(c.at - 4.1) < 1e-6)!.recipe)!.family).toBe("whoosh");
+    // Plain cuts alternate light hits and short whooshes.
+    for (const cue of plan.cues.filter((c) => c.reason === "cut (light hit)")) expect(sfxRecipe(cue.recipe)!.family).toBe("impact");
+    const cutWhooshes = plan.cues.filter((c) => c.reason === "cut" && sfxRecipe(c.recipe)!.family === "whoosh");
+    expect(Math.abs(cutWhooshes.length - plan.cues.filter((c) => c.reason === "cut (light hit)").length)).toBeLessThanOrEqual(1);
+    for (const at of [0.6, 7.9]) expect(["click", "ui", "impact"]).toContain(sfxRecipe(plan.cues.find((c) => Math.abs(c.at - at) < 1e-6)!.recipe)!.family);
+    // Light hits sit under the strong ones.
+    const light = plan.cues.filter((c) => c.reason === "cut (light hit)");
+    const strong = plan.cues.filter((c) => c.reason === "strong cut");
+    expect(light.length).toBeGreaterThan(5);
+    expect(strong.length).toBeGreaterThan(0);
+    expect(Math.max(...light.map((c) => c.gainDb))).toBeLessThan(Math.min(...strong.map((c) => c.gainDb)));
+    const times = transient(plan.cues);
+    for (let i = 1; i < times.length; i += 1) expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(MIN_TRANSIENT_GAP - 1e-9);
+  });
+
   it("builds a riser into the climax and lands an impact on it", () => {
     const cues = planSoundDesign(input({ climax: 12 })).cues;
     const riser = cues.find((c) => sfxRecipe(c.recipe)!.family === "riser")!;

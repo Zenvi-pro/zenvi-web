@@ -23,11 +23,12 @@ import { isAudioOnlyMedia } from "../../model/media.js";
 import type { Clip, Project } from "../../model/types.js";
 import { deleteClips } from "../../ops/clips.js";
 import { isAutoSfxClip, isSfxClip, soundMoments, type BeatGrid } from "../../sfx/moments.js";
-import { CLIMAX_TAIL, SFX_INTENSITIES, musicClimax, planSoundDesign, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
+import { CLIMAX_TAIL, SFX_DENSITIES, SFX_INTENSITIES, musicClimax, planSoundDesign, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
 import { KIT_SLOTS, KIT_SLOT_SPECS, applyKit, guessSlot, kitFileIds, proceduralKit, rawSoundKit, readSoundKit, slotOfRecipe, slotRecipe, type KitPick, type KitSlot, type SoundKit } from "../../sfx/kit.js";
 import { SFX_PROVIDERS, allowsCommercialUse } from "../../sfx/library.js";
 import { SFX_RECIPES, SFX_RECIPE_IDS, sfxRecipe, type SfxFamily } from "../../sfx/recipes.js";
 import type { SfxParams } from "../../sfx/render.js";
+import { fpsFloat } from "../../timeline/time.js";
 import { getEffectiveAiMetadata } from "../ai-metadata.js";
 import { MUSIC_MIN_DURATION, classifyClipAudioRole, speechWindowsFromCues } from "../audio-mix.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
@@ -113,6 +114,12 @@ const autoInput = z.strictObject({
     .enum(SFX_INTENSITIES)
     .optional()
     .describe("How much sound: subtle (only the big moments), normal (default: strong cuts, transitions, titles), hype (nearly every cut, tonal risers, sub drops)."),
+  density: z
+    .enum(SFX_DENSITIES)
+    .optional()
+    .describe(
+      "auto (default): the intensity's own spacing. every_cut: a sound on every cut, as hype edits have it (build_reel_tool's hype receipt asks for it): light hits and short whooshes alternating on the cuts, whooshes on whips, clicks on flashes and title slams, no sound twice in a row.",
+    ),
   seed: z.number().int().optional().describe("Another variation of the whole design (default 1)."),
   beats: z
     .array(z.number().min(0))
@@ -408,7 +415,7 @@ export const soundDesignTools: CatalogTool[] = [
     description:
       "Sound-design the whole edit in one step: whooshes on cuts and transitions (peaking on the cut, sized to the move), hits on strong cuts, downbeats and flash frames, " +
       "clicks and swishes on title entrances, a riser into the climax and an impact on it, all varied and gain-staged under the music and dialogue. " +
-      "Tasteful by default (not every cut); intensity sets the density. Running it again replaces its previous effects (hand-placed ones stay). One undo step.",
+      "Tasteful by default (not every cut); intensity sets the density, density=every_cut puts a sound on every cut (hype). Running it again replaces its previous effects (hand-placed ones stay). One undo step.",
     input: autoInput,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["media"],
@@ -446,7 +453,7 @@ export const soundDesignTools: CatalogTool[] = [
       if (moments.length === 0 && climax === null) {
         return refused(AUTO, "Error: nothing to sound-design: the timeline has no cuts, transitions, titles or flashes, and no climax (pass climax_seconds).");
       }
-      const plan = planSoundDesign({ moments, duration, climax, music: bed !== undefined, speech: speechWindows(project), intensity, seed: args.seed ?? 1 });
+      const plan = planSoundDesign({ moments, duration, climax, music: bed !== undefined, speech: speechWindows(project), intensity, density: args.density ?? "auto", seed: args.seed ?? 1 });
       const cues = plan.cues.map((cue) => ({ ...cue, at: snapToFrame(project, cue.at) }));
       if (cues.length === 0 && previous.length === 0) {
         return unchanged(AUTO, `No sound effects at ${intensity} intensity: no moment of this edit is strong enough. Try intensity=hype.`, { warnings });
@@ -493,10 +500,15 @@ export const soundDesignTools: CatalogTool[] = [
 
       const after = call.doc.project;
       const cut = placed.rows.filter((r) => r.trimmed > 0);
+      // Cuts whose moment got a sound (a cue within a frame of it).
+      const frame = 1 / (fpsFloat(project.fps) || 30);
+      const cutTimes = moments.filter((m) => m.kind === "cut").map((m) => m.time);
+      const sounded = cutTimes.filter((t) => placed.rows.some((r) => Math.abs(r.cue.at - t) <= frame)).length;
       const summary =
         placed.rows.length === 0
           ? `Removed the ${previous.length} effects of the last run: no moment of this edit is strong enough at ${intensity} intensity.`
-          : `Sound-designed the edit (${intensity}${kit ? `, ${kit === projectKit ? `sound kit '${kit.name}'` : `${sources} sounds`}` : ""}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
+          : `Sound-designed the edit (${intensity}${args.density === "every_cut" ? ", every cut" : ""}${kit ? `, ${kit === projectKit ? `sound kit '${kit.name}'` : `${sources} sounds`}` : ""}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
+            (cutTimes.length > 0 ? `; ${sounded} of ${cutTimes.length} cuts have a sound` : "") +
             (plan.climax !== null ? `, ${plan.riser ? "a build into the climax and an impact on it" : "an impact on the climax"} at ${plan.climax.toFixed(2)} s` : "") +
             (previous.length > 0 ? `; replaced ${previous.length} from the last run` : "") +
             (cut.length > 0 ? `; ${cut.length} ${cut.length === 1 ? "tail" : "tails"} cut and faded to end with the picture at ${duration.toFixed(2)} s` : "") +
@@ -507,6 +519,9 @@ export const soundDesignTools: CatalogTool[] = [
         ...(placed.rows.length > 30 ? { clipsNote: `${placed.rows.length - 30} more in data.cues` } : {}),
         data: {
           intensity,
+          density: args.density ?? "auto",
+          cuts: cutTimes.length,
+          cuts_with_sound: sounded,
           // `at` is the moment; `hit_seconds` where the sound's hit plays (later when the moment is too early for its lead-in).
           sources,
           kit: kit ? { name: kit.name, source: kit.source, stored: kit === projectKit } : null,

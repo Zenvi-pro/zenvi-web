@@ -6,8 +6,11 @@ import { findProfile } from "../../model/profiles.js";
 import type { Project } from "../../model/types.js";
 import { addFile } from "../../ops/files.js";
 import { runTool } from "../registry.js";
+import type { RgbaImage } from "../../render/types.js";
+import { findColorGrade, scalarY } from "../color-agent.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
 import { audioInfo, imageInfo, media, videoInfo } from "../test-support/fixture.js";
+import { pixelFrameHost } from "../test-support/pixel-host.js";
 
 const SR = BEAT_SAMPLE_RATE;
 
@@ -364,6 +367,125 @@ describe("build_reel_tool with the beat grid given", () => {
     expect(result.ok).toBe(false);
     expect(result.text).toContain("Error: offset_seconds goes with bpm");
     expect(doc.undoLabels).toHaveLength(0);
+  });
+});
+
+/** A grey ramp around `base` (so the frame has contrast), with an optional warm cast. */
+function ramp(width: number, height: number, base: number, warm = 0): RgbaImage {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const level = base - 40 + (80 * x) / Math.max(1, width - 1);
+      const i = (y * width + x) * 4;
+      data.set([level + warm, level, level - warm, 255], i);
+    }
+  }
+  return { width, height, data };
+}
+
+/** A small landscape project of night ("night*") and daylight ("day*") clips, and a song; frames painted by file name. */
+function gradeProject(names: readonly string[]): { doc: ProjectDocument; host: FakeHost; ids: string[] } {
+  const scratch = new ProjectDocument(createProject({ id: "REELGRADE1", profile: findProfile("HD 1080p 30 fps")! }));
+  const ids = names.map((name, i) => `${name.toUpperCase()}${i}`.padEnd(10, "X").slice(0, 10));
+  scratch.transaction("fixture", (tx) => {
+    names.forEach((name, i) => addFile(tx, media(`/media/${name}${i}.mp4`, videoInfo(`/media/${name}${i}.mp4`, 12)), { id: ids[i]! }));
+    addFile(tx, media("/media/song.mp3", audioInfo("/media/song.mp3", 60)), { id: "SONGXXXXXX" });
+  });
+  const project: Project = { ...structuredClone(scratch.project), width: 160, height: 90, history: { undo: [], redo: [] } };
+  const host = fakeHost();
+  host.frames = pixelFrameHost((path, w, h) => (path.includes("day") ? ramp(w, h, 190, 30) : ramp(w, h, 60)));
+  return { doc: new ProjectDocument(project), host, ids };
+}
+
+const BEATS = Array.from({ length: 60 }, (_, i) => i * 0.5);
+type GradeData = {
+  shots: { file_id: string }[];
+  tracks: Record<string, number>;
+  grade: { look: string; lut: string; clips: { file_id: string; status: string; grade: Record<string, number> }[] } | null;
+  sound_design: { tool: string; args: Record<string, unknown> } | null;
+};
+
+describe("build_reel_tool: one look", { timeout: 60_000 }, () => {
+  it("grades every shot of a hype reel into one look inside its one undo step", async () => {
+    const { doc, host, ids } = gradeProject(["day", "night", "night", "night", "night"]);
+    const result = await runTool({ doc, host }, "build_reel_tool", { style: "hype", beats: BEATS, duration_seconds: 8, labels: ["night run"] });
+    expect(result.ok, result.text).toBe(true);
+    const data = (result.data as { data: GradeData }).data;
+    expect(data.grade?.look).toBe("night");
+    expect(data.grade?.lut).toBe("night_glow");
+    expect(result.text).toMatch(/One look: night_glow/);
+    // The daylight clip is pulled down toward the night target; the night clips need less.
+    const day = data.grade!.clips.find((c) => c.file_id === ids[0])!;
+    expect(day.grade.exposure).toBeLessThan(0);
+    // Bin order has no story: a night clip opens the reel.
+    expect(data.shots[0]!.file_id).not.toBe(ids[0]);
+    const video = doc.project.clips.filter((c) => c.layer === data.tracks.video);
+    for (const clip of video) {
+      const grade = findColorGrade(clip.effects) as Record<string, unknown> | null;
+      expect(String(grade?.lut_path)).toMatch(/night_glow\.cube$/);
+      // The style's own colour stays on the same grade.
+      expect(scalarY(grade!, "saturation")).toBeCloseTo(1.18, 6);
+    }
+    const dayShot = video.find((c) => c.file_id === ids[0])!;
+    expect(scalarY(findColorGrade(dayShot.effects) as Record<string, unknown>, "exposure")).toBeCloseTo(day.grade.exposure!, 6);
+    expect(data.sound_design).toEqual({ tool: "auto_sound_design_tool", args: { intensity: "hype", density: "every_cut" } });
+    expect(doc.undoLabels).toEqual(["Build hype montage reel"]);
+    doc.undo();
+    expect(doc.project.clips).toHaveLength(0);
+  });
+
+  it("warns when a night label sits over mostly daylight footage", async () => {
+    const { doc, host } = gradeProject(["day", "day", "day", "night"]);
+    const result = await runTool({ doc, host }, "build_reel_tool", { style: "hype", beats: BEATS, duration_seconds: 8, hook: "Night run" });
+    expect(result.ok, result.text).toBe(true);
+    expect(result.text).toMatch(/set this reel at night, but \d+ % of its screen time is daylight footage/);
+    // grade none opts out of the pass, but the check still runs.
+    const plain = gradeProject(["day", "day", "day", "night"]);
+    const none = await runTool({ doc: plain.doc, host: plain.host }, "build_reel_tool", { style: "hype", beats: BEATS, duration_seconds: 8, hook: "Night run", grade: "none" });
+    expect(none.text).toMatch(/daylight footage/);
+    expect((none.data as { data: GradeData }).data.grade).toBeNull();
+    for (const clip of plain.doc.project.clips) expect((findColorGrade(clip.effects ?? []) as Record<string, unknown> | null)?.lut_path ?? "").toBe("");
+  });
+
+  it("renders nothing for grade none without night words, takes a named LUT, and refuses a LUT it does not know", async () => {
+    const plain = gradeProject(["day", "night", "night"]);
+    const none = await runTool({ doc: plain.doc, host: plain.host }, "build_reel_tool", { style: "hype", beats: BEATS, duration_seconds: 8, hook: "Launch", grade: "none" });
+    expect(none.ok, none.text).toBe(true);
+    expect((plain.host.frames as ReturnType<typeof pixelFrameHost>).renders).toHaveLength(0);
+    const named = gradeProject(["day", "night", "night"]);
+    const teal = await runTool({ doc: named.doc, host: named.host }, "build_reel_tool", { style: "highlight", beats: BEATS, duration_seconds: 8, grade: "teal_cinema" });
+    expect(teal.ok, teal.text).toBe(true);
+    expect((teal.data as { data: GradeData }).data.grade?.lut).toBe("teal_cinema");
+    const bad = gradeProject(["day", "night"]);
+    const refused = await runTool({ doc: bad.doc, host: bad.host }, "build_reel_tool", { style: "hype", beats: BEATS, grade: "no_such_lut" });
+    expect(refused.ok).toBe(false);
+    expect(bad.doc.undoLabels).toEqual([]);
+  });
+
+  it("records nothing when cancelled while it measures the footage", async () => {
+    const { doc, host } = gradeProject(["day", "night", "night"]);
+    const abort = new AbortController();
+    let renders = 0;
+    host.frames = pixelFrameHost((path, w, h) => {
+      if (++renders === 2) abort.abort();
+      return ramp(w, h, path.includes("day") ? 190 : 60);
+    });
+    const result = await runTool({ doc, host, signal: abort.signal }, "build_reel_tool", { style: "hype", beats: BEATS, duration_seconds: 8 });
+    expect(result.ok).toBe(false);
+    expect(result.text).toMatch(/"summary":"Error: cancelled; nothing changed"/);
+    expect(doc.undoLabels).toEqual([]);
+    expect(doc.project.clips).toHaveLength(0);
+  });
+
+  it("keeps a highlight wind-up's own sound, ducked under the music, instead of muting it", async () => {
+    const { doc, host } = gradeProject(["night", "night", "night", "night", "night", "night"]);
+    const result = await runTool({ doc, host }, "build_reel_tool", { style: "highlight", beats: BEATS, duration_seconds: 20, grade: "none" });
+    expect(result.ok, result.text).toBe(true);
+    const ramp = (result.data as { data: { speed_ramp: { clip_id: string } | null } }).data.speed_ramp;
+    expect(ramp).not.toBeNull();
+    const clip = doc.project.clips.find((c) => c.id === ramp!.clip_id)!;
+    const volume = clip.volume as unknown as { Points: { co: { Y: number } }[] };
+    expect(volume.Points[0]!.co.Y).toBeCloseTo(0.075, 6);
   });
 });
 

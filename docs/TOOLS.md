@@ -3230,6 +3230,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `words` | string[] |  | Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial). |
 | `beats` | number[] |  | Beat times of the music in seconds (e.g. from detect_beats_tool) instead of analysing it here. |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (they are removed in the same undo step). |
+| `grade` | string |  | One look over every shot: 'auto' (default for hype and highlight) measures each clip, corrects it toward one target and lays one shared LUT (a cool night look when the titles say night or the footage is dark, else teal and orange); a LUT id from list_looks_tool uses that LUT; 'none' (default for the other styles) skips it. Needs a surface that renders frames. |
 
 ### align_match_cut_tool
 
@@ -3465,6 +3466,7 @@ Availability: editor yes; cli yes; cloud partial (without audio decoding cuts ar
 | --- | --- | --- | --- |
 | `sources` | "procedural" \| "kit" \| "library" \| "mixed" |  | Where the sounds come from: kit (default when the project has a sound kit: every cue plays through it), procedural (default otherwise: synthesised here, no kit), library (licensed library sounds for every role, CC0 or commercial-use licences, credits recorded) or mixed (library whooshes, hits and risers; synthesised clicks, pops and subs). library and mixed use the kit's library sounds when it has them, else pick them now. |
 | `intensity` | "subtle" \| "normal" \| "hype" |  | How much sound: subtle (only the big moments), normal (default: strong cuts, transitions, titles), hype (nearly every cut, tonal risers, sub drops). |
+| `density` | "auto" \| "every_cut" |  | auto (default): the intensity's own spacing. every_cut: a sound on every cut, as hype edits have it (build_reel_tool's hype receipt asks for it): light hits and short whooshes alternating on the cuts, whooshes on whips, clicks on flashes and title slams, no sound twice in a row. |
 | `seed` | integer |  | Another variation of the whole design (default 1). (min -9007199254740991, max 9007199254740991) |
 | `beats` | number[] |  | Beat times on the timeline, seconds (e.g. build_reel_tool's `beats`), instead of analysing the music here. Every 4th is a downbeat. |
 | `climax_seconds` | number |  | Where the climax is (a riser builds into it, an impact lands on it). Default: the music's biggest jump in loudness; none without music. (min 0) |

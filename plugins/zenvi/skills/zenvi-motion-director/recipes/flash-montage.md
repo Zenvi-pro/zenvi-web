@@ -60,7 +60,8 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
    `font_scale: 1.6`, `fade_in_seconds: 0.4`, plus `add_effect_tool` Glow on
    that clip. Or `add_motion_block_tool` `block: "kinetic_headline"` with
    `style: "blur"`, `palette: "dark"`, `display_font: "serif"`.
-6. Sound: `auto_sound_design_tool` `intensity: "hype"`, beats from the
+6. Sound: `auto_sound_design_tool` `intensity: "hype"`, `density:
+   "every_cut"` (a click or hit on every new image), beats from the
    receipt. Then `add_sfx_tool` `recipe: "riser_noise"` ending at the title
    (`align: "peak"`, `at_seconds` = title start) and `impact_boom` on it.
 

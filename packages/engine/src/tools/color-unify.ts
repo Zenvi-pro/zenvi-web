@@ -40,7 +40,8 @@ export const UNIFY_TOLERANCE: Readonly<Record<UnifyKey, number>> = {
  * white balance, moderate saturation and contrast, so the shared look (a LUT)
  * has a clean plate to work on.
  */
-export const NEUTRAL_BAND: Readonly<Record<UnifyKey, readonly [number, number]>> = {
+export type UnifyBand = Readonly<Record<UnifyKey, readonly [number, number]>>;
+export const NEUTRAL_BAND: UnifyBand = {
   avg_luma: [0.32, 0.58],
   warm_cool: [-0.04, 0.06],
   green_magenta: [-0.02, 0.02],
@@ -168,16 +169,16 @@ export function unifyStats(profile: Json): Json {
 
 /**
  * The automatic target: each key's median over the clips, clamped into
- * NEUTRAL_BAND. A profile-shaped object, so it stands where a measured
- * reference would.
+ * NEUTRAL_BAND (or a look's own band, reels/grade.ts). A profile-shaped
+ * object, so it stands where a measured reference would.
  */
-export function unifyTarget(profiles: readonly Json[]): Json {
+export function unifyTarget(profiles: readonly Json[], band: UnifyBand = NEUTRAL_BAND): Json {
   const present = profiles.filter((p) => p.present);
   const target: Json = { present: present.length > 0, samples: 0 };
   for (const key of UNIFY_KEYS) {
     const m = median(present.map((p) => finite(p[key])).filter((v): v is number => v !== null));
     if (m === null) continue;
-    const [lo, hi] = NEUTRAL_BAND[key];
+    const [lo, hi] = band[key];
     target[key] = roundTo(Math.max(lo, Math.min(hi, m)), 4);
   }
   for (const key of ["clipped_highlights", "clipped_shadows"]) {

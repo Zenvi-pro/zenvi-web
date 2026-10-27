@@ -4,7 +4,11 @@ Very fast (a cut every 0.2-0.3 s on a 120-160 bpm track, 4-frame bursts after
 the drop), a slow-motion wind-up that rushes into the drop, a white flash and
 a glitch on it, negative and glitch hits on the climax's bar lines, whips in
 one direction, condensed display type that slams in, a hit on every cut,
-loud. Cars, bikes, sport, launches, events.
+loud, every shot in one graded world. Cars, bikes, sport, launches, events.
+
+"Hype", "trailer", "edit to this song", "make it fast": the cut is
+`build_reel_tool` first, not clips placed by hand. Hand cutting is for
+fixing single shots after it.
 
 ## Structure (12-20 s)
 
@@ -25,12 +29,18 @@ loud. Cars, bikes, sport, launches, events.
    that many and rebuild with `replace: true`). Music: aggressive trap/house
    120-160 bpm with a clear drop.
 2. Cut: `build_reel_tool` `style: "hype"`, `file_ids` in story order (the
-   last is the payoff), `music_file_id`, `duration_seconds`, `hook` (1-3
+   last is the payoff; leave it out and the clips that fit the look open and
+   close the reel), `music_file_id`, `duration_seconds`, `hook` (1-3
    words), `end_card` (1-2 words: one line gets the echo). It does the
    accents too; read them in the receipt: `drop`, `flashes`, `transitions`
    (whips, glitch on the drop, flash_invert/glitch hits, zoom_out landing),
    `speed_ramp` (the wind-up) and `sfx_cues`. Do **not** run
    `apply_motion_transitions_tool` on top: a move on every cut is a template.
+   It grades too (`grade` "auto"): every clip corrected toward one target
+   and one LUT over all of them, a cool night look when the titles say night
+   or the footage is dark, else teal and orange (`data.grade`). A warning
+   that the titles say night over daylight footage means: import night
+   footage and rebuild, or change the words.
 3. No wind-up in the receipt (`speed_ramp: null`, the clip was too short):
    `speed_ramp_tool` `clip_id` of the shot before `drop`, `preset:
    "velocity"`, `hit_at` = `drop`, or pick a longer clip for that slot.
@@ -40,20 +50,24 @@ loud. Cars, bikes, sport, launches, events.
 5. Treated hero shot (CLI): `subject_glow_tool` `look: "thermal"` or
    `replace_background_tool` `background: "color"`; else a contrasty LUT on
    that clip only (`apply_look_tool` `look_id: "noir_era"`).
-6. Look: `unify_grade_tool` first (daylight and night shots meet in the
-   middle), with `look: "teal_punch"` or `"heroic_cinema"`, `look_intensity`
-   0.6, leaving out the treated hero shot (`timeline_clip_ids`).
+6. Look: already done by `build_reel_tool` (`data.grade`). Another look:
+   rebuild with `grade` set to a LUT id (`"heroic_cinema"`); only for an
+   edit cut by hand run `unify_grade_tool` with `look`, leaving out the
+   treated hero shot (`timeline_clip_ids`).
 7. Extra word cards (at most two before the end): `add_title_tool` with
    `font: "Anton"`, uppercase, one word, on a downbeat, 0.5-1 s.
-8. Sound last: `auto_sound_design_tool` `intensity: "hype"`, `beats`,
-   `climax_seconds` = `drop`. `add_sfx_tool` `recipe: "glitch_burst"` at the drop if the
+8. Sound last: the receipt's `sound_design` call, `auto_sound_design_tool`
+   `intensity: "hype"`, `density: "every_cut"`, `beats`, `climax_seconds` =
+   `drop` (its receipt says how many cuts have a sound: all of them, near
+   enough). `add_sfx_tool` `recipe: "glitch_burst"` at the drop if the
    receipt's glitch cue got no sound. Then `master_audio_tool` `preset:
    "social"`.
-9. Review: `review_edit_tool` `pace: "fast"`. Fix `clip-back-soon` and
-   `repeated-footage` (more clips, rebuild with `replace: true`), `long-hold`
-   (a shot over 1.5 s outside the hook and the end: split it or rebuild
-   shorter), `cuts-off-beat`. Call it again; stop when no `high` or `medium`
-   problem is left.
+9. Review: `review_edit_tool` `pace: "fast"`. Fix every `high` and
+   `medium` problem: `long-hold` (a shot over 1.5 s outside the hook and the
+   end: split it or rebuild shorter), `cuts-off-beat`. `clip-back-soon` and
+   `repeated-footage` are `low`: fix them too when you can (more clips,
+   rebuild with `replace: true`), but they do not block. Call it again; stop
+   when no `high` or `medium` problem is left.
 
 ## Checks
 
