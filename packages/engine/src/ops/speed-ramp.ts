@@ -439,12 +439,15 @@ export function planSpeedRamp(project: Project, clipId: string, request: RampReq
 
   const speeds: number[] = [];
   for (let i = 0; i < frames; i += 1) speeds.push((stepped.cumulative[i + 1]! - stepped.cumulative[i]!));
+  // Once the footage is spent the last frame shows only what is left of it, not a speed the curve picked:
+  // it stays in `speeds` (it is a shown frame) but not in the range, the slowest moment or the choppy warning.
+  const picked = stepped.exhausted && speeds.length > 1 ? speeds.slice(0, -1) : speeds;
   // The slowest moment: the middle of the first run of minimum-speed frames.
-  const minSpeed = Math.min(...speeds);
-  const maxSpeed = Math.max(...speeds);
-  const firstMin = speeds.findIndex((s) => s <= minSpeed + 1e-6);
+  const minSpeed = Math.min(...picked);
+  const maxSpeed = Math.max(...picked);
+  const firstMin = picked.findIndex((s) => s <= minSpeed + 1e-6);
   let lastMin = firstMin;
-  while (lastMin + 1 < speeds.length && speeds[lastMin + 1]! <= minSpeed + 1e-6) lastMin += 1;
+  while (lastMin + 1 < picked.length && picked[lastMin + 1]! <= minSpeed + 1e-6) lastMin += 1;
   const slowestAt = (firstMin + (lastMin - firstMin) / 2 + 0.5) / rate;
 
   const startX = Math.trunc(pyRound(Number(clip.start) * rate)) + 1;
