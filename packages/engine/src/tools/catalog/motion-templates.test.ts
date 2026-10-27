@@ -199,7 +199,8 @@ describe("build_reel_tool motion styles", () => {
       expect(Math.min(...data.downbeats.map((d) => Math.abs(d - scene.start)))).toBeLessThan(1 / 30 + 1e-6);
       if (i > 0) expect(scene.start).toBeCloseTo(data.scenes[i - 1]!.end, 6);
     }
-    expect(data.scenes[data.scenes.length - 1]!.end).toBeCloseTo(data.duration, 6);
+    // Scene times are rounded to the millisecond.
+    expect(data.scenes[data.scenes.length - 1]!.end).toBeCloseTo(data.duration, 3);
     expect(data.scenes[0]!.templates).toEqual(["grid_background", "type_search"]);
     const music = doc.project.clips.filter((c) => c.layer === data.tracks.music);
     expect(music).toHaveLength(1);

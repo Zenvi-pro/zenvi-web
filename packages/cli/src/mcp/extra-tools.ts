@@ -79,7 +79,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         properties: {
           path: str("Project file, e.g. edits/trailer.zvn (relative to the working folder)."),
           create: bool("Create the file when it does not exist (default true)."),
-          profile: str('Video profile for a new project, e.g. "HD 1080p 30 fps" (default "HD 720p 30 fps").'),
+          profile: str('Video profile for a new project, e.g. "HD 1080p 30 fps", or a social preset: "instagram_reel", "tiktok", "youtube_shorts" (1080x1920), "youtube" (1920x1080), "square_post" (1080x1080). Default "HD 720p 30 fps".'),
         },
         required: ["path"],
         additionalProperties: false,
@@ -231,6 +231,25 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         } catch (error) {
           return { receipt: failed(tool, error instanceof CliError && error.hint ? `${error.message} ${error.hint}` : (error as Error).message) };
         }
+      },
+    },
+    {
+      name: "mcp_health",
+      title: "What the current sign-in enables",
+      description:
+        "Report who Zenvi is signed in as and which features that sign-in enables: local editing and rendering, Zenvi Cloud, AI image/video generation, AI voice (text to speech), speech recognition and media search; for each one that is off, how to turn it on. Call it before generating images, video or voice, or when one of those fails with a sign-in error. Read-only.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+      async run() {
+        const who = await ctx.auth.whoami();
+        const features = await ctx.auth.features();
+        const account = !who.loggedIn
+          ? who.expired
+            ? "Sign-in expired: run `zenvi login`."
+            : "Not signed in."
+          : `Signed in as ${who.email ?? who.userId ?? "an unnamed account"} (${who.kind === "pat" ? "personal token: Zenvi Cloud only" : "Zenvi account"}).`;
+        const lines = features.map((f) => `- ${f.name}: ${f.enabled ? "on" : `off. ${f.fix}`}`);
+        return { receipt: applied("mcp_health", [account, ...lines].join("\n"), { data: { signedIn: who.loggedIn, kind: who.kind ?? null, features } }, 0), engine: null };
       },
     },
     {
