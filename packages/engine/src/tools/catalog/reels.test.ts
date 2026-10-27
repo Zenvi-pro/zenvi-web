@@ -239,6 +239,17 @@ describe("build_reel_tool", () => {
     expect(shots[2]!.start).toBeCloseTo(1.5, 3);
   });
 
+  it("refuses a hype reel too fast for its files with strict_variety, saying how many more, and only warns without it", async () => {
+    const doc = reelProject();
+    const host = withAudio(fakeHost());
+    const strict = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12, strict_variety: true });
+    expect((strict.data as { summary: string }).summary).toMatch(/^Error: \d+ shot\(s\) bring a file back within 3 s: this pace needs about \d+ different files and the cut uses \d+\. Import \d+ more/);
+    expect(doc.undoLabels).toHaveLength(0);
+    const loose = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12 });
+    expect(loose.ok, loose.text).toBe(true);
+    expect((loose.data as { warnings: string[] }).warnings.join(" ")).toMatch(/bring a file back within 3 s/);
+  });
+
   it("refuses unknown and non-visual files without touching history", async () => {
     const doc = reelProject();
     const host = withAudio(fakeHost());
