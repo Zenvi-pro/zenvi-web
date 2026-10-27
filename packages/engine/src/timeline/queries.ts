@@ -145,7 +145,12 @@ export function timelineStart(project: Project): number {
  * (`ceil(maxTime * fps - 1e-4)`, 1 for a sliver of content, 0 when empty).
  */
 export function maxFrame(project: Project, fps: Fraction = project.fps): number {
-  const frames = timelineEnd(project) * (fps.num / fps.den);
+  return lastFrameBefore(timelineEnd(project), fps);
+}
+
+/** The last frame that starts before `seconds`, by `Timeline::GetMaxFrame`'s rule (1 for a sliver, 0 for none). */
+export function lastFrameBefore(seconds: number, fps: Fraction): number {
+  const frames = seconds * (fps.num / fps.den);
   const epsilon = 1e-4;
   if (frames > 0 && frames < epsilon) return 1;
   const frame = Math.ceil(frames - epsilon);
