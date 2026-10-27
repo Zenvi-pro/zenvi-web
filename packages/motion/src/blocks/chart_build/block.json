@@ -1,6 +1,6 @@
 {
   "id": "chart_build",
-  "version": 1,
+  "version": 2,
   "title": "Chart build",
   "description": "A bar, line or donut chart that builds itself: bars grow from the baseline, the line draws across, the donut sweeps round, every label counting up. A big number counts to the highlighted value; after a beat of stillness the highlighted bar/point/segment turns the accent, the rest dim, and a change badge lands. For stats, results and growth claims in promos and explainers.",
   "tags": [
@@ -44,7 +44,7 @@
     "title": {
       "type": "string",
       "maxLength": 60,
-      "default": "Hours saved per editor, each month",
+      "default": "Hours saved per person, each month",
       "description": "What the chart measures, in sentence case (empty: none)."
     },
     "values": {

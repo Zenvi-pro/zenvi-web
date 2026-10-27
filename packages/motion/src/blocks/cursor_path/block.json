@@ -1,6 +1,6 @@
 {
   "id": "cursor_path",
-  "version": 1,
+  "version": 2,
   "title": "Cursor path",
   "description": "An oversized pointer travels a curved path over a screenshot or screen recording, hovering each target (an accent outline lands around it), clicking with a ripple and showing a short label, while the camera pushes in toward each stop. Give `background` (a bin file id) and `points` on the targets; without a background it plays over a drawn editor screen. For product walkthroughs and UI demos.",
   "tags": [
@@ -63,7 +63,7 @@
       "maxItems": 6,
       "maxLength": 32,
       "default": [
-        "Drop in your footage",
+        "Drop in your files",
         "Trim to the beat",
         "Export in one click"
       ],

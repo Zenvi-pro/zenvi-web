@@ -1,6 +1,6 @@
 {
   "id": "code_card",
-  "version": 1,
+  "version": 2,
   "title": "Code card",
   "description": "An editor window typing code with syntax colours: line numbers, the active line lit, a caret, indentation landing at once. After a beat the run strip slides open under the code with its result. For developer tools, APIs, SDK launches and 'it's one call' moments.",
   "tags": [
@@ -33,7 +33,7 @@
     "code": {
       "type": "string",
       "maxLength": 700,
-      "default": "import { cut } from \"@reelkit/sdk\";\n\nconst teaser = await cut(\"interview.mov\", {\n  length: 30,\n  keep: [\"laughs\", \"best line\"],\n  onBeat: true,\n});\n\nawait teaser.export(\"teaser-9x16.mp4\");",
+      "default": "import { summarize } from \"@notekit/sdk\";\n\nconst brief = await summarize(\"report.pdf\", {\n  pages: 1,\n  keep: [\"findings\", \"next steps\"],\n  tone: \"plain\",\n});\n\nawait brief.save(\"brief.md\");",
       "description": "The code, lines separated by newlines (\\n); at most 16 lines show."
     },
     "language": {
@@ -50,13 +50,13 @@
     "filename": {
       "type": "string",
       "maxLength": 40,
-      "default": "teaser.ts",
+      "default": "brief.ts",
       "description": "Name on the window's tab (empty: none)."
     },
     "output": {
       "type": "string",
       "maxLength": 80,
-      "default": "Exported teaser-9x16.mp4 in 2.1 s",
+      "default": "Saved brief.md in 2.1 s",
       "description": "Result shown in the run strip after typing (empty: no strip)."
     }
   }
