@@ -5,7 +5,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
 import * as engine from "@zenvi/engine";
-import { findProfile, PROFILES, type Project } from "@zenvi/engine";
+import { findProfile, PROFILES, socialProfile, type Project } from "@zenvi/engine";
 import { CliError } from "../output.js";
 import { isProjectPath } from "../project/select.js";
 import { ProjectSession } from "../project/session.js";
@@ -14,15 +14,18 @@ import { hostOptions, runToolCommand, toolArgs, type CommandContext } from "./co
 type CreateProject = (opts?: { profile?: string }) => Project;
 
 /** A new empty project (engine `createProject`, the desktop's File ▸ New). */
-export function newProject(profile?: string): Project {
+export function newProject(requested?: string): Project {
   const create = (engine as unknown as { createProject?: CreateProject }).createProject;
   if (!create) throw new CliError("This build's engine cannot create projects (createProject is not exported).");
+  // Social preset names ("instagram_reel", "shorts", "youtube") mean their built-in profile.
+  const profile = requested && !findProfile(requested) ? (socialProfile(requested)?.description ?? requested) : requested;
   if (profile && !findProfile(profile)) {
     const hint = PROFILES.filter((p) => !p.legacy && p.description.toLowerCase().includes(profile.toLowerCase().split(" ")[0] ?? ""))
       .slice(0, 5)
       .map((p) => `"${p.description}"`)
       .join(", ");
-    throw new CliError(`Unknown profile "${profile}".`, 2, hint ? `Try ${hint}.` : "Run `zenvi new --profile list` to see them.");
+    const social = "or a social preset: instagram_reel, tiktok, youtube_shorts, youtube, square_post";
+    throw new CliError(`Unknown profile "${profile}".`, 2, hint ? `Try ${hint}, ${social}.` : `Run \`zenvi new --profile list\` to see them, ${social}.`);
   }
   return create(profile ? { profile } : {});
 }

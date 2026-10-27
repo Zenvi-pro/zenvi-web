@@ -463,19 +463,20 @@ export function estimatedTextWidth(text: string, fontPx: number, bold = true): n
   return fontPx * (normal * per + wide * (per + 0.14) + narrow * 0.3);
 }
 
-function availableWidth(slot: TextField, artboardWidth: number): number {
-  const x = Math.max(0, Math.min(artboardWidth, slot.x ?? artboardWidth / 2));
+/** Room for a slot's line on an artboard `artboardWidth` wide from `left` (a viewBox origin). */
+function availableWidth(slot: TextField, artboardWidth: number, left = 0): number {
+  const x = Math.max(0, Math.min(artboardWidth, slot.x === null ? artboardWidth / 2 : slot.x - left));
   if (slot.anchor === "middle") return 2 * Math.min(x, artboardWidth - x) * 0.94;
   if (slot.anchor === "end") return x * 0.96;
   return (artboardWidth - x) * 0.96;
 }
 
 /** `fit_field`: shrink a slot's font when its text would run off the artboard; returns the ratio applied. */
-export function fitField(slot: TextField, artboardWidth: number, minRatio = 0.35): number {
+export function fitField(slot: TextField, artboardWidth: number, minRatio = 0.35, left = 0): number {
   if (!slot.text.trim() || !slot.fontSize) return 1;
   const bold = slot.nodes.some((n) => ["bold", "700", "800", "900"].includes(String(nodeProperty(n, "font-weight") ?? "normal").toLowerCase()));
   const width = estimatedTextWidth(slot.text.trim(), slot.fontSize, bold);
-  const room = availableWidth(slot, artboardWidth);
+  const room = availableWidth(slot, artboardWidth, left);
   if (width <= room || width <= 0) return 1;
   const ratio = Math.max(minRatio, room / width);
   applyFont(slot.nodes, { sizeRatio: ratio });

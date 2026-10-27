@@ -19,6 +19,7 @@ import { makeKeyframePoint } from "../keyframe/edit.js";
 import { pyRound } from "../model/rounding.js";
 import { addFile, updateFile } from "../ops/files.js";
 import { snapSeconds } from "../ops/internal.js";
+import { isVisualClip } from "../timeline/export-end.js";
 import type { Transaction } from "../history/document.js";
 import type { ToolCall, ToolOutcome } from "./define.js";
 import { getCloseMatches } from "./difflib.js";
@@ -347,16 +348,6 @@ export function clipExtent(clip: Pick<Clip, "position" | "start" | "end">): [num
   return [position, position + duration, duration];
 }
 
-/** `_is_visual`: false for audio-only clips and clips whose picture is switched off. */
-function isVisual(clip: Clip): boolean {
-  const reader = (clip.reader ?? {}) as Record<string, unknown>;
-  if (reader.has_video === false || reader.media_type === "audio") return false;
-  const hv = (clip as unknown as Record<string, unknown>).has_video as { Points?: { co?: { Y?: unknown } }[] } | undefined;
-  const pts = hv && typeof hv === "object" ? (hv.Points ?? []) : [];
-  if (pts.length === 1 && Number(pts[0]?.co?.Y ?? 1) === 0) return false;
-  return true;
-}
-
 /** `clips_in_window`: clips (on `layer`, or any) overlapping [start, end) by more than half a frame. */
 export function clipsInWindow(project: Project, layer: number | null, start: number, end: number, exclude: ReadonlySet<string> = new Set()): Clip[] {
   const tol = ONE_FRAME_TOLERANCE * frameSecondsOf(project);
@@ -415,7 +406,7 @@ export function planOverlayTrack(
 /** The lowest free, unlocked track above `above` and above every picture in the window; a new track on top when none is. */
 function firstFreeTrack(project: Project, start: number, end: number, exclude: ReadonlySet<string>, above: number | null): OverlayPlan {
   const numbers = project.layers.map((l) => Math.trunc(Number(l.number) || 0)).sort((a, b) => a - b);
-  const visual = clipsInWindow(project, null, start, end, exclude).filter(isVisual);
+  const visual = clipsInWindow(project, null, start, end, exclude).filter(isVisualClip);
   const floors = [...visual.map((c) => Math.trunc(Number(c.layer) || 0)), ...(above === null ? [] : [above])];
   const floor = floors.length > 0 ? Math.max(...floors) : null;
   for (const num of numbers) {
