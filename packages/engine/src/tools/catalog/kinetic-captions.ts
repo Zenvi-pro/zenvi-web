@@ -80,6 +80,8 @@ interface Scope {
   cutouts: boolean;
 }
 
+/** Longest footage (source seconds) placement mattes on its own. */
+const AUTO_MATTE_SECONDS = 40;
 /** Styles whose emphasis words are display type of their own: behind_subject defaults to auto for them. */
 const DISPLAY_EMPHASIS: ReadonlySet<CaptionStyleId> = new Set(["creator", "stack"]);
 const STYLE_LINES = CAPTION_STYLE_IDS.map((id) => `${id}: ${CAPTION_STYLES[id].summary}.`).join(" ");
@@ -119,7 +121,7 @@ const input = z.strictObject({
     .describe(
       "Words behind the speaker (a cut-out of them above the captions): emphasis the emphasis words (set across the top of the head), all every word, auto (default for creator and stack) emphasis when the footage has a subject matte (generate_subject_matte_tool), else none. emphasis and all need the matte.",
     ),
-  placement: z.enum(["auto", "style"]).optional().describe("auto (default): look at the shots - keep off the head (from the subject matte when no avoid box is given) and take the calmest, darkest of the style's spots; style: the style's spots in order."),
+  placement: z.enum(["auto", "style"]).optional().describe("auto (default): look at the shots - keep off the head (from the subject matte when no avoid box is given; where the host can matte, the CLI, it makes the matte of footage up to 40 s first, about a minute) and take the calmest, darkest of the style's spots; style: the style's spots in order."),
   language: z.string().max(16).optional().describe("Speech language when the clip has to be transcribed (auto by default)."),
 });
 
@@ -312,7 +314,8 @@ export const kineticCaptionTools: CatalogTool[] = [
           return refused(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}.`);
         }
       }
-      // Mattes the host makes now for placement (auto, no avoid boxes): footage with none yet.
+      // Mattes the host makes now for placement (auto, no avoid boxes): footage with none yet, short enough to matte
+      // while the caller waits (matting runs at about 5-16 frames a second).
       const warnings: string[] = [];
       const made: { source: ProjectFile; matte: GeneratedMatte; scale: 1 | 0.5 }[] = [];
       const host = call.host.mattes;
@@ -320,6 +323,10 @@ export const kineticCaptionTools: CatalogTool[] = [
         for (const clip of clips) {
           const source = project.files.find((f) => f.id === clip.file_id);
           if (!source || matteOf(project, clip) || matteableClipProblem(project, clip) || made.some((m) => m.source.id === source.id)) continue;
+          if (Number(source.duration) > AUTO_MATTE_SECONDS) {
+            warnings.push(`${source.name ?? source.id} is over ${AUTO_MATTE_SECONDS} s: no subject matte made for placement (generate_subject_matte_tool makes one)`);
+            continue;
+          }
           const scale = autoScale(source);
           try {
             made.push({ source, matte: await host.generate(source.path, { subject: "person", scale, signal: call.signal }), scale });
