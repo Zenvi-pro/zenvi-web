@@ -154,7 +154,6 @@ def build(job):
     core.studio_world(job, strength=1.8 if style == "chrome" else 1.0, spin_degrees=150 if style in ("chrome", "iridescent", "glass") else 60)
     cam, aim = camera.camera(lens=55, location=(0, -10, 0), dof=0.5 if p.get("dof", True) and job["quality"] == "final" else None)
     dist = camera.compose(cam, width, height, float(p.get("size", 0.6)), max_height=0.62)
-    cam.location = (0.0, -dist, 0.07 * dist)
     if p.get("shadow", True):
         blob = shapes.shadow_blob("Shadow", width * 1.05, max(0.6, width * 0.35), strength=0.5, location=(0, 0.1, -0.5 * height - 0.18 * min(width, height)))
         motion.animate(blob, "scale", [(1, (0.001, max(0.6, width * 0.35), 1)), (1 + int(round(1.0 * fps)), (width * 1.05, max(0.6, width * 0.35), 1))], "out")
@@ -182,11 +181,15 @@ def build(job):
         motion.animate(logo, "scale", [(1, (0.001, 0.001, 0.001)), (1 + int(enter * 0.45), (1, 1, 1))], "out")
         landed = land + settle
 
-    # The hold: the camera drifts in (TASTE: 3-6 %); the logo stays square to it.
+    # The hold: the camera drifts in (TASTE: 3-6 %) and a little round, so the
+    # extrusion shows while the logo stays square to the frame.
     end = frames
     hold_from = min(landed, end - 1)
-    cl = tuple(cam.location)
-    motion.animate(cam, "location", [(1, (cl[0], cl[1] * 1.03, cl[2])), (end, (cl[0], cl[1] * 0.96, cl[2]))], "in-out")
+    motion.animate(cam, "location", [(1, lights.orbit_point(dist * 1.03, -11, 7)), (end, lights.orbit_point(dist * 0.96, -4, 4))], "in-out")
+    if style == "original":
+        # Brand colours as drawn: the filmic view would desaturate them.
+        bpy.context.scene.view_settings.view_transform = "Standard"
+        bpy.context.scene.view_settings.look = "None"
     if p.get("exit"):
         out = max(hold_from + 1, end - int(0.4 * fps))
         motion.animate(logo, "scale", [(out, (1, 1, 1)), (end, (0.001, 0.001, 0.001))], "in")

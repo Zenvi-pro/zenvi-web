@@ -103,7 +103,7 @@ def xray(color, name="XRay"):
     glow = core.math_node(tree, "ADD", core.math_node(tree, "MULTIPLY", edge, 0.9), core.math_node(tree, "MULTIPLY", wire.outputs[0], 0.6))
     glow = core.math_node(tree, "ADD", glow, 0.04)
     em = tree.nodes.new("ShaderNodeEmission")
-    em.inputs["Color"].default_value = rgb_of(color)
+    em.inputs["Color"].default_value = core.rgb(color, 1.0)
     tree.links.new(core.math_node(tree, "MULTIPLY", glow, 1.8), em.inputs["Strength"])
     clear = tree.nodes.new("ShaderNodeBsdfTransparent")
     add = tree.nodes.new("ShaderNodeAddShader")
@@ -123,13 +123,13 @@ def wireframe(color, fill, name="Wire"):
     tree.nodes.clear()
     out = tree.nodes.new("ShaderNodeOutputMaterial")
     body = tree.nodes.new("ShaderNodeBsdfPrincipled")
-    body.inputs["Base Color"].default_value = rgb_of(fill)
+    body.inputs["Base Color"].default_value = core.rgb(fill, 1.0)
     body.inputs["Roughness"].default_value = 0.5
     wire = tree.nodes.new("ShaderNodeWireframe")
     wire.use_pixel_size = True
     wire.inputs["Size"].default_value = 1.4
     em = tree.nodes.new("ShaderNodeEmission")
-    em.inputs["Color"].default_value = rgb_of(color)
+    em.inputs["Color"].default_value = core.rgb(color, 1.0)
     em.inputs["Strength"].default_value = 3.0
     mix = tree.nodes.new("ShaderNodeMixShader")
     tree.links.new(wire.outputs[0], mix.inputs["Fac"])
@@ -137,10 +137,6 @@ def wireframe(color, fill, name="Wire"):
     tree.links.new(em.outputs[0], mix.inputs[2])
     tree.links.new(mix.outputs[0], out.inputs["Surface"])
     return mat
-
-
-def rgb_of(color):
-    return core.rgb(color, 1.0)
 
 
 def table_material(dark):
@@ -152,19 +148,25 @@ def table_material(dark):
     bsdf = tree.nodes["Principled BSDF"]
     coord = tree.nodes.new("ShaderNodeTexCoord")
     mapping = tree.nodes.new("ShaderNodeMapping")
-    mapping.inputs["Scale"].default_value = (14.0, 1.6, 1.0)
+    mapping.inputs["Scale"].default_value = (9.0, 0.9, 1.0)
     tree.links.new(coord.outputs["Object"], mapping.inputs["Vector"])
     wave = tree.nodes.new("ShaderNodeTexWave")
     wave.inputs["Scale"].default_value = 3.0
-    wave.inputs["Distortion"].default_value = 1.6
+    wave.inputs["Distortion"].default_value = 9.0
     wave.inputs["Detail"].default_value = 4.0
     wave.inputs["Detail Roughness"].default_value = 0.6
     tree.links.new(mapping.outputs["Vector"], wave.inputs["Vector"])
     ramp = tree.nodes.new("ShaderNodeValToRGB")
     els = ramp.color_ramp.elements
-    a, b = ("#3A2416", "#5A3A24") if dark else ("#C9A27A", "#E2C29C")
+    a, b = ("#2E1C10", "#5C3B22") if dark else ("#A97C52", "#D6B08A")
     els[0].color, els[1].color = core.rgb(a, 1.0), core.rgb(b, 1.0)
-    tree.links.new(wave.outputs["Fac"], ramp.inputs["Fac"])
+    # Grain: fine rings, broken up by a slow noise so it never reads as stripes.
+    figure = tree.nodes.new("ShaderNodeTexNoise")
+    figure.inputs["Scale"].default_value = 1.2
+    figure.inputs["Detail"].default_value = 3.0
+    tree.links.new(mapping.outputs["Vector"], figure.inputs["Vector"])
+    grain = core.math_node(tree, "ADD", core.math_node(tree, "MULTIPLY", wave.outputs["Fac"], 0.22), core.math_node(tree, "MULTIPLY", figure.outputs["Fac"], 0.78))
+    tree.links.new(grain, ramp.inputs["Fac"])
     tree.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
     bsdf.inputs["Roughness"].default_value = 0.5
     bsdf.inputs["Coat Weight"].default_value = 0.12
@@ -236,7 +238,8 @@ def build(job):
 
     move = p.get("move", "turntable")
     target = (0, 0, height * 0.5)
-    fstop = (0.6 if move == "push" else 1.6) if p.get("dof", True) and job["quality"] == "final" else None
+    # A whole model must stay readable: gentle focus falloff, none on the see-through looks (blur reads as fog there).
+    fstop = (1.4 if move == "push" else 2.8) if p.get("dof", True) and job["quality"] == "final" and look == "solid" else None
     cam, aim = camera.camera(lens=50, target=target, dof=fstop)
     span = 2 * radius if move == "turntable" else max(width, 2 * radius * 0.85)
     dist = camera.compose(cam, span, height, float(p.get("size", 0.7)), max_height=0.78)

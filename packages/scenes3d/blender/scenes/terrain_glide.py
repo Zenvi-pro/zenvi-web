@@ -124,7 +124,6 @@ def haze(tree, shader, look, density):
     """Mix a surface shader into the sky's horizon colour with distance
     (exponential haze), brighter toward the sun, the same colour the sky
     has at the horizon in that direction (sky_world)."""
-    zenith, horizon, sun_haze = look[0], look[1], look[2]
     cam = tree.nodes.new("ShaderNodeCameraData")
     fog = core.math_node(tree, "SUBTRACT", 1.0, core.math_node(tree, "EXPONENT", core.math_node(tree, "MULTIPLY", cam.outputs["View Distance"], -density)))
     geo = tree.nodes.new("ShaderNodeNewGeometry")
