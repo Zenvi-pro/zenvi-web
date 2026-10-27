@@ -40,8 +40,9 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    "stack"`, `"typewriter"` for UI text. Placement is automatic: the tool
    looks at each shot, keeps off the head (the matte's) and takes the calm,
    dark side; with the matte, emphasis words go behind the head where there
-   is headroom (`behind_subject` is `"auto"`; the receipt says
-   `behind_subject: "emphasis"` or `"none"`). `avoid` (the face box, from
+   is headroom. Leave `behind_subject` out: its default `"auto"` does this
+   only where the word stays readable, and `"none"` throws it away (the
+   receipt says `behind_subject: "emphasis"` or `"none"`). `avoid` (the face box, from
    `preview_frame grid: true`) only without a matte; leave `y` out unless a
    frame check says otherwise. `text_size: 0.06` (connectors readable on a
    phone; emphasis keeps its ratio). The captions sit on their own tracks,
