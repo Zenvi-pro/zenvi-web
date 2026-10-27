@@ -3,6 +3,7 @@
  * and a short list of problems with timestamps (review_edit_tool).
  */
 
+import type { ShotSwap } from "./swaps.js";
 export type PaceProfile = "fast" | "medium" | "slow";
 
 /** How long things may last before they read as a slideshow, per kind of edit. */
@@ -114,6 +115,10 @@ export interface ReviewProblem {
   times?: number[];
   /** What to do about it. */
   fix: string;
+  /** Shots (`ReviewShot.index`) a swap would fix, for the footage problems. */
+  shots?: number[];
+  /** The swaps for them (review/swaps.ts), when the bin has footage to swap in. */
+  swaps?: ShotSwap[];
 }
 
 export interface BeatAlignment {

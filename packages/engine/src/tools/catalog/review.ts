@@ -20,6 +20,7 @@ import { frameWindow, localFrame, windowContains } from "../../timeline/windows.
 import { alignCuts, findProblems, flashAndBlack, tileMark, BLACK_LUMA, BLACK_PEAK, FLASH_LUMA, type SampledFrame } from "../../review/problems.js";
 import { DEFAULT_SHEET_PIXELS, MAX_SHEET_PIXELS, planSheet, sheetLayout } from "../../review/sheet.js";
 import { titleTextBoxes } from "../../review/text-boxes.js";
+import { swapSuggestions } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
 import type { BeatAlignment, MixReview, ReviewProblem, ReviewShot, TextBox } from "../../review/types.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
@@ -121,6 +122,11 @@ function reportText(data: Record<string, unknown>, problems: readonly ReviewProb
       ? "No problems found."
       : `${problems.length} problem${problems.length === 1 ? "" : "s"}, worst first (messages and fixes in data.problems): ${problems.map((p) => `${p.code}@${p.at.toFixed(2)}s`).join(", ")}.`,
   );
+  const swaps = problems.flatMap((p) => p.swaps ?? []);
+  if (swaps.length > 0) {
+    lines.push(`Swaps for the repeated shots (one swap_shot_tool call each):`);
+    for (const s of swaps) lines.push(`- ${s.at.toFixed(2)}s ${s.name} → ${s.to_name} (${s.why}): swap_shot_tool ${JSON.stringify({ clip_id: s.clip_id, file_id: s.to_file_id, start_seconds: s.start_seconds })}`);
+  }
   if (sheetNote) lines.push(sheetNote);
   return lines.join("\n");
 }
@@ -214,6 +220,14 @@ export const reviewTools: CatalogTool[] = [
 
       const textBoxes = await textBoxesOf(call, review.titleClips);
       const problems = findProblems({ review, pace, alignment, mix, frames, textBoxes, frame: { width: project.width, height: project.height } });
+      // One pass over every footage problem's shots, so two problems are never offered the same unused clip.
+      const footage = problems.filter((p) => p.shots);
+      const swaps = swapSuggestions(project, review, footage.flatMap((p) => p.shots!));
+      for (const p of footage) {
+        const starts = new Set(review.shots.filter((s) => p.shots!.includes(s.index)).map((s) => s.start));
+        p.swaps = swaps.filter((s) => starts.has(s.at));
+        for (const s of p.swaps) swaps.splice(swaps.indexOf(s), 1);
+      }
 
       const lengths = review.shots.map((s) => s.duration);
       const data = {
