@@ -97,6 +97,38 @@ describe("unify_grade_tool", { timeout: 60_000 }, () => {
     expect(exposure(ed, bright)).toBeNull();
   });
 
+  it("measures the cuts of one file under the same effects once, and gives them one grade", async () => {
+    const ed = painted();
+    const darkFile = ed.addFile("video", { name: "dark.mp4" });
+    // A reel's cuts: three short sections of one file, the middle one the longest.
+    const cuts = [
+      ed.addClip(darkFile, { position: 0, start: 0, end: 0.4 }),
+      ed.addClip(darkFile, { position: 0.4, start: 3, end: 4 }),
+      ed.addClip(darkFile, { position: 1.4, start: 6, end: 6.3 }),
+    ];
+    // The same file under other effects is another shot; effect ids alone do not split one.
+    const blurred = [ed.addClip(darkFile, { position: 1.7, start: 8, end: 8.5 }), ed.addClip(darkFile, { position: 2.2, start: 9, end: 9.5 })];
+    for (const id of blurred) ed.addEffect(id, "Blur");
+    ed.addClip(ed.addFile("video", { name: "mid.mp4" }), { position: 2.7, end: 4.7 });
+    ed.addClip(ed.addFile("video", { name: "bright.mp4" }), { position: 4.7, end: 6.7 });
+    const frames = ed.host.frames!;
+    let renders = 0;
+    ed.host.frames = { ...frames, renderFrame: (...a: Parameters<typeof frames.renderFrame>) => ((renders += 1), frames.renderFrame(...a)) };
+    const perShot = await unify(ed, { samples: 2, max_iterations: 1 });
+    expect(perShot.status, perShot.summary).toBe("applied");
+    // Four shots measured (dark, dark+blur, mid, bright), not seven clips: 2 samples each (no preview), then one pass.
+    expect(renders).toBeLessThanOrEqual(4 * 2 * 2);
+    const grades = cuts.map((id) => exposure(ed, id));
+    expect(grades[0]!).toBeGreaterThan(0);
+    expect(new Set(grades).size).toBe(1);
+    expect(exposure(ed, blurred[0]!)).toBe(exposure(ed, blurred[1]!));
+    expect(row(perShot.data, cuts[0]!).measured_on).toBe(cuts[1]);
+    expect(row(perShot.data, cuts[1]!).measured_on).toBeUndefined();
+    expect(row(perShot.data, blurred[1]!).measured_on).toBe(blurred[0]);
+    expect((perShot.data.clips as Row[]).map((r) => r.timeline_clip_id)).toEqual([...cuts, ...blurred, expect.any(String), expect.any(String)]);
+    expect(ed.clip(cuts[0]!)!.effects.map((e) => e.id)).not.toEqual(ed.clip(cuts[1]!)!.effects.map((e) => e.id));
+  });
+
   it("matches a reference clip without touching it, and evens out a colour cast", async () => {
     const ed = painted();
     const ref = ed.addClip(ed.addFile("video", { name: "mid.mp4" }), {

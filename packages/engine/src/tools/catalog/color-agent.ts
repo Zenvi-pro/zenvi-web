@@ -351,15 +351,15 @@ export interface ProfilePack {
   duration_s: number;
 }
 
-/** `_profile_clip_dense`: a LookProfile from frames spread across the clip (isolated renders). */
-export async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number): Promise<ProfilePack> {
+/** `_profile_clip_dense`: a LookProfile from frames spread across the clip (isolated renders); `preview: false` skips the JPEG for callers that only read the profile. */
+export async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number, opts: { preview?: boolean } = {}): Promise<ProfilePack> {
   const rate = fps(call.doc.project);
   const duration = clipDurationSeconds(clip);
   let n = sampleCountForDuration(duration);
   if (maxSamples !== undefined) n = Math.max(1, Math.min(Math.trunc(maxSamples), n));
   const frames = sampleLocalFrames(duration, rate, n);
   const solo: Clip = { ...clip, position: 0.0 };
-  const pick = previewIndex(frames.length);
+  const pick = opts.preview === false ? -1 : previewIndex(frames.length);
   const rendered = await mapLimit(frames, RENDER_CONCURRENCY, (localFrame, i) => renderClipIsolated(call, solo, localFrame, i === pick), call.signal);
   const scopes = rendered.filter((r): r is Isolated => r !== null && Boolean(r.scopes.present)).map((r) => r.scopes);
   const preview = rendered[pick]?.preview ?? null;

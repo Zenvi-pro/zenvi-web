@@ -7,6 +7,12 @@
  * one shared LUT look can go on top. Everything is one undo step; the
  * receipt lists every clip's stats before and after.
  *
+ * Clips cut from the same file with the same effects are one shot to the
+ * grade: the longest is measured and corrected and the rest take its
+ * correction, as build_reel_tool grades per file (catalog/reel-grade.ts). A
+ * 70-cut hype reel from six files measures six clips, not seventy, and the
+ * cuts of one file never get different grades.
+ *
  * The measuring is match_color_to_reference_tool's (catalog/color-agent.ts:
  * LookProfiles of isolated renders). The correction is solved per clip from
  * ColorGrade's own pixel math (tools/color-unify.ts), where match_color
@@ -123,6 +129,26 @@ function subjectsOf(call: ToolCall, args: Input, warnings: string[]): Clip[] {
   return [...clips].sort((a, b) => (Number(a.position) || 0) - (Number(b.position) || 0));
 }
 
+/** What makes clips one shot to the grade: the same file under the same effects (effect ids aside). */
+function shotKey(clip: Clip): string {
+  const effects = (clip.effects ?? []).map((e) => {
+    const { id: _id, ...rest } = e as unknown as Json;
+    return rest;
+  });
+  return `${String(clip.file_id)}\u0000${JSON.stringify(effects)}`;
+}
+
+/** The subjects as shots: each group's longest clip (measured) and the clips that take its correction. */
+export function groupShots(clips: readonly Clip[]): { measured: Clip; members: Clip[] }[] {
+  const groups = new Map<string, Clip[]>();
+  for (const clip of clips) {
+    const key = shotKey(clip);
+    groups.set(key, [...(groups.get(key) ?? []), clip]);
+  }
+  const length = (c: Clip) => (Number(c.end) || 0) - (Number(c.start) || 0);
+  return [...groups.values()].map((members) => ({ measured: members.reduce((a, b) => (length(b) > length(a) ? b : a)), members }));
+}
+
 export interface ClipOutcome {
   clip: Clip;
   before: Json;
@@ -184,7 +210,7 @@ export async function unifyClip(
     const changes = Object.fromEntries((Object.keys(next) as (keyof UnifyKnobs)[]).filter((k) => next[k] !== knobs[k]).map((k) => [k, next[k]]));
     if (Object.keys(changes).length === 0) break;
     const tried = mergedGradeEffects(effects, changes, opts.create).effects;
-    const measured = (await profileClipDense(call, { ...clip, effects: tried }, opts.samples)).profile;
+    const measured = (await profileClipDense(call, { ...clip, effects: tried }, opts.samples, { preview: false })).profile;
     passes += 1;
     if (!measured.present) break;
     // A pass that clips the picture or does not move toward the target is dropped; the last good one stays.
@@ -207,7 +233,7 @@ export const colorUnifyTools: CatalogTool[] = [
     description:
       "Grade continuity for a whole cut: measures every footage clip's exposure, white balance and contrast on frames across it, " +
       "corrects each clip's ColorGrade toward one target (a reference clip/file, or the clips' median look in a neutral band) until it sits within " +
-      "tolerance (saturation is reported, not matched), then optionally lays one LUT look over all of them. Use after cutting and before the look, so bright daylight and near-black " +
+      "tolerance (saturation is reported, not matched), then optionally lays one LUT look over all of them. Clips cut from the same file with the same effects are measured once (the longest) and share its correction. Use after cutting and before the look, so bright daylight and near-black " +
       "shots stop jumping on the cut. One undo step; the receipt lists before/after stats per clip.",
     input,
     annotations: {
@@ -238,7 +264,7 @@ export const colorUnifyTools: CatalogTool[] = [
           const ref = project.clips.find((c) => c.id === args.reference_clip_id);
           if (!ref) return refused(TOOL, `Error: reference clip ${args.reference_clip_id} not found`);
           subjects = subjects.filter((c) => c.id !== ref.id);
-          refPack = await profileClipDense(call, ref, args.samples ?? DEFAULT_SAMPLES);
+          refPack = await profileClipDense(call, ref, args.samples ?? DEFAULT_SAMPLES, { preview: false });
           reference = { kind: "clip", timeline_clip_id: ref.id };
         } else if (args.reference_file_id) {
           const file = project.files.find((f) => String(f.id) === args.reference_file_id);
@@ -258,10 +284,11 @@ export const colorUnifyTools: CatalogTool[] = [
           return refused(TOOL, "Error: unifying needs two or more clips, or a reference_clip_id / reference_file_id to match");
 
         const samples = args.samples ?? DEFAULT_SAMPLES;
+        const shots = groupShots(subjects);
         const packs: ProfilePack[] = [];
-        for (const clip of subjects) {
+        for (const shot of shots) {
           if (call.signal?.aborted) return refused(TOOL, "Error: cancelled; nothing changed");
-          packs.push(await profileClipDense(call, clip, samples));
+          packs.push(await profileClipDense(call, shot.measured, samples, { preview: false }));
         }
         const target = refPack ? refPack.profile : unifyTarget(packs.map((p) => p.profile));
         if (!refPack) {
@@ -269,22 +296,33 @@ export const colorUnifyTools: CatalogTool[] = [
             packs.map((p) => p.profile),
             target,
           );
-          if (closest >= 0) reference.closest_clip_id = subjects[closest]!.id;
+          if (closest >= 0) reference.closest_clip_id = shots[closest]!.measured.id;
         }
 
         const create = effectFactory(project);
         const outcomes: ClipOutcome[] = [];
-        for (const [i, clip] of subjects.entries()) {
+        const measuredOn = new Map<string, string>();
+        for (const [i, shot] of shots.entries()) {
           if (call.signal?.aborted) return refused(TOOL, "Error: cancelled; nothing changed");
-          outcomes.push(
-            await unifyClip(call, clip, packs[i]!, target, {
-              strength: args.strength ?? 1,
-              samples,
-              maxIterations: args.max_iterations ?? 4,
-              create,
-            }),
-          );
+          const outcome = await unifyClip(call, shot.measured, packs[i]!, target, {
+            strength: args.strength ?? 1,
+            samples,
+            maxIterations: args.max_iterations ?? 4,
+            create,
+          });
+          const from = knobsOf(shot.measured.effects ?? []);
+          const to = knobsOf(outcome.effects);
+          const changes = Object.fromEntries((Object.keys(to) as (keyof UnifyKnobs)[]).filter((k) => to[k] !== from[k]).map((k) => [k, to[k]]));
+          for (const clip of shot.members) {
+            if (clip === shot.measured) outcomes.push(outcome);
+            else {
+              measuredOn.set(clip.id, shot.measured.id);
+              const effects = Object.keys(changes).length > 0 ? mergedGradeEffects([...(clip.effects ?? [])], changes, create).effects : [...(clip.effects ?? [])];
+              outcomes.push({ ...outcome, clip, effects });
+            }
+          }
         }
+        outcomes.sort((a, b) => subjects.indexOf(a.clip) - subjects.indexOf(b.clip));
 
         // The shared look goes over every unified clip (and a reference clip), after its correction.
         const lookIds = new Set(lut ? subjects.map((c) => c.id) : []);
@@ -313,6 +351,8 @@ export const colorUnifyTools: CatalogTool[] = [
             gap_after: unifyGap(o.after, target),
             out_of_band: outOfBand(o.after, target),
           };
+          const measured = measuredOn.get(o.clip.id);
+          if (measured) row.measured_on = measured;
           const grade = findColorGrade(finalEffects.get(o.clip.id) ?? []);
           row.grade = grade ? gradeKnobs(grade as Json) : null;
           return row;
