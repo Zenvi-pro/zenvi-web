@@ -28,7 +28,7 @@ import type { ContainerFormat, ExportOptions } from "@zenvi/engine/tools";
 import { windowEnd } from "../audio/channels.js";
 import { mixWindow, planHasSound } from "../audio/mixdown.js";
 import { AudioRenderer } from "../audio/renderer.js";
-import type { LayerError } from "../compositor/compositor.js";
+import type { LayerError, PreparedFrame } from "../compositor/compositor.js";
 import { defaultEngine, type RenderEngine } from "../engine.js";
 import type { MediaRegistry } from "../media/registry.js";
 import type { SvgRasterizer } from "../media/svg.js";
@@ -65,6 +65,9 @@ export interface ExportRunOptions {
   allowVideoOnly?: boolean;
   svgRasterizer?: SvgRasterizer;
 }
+
+/** New clips start decoding this many frames before they are drawn. */
+const DECODE_AHEAD = 8;
 
 /** Audio is mixed about this many seconds at a time (windows end on audio frame boundaries). */
 const AUDIO_WINDOW = 10;
@@ -257,15 +260,31 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
     }
   };
 
+  const size = { width: choice.width, height: choice.height };
+  const frameOf = (i: number) => engine.frameAt(project, start + i / rate);
+  // The next frame decodes while this one draws (its kernels run on this thread), and new clips start decoding a few
+  // frames before their cut.
+  let next: Promise<PreparedFrame> | null = null;
+  const prepare = (i: number) => {
+    const pending = frames!.prepare(project, frameOf(i), size, "sequential");
+    pending.catch(() => undefined);
+    return pending;
+  };
+  const warmed = new Set<string>();
+  let warmedTo = 0;
+
   try {
     await output.start();
+    if (frames && videoSource) next = prepare(0);
     for (let i = 0; i < frameCount; i += 1) {
       if (signal?.aborted) throw abortReason(signal);
       const time = start + i / rate;
-      if (frames && videoSource) {
-        const frame = engine.frameAt(project, time);
-        const errors = await frames.draw(project, frame, { width: choice.width, height: choice.height }, "sequential");
-        for (const error of errors) run.onLayerError?.(error, frame);
+      if (frames && videoSource && next) {
+        for (; warmedTo < frameCount && warmedTo <= i + DECODE_AHEAD; warmedTo += 1) frames.warm(project, frameOf(warmedTo), size, warmed);
+        const prepared = await next;
+        next = i + 1 < frameCount ? prepare(i + 1) : null;
+        const errors = frames.drawPrepared(prepared, size);
+        for (const error of errors) run.onLayerError?.(error, prepared.plan.frame);
         await videoSource.add(i / rate, 1 / rate);
         if (i % 120 === 119) frames.sweep();
       }
@@ -282,6 +301,7 @@ async function encode(source: Project, media: MediaRegistry, options: ExportOpti
     await output.cancel().catch(() => undefined);
     throw signal?.aborted ? abortReason(signal) : error;
   } finally {
+    await next?.then((prepared) => prepared.release(), () => undefined);
     await frames?.dispose();
     await audio?.dispose();
   }
