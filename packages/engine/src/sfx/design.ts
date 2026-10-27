@@ -168,12 +168,7 @@ function choose(input: DesignInput): { keep: Set<number>; dry: Map<number, strin
 }
 
 /** The design for a cue sheet. */
-export function designSound(given: DesignInput): SoundDesign {
-  // every_cut asks for a sound on every cut: a flash run's inner cuts get ticks pitch-walking up the run, locked to the cut rate (CRAFT.md §10 flash montage).
-  const input: DesignInput =
-    given.density === "every_cut"
-      ? { ...given, points: given.points.map((p) => (p.dry === "inside a flash run" ? { ...p, needsCue: true, dry: undefined, role: "micro" as const, label: `${p.label} (flash run tick)` } : p)) }
-      : given;
+export function designSound(input: DesignInput): SoundDesign {
   const { points, palette, duration } = input;
   const rng = new Rng(Math.imul(input.seed | 0, 2654435761) ^ 0x5d2);
   const pool = new Pool(rng.fork(1));

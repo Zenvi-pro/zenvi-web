@@ -97,13 +97,6 @@ describe("designSound", () => {
     expect(design.dips).toEqual([]);
   });
 
-  it("every_cut ticks a flash run's inner cuts, pitch-walking up", () => {
-    const run = [0, 1, 2, 3].map((k) => pt(2 + k * 0.1, "cut", "micro", { needsCue: false, dry: "inside a flash run" }));
-    const ticks = designSound(input(run, { density: "every_cut" })).cues;
-    expect(ticks.map((c) => c.role)).toEqual(["micro", "micro", "micro", "micro"]);
-    expect(ticks.every((c, i) => i === 0 || c.params.pitch! > ticks[i - 1]!.params.pitch!)).toBe(true);
-  });
-
   it("subtle keeps only the big moments", () => {
     const points = [pt(1, "cut", "transition", { weight: 0.4 }), pt(2, "cut", "hero", { weight: 0.9 }), pt(3, "block", "ui", { event: "click", weight: 0.3 })];
     const design = designSound(input(points, { intensity: "subtle" }));

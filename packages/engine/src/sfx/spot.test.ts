@@ -127,6 +127,20 @@ describe("spotHitPoints", () => {
     for (let i = 1; i < heroes.length; i += 1) expect(heroes[i]!.t - heroes[i - 1]!.t).toBeGreaterThanOrEqual(0.25);
   });
 
+  it("hears a cut under a cropped grid tile, and the tile's entrance", () => {
+    const doc = project((tx, layer) => {
+      [0, 1].forEach((at, i) => addClip(tx, { fileId: shot(i), position: at, layer: layer - 1, start: 0, end: 1 }));
+      const tile = addClip(tx, { fileId: "SHOTAAXXXX", position: 0.5, layer, start: 0, end: 1.5 });
+      const edge = (y: number) => ({ Points: [openshotPoint(1, y, Interpolation.LINEAR)] });
+      tx.update(["clips", { id: tile.id }], { effects: [{ id: "CROP000001", class_name: "Crop", type: "Crop", left: edge(0), right: edge(0.8), top: edge(0), bottom: edge(0) }] } as Partial<Clip>);
+    });
+    const points = spotHitPoints(doc.project);
+    expect(points.map((p) => [p.t, p.kind])).toEqual([
+      [0.5, "title"],
+      [1, "cut"],
+    ]);
+  });
+
   it("marks points under speech", () => {
     const doc = project((tx, layer) => [0, 1, 2].forEach((at, i) => addClip(tx, { fileId: shot(i), position: at, layer, start: 0, end: 1 })));
     const points = spotHitPoints(doc.project, { speech: [[0.8, 1.5]] });
