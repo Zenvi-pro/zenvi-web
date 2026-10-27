@@ -242,6 +242,25 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       },
     },
     {
+      name: "mcp_health",
+      title: "What the current sign-in enables",
+      description:
+        "Report who Zenvi is signed in as and which features that sign-in enables: local editing and rendering, Zenvi Cloud, AI image/video generation, AI voice (text to speech), speech recognition and media search; for each one that is off, how to turn it on. Call it before generating images, video or voice, or when one of those fails with a sign-in error. Read-only.",
+      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+      async run() {
+        const who = await ctx.auth.whoami();
+        const features = await ctx.auth.features();
+        const account = !who.loggedIn
+          ? who.expired
+            ? "Sign-in expired: run `zenvi login`."
+            : "Not signed in."
+          : `Signed in as ${who.email ?? who.userId ?? "an unnamed account"} (${who.kind === "pat" ? "personal token: Zenvi Cloud only" : "Zenvi account"}).`;
+        const lines = features.map((f) => `- ${f.name}: ${f.enabled ? "on" : `off. ${f.fix}`}`);
+        return { receipt: applied("mcp_health", [account, ...lines].join("\n"), { data: { signedIn: who.loggedIn, kind: who.kind ?? null, features } }, 0), engine: null };
+      },
+    },
+    {
       name: "push_to_cloud",
       title: "Share through Zenvi Cloud",
       description:
