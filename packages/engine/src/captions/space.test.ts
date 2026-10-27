@@ -63,13 +63,17 @@ describe("scene cost", () => {
     expect(luma[1]).toBeCloseTo(0.47, 1);
   });
 
-  it("counts the subject's share of each cell, and weighs it most", () => {
+  it("counts the subject's share of each cell, and weighs it over any picture", () => {
     const matte = image(40, 20, (x) => x < 20);
     expect(matteCells(matte, 2, 1)).toEqual([1, 0]);
     const grid = sceneCost(image(40, 20, () => false), matte, 2, 1)!;
-    expect(grid.cells[0]).toBeCloseTo(0.6 / 1.3, 9);
+    expect(grid.cells[0]).toBeCloseTo(1, 9);
     expect(grid.cells[1]).toBe(0);
     expect(sceneCost(null, null, 2, 1)).toBeNull();
+    // The busiest, brightest background costs less than a dark, calm body.
+    const white = image(40, 20, (x, y) => (x + y) % 2 === 0);
+    const busy = sceneCost(white, null, 2, 1)!;
+    expect(Math.max(...busy.cells)).toBeLessThan(grid.cells[0]!);
   });
 
   it("averages a box's cells by the area it covers", () => {

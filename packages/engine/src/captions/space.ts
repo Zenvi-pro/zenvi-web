@@ -9,8 +9,8 @@
  *             box the captions keep off (and emphasis words go behind), and
  *             how much of each cell is the subject.
  *
- * A cell's cost is 0 (calm, dark, empty) to 1; the caption builder picks,
- * among the spots that stay clear of the head, the cheapest one.
+ * A cell's cost is 0 (calm, dark, empty) to 1.5; the caption builder
+ * picks, among the spots that stay clear of the head, the cheapest one.
  */
 
 import type { RgbaImage } from "../render/types.js";
@@ -141,9 +141,10 @@ export function matteHead(matte: RgbaImage): AvoidBox | null {
 }
 
 /**
- * Cost of each cell: busy and bright picture, and the subject. Weights: the
- * subject counts most (type over a body is clutter even where it is calm),
- * then detail, then brightness (white type).
+ * Cost of each cell: the picture, 0-0.5 (detail, and brightness: white
+ * type on a white wall does not read), plus the subject's share, 0-1: type over a
+ * body is clutter even where the shirt is calm and dark, so any clear patch
+ * of background beats it.
  */
 export function sceneCost(picture: RgbaImage | null, matte: RgbaImage | null, cols: number, rows: number): CostGrid | null {
   if (!picture && !matte) return null;
@@ -151,13 +152,7 @@ export function sceneCost(picture: RgbaImage | null, matte: RgbaImage | null, co
   const p = picture ? pictureCells(picture, cols, rows) : null;
   const m = matte ? matteCells(matte, cols, rows) : null;
   const cells: number[] = [];
-  for (let k = 0; k < n; k += 1) {
-    const parts: [number, number][] = [];
-    if (p) parts.push([p.busy[k]!, 0.45], [p.luma[k]!, 0.25]);
-    if (m) parts.push([m[k]!, 0.6]);
-    const weight = parts.reduce((s, [, w]) => s + w, 0);
-    cells.push(parts.reduce((s, [v, w]) => s + v * w, 0) / weight);
-  }
+  for (let k = 0; k < n; k += 1) cells.push((p ? 0.25 * p.busy[k]! + 0.25 * p.luma[k]! : 0) + (m ? m[k]! : 0));
   return { cols, rows, cells };
 }
 

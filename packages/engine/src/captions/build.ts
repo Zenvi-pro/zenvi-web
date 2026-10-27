@@ -523,7 +523,11 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
       }
       block = { words: [...eb.words, ...cb.words].sort((a, b) => a.index - b.index), width: Math.max(eb.width, cb.width), height: eb.height + cb.height };
     } else {
-      for (const scale of [1, 0.85, 0.7]) {
+      // Clear means off the avoid boxes and, with the shot's subject known, mostly off its body too: a word set to
+      // fill the measure is stepped down until it fits beside the speaker.
+      const covers = (box: Box) => (scene.subject ? boxCost(scene.subject, box, W, H) : 0);
+      let best = Infinity;
+      for (const scale of scene.subject ? [1, 0.85, 0.7, 0.55] : [1, 0.85, 0.7]) {
         const b = layoutGroup(lib, style, items, u, scale, style.measure * safeWidth);
         if (style.arrangement === "split") {
           const sb = subject ? { x: (subject.x - subject.w / 2) * W, y: (subject.y - subject.h / 2) * H, w: subject.w * W, h: subject.h * H } : { x: W * 0.35, y: H * 0.3, w: W * 0.3, h: H * 0.3 };
@@ -548,13 +552,17 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
           continue;
         }
         const p = place(b.width, b.height, [...spots, ...around(b)], safe, avoid, cost, rankCost);
-        if (!block || p.overlap < overlap) {
+        const cover = covers(p.box);
+        // Ranked by overlap with the boxes first, then by how much of the body it covers.
+        const rank = p.overlap * 1e3 + cover;
+        if (!block || rank < best - 1e-9) {
           block = b;
+          best = rank;
           overlap = p.overlap;
           offsets.clear();
           for (const w of b.words) offsets.set(w, { dx: p.box.x, dy: p.box.y });
         }
-        if (p.overlap === 0) break;
+        if (p.overlap === 0 && cover < 0.15) break;
       }
     }
     const b = block!;
