@@ -87,6 +87,18 @@ describe("zenvi CLI", () => {
     expect(badArgs.code).toBe(2);
   });
 
+  it("saves the images a tool returns with `call --images` (review_render_tool's contact sheet of a real file)", async () => {
+    // The real tool catalog, in a folder of its own.
+    const dir = path.join(work, "review");
+    const file = await makeVideo(dir, "out.mp4", { duration: 2, audioHz: 440 });
+    const step = (args: string[]) => zenvi(args, { cwd: dir, env: testEnv(home), registry: engineRegistry() });
+    expect((await step(["new", "review.zvn"])).code).toBe(0);
+    const r = await step(["call", "review_render_tool", `path=${file}`, "--images", path.join(dir, "sheets")]);
+    expect(r.code, r.stderr).toBe(0);
+    expect(r.stdout).toMatch(/Reviewed .*out\.mp4 \(2\.00s, 320x240\)/);
+    expect((await readFile(path.join(dir, "sheets", "review_render_tool-1.jpg"))).subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+  });
+
   it("places `keyframe` points at timeline times (or source times with --clip-time) on a trimmed clip", async () => {
     // The real tool catalog, in a folder of its own: the tests around this one use the work folder's only project.
     const dir = path.join(work, "keys");

@@ -217,6 +217,19 @@ def cases(media):
     out.append(("corner-rotate-alpha", project([clip(media, "grad.png", end=3.0, layer=1), rounded]), [1]))
     cropped = clip(media, "bars.mkv", rotation=kf((1, 15)), scale_x=kf((1, 0.7)), scale_y=kf((1, 0.7)), effects=[effect("Crop", left=kf((1, 0.2)), right=kf((1, 0.1)), resize=True)])
     out.append(("crop-resize-rotate", project([cropped]), [1]))
+    # A kaleidoscope as the grid template builds it (motion/templates/montage-grid.ts): four centred clips
+    # showing one Crop window, alternate ones mirrored by negative scales, in-points apart (a repeat's phase),
+    # all pushed in by a linear camera (drift).
+    window = dict(left=kf((1, 0.0)), top=kf((1, 0.0)), right=kf((1, 0.5)), bottom=kf((1, 0.5)), resize=True)
+    segments = []
+    for i, (sx, sy, start) in enumerate([(1, 1, 0.0), (-1, 1, 0.0), (1, -1, 0.2), (-1, -1, 0.4)]):
+        lx, ly = (0.25 if sx < 0 else -0.25), (0.25 if sy < 0 else -0.25)
+        n = round(start * 30)
+        segments.append(clip(media, "bars.mkv", layer=i + 1, start=start, end=start + 1.5,
+                             scale_x=kf((1 + n, 0.5 * sx), (45 + n, 0.56 * sx)), scale_y=kf((1 + n, 0.5 * sy), (45 + n, 0.56 * sy)),
+                             location_x=kf((1 + n, lx), (45 + n, lx * 1.12)), location_y=kf((1 + n, ly), (45 + n, ly * 1.12)),
+                             effects=[effect("Crop", **window)]))
+    out.append(("kaleidoscope-tiles", project(segments), [1, 15, 30]))
     out.append(("waveform-clip", project([clip(media, "bars.mkv", layer=1), clip(media, "tone.mkv", layer=2, waveform=True)]), [1, 20]))
     viz = clip(media, "tone.mkv", effects=[effect("AudioVisualization")])
     out.append(("audio-visualization", project([viz]), [1, 30]))

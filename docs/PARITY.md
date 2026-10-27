@@ -64,6 +64,7 @@ without them. Media are generated into a temp dir (≤ 320×180, ≤ 3 s).
 | displace-map | Displace with a still map | 1 | exact |
 | corner-rotate-alpha | corner radius with rotation and opacity | 1 | exact |
 | crop-resize-rotate | Crop `resize` with rotation | 1 | exact |
+| kaleidoscope-tiles | the grid template's kaleidoscope / repeat: one Crop window on four centred clips, mirrored by negative `scale_x`/`scale_y`, in-points apart, a linear push-in | 1, 15, 30 | exact |
 | waveform-clip | `waveform` clip over video (AudioVisualization shortcut fed with the clip's PCM) | 1, 20 | exact |
 | audio-visualization | AudioVisualization effect on a clip with audio | 1, 30 | exact |
 
