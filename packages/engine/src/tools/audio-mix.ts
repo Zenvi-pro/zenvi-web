@@ -9,6 +9,7 @@
  * are built.
  */
 
+import { evaluateAtX } from "../keyframe/evaluate.js";
 import { pyRound } from "../model/rounding.js";
 import { Interpolation, type KeyframePoint } from "../model/types.js";
 import { parsePythonFloat } from "./coerce.js";
@@ -476,28 +477,18 @@ export function curvePoints(clip: unknown): KeyframePoint[] {
     .map(({ p }) => p);
 }
 
-/** Piecewise-linear value of a volume curve at source frame x. */
+/**
+ * Value of a volume curve at source frame x, interpolated the way libopenshot
+ * plays it (libopenshot/src/KeyFrame.cpp:36-95 `InterpolateBetween`: each
+ * segment takes the right point's linear / bezier / constant shape; ported in
+ * keyframe/evaluate.ts), so a relative change rides the curve the desktop
+ * hears. zenvi-core audio_mix.py reads every segment as linear; on linear
+ * curves (what the duck tools write) the two agree.
+ */
 export function evaluateVolumeCurve(points: readonly KeyframePoint[], x: unknown, fallback = 1.0): number {
   const pts = (points ?? []).filter((p) => isRecord(p) && isRecord(p.co));
   if (pts.length === 0) return f(fallback, 1);
-  const sorted = pts
-    .map((p, i) => ({ p, i }))
-    .sort((a, b) => f(a.p.co.X, 0) - f(b.p.co.X, 0) || a.i - b.i)
-    .map(({ p }) => p);
-  const target = f(x, 1);
-  if (target <= f(sorted[0]!.co.X, 1)) return f(sorted[0]!.co.Y, fallback);
-  if (target >= f(sorted[sorted.length - 1]!.co.X, 1)) return f(sorted[sorted.length - 1]!.co.Y, fallback);
-  for (let i = 0; i + 1 < sorted.length; i += 1) {
-    const x0 = f(sorted[i]!.co.X, 0);
-    const y0 = f(sorted[i]!.co.Y, fallback);
-    const x1 = f(sorted[i + 1]!.co.X, 0);
-    const y1 = f(sorted[i + 1]!.co.Y, fallback);
-    if (x0 <= target && target <= x1) {
-      if (x1 - x0 <= EPS) return y1;
-      return y0 + (y1 - y0) * ((target - x0) / (x1 - x0));
-    }
-  }
-  return f(sorted[sorted.length - 1]!.co.Y, fallback);
+  return evaluateAtX({ Points: pts }, f(x, 1));
 }
 
 /** dB of attenuation that sits a bed `headroomDb` under the speech (auto_duck_db). */
