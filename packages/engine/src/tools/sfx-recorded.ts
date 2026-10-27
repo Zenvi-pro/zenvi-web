@@ -6,12 +6,14 @@
  */
 
 import { SFX_CONDITION_VERSION } from "../sfx/condition.js";
-import { kitVariation, type KitVariation } from "../sfx/kit-search.js";
+import { kitVariation, type KitUse, type KitVariation } from "../sfx/kit-search.js";
+import type { Project } from "../model/types.js";
+import { isSfxClip } from "../sfx/moments.js";
 import { pickRecorded, recordedCredit, recordedGroupOf, recordedMaxSeconds, type RecordedSample, type SfxKit } from "../sfx/recorded.js";
-import { fpsFloatOf } from "./catalog/common.js";
+import { fileById, fpsFloatOf } from "./catalog/common.js";
 import type { ToolCall } from "./define.js";
 import { cachedSfx, conditionedSfxFile, variationTag } from "./sfx-library.js";
-import { prepareSfx, type PreparedSfx, type SfxRequest } from "./sfx-media.js";
+import { markOf, prepareSfx, type PreparedSfx, type SfxRequest } from "./sfx-media.js";
 import type { ToolHost } from "./types.js";
 
 /** Whether this surface can play the recorded kit: fetch to a cache, decode, write WAV. */
@@ -33,6 +35,21 @@ export function recordedKey(id: number, recipe: string, maxSeconds: number, fps:
 export function recordedIdOfKey(key: unknown): number | undefined {
   const m = typeof key === "string" ? /^rec-\d+-(\d+)-/.exec(key) : null;
   return m ? Number(m[1]) : undefined;
+}
+
+/**
+ * The kit sounds on the timeline, each at its hit point (a whoosh's peak, a
+ * hit's transient), for the variety rules: the moment a new cue is asked
+ * for is a hit point too, while a peaking sound's clip starts its pre-roll
+ * earlier.
+ */
+export function kitUsesOf(project: Project): KitUse[] {
+  return project.clips.flatMap((clip) => {
+    const file = isSfxClip(clip) ? fileById(project, String(clip.file_id)) : undefined;
+    const mark = file ? markOf(file) : undefined;
+    const id = recordedIdOfKey(mark?.key);
+    return id !== undefined ? [{ id, at: clip.position + (mark?.hit ?? 0) - clip.start }] : [];
+  });
 }
 
 /** One kit sound ready to place for `recipeId`, varied by `variation`. Throws with words when it cannot be fetched or decoded. */

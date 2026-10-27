@@ -22,10 +22,8 @@ import { RECORDED_GROUPS, RECORDED_GROUP_SPECS, recordedSamples } from "../../sf
 import { directTool, unavailable, type CatalogTool } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
 import { cachedSfx, conditionedSfxFile } from "../sfx-library.js";
-import { recordedIdOfKey, recordedKitAvailable } from "../sfx-recorded.js";
-import { addSfxFile, markOf, pictureEnd, placeSfx, snapToFrame } from "../sfx-media.js";
-import { isSfxClip } from "../../sfx/moments.js";
-import { fileById } from "./common.js";
+import { kitUsesOf, recordedKitAvailable } from "../sfx-recorded.js";
+import { addSfxFile, pictureEnd, placeSfx, snapToFrame } from "../sfx-media.js";
 
 const SEARCH = "search_sound_library_tool";
 const GENERATE = "generate_sfx_tool";
@@ -126,16 +124,6 @@ function resultLine(m: KitMatch): string {
   );
 }
 
-/** The kit sounds on the timeline, for the variety rules. */
-function kitUses(project: Parameters<typeof pictureEnd>[0]): { id: number; at: number }[] {
-  return project.clips.flatMap((clip) => {
-    if (!isSfxClip(clip)) return [];
-    const file = fileById(project, String(clip.file_id));
-    const id = file ? recordedIdOfKey(markOf(file)?.key) : undefined;
-    return id !== undefined ? [{ id, at: clip.position }] : [];
-  });
-}
-
 /** A generated sound's credit: no licence to cite, but where it came from and on what terms stays on the file. */
 function generatedCredit(prompt: string, gen: { provider: string; model: string; key: string; licence: string; termsUrl: string }): SfxCredit {
   const credit = {
@@ -177,7 +165,7 @@ export const soundKitTools: CatalogTool[] = [
       const count = args.count ?? 8;
       let ordered = matches;
       if (args.near_seconds !== undefined && matches.length > 0) {
-        const pick = pickVaried(matches.map((m) => m.sample), kitUses(call.doc.project), args.near_seconds);
+        const pick = pickVaried(matches.map((m) => m.sample), kitUsesOf(call.doc.project), args.near_seconds);
         ordered = [...matches.filter((m) => m.sample.id === pick?.id), ...matches.filter((m) => m.sample.id !== pick?.id)];
       }
       const shown = ordered.slice(0, count);

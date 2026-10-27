@@ -8,7 +8,7 @@ import { Rng } from "../sfx/dsp.js";
 import { isSfxClip } from "../sfx/moments.js";
 import { recordedSample } from "../sfx/recorded.js";
 import { runTool } from "./registry.js";
-import { recordedIdOfKey } from "./sfx-recorded.js";
+import { kitUsesOf, recordedIdOfKey } from "./sfx-recorded.js";
 import { markOf } from "./sfx-media.js";
 import { fakeHost, type FakeHost } from "./test-support/fake-host.js";
 import { media, videoInfo } from "./test-support/fixture.js";
@@ -166,6 +166,24 @@ describe("add_sfx_tool with the recorded kit", () => {
     const elsewhere = await runTool({ doc: edit(), host: fakeHost() }, "add_sfx_tool", { provider: "kit", sound_id: found.pick, at_seconds: 1 });
     expect(elsewhere.ok).toBe(false);
     expect(elsewhere.text).toMatch(/cannot fetch Zenvi's recorded kit/);
+  });
+
+  it("counts a placed kit sound at its hit point, not where its pre-roll starts", async () => {
+    // Regression: the variety rules read clip starts, so a whoosh peaking on 2 s counted as 0.4 s earlier than the moments asked about.
+    const doc = edit();
+    const host = kitHost();
+    host.audio!.decodePcm = async () => {
+      const sr = 44100;
+      const rng = new Rng(9);
+      const samples = Float32Array.from({ length: Math.round(0.6 * sr) }, (_, i) => rng.bipolar() * 0.5 * (i < 0.4 * sr ? (i / (0.4 * sr)) ** 2 : Math.exp(-(i - 0.4 * sr) / (0.03 * sr))));
+      return { sampleRate: sr, samples };
+    };
+    const placed = await runTool({ doc, host }, "add_sfx_tool", { recipe: "whoosh_short", at_seconds: 2 });
+    expect(placed.ok, placed.text).toBe(true);
+    const [clip] = sfxClips(doc);
+    expect(clip!.position).toBeLessThan(1.8);
+    const [use] = kitUsesOf(doc.project);
+    expect(use).toEqual({ id: kitIdOf(doc, clip!), at: expect.closeTo(2, 3) });
   });
 
   it("lists the library's categories when asked for nothing in particular", async () => {

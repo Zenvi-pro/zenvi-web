@@ -37,7 +37,7 @@ import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged, type ReceiptClip } from "../receipt.js";
 import { lookupLibrarySound, prepareLibrarySfx } from "../sfx-library.js";
-import { kitRequests, prepareKitSfx, prepareRecordedSfx, recordedIdOfKey, recordedKitAvailable, resolveSfxKit } from "../sfx-recorded.js";
+import { kitRequests, kitUsesOf, prepareKitSfx, prepareRecordedSfx, recordedKitAvailable, resolveSfxKit } from "../sfx-recorded.js";
 import { markOf, pictureEnd, placeSfx, prepareSfx, removeUnusedSfxFiles, snapToFrame, type PlacedSfx, type PreparedSfx } from "../sfx-media.js";
 import { fileById } from "./common.js";
 import { clipTitle } from "./timeline-edit-common.js";
@@ -311,12 +311,6 @@ async function soundsOf(
   return { sounds: out as PreparedSfx[], recorded: made.recorded };
 }
 
-/** The recorded kit sound playing a clip, if it plays one. */
-function recordedIdOfClip(project: Project, clip: Clip): number | undefined {
-  const file = fileById(project, String(clip.file_id));
-  return file ? recordedIdOfKey(markOf(file)?.key) : undefined;
-}
-
 /**
  * add_sfx_tool's recorded kit sound for `recipe` at `at`: the group's least
  * used, never the kit sound right before or after the moment, nor one
@@ -331,11 +325,7 @@ async function recordedFor(call: ToolCall, recipe: string, args: AddInput, at: n
     warnings.push("This surface cannot fetch the recorded kit, so the sound is synthesised.");
     return undefined;
   }
-  const project = call.doc.project;
-  const used = project.clips.flatMap((clip) => {
-    const id = isSfxClip(clip) ? recordedIdOfClip(project, clip) : undefined;
-    return id !== undefined ? [{ id, at: clip.position }] : [];
-  });
+  const used = kitUsesOf(call.doc.project);
   const sample = pickRecordedOne({ recipe, seconds: args.duration, at }, args.seed ?? 1, used);
   if (!sample) return undefined;
   try {
@@ -349,8 +339,7 @@ async function recordedFor(call: ToolCall, recipe: string, args: AddInput, at: n
 
 /** A kit sound picked by id (search_sound_library_tool), varied by how often it already plays on the timeline. */
 async function placedKitSound(call: ToolCall, sample: RecordedSample, recipe: string, at: number, args: AddInput): Promise<PreparedSfx> {
-  const project = call.doc.project;
-  const uses = project.clips.filter((clip) => isSfxClip(clip) && recordedIdOfClip(project, clip) === sample.id && Math.abs(clip.position - at) > 1e-3).length;
+  const uses = kitUsesOf(call.doc.project).filter((u) => u.id === sample.id && Math.abs(u.at - at) > 1e-3).length;
   return prepareRecordedSfx(call, sample, recipe, args.max_seconds ?? recordedMaxSeconds(sample.group, undefined), kitVariation(sample.id, uses, args.seed ?? 1));
 }
 
