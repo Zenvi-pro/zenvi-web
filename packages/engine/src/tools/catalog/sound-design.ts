@@ -27,6 +27,7 @@ import { CLIMAX_TAIL, SFX_DENSITIES, SFX_INTENSITIES, musicClimax, planSoundDesi
 import { KIT_SLOTS, KIT_SLOT_SPECS, applyKit, guessSlot, kitFileIds, proceduralKit, rawSoundKit, readSoundKit, slotOfRecipe, slotRecipe, type KitPick, type KitSlot, type SoundKit } from "../../sfx/kit.js";
 import { SFX_PROVIDERS, allowsCommercialUse } from "../../sfx/library.js";
 import { SFX_RECIPES, SFX_RECIPE_IDS, sfxRecipe, type SfxFamily } from "../../sfx/recipes.js";
+import { SFX_KITS, pickRecordedOne, recordedGroupOf, recordedMaxSeconds, recordedSample, type SfxKit } from "../../sfx/recorded.js";
 import type { SfxParams } from "../../sfx/render.js";
 import { fpsFloat } from "../../timeline/time.js";
 import { getEffectiveAiMetadata } from "../ai-metadata.js";
@@ -35,6 +36,7 @@ import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged, type ReceiptClip } from "../receipt.js";
 import { lookupLibrarySound, prepareLibrarySfx } from "../sfx-library.js";
+import { kitRequests, prepareKitSfx, prepareRecordedSfx, recordedIdOfKey, recordedKitAvailable, resolveSfxKit } from "../sfx-recorded.js";
 import { markOf, pictureEnd, placeSfx, prepareSfx, removeUnusedSfxFiles, snapToFrame, type PlacedSfx, type PreparedSfx } from "../sfx-media.js";
 import { fileById } from "./common.js";
 import { clipTitle } from "./timeline-edit-common.js";
@@ -88,6 +90,13 @@ const addInput = z.strictObject({
     .describe("Library sounds: what it plays; its hit point and level follow (whoosh, swish, whip peak on the moment; hit, boom, sub, click, pop, glitch start on it; riser ends on it). Default: from its title and tags."),
   max_seconds: z.number().positive().max(15).optional().describe("Library sounds: the longest it may run, seconds (default: the role's longest, e.g. 3 s for a whoosh)."),
   allow_noncommercial: z.boolean().optional().describe("Library sounds: accept a non-commercial licence (default false: refused)."),
+  kit: z
+    .enum(SFX_KITS)
+    .optional()
+    .describe(
+      "With a recipe: recorded (default where this surface can fetch it, unless pitch, brightness, intensity or pan shape a synthesised one) plays a real CC0 recording of that sound from Zenvi's kit, a different one than the kit sounds next to it; " +
+        "synth synthesises the recipe. Recipes the kit has no recording of (sub_drop, sparkle, riser_tonal...) are synthesised.",
+    ),
   at_seconds: z.number().min(0).optional().describe("Timeline time of the moment, seconds."),
   clip_id: z.string().min(1).optional().describe("Or: a timeline clip whose edge is the moment."),
   edge: z.enum(["start", "end"]).optional().describe("With clip_id: the clip's start (default) or end."),
@@ -106,9 +115,16 @@ const autoInput = z.strictObject({
     .enum(SFX_SOURCES)
     .optional()
     .describe(
-      "Where the sounds come from: kit (default when the project has a sound kit: every cue plays through it), procedural (default otherwise: synthesised here, no kit), " +
+      "Where the sounds come from: kit (default when the project has a sound kit: every cue plays through it), procedural (default otherwise: Zenvi's own sounds, see kit), " +
         "library (licensed library sounds for every role, CC0 or commercial-use licences, credits recorded) or mixed (library whooshes, hits and risers; synthesised clicks, pops and subs). " +
         "library and mixed use the kit's library sounds when it has them, else pick them now.",
+    ),
+  kit: z
+    .enum(SFX_KITS)
+    .optional()
+    .describe(
+      "Zenvi's own sounds: recorded (default where this surface can fetch it: real CC0 recordings, whooshes, punches, clicks, shutters, typing, never the same sample twice in a row; fetched once and cached) " +
+        "or synth (synthesised here, works offline). Plays every cue not taken from a library; sub drops, sparkles and tonal risers stay synthesised. Not with a project sound kit (sources=kit).",
     ),
   intensity: z
     .enum(SFX_INTENSITIES)
@@ -260,8 +276,20 @@ function kitFileSound(project: Project, fileId: string): PreparedSfx | undefined
   return { key: mark.key, recipe: mark.recipe, hit: mark.hit, duration: typeof mark.duration === "number" ? mark.duration : Number(file.duration) || 0, fileId, title: credit?.title ?? String(file.name ?? ""), credit };
 }
 
-/** One sound per cue: procedural picks rendered (or reused), library picks from the bin or this run's downloads; a kit sound no longer in the project is synthesised instead. */
-async function soundsOf(call: ToolCall, picks: readonly KitPick[], cues: readonly SfxCue[], pending: ReadonlyMap<string, PreparedSfx>, warnings: string[]): Promise<PreparedSfx[]> {
+/**
+ * One sound per cue: procedural picks played through the recorded kit where
+ * it has the sound (kit=recorded) or rendered (or reused), library picks
+ * from the bin or this run's downloads; a kit sound no longer in the project
+ * is synthesised instead. `recorded` counts the recorded kit's.
+ */
+async function soundsOf(
+  call: ToolCall,
+  picks: readonly KitPick[],
+  cues: readonly SfxCue[],
+  pending: ReadonlyMap<string, PreparedSfx>,
+  warnings: string[],
+  own: { kit: SfxKit; seed: number },
+): Promise<{ sounds: PreparedSfx[]; recorded: number }> {
   const out: (PreparedSfx | undefined)[] = picks.map((pick) => (pick.kind === "library" ? (pending.get(pick.sound.file_id) ?? kitFileSound(call.doc.project, pick.sound.file_id)) : undefined));
   const missing = new Set<string>();
   const requests = picks.map((pick, i) => {
@@ -274,9 +302,47 @@ async function soundsOf(call: ToolCall, picks: readonly KitPick[], cues: readonl
   });
   if (missing.size > 0) warnings.push(`The kit's ${[...missing].map((t) => `'${t}'`).join(", ")} ${missing.size === 1 ? "is" : "are"} no longer in the project: synthesised instead (create_sound_kit_tool makes the kit again).`);
   const todo = requests.flatMap((r, i) => (r ? [{ r, i }] : []));
-  const rendered = await prepareSfx(call, todo.map((t) => t.r));
-  todo.forEach((t, k) => (out[t.i] = rendered[k]));
-  return out as PreparedSfx[];
+  const made = await prepareKitSfx(call, kitRequests(todo.map((t) => t.r), own.kit, own.seed), warnings);
+  todo.forEach((t, k) => (out[t.i] = made.sounds[k]));
+  return { sounds: out as PreparedSfx[], recorded: made.recorded };
+}
+
+/** The recorded kit sound playing a clip, if it plays one. */
+function recordedIdOfClip(project: Project, clip: Clip): number | undefined {
+  const file = fileById(project, String(clip.file_id));
+  return file ? recordedIdOfKey(markOf(file)?.key) : undefined;
+}
+
+/**
+ * add_sfx_tool's recorded kit sound for `recipe` at `at`: the group's next
+ * after the ones already on the timeline, never the kit sound right before
+ * or after the moment. Undefined (synthesise) with kit=synth, for recipes
+ * the kit has no recording of, or when it cannot be fetched (said in
+ * `warnings`).
+ */
+async function recordedFor(call: ToolCall, recipe: string, args: AddInput, at: number, warnings: string[]): Promise<PreparedSfx | undefined> {
+  const group = recordedGroupOf(recipe);
+  if (resolveSfxKit(call.host, args.kit) !== "recorded" || !group) return undefined;
+  if (!recordedKitAvailable(call.host)) {
+    warnings.push("This surface cannot fetch the recorded kit, so the sound is synthesised.");
+    return undefined;
+  }
+  const project = call.doc.project;
+  const placed = project.clips
+    .filter(isSfxClip)
+    .map((clip) => ({ clip, id: recordedIdOfClip(project, clip) }))
+    .filter((p): p is { clip: Clip; id: number } => p.id !== undefined && recordedSample(p.id)?.group === group)
+    .sort((a, b) => a.clip.position - b.clip.position);
+  const before = placed.filter((p) => p.clip.position <= at).at(-1);
+  const after = placed.find((p) => p.clip.position > at);
+  const sample = pickRecordedOne({ recipe, seconds: args.duration }, args.seed ?? 1, placed.length, [before?.id, after?.id].filter((id): id is number => id !== undefined));
+  if (!sample) return undefined;
+  try {
+    return await prepareRecordedSfx(call, sample, recipe, recordedMaxSeconds(group, args.duration));
+  } catch (error) {
+    warnings.push(`The recorded kit sound could not be fetched (${errorText(error)}), so it is synthesised.`);
+    return undefined;
+  }
 }
 
 export const soundDesignTools: CatalogTool[] = [
@@ -330,6 +396,9 @@ export const soundDesignTools: CatalogTool[] = [
       if (procedural && libraryOnly.length > 0) return refused(ADD, `Error: ${libraryOnly.join(", ")} ${libraryOnly.length === 1 ? "goes" : "go"} with a library sound, not a recipe.`);
       const synthOnly = (Object.keys(paramShape) as (keyof typeof paramShape)[]).filter((k) => args[k] !== undefined);
       if (!procedural && synthOnly.length > 0) return refused(ADD, `Error: ${synthOnly.join(", ")} shape procedural recipes; a library sound plays as it is (role, max_seconds and gain_db apply).`);
+      if (!procedural && args.kit) return refused(ADD, "Error: kit goes with a recipe; a library sound plays as it is.");
+      const shaping = (["pitch", "brightness", "intensity", "pan"] as const).filter((k) => args[k] !== undefined);
+      if (args.kit === "recorded" && shaping.length > 0) return refused(ADD, `Error: ${shaping.join(", ")} ${shaping.length === 1 ? "shapes" : "shape"} a synthesised sound; kit=recorded plays a recording (duration and seed apply). Pass kit=synth.`);
       if (!call.host.media?.writeGenerated) return refused(ADD, "Error: add_sfx_tool is not available in this Zenvi surface: it cannot store generated audio.");
       let at: number;
       let moment: string;
@@ -354,6 +423,7 @@ export const soundDesignTools: CatalogTool[] = [
       // Past the picture nothing fits: refused before any library is reached (the exact checks follow).
       if (until !== undefined && at > until + 1e-6) return refused(ADD, pastPicture(at, until));
 
+      const warnings: string[] = [];
       // A library sound is looked up again (its licence is the library's word, not the caller's), then downloaded and conditioned.
       let library: Awaited<ReturnType<typeof lookupLibrarySound>> | undefined;
       let role: KitSlot | undefined;
@@ -377,7 +447,10 @@ export const soundDesignTools: CatalogTool[] = [
       let sound: PreparedSfx & { prep?: { trimmedHead: number; trimmedTail: number; gainDb: number } };
       try {
         if (library && typeof library !== "string") sound = await prepareLibrarySfx(call, library, recipe.id, args.max_seconds ?? KIT_SLOT_SPECS[role!].seconds[1]);
-        else [sound] = (await prepareSfx(call, [{ recipe: recipe.id, params: paramsOf(args) }])) as [PreparedSfx];
+        else {
+          const recorded = shaping.length > 0 ? undefined : await recordedFor(call, recipe.id, args, at, warnings);
+          [sound] = recorded ? [recorded] : ((await prepareSfx(call, [{ recipe: recipe.id, params: paramsOf(args) }])) as [PreparedSfx]);
+        }
       } catch (error) {
         return failed(ADD, `Error: failed to ${library ? "download the library sound" : "store the sound effect"}: ${errorText(error)}`);
       }
@@ -399,11 +472,12 @@ export const soundDesignTools: CatalogTool[] = [
       return applied(
         ADD,
         `Added ${name} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (${gainDb} dB).` +
-          (sound.credit ? ` ${sound.credit.license_name}${sound.credit.attribution_required ? ": credit it (list_credits_tool)" : ", no credit needed"}.` : "") +
+          (sound.credit ? ` ${library ? "" : "A recording from Zenvi's kit, "}${sound.credit.license_name}${sound.credit.attribution_required ? ": credit it (list_credits_tool)" : ", no credit needed"}.` : "") +
           (trimmed > 0 ? ` Its last ${trimmed.toFixed(2)} s would run past the picture, so it ends with it at ${until!.toFixed(2)} s, faded over ${fadeOut.toFixed(2)} s.` : ""),
         {
-          clips: [clipRow(call.doc.project, clip, { recipe: recipe.id, hit_seconds: hitAt, gain_db: gainDb, ...trim })],
-          data: { clip_id: clip.id, file_id: clip.file_id, recipe: recipe.id, ...(sound.params ? { params: sound.params } : {}), hit_seconds: hitAt, gain_db: gainDb, cached, ...trim, ...credit },
+          warnings,
+          clips: [clipRow(call.doc.project, clip, { recipe: recipe.id, ...libraryOf(sound), hit_seconds: hitAt, gain_db: gainDb, ...trim })],
+          data: { clip_id: clip.id, file_id: clip.file_id, recipe: recipe.id, ...(procedural ? { kit: sound.credit ? "recorded" : "synth" } : {}), ...(sound.params ? { params: sound.params } : {}), hit_seconds: hitAt, gain_db: gainDb, cached, ...trim, ...credit },
         },
       );
     },
@@ -425,6 +499,7 @@ export const soundDesignTools: CatalogTool[] = [
       const projectKit = readSoundKit(project);
       const sources: SfxSources = args.sources ?? (projectKit ? "kit" : "procedural");
       if (sources === "kit" && !projectKit) return refused(AUTO, "Error: the project has no sound kit: make one with create_sound_kit_tool, or pass sources=procedural.");
+      if (sources === "kit" && args.kit) return refused(AUTO, "Error: kit goes with Zenvi's own sounds, not the project's sound kit (sources=kit plays the kit's): pass sources=procedural to use it.");
       const pickNow = (sources === "library" || sources === "mixed") && projectKit?.source !== sources;
       if (pickNow && (!call.host.media.importUrl || !call.host.audio?.decodePcm || (!call.host.library && !call.host.stock))) {
         return refused(AUTO, `Error: sources=${sources} is not available in this Zenvi surface: it cannot search, download and decode library sounds. Use sources=procedural.`);
@@ -471,9 +546,12 @@ export const soundDesignTools: CatalogTool[] = [
         for (const [key, sound] of filled.pending) pending.set(key, sound);
       }
       const picks: KitPick[] = kit ? applyKit(kit, cues) : cues.map((c) => ({ kind: "procedural", recipe: c.recipe, params: c.params }));
+      const ownKit = sources === "kit" ? "synth" : resolveSfxKit(call.host, args.kit);
+      if (args.kit === "recorded" && !recordedKitAvailable(call.host)) warnings.push("This surface cannot fetch the recorded kit, so the sounds are synthesised.");
       let sounds: PreparedSfx[];
+      let recorded = 0;
       try {
-        sounds = await soundsOf(call, picks, cues, pending, warnings);
+        ({ sounds, recorded } = await soundsOf(call, picks, cues, pending, warnings, { kit: ownKit, seed: args.seed ?? 1 }));
       } catch (error) {
         return failed(AUTO, `Error: failed to store the sound effects: ${errorText(error)}`);
       }
@@ -508,6 +586,7 @@ export const soundDesignTools: CatalogTool[] = [
         placed.rows.length === 0
           ? `Removed the ${previous.length} effects of the last run: no moment of this edit is strong enough at ${intensity} intensity.`
           : `Sound-designed the edit (${intensity}${args.density === "every_cut" ? ", every cut" : ""}${kit ? `, ${kit === projectKit ? `sound kit '${kit.name}'` : `${sources} sounds`}` : ""}): ${placed.rows.length} effects — ${familyCounts(placed.rows.map((r) => r.cue))}` +
+            (recorded > 0 ? `; ${recorded} recorded (CC0 kit)` : "") +
             (cutTimes.length > 0 ? `; ${sounded} of ${cutTimes.length} cuts have a sound` : "") +
             (plan.climax !== null ? `, ${plan.riser ? "a build into the climax and an impact on it" : "an impact on the climax"} at ${plan.climax.toFixed(2)} s` : "") +
             (previous.length > 0 ? `; replaced ${previous.length} from the last run` : "") +
@@ -525,6 +604,7 @@ export const soundDesignTools: CatalogTool[] = [
           // `at` is the moment; `hit_seconds` where the sound's hit plays (later when the moment is too early for its lead-in).
           sources,
           kit: kit ? { name: kit.name, source: kit.source, stored: kit === projectKit } : null,
+          own_sounds: sources === "kit" ? null : { kit: ownKit, recorded },
           cues: placed.rows.map(({ clip, cue, hit, trimmed, sound, gainDb }) => ({ clip_id: clip.id, recipe: sound.recipe, ...libraryOf(sound), at: cue.at, hit_seconds: hit, gain_db: gainDb, reason: cue.reason, ...trimOf(trimmed) })),
           picture_end: duration,
           music: bed ? { clip_id: bed.id, bpm: music.bpm ?? null, beats_analysed: music.grid !== null } : null,

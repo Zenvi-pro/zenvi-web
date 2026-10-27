@@ -21,6 +21,7 @@ import {
   readFreesoundSound,
   readOpenverseAudio,
   readOpenverseSearch,
+  type SfxCredit,
   type SfxLibraryProvider,
   type SfxLibraryResult,
   type SfxSearchFilters,
@@ -29,6 +30,7 @@ import { sfxRecipe } from "../sfx/recipes.js";
 import { framePad, padSfx } from "../sfx/render.js";
 import type { FreesoundSound } from "../stock/stock.js";
 import { fpsFloatOf } from "./catalog/common.js";
+import type { Project } from "../model/types.js";
 import type { ToolCall } from "./define.js";
 import { markOf, type PreparedSfx } from "./sfx-media.js";
 import type { LibraryHost } from "./types.js";
@@ -168,12 +170,8 @@ export async function prepareLibrarySfx(call: ToolCall, result: LibraryResult, r
   const key = libraryKey(result.provider, result.id, recipe.id, maxSeconds, fps);
   const credit = creditOf(result);
   const title = result.title.slice(0, 120);
-  for (const file of project.files) {
-    const mark = markOf(file);
-    if (mark?.key === key && typeof mark.hit === "number") {
-      return { key, recipe: recipe.id, hit: mark.hit, duration: typeof mark.duration === "number" ? mark.duration : Number(file.duration) || 0, fileId: String(file.id), title, credit };
-    }
-  }
+  const cached = cachedSfx(project, key, title, credit);
+  if (cached) return cached;
   const media = call.host.media;
   if (!media?.importUrl || !media.writeGenerated) throw new Error("this surface cannot download library sounds.");
   if (!call.host.audio?.decodePcm) throw new Error("this surface cannot decode audio, so library sounds cannot be trimmed and levelled here.");
@@ -182,20 +180,49 @@ export async function prepareLibrarySfx(call: ToolCall, result: LibraryResult, r
   const ext = /\.(mp3|ogg|oga|wav|flac|m4a|aac|opus)(?:$|\?)/i.exec(result.preview_url)?.[1]?.toLowerCase() ?? "mp3";
   const stem = `${result.provider}_${result.id.slice(0, 36)}`.replace(/[^\w-]/g, "_");
   const downloaded = await media.importUrl(result.preview_url, { filename: `${stem}.${ext}`, signal: call.signal });
-  const pcm = await call.host.audio.decodePcm(downloaded.path, { sampleRate: SFX_SAMPLE_RATE, channels: 2, maxSeconds: MAX_DECODE_SECONDS, signal: call.signal });
-  const conditioned = conditionSfx({ sampleRate: pcm.sampleRate, left: pcm.samples, right: pcm.right }, { hit: recipe.hit, maxSeconds, targetRms: recipeLoudness(recipe.id) });
-  if (!conditioned) throw new Error(`${result.provider} sound ${result.id} is silent.`);
+  return conditionedSfxFile(call, downloaded.path, { key, recipeId: recipe.id, maxSeconds, stem, title, credit, what: `${result.provider} sound ${result.id}` });
+}
+
+/**
+ * A downloaded sound file decoded, conditioned for `recipeId` (its hit
+ * point and loudness), padded to the frame grid and written back as WAV,
+ * ready to place. Throws with words when it cannot be decoded or is silent.
+ */
+export async function conditionedSfxFile(
+  call: ToolCall,
+  source: string,
+  o: { key: string; recipeId: string; maxSeconds: number; stem: string; title: string; credit: SfxCredit; what: string },
+): Promise<PreparedSfx & { prep: LibraryPrep }> {
+  const media = call.host.media;
+  if (!media?.writeGenerated) throw new Error("this surface cannot store generated audio.");
+  if (!call.host.audio?.decodePcm) throw new Error("this surface cannot decode audio, so library sounds cannot be trimmed and levelled here.");
+  const recipe = sfxRecipe(o.recipeId)!;
+  const fps = fpsFloatOf(call.doc.project);
+  const pcm = await call.host.audio.decodePcm(source, { sampleRate: SFX_SAMPLE_RATE, channels: 2, maxSeconds: MAX_DECODE_SECONDS, signal: call.signal });
+  const conditioned = conditionSfx({ sampleRate: pcm.sampleRate, left: pcm.samples, right: pcm.right }, { hit: recipe.hit, maxSeconds: o.maxSeconds, targetRms: recipeLoudness(recipe.id) });
+  if (!conditioned) throw new Error(`${o.what} is silent.`);
   const audio = padSfx(conditioned, framePad(conditioned.hit, fps));
-  const path = await media.writeGenerated(`sfx-${stem}-${recipe.id}-${Math.round(maxSeconds * 100)}-${Math.round(fps * 100)}-v${SFX_CONDITION_VERSION}.wav`, encodeWav([audio.left, audio.right], audio.sampleRate), "audio/wav");
+  const path = await media.writeGenerated(`sfx-${o.stem}-${recipe.id}-${Math.round(o.maxSeconds * 100)}-${Math.round(fps * 100)}-v${SFX_CONDITION_VERSION}.wav`, encodeWav([audio.left, audio.right], audio.sampleRate), "audio/wav");
   const info = await media.probe(path);
   return {
-    key,
+    key: o.key,
     recipe: recipe.id,
     hit: audio.hit,
     duration: audio.duration,
-    media: { path, info: { ...info, media_type: "audio", has_video: false, has_audio: true }, name: `SFX ${title}` },
-    title,
-    credit,
+    media: { path, info: { ...info, media_type: "audio", has_video: false, has_audio: true }, name: `SFX ${o.title}` },
+    title: o.title,
+    credit: o.credit,
     prep: { trimmedHead: conditioned.trimmedHead, trimmedTail: conditioned.trimmedTail, gainDb: conditioned.gainDb },
   };
+}
+
+/** The bin's file made for `key` before, as a sound to place; undefined when there is none. */
+export function cachedSfx(project: Project, key: string, title: string, credit: SfxCredit): PreparedSfx | undefined {
+  for (const file of project.files) {
+    const mark = markOf(file);
+    if (mark?.key === key && typeof mark.hit === "number") {
+      return { key, recipe: String(mark.recipe), hit: mark.hit, duration: typeof mark.duration === "number" ? mark.duration : Number(file.duration) || 0, fileId: String(file.id), title, credit };
+    }
+  }
+  return undefined;
 }

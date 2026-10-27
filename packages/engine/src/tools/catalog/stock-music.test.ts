@@ -179,3 +179,16 @@ describe("search_freesound_music_tool by tempo", () => {
     }
   });
 });
+
+describe("search_freesound_music_tool licences", () => {
+  const sounds = () => [sound(31), sound(32, "http://creativecommons.org/licenses/by-nc/4.0/"), sound(33, "http://creativecommons.org/licenses/by/4.0/")];
+  it("keeps only commercial-use licences by default, CC0 only with licence=cc0, everything with licence=any", async () => {
+    const plain = await search({ query: "loop" }, musicHost({ sounds: sounds() }));
+    expect(plain.data.results.map((r) => r.sound_id)).toEqual([31, 33]);
+    expect(plain.warnings.join(" ")).toMatch(/1 of 3 results dropped: not licensed for commercial use/);
+    const cc0 = await search({ query: "loop", licence: "cc0" }, musicHost({ sounds: sounds() }));
+    expect(cc0.data.results.map((r) => r.sound_id)).toEqual([31]);
+    const any = await search({ query: "loop", licence: "any" }, musicHost({ sounds: sounds() }));
+    expect(any.data.results.map((r) => r.sound_id)).toEqual([31, 33, 32]);
+  });
+});

@@ -90,10 +90,22 @@ too quiet and nobody has looked at the file.
    (`build_reel_tool`'s hype and highlight styles do it in their own step).
    Soft presets (`sunny`,
    `warm_up`...) replace the corrective grade: not after unifying. Grain
-   only on cinematic pieces.
+   only on cinematic pieces. Stylised looks go through `apply_look_tool`
+   too: `solarize` (a flash frame or one hype shot), `chrome` (silver
+   metal), `bleach_bypass`, `duotone` / `"duotone #rrggbb #rrggbb"` (promo
+   landscapes), `accent_red` / `"accent #rrggbb"` (one colour kept; a
+   different accent per shot for a sequence). Frame them with
+   `add_vignette_tool` (cinematic: amount 0.3-0.5) and
+   `add_shape_mask_tool` (feathered box or ellipse windows, iris and box
+   reveals with `keyframes` on `grow`).
 10. **Sound, last.** When the picture is locked: `auto_sound_design_tool`
     (`intensity`, `beats`, `climax_seconds`), then `add_sfx_tool` for what it
-    cannot know (typing, a click, the landing). Music at full level unless
+    cannot know (typing, a click, a shutter, the landing). Both play real
+    CC0 recordings from Zenvi's kit by default (`kit: "recorded"`; no
+    Freesound search needed, never the same sample twice in a row); keep
+    `kit: "synth"` for tonal risers and sub drops you shape with pitch.
+    Music from `search_freesound_music_tool` is commercial-use by default;
+    `licence: "cc0"` for no credit at all. Music at full level unless
     there is speech (`duck_under_speech_tool`).
 11. **Master, always last.** `master_audio_tool` (`preset: "social"`, -14
     LUFS / -1 dBTP) after the last audio change; any later audio edit means

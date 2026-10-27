@@ -18,6 +18,7 @@ import { probe } from "../probe/probe.js";
 import { projectAssetsDir, sequenceFramesPresent } from "@zenvi/engine";
 import { cacheDir } from "../svg/fonts.js";
 import { isInside } from "./paths.js";
+import { createKitSampleCache } from "./sfx-kit.js";
 import { createWebVideoFetcher } from "./web-video.js";
 
 /**
@@ -283,6 +284,8 @@ export function createNodeMediaHost(options: NodeMediaOptions): MediaHost {
         throw error;
       }
     },
+
+    kitSample: createKitSampleCache({ cacheRoot: options.cacheRoot ?? cacheDir(options.env), fetchImpl: options.fetchImpl }),
 
     fetchWebVideo:
       options.fetchWebVideo ??

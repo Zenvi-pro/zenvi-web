@@ -61,7 +61,8 @@ describe("color_agent.py, replayed", () => {
   it("the looks catalog, a merge, sample counts and a soft preset match the desktop", () => {
     expect(listLooksCatalog("teal orange")).toEqual(golden.looks_teal_orange);
     expect((listLooksCatalog("sunny").looks as Json[]).map((e) => e.id)).toEqual(golden.looks_sunny_ids);
-    expect(listLooksCatalog().count).toBe(golden.looks_count);
+    // The web's stylised looks (looks/stylized.ts) come on top of the desktop's catalog.
+    expect((listLooksCatalog().looks as Json[]).filter((e) => e.kind !== "generated")).toHaveLength(golden.looks_count);
     const merged = mergeColorGrade(blankColorGrade("e1"), {
       temperature_delta: 0.08,
       exposure: "0.2",

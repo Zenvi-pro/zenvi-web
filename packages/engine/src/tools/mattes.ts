@@ -164,15 +164,25 @@ export interface GeneratedAsset {
   media: ImportedMedia;
 }
 
-/** Where an earlier run stored a generated file with this hash (a bin file, or a LUT effect's `lut_path`). */
+/**
+ * Where an earlier run stored a generated file with this hash (a bin file,
+ * or an effect's `lut_path` / `mask_reader`). An effect keeps its mark when
+ * another tool later points it at a different file (a LUT graded over a
+ * look), so its path counts only while it still names the hash (writeAsset).
+ */
 function knownAsset(project: Project, hash: string): string | undefined {
   const file = project.files.find((f) => (f as Record<string, unknown>)[ASSET_KEY] === hash);
   if (file) return file.path;
-  const lut = project.clips.flatMap((c) => c.effects ?? []).find((e) => (e as Record<string, unknown>)[ASSET_KEY] === hash)?.lut_path;
-  return typeof lut === "string" && lut ? lut : undefined;
+  for (const effect of project.clips.flatMap((c) => c.effects ?? []) as Record<string, unknown>[]) {
+    if (effect[ASSET_KEY] !== hash) continue;
+    const path = effect.lut_path || (effect.mask_reader as { path?: unknown } | undefined)?.path;
+    if (typeof path === "string" && path.includes(hash.slice(0, 8))) return path;
+  }
+  return undefined;
 }
 
-async function writeAsset(call: ToolCall, stem: string, ext: string, text: string, contentType: string): Promise<{ hash: string; path: string }> {
+/** Write (or reuse: same content, same file) a generated asset; effects that read it carry `ASSET_KEY: hash`. */
+export async function writeAsset(call: ToolCall, stem: string, ext: string, text: string, contentType: string): Promise<{ hash: string; path: string }> {
   const hash = contentHash(`${contentType}\n${text}`);
   const known = knownAsset(call.doc.project, hash);
   if (known) return { hash, path: known };

@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { SFX_LICENSE_FILTERS, allowedLicenses, licenseCode } from "../../sfx/library.js";
 import { matchTempo, parseTempoRange, rangeAround, splitTempoFromQuery, tempoDistance } from "../../stock/music.js";
 import { clockTime, licenceName, licenceRank, pickStockFile, previewOf, type FreesoundSound } from "../../stock/stock.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
@@ -118,8 +119,7 @@ export const stockTools: CatalogTool[] = [
     name: "search_freesound_music_tool",
     title: "Search stock music",
     description:
-      "Search Freesound music and sound effects. Returns ids, durations, licences and MP3 preview URLs, open licences first (CC0, then CC BY; " +
-      "non-commercial last), then longer tracks. With bpm, bpm_range or energy, the previews are downloaded and measured (where the surface can) and each result gets its tempo (bpm, confidence, other octave readings), level (loudness_db) and energy; a plain search is not measured. " +
+      "Search Freesound music and sound effects. Returns ids, durations, licences and MP3 preview URLs, licensed for commercial use by default (licence: cc0, commercial-ok, any), CC0 first, then longer tracks. With bpm, bpm_range or energy, the previews are downloaded and measured (where the surface can) and each result gets its tempo (bpm, confidence, other octave readings), level (loudness_db) and energy; a plain search is not measured. " +
       "Do not put a tempo in the query (Freesound matches words, so '128 bpm' finds pages that mention a number): give bpm or bpm_range and the tracks are filtered by their measured tempo, " +
       "a half- or double-time reading counts. Words like '120 bpm' in the query are moved to bpm_range for you. " +
       "To add one: import_stock_media_tool with source='freesound', its sound_id and preview_url. Credit CC BY sounds (user and link) wherever the video is published.",
@@ -140,6 +140,10 @@ export const stockTools: CatalogTool[] = [
         .describe("Wanted tempo range, [min, max] or 'min-max' BPM (instead of bpm), e.g. '150-170' for a hype cut."),
       mood: z.string().trim().max(100).optional().describe("Mood words added to the search, e.g. 'dark energetic'. Dropped if they leave no results."),
       energy: z.enum(["low", "medium", "high"]).optional().describe("Keep tracks of this energy (level and how hard the beats hit, measured); hype cuts want high."),
+      licence: z
+        .enum(SFX_LICENSE_FILTERS)
+        .optional()
+        .describe("Licences kept: cc0 (public domain only, no credit), commercial-ok (default: CC0, CC BY, CC BY-SA, fine in a paid video with credit) or any (non-commercial ones too, for a video nobody sells)."),
     }),
     annotations: SEARCH,
     requires: ["stock"],
@@ -169,7 +173,9 @@ export const stockTools: CatalogTool[] = [
       if (filtering && !measuring) warnings.push("bpm / energy filters are not applied: this surface cannot measure audio previews. Check the results by ear or pick by tags.");
 
       // Mood words narrow the search; Freesound wants every word, so retry without them when nothing matches.
-      const pageSize = measuring ? 60 : Math.min(30, n * 2);
+      const licence = args.licence ?? "commercial-ok";
+      // Licences are filtered here, so CC0 only asks for more to filter.
+      const pageSize = measuring || licence === "cc0" ? 60 : Math.min(30, n * 2);
       const minSeconds = Number(args.min_seconds ?? 0);
       let found = await searchFreesound(call, args.mood ? `${typed.query} ${args.mood}` : typed.query, pageSize, minSeconds);
       if (!("error" in found) && found.sounds.length === 0 && args.mood) {
@@ -177,7 +183,10 @@ export const stockTools: CatalogTool[] = [
         warnings.push(`Nothing matched with the mood '${args.mood}': searched without it.`);
       }
       if ("error" in found) return refused(tool, `Error: Freesound search failed: ${found.error}`);
-      const candidates = found.sounds
+      const allowed = new Set(allowedLicenses(licence));
+      const licensed = found.sounds.filter((s) => licence === "any" || allowed.has(licenseCode(s.license) ?? ""));
+      if (licensed.length < found.sounds.length) warnings.push(`${found.sounds.length - licensed.length} of ${found.sounds.length} results dropped: not ${licence === "cc0" ? "CC0" : "licensed for commercial use"} (licence=any keeps them).`);
+      const candidates = licensed
         .filter((s) => previewOf(s))
         .sort((a, b) => licenceRank(a.license) - licenceRank(b.license) || b.duration - a.duration);
 
@@ -256,7 +265,7 @@ export const stockTools: CatalogTool[] = [
           : [];
 
       const asked = [wanted ? `${Math.round(wanted[0])}-${Math.round(wanted[1])} BPM` : "", args.energy ? `${args.energy} energy` : ""].filter(Boolean).join(", ");
-      const data = { query: typed.query, ...(args.mood ? { mood: args.mood } : {}), ...(wanted ? { bpm_range: wanted } : {}), total: found.total, measured: measures.size, results, ...(nearest.length > 0 ? { nearest } : {}) };
+      const data = { query: typed.query, licence, ...(args.mood ? { mood: args.mood } : {}), ...(wanted ? { bpm_range: wanted } : {}), total: found.total, measured: measures.size, results, ...(nearest.length > 0 ? { nearest } : {}) };
       const line = (r: MusicResult) =>
         `  id=${r.sound_id}  duration=${clockTime(r.duration_seconds)}  licence=${r.licence}  user=${r.user}` +
         (r.energy ? `  bpm=${r.bpm ?? "?"}${r.bpm_match ? ` (${r.bpm_match}, also ${(r.bpm_also ?? []).join("/")})` : ""}  energy=${r.energy}  loudness=${r.loudness_db}dB` : "") +
