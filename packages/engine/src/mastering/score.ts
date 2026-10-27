@@ -208,31 +208,32 @@ export function scoreMix(input: ScoreInput): MixScore {
     for (const c of cues) if (Math.abs(c.t - t) <= within && (!best || Math.abs(c.t - t) < Math.abs(best.t - t))) best = c;
     return best;
   };
-  /** The stem with the most energy around sample `index`. */
-  const dominantStem = (index: number): StemName | undefined => {
+  /** The stem with the largest sample within `halfSeconds` of sample `index` (a peak's owner; 25 ms for a loud moment). */
+  const dominantStem = (index: number, halfSeconds = 0.001): StemName | undefined => {
     let best: StemName | undefined;
-    let bestEnergy = 0;
-    const half = Math.round(0.025 * sr);
+    let bestPeak = 0;
+    const half = Math.max(1, Math.round(halfSeconds * sr));
     for (const name of STEM_NAMES) {
       const s = stems[name];
       if (!s) continue;
-      let e = 0;
-      for (const ch of s) for (let i = Math.max(0, index - half); i < Math.min(n, index + half); i += 1) e += ch[i]! * ch[i]!;
-      if (e > bestEnergy) {
-        bestEnergy = e;
+      let peak = 0;
+      for (const ch of s) for (let i = Math.max(0, index - half); i < Math.min(n, index + half); i += 1) peak = Math.max(peak, Math.abs(ch[i]!));
+      if (peak > bestPeak) {
+        bestPeak = peak;
         best = name;
       }
     }
     return best;
   };
   /** "Lower what is loudest at sample `index` by `db`": the cue there, else its stem. */
-  const lowerAt = (index: number, db: number): { what: string; calls: FixCall[] } => {
+  const lowerAt = (index: number, db: number, halfSeconds?: number): { what: string; calls: FixCall[]; culprit: { t: number; cue?: string; stem?: StemName } } => {
     const t = index / sr;
-    const stem = dominantStem(index);
+    const stem = dominantStem(index, halfSeconds);
     const cue = stem === "sfx" || !stem ? cueNear(t, 0.3) : undefined;
-    if (cue) return { what: `cue ${cue.id} (${cue.kind}) at ${secs(cue.t)}`, calls: [{ tool: "set_audio_gain_tool", args: { clip_ids: [cue.id], gain_db: r1(-db) } }] };
-    if (stem) return { what: `the ${stem} at ${secs(t)}`, calls: [{ tool: "automate_volume_tool", args: { role: stem, shape: "dip", start_seconds: r2(Math.max(0, t - 0.25)), end_seconds: r2(t + 0.25), db: r1(-db) } }] };
-    return { what: `the mix at ${secs(t)}`, calls: [] };
+    const culprit = { t: r2(t), ...(cue ? { cue: cue.id } : {}), ...(stem ? { stem } : {}) };
+    if (cue) return { culprit, what: `cue ${cue.id} (${cue.kind}) at ${secs(cue.t)}`, calls: [{ tool: "set_audio_gain_tool", args: { clip_ids: [cue.id], gain_db: r1(-db) } }] };
+    if (stem) return { culprit, what: `the ${stem} at ${secs(t)}`, calls: [{ tool: "automate_volume_tool", args: { role: stem, shape: "dip", start_seconds: r2(Math.max(0, t - 0.25)), end_seconds: r2(t + 0.25), db: r1(-db) } }] };
+    return { culprit, what: `the mix at ${secs(t)}`, calls: [] };
   };
 
   // 1. Loudness and peaks.
@@ -248,7 +249,7 @@ export function scoreMix(input: ScoreInput): MixScore {
     const { index } = loudestSample(mix);
     const over = TP + 1;
     const where = lowerAt(index, over + 0.5);
-    put("L2_true_peak", TP, -60, -1, "loudness", { text: `true peak ${TP.toFixed(1)} dBTP at ${secs(index / sr)}: lower ${where.what} ${(over + 0.5).toFixed(1)} dB (then the export limiter catches the rest)`, calls: where.calls }, {}, true);
+    put("L2_true_peak", TP, -60, -1, "loudness", { text: `true peak ${TP.toFixed(1)} dBTP at ${secs(index / sr)}: lower ${where.what} ${(over + 0.5).toFixed(1)} dB (then the export limiter catches the rest)`, calls: where.calls }, { culprit: where.culprit }, true);
   }
   const sMax = S.length ? S[argMax(S)]! : I;
   const sAt = argMax(S) * series.hop;
@@ -260,7 +261,7 @@ export function scoreMix(input: ScoreInput): MixScore {
   const mMax = M.length ? M[mMaxIndex]! : I;
   {
     const centre = Math.round((mMaxIndex * series.hop + 0.2) * sr);
-    const where = lowerAt(Math.min(n - 1, centre), mMax - I - 10);
+    const where = lowerAt(Math.min(n - 1, centre), mMax - I - 10, 0.2);
     put("L4_momentary_max_rel", mMax - I, 0, 10, "loudness", { text: `loudest 400 ms at ${secs(mMaxIndex * series.hop + 0.2)} is ${(mMax - I - 10).toFixed(1)} dB too hot: lower ${where.what}`, calls: where.calls });
   }
   const [lraLo, lraHi] = LRA_BAND[genre];

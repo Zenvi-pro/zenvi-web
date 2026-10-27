@@ -6,7 +6,7 @@
  *
  * A clip's stem is, in order: its own `zenvi_audio_role`, its track's
  * (set_track_role_tool), a sound-design clip's "sfx", the indexer's role,
- * then its shape (master_audio_tool's rule: sound without picture is music
+ * a text-to-speech file's "voice", what its track's name says, then its shape (master_audio_tool's rule: sound without picture is music
  * from MUSIC_MIN_DURATION seconds, an effect below; footage is the bed).
  */
 
@@ -34,6 +34,16 @@ export const STEM_ROLE_OF: Record<MixRole, StemRole> = { voice: "speech", music:
 
 const ROLE_OF_ANALYSIS: Partial<Record<AudioRole, MixRole>> = { speech: "voice", music: "music", sfx: "sfx", ambient: "ambience" };
 
+/** Files the text-to-speech tool writes (generation.ts). */
+const TTS_FILE = /(^|[\\/])zenvi_tts_[^\\/]*$/;
+/** Track names that say what a track carries ("Voice", "VO 2", "Music", "SFX", "Room tone"). */
+const TRACK_LABELS: readonly [RegExp, MixRole][] = [
+  [/^(voice|vo|narration|narrator|dialog(ue)?|speech)\b/i, "voice"],
+  [/^(music|score|song|bed)\b/i, "music"],
+  [/^(sfx|sound ?fx|sound effects?|foley|fx audio)\b/i, "sfx"],
+  [/^(ambien(ce|t)|room ?tone|atmos|amb)\b/i, "ambience"],
+];
+
 export interface MixEntry extends AudioEntry {
   mixRole: MixRole;
   locked: boolean;
@@ -52,6 +62,10 @@ export function mixRoleOf(project: Project, entry: AudioEntry): MixRole {
   if (isSfxClip(entry.clip)) return "sfx";
   const analysed = ROLE_OF_ANALYSIS[entry.role];
   if (analysed) return analysed;
+  if (TTS_FILE.test(String(entry.file?.path ?? ""))) return "voice";
+  const label = String(project.layers.find((l) => Number(l.number) === entry.layer)?.label ?? "");
+  const named = TRACK_LABELS.find(([re]) => re.test(label));
+  if (named) return named[1];
   if (hasVideoStream(entry.clip, entry.file)) return "music";
   return entry.end - entry.start >= MUSIC_MIN_DURATION ? "music" : "sfx";
 }
