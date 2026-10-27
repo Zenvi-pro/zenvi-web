@@ -188,7 +188,7 @@ export const SCENE3D_PARAMS = {
     colors: z.array(hex).min(1).max(8).optional().describe("Card colours (default accent + a vivid set)."),
     fan_degrees: z.number().min(2).max(30).default(12).describe("fan: angle between cards."),
     elevation: z.number().min(20).max(85).default(52).describe("Camera angle above the table, degrees (85: nearly top-down)."),
-    size: size(0.66, "stack"),
+    size: size(0.75, "stack"),
     shadow: z.boolean().default(true).describe("Real soft shadows on the floor."),
     dof: z.boolean().default(true).describe("Subtle depth of field."),
   }),

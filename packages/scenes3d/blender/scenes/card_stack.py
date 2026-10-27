@@ -26,7 +26,7 @@ def paper_material(name, lines):
         sep = tree.nodes.new("ShaderNodeSeparateXYZ")
         tree.links.new(coord.outputs["UV"], sep.inputs["Vector"])
         rows = core.math_node(tree, "FRACT", core.math_node(tree, "MULTIPLY", sep.outputs["Y"], 22.0))
-        line = core.map_range(tree, core.math_node(tree, "ABSOLUTE", core.math_node(tree, "SUBTRACT", rows, 0.5)), 0.47, 0.5)
+        line = core.map_range(tree, core.math_node(tree, "ABSOLUTE", core.math_node(tree, "SUBTRACT", rows, 0.5)), 0.42, 0.48)
         # No lines in the top band (a header) and margins.
         band = core.math_node(tree, "MULTIPLY", core.map_range(tree, sep.outputs["Y"], 0.9, 0.86), core.map_range(tree, sep.outputs["X"], 0.06, 0.1))
         band = core.math_node(tree, "MULTIPLY", band, core.map_range(tree, sep.outputs["X"], 0.94, 0.9))
@@ -34,7 +34,7 @@ def paper_material(name, lines):
         mix.data_type = "RGBA"
         tree.links.new(core.math_node(tree, "MULTIPLY", line, band), mix.inputs["Factor"])
         mix.inputs[6].default_value = core.rgb("#F6F4EE", 1.0)
-        mix.inputs[7].default_value = core.rgb("#B9C6DA", 1.0)
+        mix.inputs[7].default_value = core.rgb("#8FA6CC", 1.0)
         tree.links.new(mix.outputs[2], b.inputs["Base Color"])
     return mat
 
@@ -71,7 +71,7 @@ def build(job):
 
     lights.studio(scale=1.6, energy=0.8)
     core.studio_world(job, strength=0.45, spin_degrees=30)
-    sun = lights.sun("Sun", 62, -40, strength=3.0, angle_deg=10)
+    sun = lights.sun("Sun", 48, -40, strength=3.0, angle_deg=8)  # low enough that each card shadows the next
     rig = [o for o in bpy.data.objects if o.type == "LIGHT" and o is not sun]
 
     cards = []
@@ -148,7 +148,7 @@ def build(job):
             enter_end = max(enter_end, g0 + int(0.6 * fps))
 
     # Across the frame the stack shows its width (the camera looks along its length); a fan adds its swing.
-    footprint_w = w + 2 * h * 0.84 * math.sin(spread * (count - 1) / 2) if fan else w * 1.2
+    footprint_w = w + 2 * h * 0.84 * math.sin(spread * (count - 1) / 2) if fan else w * 1.1
     if p.get("shadow", True):
         catcher = shapes.shadow_catcher("Floor", 14, sun, strength=0.85)
         catcher.location = (0, 0, -0.0005)
@@ -161,6 +161,7 @@ def build(job):
     elevation = float(p.get("elevation", 52))
     target = (0, -0.05 * h if not fan else 0.12 * h, 0.0)
     cam, aim = camera.camera(lens=50, target=target, dof=2.0 if p.get("dof", True) and job["quality"] == "final" else None)
-    depth_seen = h * 1.1 * math.sin(math.radians(elevation)) + count * thick
-    dist = camera.compose(cam, footprint_w * 1.05, depth_seen, float(p.get("size", 0.66)), max_height=0.8)
+    # The near end of the stack looms larger in perspective: leave room for it.
+    depth_seen = h * (1.6 if fan else 1.35) * math.sin(math.radians(elevation)) + count * thick
+    dist = camera.compose(cam, footprint_w * 1.05, depth_seen, float(p.get("size", 0.75)), max_height=0.8)
     motion.animate(cam, "location", [(1, lights.orbit_point(dist * 1.04, -22, elevation + 3, target)), (frames, lights.orbit_point(dist * 0.97, -10, elevation, target))], "in-out")
