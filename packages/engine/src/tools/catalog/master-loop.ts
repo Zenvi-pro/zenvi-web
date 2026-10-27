@@ -22,7 +22,7 @@ import { spottedHits } from "./sound-design.js";
 
 export const MAX_ROUNDS = 3;
 export const TARGET_SCORE = 85;
-const PEAK_MARGIN_DB = 0.2;
+export const PEAK_MARGIN_DB = 0.2;
 
 /** `a` scores higher than `b`: the capped score, then the raw score. */
 function isBetter(a: MixScore, b: MixScore): boolean {
