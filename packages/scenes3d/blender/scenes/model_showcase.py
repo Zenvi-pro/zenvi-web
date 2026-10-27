@@ -190,6 +190,13 @@ def override(objects, mat):
 def build(job):
     p = job["params"]
     fps, frames = job["fps"], job["frames"]
+    if job["quality"] == "final":
+        # Product clips run long (7-8 s in ads): fewer samples and half-res ray
+        # tracing keep a final under the MCP call's time limit; the soft
+        # studio light hides the difference.
+        ee = bpy.context.scene.eevee
+        ee.taa_render_samples = 24
+        ee.ray_tracing_options.resolution_scale = "2"
     if p.get("model"):
         objects = import_model(job["files"]["model"])
     else:
@@ -241,7 +248,7 @@ def build(job):
             lights.exclude(floor_lights, [catcher])
             shapes.calibrate_catcher(catcher)
 
-    move = p.get("move", "turntable")
+    move = p.get("move") or ("turntable" if p.get("model") else "hero")
     target = (0, 0, height * 0.5)
     # A whole model must stay readable: gentle focus falloff, none on the see-through looks (blur reads as fog there).
     fstop = (1.4 if move == "push" else 2.8) if p.get("dof", True) and job["quality"] == "final" and look == "solid" else None

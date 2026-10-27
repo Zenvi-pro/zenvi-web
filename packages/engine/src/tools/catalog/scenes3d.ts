@@ -208,7 +208,7 @@ export const scenes3dTools: CatalogTool[] = [
     description:
       "Render a Zenvi 3D scene with Blender and place it on the timeline in one undo step: an extruded chrome/glass title tumbling in, a phone/tablet/laptop playing a bin video while the camera glides, " +
       "cards floating in depth with depth of field, an icon cube that spins and explodes, a 3D cube turn between two clips (cube_cut, placed over their cut), a glass/chrome hero object, a confetti/sparks/shards burst, " +
-      "the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model or a generic music player / speaker on a turntable, landing on a table, or in x-ray (model_showcase), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack). " +
+      "the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model or a generic music player / speaker, on a turntable, in x-ray, or spinning in and landing for a product reveal (model_showcase move=hero, the default without a model file), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack). " +
       "Transparent scenes render with alpha (ProRes 4444) and go on the lowest free track above the video; with background dark/light/#rrggbb they are opaque full-frame. " +
       "Use quality=draft (seconds) to check the look with preview_frame, then rerender_3d_scene_tool quality=final. list_3d_scenes_tool lists every param.",
     input: addInput,
