@@ -294,7 +294,8 @@ export function searchRecipes(query: string, filters: Pick<SfxSearchFilters, "mi
 
 /** What a library sound's project file records about where it came from (`file.zenvi_credit`): list_credits_tool reads it. */
 export interface SfxCredit {
-  provider: SfxLibraryProvider;
+  /** generated: made by a sound generator (generate_sfx_tool), credited to the provider's terms. */
+  provider: SfxLibraryProvider | "generated";
   id: string;
   title: string;
   creator?: string;

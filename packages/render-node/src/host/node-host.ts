@@ -28,6 +28,8 @@ import { createNodeMatteHost } from "../matte/host.js";
 import { onnxRuntimeAvailable, rvmModel, type MatteModel } from "../matte/rvm.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
+import { createSfxGenerator } from "./sfx-generate.js";
+import { cacheDir } from "../svg/fonts.js";
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
 import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
@@ -238,6 +240,9 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
+  // Sound effects generated for cues the recorded kit lacks, where a paid ElevenLabs key is configured.
+  const generateSfx = createSfxGenerator({ env: options.env, cacheRoot: cacheDir(options.env) });
+  if (generateSfx) host.audio!.generateSfx = generateSfx;
   const matteModel = options.mattes ?? (onnxRuntimeAvailable() ? rvmModel({ env: options.env, signal: options.signal, log: options.log }) : false);
   if (matteModel) host.mattes = createNodeMatteHost({ projectFile: current, resolveMedia, model: matteModel, signal: options.signal, log: options.log });
   if (options.scenes3d !== false) {
