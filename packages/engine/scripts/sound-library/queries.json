@@ -1,0 +1,29 @@
+{
+  "_comment": "Freesound searches the recorded kit is curated from (curate-kit.ts search). Per group: how many sounds the kit keeps, how many candidates are measured (default 4 x keep), the length range searched (seconds) and the queries. Only CC0 is ever searched.",
+  "groups": {
+    "whoosh": { "keep": 50, "seconds": [0.2, 3], "queries": ["whoosh", "swoosh", "woosh", "air whoosh", "whoosh pass by", "fast whoosh", "whoosh transition", "stick swing whoosh"] },
+    "swish": { "keep": 25, "seconds": [0.15, 1.5], "queries": ["swish", "sword swing", "swipe", "cloth swish", "swing air"] },
+    "whip": { "keep": 15, "measure": 220, "seconds": [0.1, 1.2], "queries": ["whip crack", "whip", "bullwhip"] },
+    "punch": { "keep": 25, "seconds": [0.1, 1.5], "queries": ["punch", "punch impact", "slap", "body hit", "kick punch"] },
+    "hit": { "keep": 25, "seconds": [0.05, 1.5], "queries": ["clap", "finger snap", "stick hit", "wood hit", "snare hit", "metal hit", "hand clap"] },
+    "thud": { "keep": 25, "seconds": [0.1, 2], "queries": ["thud", "body fall", "drop floor", "door slam", "thump", "book drop"] },
+    "boom": { "keep": 25, "seconds": [0.5, 5], "queries": ["boom", "explosion", "big impact", "cinematic impact", "thunder", "firework boom"] },
+    "sub": { "keep": 15, "seconds": [0.3, 3], "queries": ["bass drum hit", "kick drum", "timpani hit", "taiko", "low boom", "bass drum"] },
+    "riser": { "keep": 20, "measure": 220, "seconds": [1, 8], "queries": ["riser", "reverse cymbal", "build up", "swell", "cymbal swell", "reverse crash"] },
+    "reverse": { "keep": 20, "measure": 220, "seconds": [0.5, 4], "queries": ["reverse cymbal", "reverse crash", "reversed", "reverse swell", "reverse piano"] },
+    "click": { "keep": 30, "measure": 220, "seconds": [0.02, 0.6], "queries": ["mouse click", "click", "button click", "pen click", "computer mouse"] },
+    "toggle": { "keep": 20, "seconds": [0.05, 0.6], "queries": ["light switch", "switch", "toggle switch", "latch", "switch on off"] },
+    "tap": { "keep": 25, "measure": 220, "seconds": [0.03, 0.5], "queries": ["tap", "finger tap", "glass tap", "knock", "table tap", "tap screen"] },
+    "key": { "keep": 20, "measure": 220, "seconds": [0.03, 0.6], "queries": ["keyboard key", "key press", "typewriter key", "mechanical keyboard key", "spacebar"] },
+    "typing": { "keep": 15, "measure": 220, "seconds": [1, 10], "queries": ["typing", "keyboard typing", "typewriter typing", "mechanical keyboard typing"] },
+    "shutter": { "keep": 15, "seconds": [0.1, 1.5], "queries": ["camera shutter", "camera click", "shutter", "polaroid", "dslr shutter"] },
+    "pop": { "keep": 20, "seconds": [0.03, 0.8], "queries": ["pop", "bubble pop", "cork pop", "mouth pop", "balloon pop"] },
+    "glitch": { "keep": 15, "seconds": [0.1, 2], "queries": ["glitch", "electric crackle", "static burst", "radio static", "electric spark", "tv static"] },
+    "sparkle": { "keep": 25, "seconds": [0.2, 3], "queries": ["chime", "wind chimes", "bell tree", "triangle", "glockenspiel", "glass chime", "sparkle", "shimmer"] },
+    "notify": { "keep": 15, "seconds": [0.1, 2], "queries": ["ding", "bell ding", "glass ding", "xylophone note", "marimba note", "desk bell"] },
+    "paper": { "keep": 20, "seconds": [0.1, 3], "queries": ["page turn", "paper", "paper crumple", "paper slide", "paper rustle", "book page"] },
+    "cloth": { "keep": 20, "seconds": [0.1, 3], "queries": ["cloth", "fabric", "clothes rustle", "jacket", "fabric movement"] },
+    "scratch": { "keep": 8, "seconds": [0.1, 2], "queries": ["record scratch", "vinyl scratch", "scratch dj"] },
+    "ambience": { "keep": 20, "seconds": [10, 60], "queries": ["room tone", "city ambience", "office ambience", "nature ambience", "wind ambience", "cafe ambience", "forest ambience", "rain ambience"] }
+  }
+}

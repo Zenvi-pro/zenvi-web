@@ -1,25 +1,48 @@
 import { describe, expect, it } from "vitest";
 import { RECORDED_KIT } from "./recorded-kit.data.js";
-import { RECORDED_GROUPS, RECORDED_GROUP_SPECS, pickRecorded, pickRecordedOne, recordedCredit, recordedGroupOf, recordedMaxSeconds, recordedSamples } from "./recorded.js";
+import { RECORDED_GROUPS, RECORDED_GROUP_SPECS, pickRecorded, pickRecordedOne, recordedCredit, recordedGroupOf, recordedMaxSeconds, recordedPlaceRecipe, recordedSamples } from "./recorded.js";
 import { sfxRecipe } from "./recipes.js";
 
 describe("the recorded kit", () => {
-  it("is CC0 sounds on Freesound's CDN, each listed once with a checksum, in every group", () => {
-    expect(RECORDED_KIT.length).toBeGreaterThanOrEqual(70);
+  it("is 400-600 CC0 sounds on Freesound's CDN, each listed once with a checksum, licence date and measurements, in every group", () => {
+    expect(RECORDED_KIT.length).toBeGreaterThanOrEqual(400);
+    expect(RECORDED_KIT.length).toBeLessThanOrEqual(600);
     expect(new Set(RECORDED_KIT.map((s) => s.id)).size).toBe(RECORDED_KIT.length);
     for (const s of RECORDED_KIT) {
       expect(s.license).toBe("CC0");
       expect(s.url).toMatch(/^https:\/\/cdn\.freesound\.org\/previews\/\d+\/\d+_\d+-hq\.mp3$/);
       expect(s.sha256).toMatch(/^[0-9a-f]{64}$/);
+      expect(s.licenseCheckedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(s.sourceRate).toBeGreaterThanOrEqual(44100);
+      expect(s.endMs).toBeGreaterThan(s.onsetMs);
+      expect(s.peakMs).toBeGreaterThanOrEqual(s.onsetMs - 25);
+      // Previews are MP3: a recording peaking at 0 dBFS decodes with inter-sample overs, levelled away when placed.
+      expect(s.truePeakDb).toBeLessThan(3);
+      expect(Number.isFinite(s.lufs) && Number.isFinite(s.gainDb) && s.centroidHz > 0).toBe(true);
     }
-    for (const g of RECORDED_GROUPS) expect(recordedSamples(g).length, g).toBeGreaterThanOrEqual(3);
+    // CRAFT: a pool of at least four per class, so a sound never has to repeat.
+    for (const g of RECORDED_GROUPS) expect(recordedSamples(g).length, g).toBeGreaterThanOrEqual(4);
   });
 
-  it("plays only recipes that exist; sub drops, sparkles and tonal risers stay synthesised", () => {
-    for (const g of RECORDED_GROUPS) for (const r of RECORDED_GROUP_SPECS[g].recipes) expect(sfxRecipe(r), r).toBeDefined();
+  it("plays only recipes that exist, and now has recordings for sub drops, sparkles, tonal risers and notifications", () => {
+    for (const g of RECORDED_GROUPS) for (const r of [...RECORDED_GROUP_SPECS[g].recipes, recordedPlaceRecipe(g)]) expect(sfxRecipe(r), r).toBeDefined();
     expect(recordedGroupOf("whoosh_short")).toBe("whoosh");
     expect(recordedGroupOf("camera_shutter")).toBe("shutter");
-    for (const r of ["sub_drop", "sparkle", "riser_tonal", "notification_blip"]) expect(recordedGroupOf(r)).toBeUndefined();
+    expect(recordedGroupOf("sub_drop")).toBe("sub");
+    expect(recordedGroupOf("sparkle")).toBe("sparkle");
+    expect(recordedGroupOf("riser_tonal")).toBe("riser");
+    expect(recordedGroupOf("notification_blip")).toBe("notify");
+    expect(recordedGroupOf("reverse_swell")).toBe("reverse");
+    expect(recordedGroupOf("swoosh_hit")).toBeUndefined();
+  });
+
+  it("plays no sound more than three times in 30 s", () => {
+    // 40 shutters in 20 s: a pool of 14 or more covers them at three uses each.
+    expect(recordedSamples("shutter").length).toBeGreaterThanOrEqual(14);
+    const picks = pickRecorded(Array.from({ length: 40 }, (_, i) => ({ recipe: "camera_shutter", at: i * 0.5 })), 3);
+    const counts = new Map<number, number>();
+    for (const p of picks) counts.set(p!.id, (counts.get(p!.id) ?? 0) + 1);
+    expect(Math.max(...counts.values())).toBeLessThanOrEqual(3);
   });
 
   it("never plays the same sound twice in a row, and rotates through a group", () => {
@@ -36,19 +59,23 @@ describe("the recorded kit", () => {
 
   it("prefers sounds about as long as the cue, and cuts sustained ones to it", () => {
     const short = pickRecorded(Array.from({ length: 10 }, () => ({ recipe: "whoosh_short", seconds: 0.3 })), 1);
-    expect(short.every((p) => p!.duration <= 0.3 * 1.8 + 0.15)).toBe(true);
-    expect(pickRecorded([{ recipe: "sub_drop" }], 1)).toEqual([undefined]);
+    expect(short.every((p) => (p!.endMs - p!.onsetMs) / 1000 <= 0.3 * 1.8 + 0.15)).toBe(true);
+    expect(pickRecorded([{ recipe: "swoosh_hit" }], 1)).toEqual([undefined]);
     // Hits are cut to length: a short cue still rotates through every punch.
-    const punches = pickRecorded(Array.from({ length: 16 }, () => ({ recipe: "impact_punch", seconds: 0.3 })), 1);
-    expect(new Set(punches.map((p) => p!.id)).size).toBe(8);
+    const all = recordedSamples("punch").length;
+    const punches = pickRecorded(Array.from({ length: 2 * all }, () => ({ recipe: "impact_punch", seconds: 0.3 })), 1);
+    expect(new Set(punches.map((p) => p!.id)).size).toBe(all);
     expect(recordedMaxSeconds("riser", 2)).toBe(2);
     expect(recordedMaxSeconds("whoosh", 0.3)).toBe(RECORDED_GROUP_SPECS.whoosh.maxSeconds);
   });
 
   it("picks one sound away from its neighbours, and credits it as CC0 with no credit required", () => {
-    const first = pickRecordedOne({ recipe: "camera_shutter" }, 1, 0, [])!;
-    const next = pickRecordedOne({ recipe: "camera_shutter" }, 1, 0, [first.id])!;
+    const first = pickRecordedOne({ recipe: "camera_shutter", at: 5 }, 1, [])!;
+    const next = pickRecordedOne({ recipe: "camera_shutter", at: 6 }, 1, [{ id: first.id, at: 5 }])!;
     expect(next.id).not.toBe(first.id);
+    // Between two placed sounds, neither of them.
+    const between = pickRecordedOne({ recipe: "camera_shutter", at: 5.5 }, 1, [{ id: first.id, at: 5 }, { id: next.id, at: 6 }])!;
+    expect([first.id, next.id]).not.toContain(between.id);
     const credit = recordedCredit(first);
     expect(credit).toMatchObject({ provider: "freesound", id: String(first.id), license: "cc0", attribution_required: false, landing_url: `https://freesound.org/s/${first.id}/` });
     expect(credit.attribution).toMatch(/CC0 1\.0/);

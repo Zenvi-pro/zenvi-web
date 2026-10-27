@@ -45,6 +45,8 @@ export interface ConditionOptions {
   maxSeconds: number;
   /** Loudest-window RMS to level to (linear). */
   targetRms: number;
+  /** Played this many semitones faster (+) or slower (−), as a sampler does: pitch and length change together. */
+  semitones?: number;
 }
 
 /** Below the peak by this much counts as silence, dB. */
@@ -131,8 +133,9 @@ function resample(x: Float32Array, from: number, to: number): Float32Array {
 /** Condition a decoded sound; null when it is silent. */
 export function conditionSfx(input: PcmInput, options: ConditionOptions): ConditionedSfx | null {
   const sr = SFX_SAMPLE_RATE;
-  const inL = resample(input.left, input.sampleRate, sr);
-  const inR = input.right ? resample(input.right, input.sampleRate, sr) : inL;
+  const rate = input.sampleRate * 2 ** ((options.semitones ?? 0) / 12);
+  const inL = resample(input.left, rate, sr);
+  const inR = input.right ? resample(input.right, rate, sr) : inL;
   const n = Math.min(inL.length, inR.length);
   let peak = 0;
   for (let i = 0; i < n; i += 1) peak = Math.max(peak, Math.abs(inL[i]!), Math.abs(inR[i]!));

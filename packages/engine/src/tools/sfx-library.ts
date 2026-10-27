@@ -11,6 +11,7 @@
 import { encodeWav } from "../io/wav.js";
 import { SFX_CONDITION_VERSION, conditionSfx, recipeLoudness } from "../sfx/condition.js";
 import { SFX_SAMPLE_RATE } from "../sfx/dsp.js";
+import type { KitVariation } from "../sfx/kit-search.js";
 import {
   OPENVERSE_API,
   creditOf,
@@ -191,7 +192,7 @@ export async function prepareLibrarySfx(call: ToolCall, result: LibraryResult, r
 export async function conditionedSfxFile(
   call: ToolCall,
   source: string,
-  o: { key: string; recipeId: string; maxSeconds: number; stem: string; title: string; credit: SfxCredit; what: string },
+  o: { key: string; recipeId: string; maxSeconds: number; stem: string; title: string; credit: SfxCredit; what: string; variation?: KitVariation },
 ): Promise<PreparedSfx & { prep: LibraryPrep }> {
   const media = call.host.media;
   if (!media?.writeGenerated) throw new Error("this surface cannot store generated audio.");
@@ -199,10 +200,15 @@ export async function conditionedSfxFile(
   const recipe = sfxRecipe(o.recipeId)!;
   const fps = fpsFloatOf(call.doc.project);
   const pcm = await call.host.audio.decodePcm(source, { sampleRate: SFX_SAMPLE_RATE, channels: 2, maxSeconds: MAX_DECODE_SECONDS, signal: call.signal });
-  const conditioned = conditionSfx({ sampleRate: pcm.sampleRate, left: pcm.samples, right: pcm.right }, { hit: recipe.hit, maxSeconds: o.maxSeconds, targetRms: recipeLoudness(recipe.id) });
+  const conditioned = conditionSfx({ sampleRate: pcm.sampleRate, left: pcm.samples, right: pcm.right }, {
+    hit: recipe.hit,
+    maxSeconds: o.maxSeconds,
+    targetRms: recipeLoudness(recipe.id) * 10 ** ((o.variation?.gainDb ?? 0) / 20),
+    semitones: o.variation?.semitones,
+  });
   if (!conditioned) throw new Error(`${o.what} is silent.`);
   const audio = padSfx(conditioned, framePad(conditioned.hit, fps));
-  const path = await media.writeGenerated(`sfx-${o.stem}-${recipe.id}-${Math.round(o.maxSeconds * 100)}-${Math.round(fps * 100)}-v${SFX_CONDITION_VERSION}.wav`, encodeWav([audio.left, audio.right], audio.sampleRate), "audio/wav");
+  const path = await media.writeGenerated(`sfx-${o.stem}-${recipe.id}-${Math.round(o.maxSeconds * 100)}-${Math.round(fps * 100)}${variationTag(o.variation)}-v${SFX_CONDITION_VERSION}.wav`, encodeWav([audio.left, audio.right], audio.sampleRate), "audio/wav");
   const info = await media.probe(path);
   return {
     key: o.key,
@@ -214,6 +220,11 @@ export async function conditionedSfxFile(
     credit: o.credit,
     prep: { trimmedHead: conditioned.trimmedHead, trimmedTail: conditioned.trimmedTail, gainDb: conditioned.gainDb },
   };
+}
+
+/** File-name and cache-key part of a placement's variation ('' when it plays as recorded). */
+export function variationTag(v: KitVariation | undefined): string {
+  return v && (v.semitones !== 0 || v.gainDb !== 0) ? `-p${Math.round(v.semitones * 100)}g${Math.round(v.gainDb * 10)}` : "";
 }
 
 /** The bin's file made for `key` before, as a sound to place; undefined when there is none. */

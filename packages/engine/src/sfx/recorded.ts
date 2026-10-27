@@ -1,23 +1,52 @@
 /**
- * Zenvi's recorded SFX kit: real recordings (whooshes swung past a mic,
- * punches, shutters, typing...) chosen from Freesound, CC0 only, by id.
+ * Zenvi's recorded SFX kit: about 500 real recordings (whooshes swung
+ * past a mic, punches, sub hits, reverse cymbals, chimes, clicks, paper,
+ * cloth, room tones...) chosen from Freesound, CC0 only, by id, by
+ * listening and by measurement (scripts/sound-library/curate-kit.ts).
+ * Every sound carries its measured onset, peak, end, loudness, brightness
+ * and sub share (sfx/analyse.ts); sfx/kit-search.ts searches by them.
  * The repo holds the list, the checksums and the licences
  * (recorded-kit.data.ts, made by scripts/gen-recorded-kit.ts), never the
  * audio: a host fetches a sound on first use into a cache every project
  * shares (MediaHost.kitSample) and checks its bytes against the list.
  *
  * add_sfx_tool and auto_sound_design_tool play a cue through the kit when
- * its recipe has a group here; recipes without one (sub drops, sparkles,
- * tonal risers) and hosts that cannot fetch stay synthesised. Picks vary:
- * a group's sounds are taken in a seeded order, never the same twice in a
- * row. Pure.
+ * its recipe has a group here; hosts that cannot fetch stay synthesised.
+ * Picks vary: a group's sounds are taken in a seeded order, never the same
+ * twice in a row, at most three times in 30 s. Pure.
  */
 
 import { Rng } from "./dsp.js";
+import { pickVaried, soundSeconds, type KitUse } from "./kit-search.js";
 import { attributionLine, type SfxCredit } from "./library.js";
 import { RECORDED_KIT } from "./recorded-kit.data.js";
 
-export const RECORDED_GROUPS = ["whoosh", "swish", "whip", "punch", "thud", "boom", "riser", "click", "toggle", "tap", "key", "typing", "shutter", "pop", "glitch"] as const;
+export const RECORDED_GROUPS = [
+  "whoosh",
+  "swish",
+  "whip",
+  "punch",
+  "hit",
+  "thud",
+  "boom",
+  "sub",
+  "riser",
+  "reverse",
+  "click",
+  "toggle",
+  "tap",
+  "key",
+  "typing",
+  "shutter",
+  "pop",
+  "glitch",
+  "sparkle",
+  "notify",
+  "paper",
+  "cloth",
+  "scratch",
+  "ambience",
+] as const;
 export type RecordedGroup = (typeof RECORDED_GROUPS)[number];
 
 /** How Zenvi's own sounds are made: recorded (the kit, default where the host can fetch it) or synth (sfx/recipes.ts). */
@@ -38,11 +67,37 @@ export interface RecordedSample {
   bytes: number;
   /** Always CC0: the generator refuses anything else. */
   license: "CC0";
+  /** The day Freesound last said CC0 for this id (YYYY-MM-DD). */
+  licenseCheckedAt: string;
+  /** Freesound's tags, lower case, at most a dozen. */
+  tags: readonly string[];
+  /** Measured on the fetched file (sfx/analyse.ts), ms from its start: first sound, loudest 50 ms, last sound. */
+  onsetMs: number;
+  peakMs: number;
+  endMs: number;
+  /** Onset to within 3 dB of the peak sample, ms (a hit's few ms, a swell's second). */
+  attackMs: number;
+  /** BS.1770 loudness of onset..end, LUFS, and its true peak, dBTP. */
+  lufs: number;
+  truePeakDb: number;
+  /** Gain that brings the loudest 400 ms to the kit's reference (-18 LUFS) without passing -1 dBTP, dB. */
+  gainDb: number;
+  /** Peak over RMS of onset..end, dB: high for a snap, low for a bed. */
+  crestDb: number;
+  /** Spectral centroid, Hz, and the share of power under 150 Hz (0..1). */
+  centroidHz: number;
+  lowShare: number;
+  /** Real stereo (side within 30 dB of mid), not two equal channels. */
+  stereo: boolean;
+  /** The original recording's sample rate, Hz. */
+  sourceRate: number;
 }
 
 interface GroupSpec {
   /** Recipes the group's sounds play (the cue's recipe sets the level and the hit point). */
   recipes: readonly string[];
+  /** Groups no recipe plays (placed from search_sound_library_tool): the recipe whose level and hit point they take. */
+  placeAs?: string;
   /** Longest a sound of the group may run, seconds (a whoosh keeps its peak, a riser its end). */
   maxSeconds: number;
 }
@@ -54,7 +109,10 @@ export const RECORDED_GROUP_SPECS: Readonly<Record<RecordedGroup, GroupSpec>> = 
   punch: { recipes: ["impact_punch", "impact_slam"], maxSeconds: 1.5 },
   thud: { recipes: ["impact_thud"], maxSeconds: 2 },
   boom: { recipes: ["impact_boom"], maxSeconds: 5 },
-  riser: { recipes: ["riser_noise", "reverse_swell"], maxSeconds: 8 },
+  hit: { recipes: [], placeAs: "impact_punch", maxSeconds: 1.5 },
+  sub: { recipes: ["sub_drop"], maxSeconds: 3 },
+  riser: { recipes: ["riser_noise", "riser_tonal"], maxSeconds: 8 },
+  reverse: { recipes: ["reverse_swell"], maxSeconds: 4 },
   click: { recipes: ["mouse_click"], maxSeconds: 0.6 },
   toggle: { recipes: ["toggle"], maxSeconds: 0.6 },
   tap: { recipes: ["ui_tap"], maxSeconds: 0.5 },
@@ -63,6 +121,12 @@ export const RECORDED_GROUP_SPECS: Readonly<Record<RecordedGroup, GroupSpec>> = 
   shutter: { recipes: ["camera_shutter"], maxSeconds: 1.5 },
   pop: { recipes: ["pop"], maxSeconds: 0.8 },
   glitch: { recipes: ["glitch_burst", "static"], maxSeconds: 2 },
+  sparkle: { recipes: ["sparkle"], maxSeconds: 3 },
+  notify: { recipes: ["notification_blip"], maxSeconds: 2 },
+  paper: { recipes: [], placeAs: "swish_airy", maxSeconds: 3 },
+  cloth: { recipes: [], placeAs: "swish_airy", maxSeconds: 3 },
+  scratch: { recipes: [], placeAs: "glitch_burst", maxSeconds: 2 },
+  ambience: { recipes: [], placeAs: "static", maxSeconds: 60 },
 };
 
 const GROUP_OF: ReadonlyMap<string, RecordedGroup> = new Map(RECORDED_GROUPS.flatMap((g) => RECORDED_GROUP_SPECS[g].recipes.map((r) => [r, g] as const)));
@@ -72,12 +136,18 @@ export function recordedGroupOf(recipe: string): RecordedGroup | undefined {
   return GROUP_OF.get(recipe);
 }
 
+/** The recipe a sound of `group` is levelled and timed as when it is placed by id. */
+export function recordedPlaceRecipe(group: RecordedGroup): string {
+  const spec = RECORDED_GROUP_SPECS[group];
+  return spec.recipes[0] ?? spec.placeAs!;
+}
+
 export function recordedSamples(group: RecordedGroup, kit: readonly RecordedSample[] = RECORDED_KIT): RecordedSample[] {
   return kit.filter((s) => s.group === group);
 }
 
 /** Groups whose sounds sustain for as long as the cue asks (a riser into the climax, typing under a prompt): cut to the cue, not the group. */
-const SUSTAINED: ReadonlySet<RecordedGroup> = new Set(["riser", "typing", "glitch"]);
+const SUSTAINED: ReadonlySet<RecordedGroup> = new Set(["riser", "reverse", "typing", "glitch", "ambience"]);
 
 /** Longest the sound for a cue of `group` may run: the cue's own length for sustained sounds, else the group's. */
 export function recordedMaxSeconds(group: RecordedGroup, cueSeconds: number | undefined): number {
@@ -86,7 +156,7 @@ export function recordedMaxSeconds(group: RecordedGroup, cueSeconds: number | un
 }
 
 /** Groups whose sound peaks mid-file, so a long one cannot be cut to a short cue (a hit keeps its start, a riser its end). */
-const PEAKING: ReadonlySet<RecordedGroup> = new Set(["whoosh", "swish", "whip"]);
+const PEAKING: ReadonlySet<RecordedGroup> = new Set(["whoosh", "swish", "whip", "paper", "cloth"]);
 
 /**
  * Sounds that suit a cue `wanted` seconds long: a 2 s whoosh under a 0.3 s
@@ -95,9 +165,9 @@ const PEAKING: ReadonlySet<RecordedGroup> = new Set(["whoosh", "swish", "whip"])
  */
 function fitting(group: RecordedGroup, samples: readonly RecordedSample[], wanted: number | undefined): RecordedSample[] {
   if (wanted === undefined || !PEAKING.has(group)) return [...samples];
-  const fit = samples.filter((s) => s.duration <= wanted * 1.8 + 0.15);
+  const fit = samples.filter((s) => soundSeconds(s) <= wanted * 1.8 + 0.15);
   if (fit.length >= 2) return fit;
-  return [...samples].sort((a, b) => a.duration - b.duration || a.id - b.id).slice(0, Math.min(3, samples.length));
+  return [...samples].sort((a, b) => soundSeconds(a) - soundSeconds(b) || a.id - b.id).slice(0, Math.min(3, samples.length));
 }
 
 function shuffled<T>(items: readonly T[], seed: number): T[] {
@@ -114,50 +184,42 @@ function groupSeed(seed: number, group: RecordedGroup): number {
   return Math.imul(seed | 0, 2654435761) ^ Math.imul(RECORDED_GROUPS.indexOf(group) + 1, 0x9e3779b9);
 }
 
+/** A group's sounds that fit `request`, in the seeded order picks prefer. */
+function candidatesFor(request: RecordedRequest, seed: number, kit: readonly RecordedSample[]): RecordedSample[] {
+  const group = recordedGroupOf(request.recipe);
+  return group ? shuffled(fitting(group, recordedSamples(group, kit), request.seconds), groupSeed(seed, group)) : [];
+}
+
 export interface RecordedRequest {
   recipe: string;
   /** The cue's length, seconds, when it has one. */
   seconds?: number;
+  /** Timeline seconds of the cue (variety is counted over 30 s windows); default: one second after the previous request. */
+  at?: number;
 }
 
 /**
- * The kit sound each request plays (undefined: synthesised). A group's
- * sounds are taken in turn from a seeded order; a sound never follows
- * itself, within its group or in the sequence.
+ * The kit sound each request plays (undefined: synthesised), by the variety
+ * rules (sfx/kit-search.ts pickVaried): a sound never follows itself in the
+ * sequence, plays at most three times in 30 s, and a group's sounds take
+ * turns in a seeded order.
  */
 export function pickRecorded(requests: readonly RecordedRequest[], seed: number, kit: readonly RecordedSample[] = RECORDED_KIT): (RecordedSample | undefined)[] {
-  const turns = new Map<RecordedGroup, number>();
-  const last = new Map<RecordedGroup, number>();
-  let previous: number | undefined;
-  return requests.map((request) => {
-    const group = recordedGroupOf(request.recipe);
-    if (!group) return undefined;
-    const order = shuffled(fitting(group, recordedSamples(group, kit), request.seconds), groupSeed(seed, group));
-    if (order.length === 0) return undefined;
-    let turn = turns.get(group) ?? 0;
-    let pick = order[turn % order.length]!;
-    if (order.length > 1 && (pick.id === last.get(group) || pick.id === previous)) pick = order[++turn % order.length]!;
-    turns.set(group, turn + 1);
-    last.set(group, pick.id);
-    previous = pick.id;
+  const used: KitUse[] = [];
+  return requests.map((request, i) => {
+    const pick = pickVaried(candidatesFor(request, seed, kit), used, request.at ?? i);
+    if (pick) used.push({ id: pick.id, at: request.at ?? i });
     return pick;
   });
 }
 
 /**
- * One sound for a single cue (add_sfx_tool): the group's next in its seeded
- * order after the ones already placed, and never one of `neighbours` (the
- * kit sounds placed just before and after the moment).
+ * One sound for a single cue (add_sfx_tool) at `at`, given the kit sounds
+ * already on the timeline: never the one right before or after the moment,
+ * the group's least used next in its seeded order.
  */
-export function pickRecordedOne(request: RecordedRequest, seed: number, placed: number, neighbours: readonly number[], kit: readonly RecordedSample[] = RECORDED_KIT): RecordedSample | undefined {
-  const group = recordedGroupOf(request.recipe);
-  if (!group) return undefined;
-  const order = shuffled(fitting(group, recordedSamples(group, kit), request.seconds), groupSeed(seed, group));
-  for (let k = 0; k < order.length; k += 1) {
-    const pick = order[(placed + k) % order.length]!;
-    if (!neighbours.includes(pick.id)) return pick;
-  }
-  return order[placed % Math.max(1, order.length)];
+export function pickRecordedOne(request: RecordedRequest & { at: number }, seed: number, used: readonly KitUse[], kit: readonly RecordedSample[] = RECORDED_KIT): RecordedSample | undefined {
+  return pickVaried(candidatesFor(request, seed, kit), used, request.at);
 }
 
 export function recordedSample(id: number, kit: readonly RecordedSample[] = RECORDED_KIT): RecordedSample | undefined {
