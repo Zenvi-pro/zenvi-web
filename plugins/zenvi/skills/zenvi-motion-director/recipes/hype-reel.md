@@ -54,8 +54,10 @@ fixing single shots after it.
    rebuild with `grade` set to a LUT id (`"heroic_cinema"`); only for an
    edit cut by hand run `unify_grade_tool` with `look`, leaving out the
    treated hero shot (`timeline_clip_ids`).
-7. Extra word cards (at most two before the end): `add_title_tool` with
-   `font: "Anton"`, uppercase, one word, on a downbeat, 0.5-1 s.
+7. Extra word cards (at most two before the end): `add_kinetic_title_tool`
+   `{"text": "NO BRAKES", "style": "stack", "animation": "slam",
+   "position_seconds": <downbeat>, "duration_seconds": 0.8}`, one or two
+   words, on a downbeat.
 8. Sound last: the receipt's `sound_design` call, `auto_sound_design_tool`
    `intensity: "hype"`, `density: "every_cut"`, `beats`, `climax_seconds` =
    `drop` (its receipt says how many cuts have a sound: all of them, near

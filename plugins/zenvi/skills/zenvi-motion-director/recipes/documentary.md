@@ -27,8 +27,19 @@ a small logo bug, low impacts on topic changes and a quiet music bed.
 3. Collage: `add_motion_template_tool` `template: "grid"`, `layout:
    "mosaic"`, `tiles: 3`, `reveal: "slide"`, `file_ids` (3 stills), over the
    matching sentence.
-4. Captions: `add_captions_tool` `clipId` = narration, `maxWords: 1`,
-   `style: "minimal"`, `text_size: 0.045`, `position: "center"`.
+4. Captions in each shot's negative space (DekLMhxqrFE: small words beside
+   the subject, on the calm side): `kinetic_captions_tool` `style:
+   "documentary"` (a phrase at a time) or `"split"` (two words either side
+   of the subject), `animation: "rise"`, `cues` from the narration's word
+   times (`get_transcript_tool` `includeWords: true`, plus the narration
+   clip's position), `timeline_clip_ids`: the b-roll under them. The tool
+   reads each shot and places the line where the picture is calm and dark.
+   Chapter cards (2-4 words, at most three): `add_kinetic_title_tool`
+   `{"text": "Part two: the money", "style": "editorial", "animation":
+   "rise", "position_seconds": 12, "duration_seconds": 1.6}`, `"scramble"`
+   on a number (`"491GB"`). Fallback (no drawings on this host):
+   `add_captions_tool` `clipId` = narration, `maxWords: 1`, `style:
+   "minimal"`, `text_size: 0.045`, `position: "center"`.
 5. Logo bug: `add_title_tool` with a short mark (`text`, `font: "Space
    Mono"`, `font_scale: 0.5`) placed top right with `set_clip_property_tool`
    (`property: "location_x"` / `"location_y"`, then `property: "alpha"`,

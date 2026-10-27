@@ -25,16 +25,27 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    (`file_id` of the narration) and `get_transcript_tool` with
    `includeWords: true` for word times.
 2. Picture: talking-head clip on track 1 for the whole length; inserts on the
-   same track at the noun times, 0.8-1.5 s each.
+   same track at the noun times, 0.8-1.5 s each. Then the head's matte, once:
+   `generate_subject_matte_tool` `{"clip_id": "<head clip>"}` (CLI; about 15
+   frames a second). With it the captions find the head in every shot and
+   put the emphasis words behind it; a refusal (no matting here) only costs
+   that, the captions still work.
 3. Captions, one call: `kinetic_captions_tool` `style: "creator"` (word by
-   word, connectors white, the emphasis words huge red condensed capitals,
-   each popping in on its word). `emphasis`: the 3-6 words that carry the
-   line, each once. `avoid`: the face box, read off `preview_frame grid:
-   true`. `text_size: 0.06` (connectors readable on a phone; emphasis keeps
-   its ratio), `y: 0.62` on 9:16 (under the face; the tool keeps every group
-   inside the safe area, out of the bottom fifth), `animation: "pop"`
-   (`"slam"` for a harder edit, `"slide_up"` with `style: "stack"`). The
-   captions sit on their own tracks, so they stay on screen over the
+   word, connectors white, the emphasis words huge red condensed capitals).
+   `emphasis`: the 3-6 words that carry the line, each once. `animation:
+   "tilt"` (Dc3mgNJO73W: words swing in, emphasis words stay turned 7°),
+   `"pop"` for a calmer piece, `"slam"` for a harder one, `"scramble"` (tech,
+   numbers: the emphasis word decodes from random letters), `"letters"`
+   (brand, playful: its letters bounce in), `"slide_up"` with `style:
+   "stack"`, `"typewriter"` for UI text. Placement is automatic: the tool
+   looks at each shot, keeps off the head (the matte's) and takes the calm,
+   dark side; with the matte, emphasis words go behind the head where there
+   is headroom (`behind_subject` is `"auto"`; the receipt says
+   `behind_subject: "emphasis"` or `"none"`). `avoid` (the face box, from
+   `preview_frame grid: true`) only without a matte; leave `y` out unless a
+   frame check says otherwise. `text_size: 0.06` (connectors readable on a
+   phone; emphasis keeps its ratio). The captions sit on their own tracks,
+   so they stay on screen over the
    inserts. `timeline_clip_ids`: the talking-head clip (the captions belong
    to it). The words: `cues` in timeline seconds. With a TTS narration, the
    word times from step 1's `get_transcript_tool` (one cue per word, start
@@ -44,21 +55,24 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    transcribes the clip.
 
 ```json
-kinetic_captions_tool {"timeline_clip_ids": ["<head clip>"], "style": "creator", "animation": "pop",
-  "text_size": 0.06, "y": 0.62, "emphasis": ["deadline", "idea", "today"],
-  "avoid": [{"x": 0.5, "y": 0.32, "w": 0.36, "h": 0.3}],
+generate_subject_matte_tool {"clip_id": "<head clip>"}
+kinetic_captions_tool {"timeline_clip_ids": ["<head clip>"], "style": "creator", "animation": "tilt",
+  "text_size": 0.06, "emphasis": ["deadline", "idea", "today"],
   "cues": [{"text": "Stop chasing the", "start": 0, "end": 1.1}, {"text": "deadline", "start": 1.1, "end": 1.8}]}
 ```
 
-   Check 2 frames: the emphasis word whole and off the mouth, the connector
-   line readable. Too small or too low: run it again with other `text_size`
-   or `y` (it replaces its own captions, one undo step).
-4. The hero word behind the head, once: `generate_subject_matte_tool`
-   `clip_id` = the head clip; when it works (CLI), `text_behind_subject_tool`
-   `{"clip_id": "<head clip>", "text": "IDEA", "color": "#e0201b", "font":
-   "Anton", "y": 0.36}` for the one word the piece is about (leave it out of
-   `emphasis`). A refusal (no matting here) means the word stays in the
-   captions beside the head. Without `kinetic_captions_tool` (it refuses
+   Check 2 frames: the emphasis word whole and off the mouth (behind the
+   head it shows above it, the head over its lower third), the connector
+   line readable. Too small or misplaced: run it again with other
+   `text_size`, `y` or `animation` (it replaces its own captions, one undo
+   step).
+4. Optional, the one word the piece is about as a full-width line behind
+   the head: `text_behind_subject_tool` `{"clip_id": "<head clip>", "text":
+   "IDEA", "color": "#e0201b", "font": "Anton", "y": 0.36}` (leave it out of
+   `emphasis`). The opening or closing title card:
+   `add_kinetic_title_tool` `{"text": "STOP SCROLLING", "style": "stack",
+   "animation": "slam", "position_seconds": 0, "duration_seconds": 1.2}`.
+   Without `kinetic_captions_tool` (it refuses
    when the host cannot store drawings): `add_captions_tool` (`cues`,
    `maxWords: 1`, `text_size: 0.065`) for the connectors and `add_title_tool`
    (`font: "Anton"`, red, `font_scale` 3-4) per emphasis word.
@@ -104,6 +118,7 @@ the frame at its start shows it.
   20 s) and each appears once.
 - Rail words tiny at the bottom edge: `text_size` 0.055-0.07 and `y` near
   the subject, centred, big enough to read on a phone.
-- Captions where the subject's face is: read face position off a
-  `preview_frame grid: true` first.
+- Captions where the subject's face is: make the matte first (step 2), or
+  give `avoid` from a `preview_frame grid: true`.
+- Every caption fading in place: that is subtitles. Pick an animation.
 - Music over the voice at full level: duck it.
