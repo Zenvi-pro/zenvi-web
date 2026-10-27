@@ -272,9 +272,9 @@ def grass_material(look, density):
     info = tree.nodes.new("ShaderNodeObjectInfo")
     ramp = tree.nodes.new("ShaderNodeValToRGB")
     els = ramp.color_ramp.elements
-    els[0].color = core.rgb("#1E3511", 1.0)
-    els[1].color = core.rgb("#8DA34A", 1.0)
-    els.new(0.6).color = core.rgb("#4E7426", 1.0)
+    els[0].color = core.rgb("#24401A", 1.0)
+    els[1].color = core.rgb("#A3B85A", 1.0)
+    els.new(0.6).color = core.rgb("#5A8430", 1.0)
     shade = core.math_node(tree, "ADD", core.math_node(tree, "MULTIPLY", tip, 0.8), core.math_node(tree, "MULTIPLY", info.outputs["Random"], 0.25))
     tree.links.new(shade, ramp.inputs["Fac"])
     bsdf = tree.nodes.new("ShaderNodeBsdfPrincipled")
@@ -284,7 +284,7 @@ def grass_material(look, density):
     trans = tree.nodes.new("ShaderNodeBsdfTranslucent")
     tree.links.new(ramp.outputs["Color"], trans.inputs["Color"])
     mix = tree.nodes.new("ShaderNodeMixShader")
-    mix.inputs["Fac"].default_value = 0.4
+    mix.inputs["Fac"].default_value = 0.5
     tree.links.new(bsdf.outputs[0], mix.inputs[1])
     tree.links.new(trans.outputs[0], mix.inputs[2])
     tree.links.new(haze(tree, mix.outputs[0], look, density), out.inputs["Surface"])
@@ -394,7 +394,9 @@ def build(job):
     fog = 0.004 + 0.05 * float(p.get("haze", 0.4)) ** 1.5
 
     # A low sun ahead of the camera, a little to the side: backlight through the grass.
-    sun_az = 180 + (18 if rng.random() < 0.5 else -18)
+    # On a vertical frame the view is narrow: keep the sun inside it.
+    side = 18 if camera.frame_aspect() >= 1 else 7
+    sun_az = 180 + (side if rng.random() < 0.5 else -side)
     elevation = look[5]
     sun_vec = lights.orbit_point(1.0, sun_az, elevation)
     SUN_DIR[:] = list(sun_vec)

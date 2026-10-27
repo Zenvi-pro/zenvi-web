@@ -125,9 +125,9 @@ def build(job):
         suf.data.offset_y = -(b[2]) + (min(i[2] for i in inks) - y_mid)
         suf.data.offset_x = -b[0]
         suf.rotation_euler = (math.radians(90), 0, 0)
-        suf.location = (digits_right + advance * 0.18, -radius, 0)
+        suf.location = (digits_right + advance * 0.12, -radius, 0)
         suf.parent = counter
-        right = digits_right + advance * 0.18 + (b[1] - b[0])
+        right = digits_right + advance * 0.12 + (b[1] - b[0])
     width = right - left
     counter.location = (-(left + right) / 2, radius, 0)  # the front face of the drums at y = 0
 
