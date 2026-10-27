@@ -3,7 +3,7 @@
  * ceiling stops the mix short of its loudness target (an unmastered music
  * bed with 15 dB of crest, a few hot hits), the frames whose peaks would pass
  * the ceiling at the target are turned down just enough, on every clip that
- * plays there except the voice: a look-ahead limiter on the mix bus, written
+ * plays there (a voice included): a look-ahead limiter on the mix bus, written
  * as volume keyframes because libopenshot has no bus and its Compressor
  * (Compressor.cpp:48-113) detects on the mono sum, so it misses the peaks of
  * a wide stereo bed. libopenshot ramps each frame's volume from the previous

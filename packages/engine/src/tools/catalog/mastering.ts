@@ -88,7 +88,7 @@ const input = z.strictObject({
   limit: z
     .boolean()
     .default(true)
-    .describe("When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes on every clip but the voice, at most 4 dB: a look-ahead limiter the desktop plays too), so the mix gets there."),
+    .describe("When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes on every clip that plays there, at most 4 dB: a look-ahead limiter the desktop plays too), so the mix gets there."),
   iterate: z
     .boolean()
     .default(false)
@@ -279,7 +279,7 @@ export const masteringTools: CatalogTool[] = [
       "Writes clip volume and Compressor makeup gain only (the desktop plays the same mix), one undo step, and returns the before/after loudness. " +
       "Presets: social -14 LUFS / -1 dBTP, broadcast -23, podcast -16. Run it LAST, after the edit, music and sound design are in place; running it again changes nothing. " +
         "iterate=true (with genre) first runs analyze_mix_tool's loop (duck the bed to 10 dB under the voice, fix levels, timing, masking: its top fixes, re-scored, up to 3 rounds) and then masters, all one undo step: the best finishing call. " +
-      "If the true-peak ceiling stops the mix short of the target, the frames that peak are ridden down (at most 4 dB, every clip but the voice; limit=false: stop at the ceiling and say so). " +
+      "If the true-peak ceiling stops the mix short of the target, the frames that peak are ridden down (at most 4 dB on every clip playing there; limit=false: stop at the ceiling and say so). " +
       "dry_run=true measures and plans without changing anything. Refuses timelines with no audible audio.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
@@ -349,7 +349,8 @@ export const masteringTools: CatalogTool[] = [
 
       // Short of the target at the ceiling: ride the peaks down (master-limit.ts), then plan again on a copy that has the rides.
       let rides: Rides | null = null;
-      const ridden = staged.filter((st) => st.stem !== "speech" && !st.locked).map((st) => st.entry.id);
+      // The voice too: a talking head's own crest is what stops it short, and a few dB off a plosive for three frames is what any dialogue limiter does.
+      const ridden = staged.filter((st) => !st.locked).map((st) => st.entry.id);
       if (args.limit && plan.limitedBy === "peak" && plan.shortfallLu > RIDE_ABOVE_LU && ridden.length > 0) {
         const { present, sampleRate } = planned;
         rides = planPeakRides(present.map((st) => ({ channels: st.channels, gainDb: plan!.roleGainDb[st.role] ?? 0 })), sampleRate, fpsFloatOf(project), base.ceilingDbtp, plan.shortfallLu);

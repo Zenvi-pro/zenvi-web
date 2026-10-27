@@ -46,23 +46,20 @@ describe("planPeakRides", () => {
 });
 
 describe("master_audio_tool peak rides", { timeout: 60_000 }, () => {
-  it("rides the peaks down so the mix gets closer to the target in one undo step, leaving the voice alone", async () => {
+  it("rides the peaks down so the mix gets closer to the target in one undo step", async () => {
     const off = peaky();
     expect((await master(off, { limit: false })).data).toMatchObject({ limitedBy: "peak" });
     const stopped = await loudness(off);
 
     const p = peaky();
     const undo = p.doc.undoLabels.length;
-    const voiceCurve = JSON.stringify(curvePoints(p.doc.project.clips.find((c) => c.id === p.voice)));
     const receipt = await master(p, {});
     expect(p.doc.undoLabels.length).toBe(undo + 1);
     expect(receipt.summary).toMatch(/peaks ridden down/);
     const after = await loudness(p);
     expect(after.integrated).toBeGreaterThan(stopped.integrated + 1);
     expect(after.truePeakDb).toBeLessThanOrEqual(-0.9);
-    // The voice keeps its own curve (gain may scale it, rides never touch it); the clicks carry the rides.
-    const voice = curvePoints(p.doc.project.clips.find((c) => c.id === p.voice));
-    expect(voice.length).toBeLessThanOrEqual(Math.max(1, JSON.parse(voiceCurve).length));
+    // The clicks carry the rides.
     expect(p.hits.some((id) => curvePoints(p.doc.project.clips.find((c) => c.id === id)).length > 2)).toBe(true);
   });
 });
