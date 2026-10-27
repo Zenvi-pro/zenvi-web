@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { loadConfig } from "../config.js";
 import { type Harness, harness, USER_A } from "../testing/helpers.js";
 import { randomSecret, sha256Base64Url } from "../util/crypto.js";
 import { redirectUriMatches, redirectUriProblem } from "./redirect.js";
@@ -307,6 +308,70 @@ describe("client ID metadata documents", () => {
       const res = await h.request("GET", authorizeUrl({ response_type: "code", client_id: clientId, redirect_uri: redirect, code_challenge: pkce().challenge, code_challenge_method: "S256" }));
       expect(res.status).toBe(400);
     }
+  });
+});
+
+describe("MCP URL aliases (a proxy's public URL, e.g. https://zenvi.pro/plugin)", () => {
+  const PLUGIN = "https://zenvi.test/plugin";
+  const withAlias = () => harness({ config: { mcpUrlAliases: [PLUGIN] } });
+  const initialize = (h: Harness, path: string, token?: string) =>
+    h.request("POST", path, {
+      token,
+      headers: { accept: "application/json, text/event-stream" },
+      json: { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "test", version: "1" } } },
+    });
+
+  it("serve the alias's own metadata and challenge, naming this service as authorization server", async () => {
+    const h = await withAlias();
+    const prm = await h.request("GET", "/.well-known/oauth-protected-resource/plugin");
+    expect(prm.json).toMatchObject({ resource: PLUGIN, authorization_servers: ["https://cloud.test"] });
+    const res = await initialize(h, "/plugin");
+    expect(res.status).toBe(401);
+    expect(res.headers.get("www-authenticate")).toContain('resource_metadata="https://zenvi.test/.well-known/oauth-protected-resource/plugin"');
+    expect((await initialize(await harness(), "/plugin")).status).toBe(404);
+  });
+
+  it("issue tokens bound to the alias: they work there, survive refresh, and are refused on /mcp (and the reverse)", async () => {
+    const h = await withAlias();
+    const clientId = await register(h);
+    const { verifier, challenge } = pkce();
+    const code = (await authorizeAndConsent(h, clientId, { challenge, resource: PLUGIN })).searchParams.get("code") ?? "";
+    const tokens = await exchange(h, clientId, code, verifier, { resource: PLUGIN });
+    expect(tokens.status).toBe(200);
+    const init = await initialize(h, "/plugin", tokens.json.access_token);
+    expect(init.status).toBe(200);
+    expect(init.json.result.serverInfo.name).toBe("zenvi");
+    const elsewhere = await initialize(h, "/mcp", tokens.json.access_token);
+    expect(elsewhere.status).toBe(401);
+    expect(elsewhere.json.error_description).toContain(PLUGIN);
+
+    const refreshed = await h.request("POST", "/oauth/token", {
+      form: { grant_type: "refresh_token", refresh_token: tokens.json.refresh_token, client_id: clientId, resource: PLUGIN },
+    });
+    expect(refreshed.status).toBe(200);
+    expect((await initialize(h, "/plugin", refreshed.json.access_token)).status).toBe(200);
+
+    const canonicalCode = (await authorizeAndConsent(h, clientId, { challenge })).searchParams.get("code") ?? "";
+    expect((await exchange(h, clientId, canonicalCode, verifier, { resource: PLUGIN })).json.error).toBe("invalid_target");
+    const canonicalCode2 = (await authorizeAndConsent(h, clientId, { challenge })).searchParams.get("code") ?? "";
+    const canonical = await exchange(h, clientId, canonicalCode2, verifier);
+    expect((await initialize(h, "/plugin", canonical.json.access_token)).status).toBe(401);
+    expect((await initialize(h, "/mcp", canonical.json.access_token)).status).toBe(200);
+  });
+
+  it("refuse an authorization request that names two different resources", async () => {
+    const h = await withAlias();
+    const clientId = await register(h);
+    const base = authorizeUrl({ response_type: "code", client_id: clientId, redirect_uri: "https://client.test/callback", code_challenge: pkce().challenge, code_challenge_method: "S256" });
+    const res = await h.request("GET", `${base}&resource=${encodeURIComponent(PLUGIN)}&resource=${encodeURIComponent(RESOURCE)}`);
+    expect(new URL(res.headers.get("location") ?? "").searchParams.get("error")).toBe("invalid_target");
+  });
+
+  it("are https URLs with one path segment that no other route uses", () => {
+    for (const bad of ["http://zenvi.test/plugin", "https://zenvi.test/", "https://zenvi.test/a/b", "https://zenvi.test/mcp", "https://zenvi.test/plugin?x=1"]) {
+      expect(() => loadConfig({ STORAGE: "memory", MCP_URL_ALIASES: bad })).toThrow(/MCP_URL_ALIASES/);
+    }
+    expect(loadConfig({ STORAGE: "memory", MCP_URL_ALIASES: "https://zenvi.test/plugin/" }).mcpUrlAliases).toEqual([PLUGIN]);
   });
 });
 

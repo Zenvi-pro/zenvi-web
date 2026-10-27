@@ -2,6 +2,7 @@
  * OAuth 2.1 authorization server + discovery documents for remote MCP.
  *
  *   GET  /.well-known/oauth-protected-resource[/mcp]   RFC 9728 (resource = <origin>/mcp)
+ *   GET  /.well-known/oauth-protected-resource/<path>  the same for each MCP URL alias (resource = the alias)
  *   GET  /.well-known/oauth-authorization-server       RFC 8414
  *   POST /oauth/register                               RFC 7591 (public clients)
  *   GET  /oauth/authorize                              → 302 to the editor's consent page
@@ -51,6 +52,9 @@ export function wellKnownRoutes(services: Services): Hono<AppEnv> {
   const prm = (origin: string) => services.oauth.protectedResourceMetadata(origin);
   app.get("/oauth-protected-resource", (c) => c.json(prm(c.get("origin"))));
   app.get("/oauth-protected-resource/mcp", (c) => c.json(prm(c.get("origin"))));
+  for (const alias of services.config.mcpUrlAliases) {
+    app.get(`/oauth-protected-resource${new URL(alias).pathname}`, (c) => c.json(services.oauth.protectedResourceMetadata(c.get("origin"), alias)));
+  }
   app.get("/oauth-authorization-server", (c) => c.json(services.oauth.authorizationServerMetadata(c.get("origin"))));
   return app;
 }
