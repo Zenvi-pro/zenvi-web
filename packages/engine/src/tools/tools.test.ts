@@ -998,6 +998,14 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
 
+  review_render_tool: {
+    happy: {
+      args: { path: "/out/reel.mp4" },
+      summary: /^Reviewed \/out\/reel\.mp4 \(8\.00s, 1280x720\): 0 problem\(s\), 0 warning\(s\)\. 2 shot\(s\)/,
+      check: ({ host }) => expect(host.calls).toContain("inspectRender /out/reel.mp4"),
+    },
+    failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for review_render_tool/ },
+  },
   add_motion_template_tool: {
     happy: {
       args: { template: "end_card", text: "Northwind", subtitle: "Brews in four minutes", position_seconds: "1", bpm: "120" },
