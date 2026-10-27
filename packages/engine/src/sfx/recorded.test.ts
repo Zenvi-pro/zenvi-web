@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { RECORDED_KIT } from "./recorded-kit.data.js";
 import { RECORDED_GROUPS, RECORDED_GROUP_SPECS, pickRecorded, pickRecordedOne, recordedCredit, recordedGroupOf, recordedMaxSeconds, recordedPlaceRecipe, recordedSamples } from "./recorded.js";
+import { kitTraits } from "./kit-search.js";
 import { sfxRecipe } from "./recipes.js";
 
 describe("the recorded kit", () => {
@@ -36,10 +37,20 @@ describe("the recorded kit", () => {
     expect(recordedGroupOf("swoosh_hit")).toBeUndefined();
   });
 
+  it("puts only fast-attack recordings on a transient, and no soft ones on a hero hit", () => {
+    for (const recipe of ["impact_punch", "impact_thud", "mouse_click", "pop"]) {
+      const picks = pickRecorded(Array.from({ length: 30 }, (_, i) => ({ recipe, at: i * 2 })), 1);
+      expect(picks.every((p) => p!.attackMs <= 30), recipe).toBe(true);
+      expect(new Set(picks.map((p) => p!.id)).size, recipe).toBeGreaterThanOrEqual(4);
+    }
+    const booms = pickRecorded(Array.from({ length: 30 }, (_, i) => ({ recipe: "impact_boom", at: i * 2 })), 1);
+    expect(booms.every((p) => kitTraits(p!).energy !== "soft")).toBe(true);
+  });
+
   it("plays no sound more than three times in 30 s", () => {
-    // 40 shutters in 20 s: a pool of 14 or more covers them at three uses each.
-    expect(recordedSamples("shutter").length).toBeGreaterThanOrEqual(14);
-    const picks = pickRecorded(Array.from({ length: 40 }, (_, i) => ({ recipe: "camera_shutter", at: i * 0.5 })), 3);
+    // 40 whooshes in 20 s: a pool of 14 or more covers them at three uses each.
+    expect(recordedSamples("whoosh").length).toBeGreaterThanOrEqual(14);
+    const picks = pickRecorded(Array.from({ length: 40 }, (_, i) => ({ recipe: "whoosh_medium", at: i * 0.5 })), 3);
     const counts = new Map<number, number>();
     for (const p of picks) counts.set(p!.id, (counts.get(p!.id) ?? 0) + 1);
     expect(Math.max(...counts.values())).toBeLessThanOrEqual(3);
@@ -61,10 +72,10 @@ describe("the recorded kit", () => {
     const short = pickRecorded(Array.from({ length: 10 }, () => ({ recipe: "whoosh_short", seconds: 0.3 })), 1);
     expect(short.every((p) => (p!.endMs - p!.onsetMs) / 1000 <= 0.3 * 1.8 + 0.15)).toBe(true);
     expect(pickRecorded([{ recipe: "swoosh_hit" }], 1)).toEqual([undefined]);
-    // Hits are cut to length: a short cue still rotates through every punch.
+    // Hits are cut to length: a short cue still rotates through the fast, hard punches (not only the shortest).
     const all = recordedSamples("punch").length;
     const punches = pickRecorded(Array.from({ length: 2 * all }, () => ({ recipe: "impact_punch", seconds: 0.3 })), 1);
-    expect(new Set(punches.map((p) => p!.id)).size).toBe(all);
+    expect(new Set(punches.map((p) => p!.id)).size).toBeGreaterThanOrEqual(8);
     expect(recordedMaxSeconds("riser", 2)).toBe(2);
     expect(recordedMaxSeconds("whoosh", 0.3)).toBe(RECORDED_GROUP_SPECS.whoosh.maxSeconds);
   });

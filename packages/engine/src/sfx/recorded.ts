@@ -17,8 +17,9 @@
  */
 
 import { Rng } from "./dsp.js";
-import { pickVaried, soundSeconds, type KitUse } from "./kit-search.js";
+import { kitTraits, pickVaried, soundSeconds, type KitUse } from "./kit-search.js";
 import { attributionLine, type SfxCredit } from "./library.js";
+import { sfxRecipe } from "./recipes.js";
 import { RECORDED_KIT } from "./recorded-kit.data.js";
 
 export const RECORDED_GROUPS = [
@@ -184,10 +185,32 @@ function groupSeed(seed: number, group: RecordedGroup): number {
   return Math.imul(seed | 0, 2654435761) ^ Math.imul(RECORDED_GROUPS.indexOf(group) + 1, 0x9e3779b9);
 }
 
+/** Longest attack of a sound whose transient goes on the moment, ms (DEPLOY S4.3: a hero's transient is <= 30 ms). */
+const MAX_ATTACK_MS = 30;
+/** Recipes that play a hero hit: never from the softest third of their group. */
+const HERO_RECIPES: ReadonlySet<string> = new Set(["impact_punch", "impact_slam", "impact_boom", "impact_thud", "sub_drop"]);
+
+/**
+ * The sounds of `group` that suit `recipe` by their measurements: a fast
+ * attack where the recipe's transient lands on the moment (a slow one
+ * smears it before the cut), and a hard hit for a hero. A filter that
+ * would leave fewer than four sounds is skipped, so variety holds.
+ */
+function suited(group: RecordedGroup, recipe: string, samples: readonly RecordedSample[], kit: readonly RecordedSample[]): readonly RecordedSample[] {
+  let pool = samples;
+  const keep = (test: (s: RecordedSample) => boolean) => {
+    const kept = pool.filter(test);
+    if (kept.length >= 4) pool = kept;
+  };
+  if (sfxRecipe(recipe)?.hit === "onset" && !SUSTAINED.has(group)) keep((s) => s.attackMs <= MAX_ATTACK_MS);
+  if (HERO_RECIPES.has(recipe)) keep((s) => kitTraits(s, kit).energy !== "soft");
+  return pool;
+}
+
 /** A group's sounds that fit `request`, in the seeded order picks prefer. */
 function candidatesFor(request: RecordedRequest, seed: number, kit: readonly RecordedSample[]): RecordedSample[] {
   const group = recordedGroupOf(request.recipe);
-  return group ? shuffled(fitting(group, recordedSamples(group, kit), request.seconds), groupSeed(seed, group)) : [];
+  return group ? shuffled(fitting(group, suited(group, request.recipe, recordedSamples(group, kit), kit), request.seconds), groupSeed(seed, group)) : [];
 }
 
 export interface RecordedRequest {
