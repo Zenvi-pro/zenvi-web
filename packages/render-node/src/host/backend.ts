@@ -22,6 +22,13 @@ export interface BackendHostOptions {
   baseUrl: string;
   /** Current access token, refreshed by the caller; undefined when signed out. */
   token?: () => Promise<string | undefined>;
+  /**
+   * Why the backend cannot be used with the current sign-in (e.g. a personal
+   * token, which only Zenvi Cloud accepts), or undefined. Checked before any
+   * request, so the person is told how to sign in instead of getting the
+   * backend's 401.
+   */
+  unavailable?: () => Promise<string | undefined>;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   /** Speech uploads wait this long for the transcription (default 10 minutes). */
@@ -48,6 +55,8 @@ export function createBackendHost(options: BackendHostOptions): BackendHost {
   return {
     baseUrl: base,
     async request<T = unknown>(requestPath: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+      const blocked = await options.unavailable?.();
+      if (blocked) throw new BackendError(blocked, 401, undefined);
       const url = `${base}${requestPath.startsWith("/") ? requestPath : `/${requestPath}`}`;
       const headers: Record<string, string> = { Accept: "application/json" };
       if (options.userAgent) headers["User-Agent"] = options.userAgent;
@@ -94,6 +103,8 @@ export function backendSpeechUpload(options: BackendHostOptions): SpeechUpload {
   const base = options.baseUrl.replace(/\/+$/, "");
   const doFetch = options.fetchImpl ?? fetch;
   return async (piece, fields) => {
+    const blocked = await options.unavailable?.();
+    if (blocked) throw new TranscriptionError("sign_in", blocked);
     const form = new FormData();
     form.append("file", new Blob([piece.bytes], { type: piece.contentType }), piece.fileName);
     if (fields.language) form.append("language", fields.language);

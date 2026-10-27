@@ -238,6 +238,15 @@ describe("backend host", () => {
     await expect(down.request("/api/v1/ok")).rejects.toThrow(/Cannot reach/);
   });
 
+  it("says why it cannot be used before sending anything", async () => {
+    const before = requests.length;
+    const backend = createBackendHost({ baseUrl, token: async () => "tok", unavailable: async () => "Sign in with `zenvi login`." });
+    await expect(backend.request("/api/v1/ok")).rejects.toMatchObject({ status: 401, message: "Sign in with `zenvi login`." });
+    expect(requests.length).toBe(before);
+    const usable = createBackendHost({ baseUrl, unavailable: async () => undefined });
+    expect(await usable.request("/api/v1/ok", { body: {} })).toEqual({ ok: true, echo: {} });
+  });
+
   it("shows a credit or tier refusal in the backend's own words (detail.message)", async () => {
     const message = "Out of credits for image generation. Need 3, have 0. Upgrade your plan or enable overage to continue.";
     const backend = createBackendHost({

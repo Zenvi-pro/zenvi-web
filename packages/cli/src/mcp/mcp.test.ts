@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -61,6 +61,35 @@ describe("zenvi mcp", () => {
     const tool = (await client.listTools()).tools.find((t) => t.name === "preview_frame")!;
     expect(tool.inputSchema).toMatchObject({ type: "object", required: ["seconds"] });
     expect(tool.annotations).toMatchObject({ readOnlyHint: true });
+  });
+
+  it("says how to sign in, without calling the backend, when the sign-in is a personal token", async () => {
+    const env = testEnv(home, { ZENVI_BACKEND_URL: "http://127.0.0.1:9" });
+    const configDir = env.ZENVI_CONFIG_DIR!;
+    await mkdir(configDir, { recursive: true });
+    await writeFile(path.join(configDir, "auth.json"), JSON.stringify({ kind: "pat", token: "zvn_pat_abc", user_email: "p@q.r", saved_at: "x" }));
+    try {
+      // The real catalog: the test registry stubs the generation tools.
+      const ctx = createContext({ env, cwd: work });
+      const server = await createZenviMcpServer(ctx);
+      const [a, b] = InMemoryTransport.createLinkedPair();
+      await server.server.connect(b);
+      const client = new Client({ name: "test", version: "1" });
+      await client.connect(a);
+      open.push({ client, server });
+
+      const health = await call(client, "mcp_health");
+      expect(health.receipt.status).toBe("applied");
+      expect(health.receipt.summary).toMatch(/personal token: Zenvi Cloud only/);
+      expect(health.receipt.summary).toMatch(/AI voice \(text to speech\): off\. .*zenvi login/);
+      expect(health.receipt.summary).toMatch(/Zenvi Cloud .*: on/);
+
+      const tts = await call(client, "generate_tts_and_add_to_timeline_tool", { text: "hello" });
+      expect(tts.receipt.summary).toMatch(/personal tokens \(zvn_…\).*zenvi login/);
+      expect(tts.receipt.summary).not.toMatch(/Cannot reach/);
+    } finally {
+      await rm(path.join(configDir, "auth.json"), { force: true });
+    }
   });
 
   it("works untitled, then saves those edits when a file is chosen; later edits autosave", async () => {

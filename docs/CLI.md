@@ -305,7 +305,10 @@ zenvi call premiere_export preset=h264-high output=/Users/me/out/cut.mp4
   works for Zenvi Cloud and for the AI tools that use the Zenvi backend.
 - `zenvi login --device` (SSH, servers): shows a short code to approve at
   zenvi.pro from any device and stores a Zenvi personal token
-  (`zvn_pat_…`). It works for Zenvi Cloud only.
+  (`zvn_pat_…`). It works for Zenvi Cloud only: AI image/video/voice,
+  speech recognition and media search say so and ask for `zenvi login`
+  without calling the backend. `zenvi whoami` lists what the sign-in turns
+  off; the MCP tool `mcp_health` reports the same.
 - `zenvi push` hashes each media file (SHA-256 of the whole file), uploads
   only the files Zenvi Cloud does not have yet, uploads the project with its
   history, and opens the web editor. Local folder names are not uploaded:
