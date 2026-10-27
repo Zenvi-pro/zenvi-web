@@ -13,6 +13,7 @@ import {
   ProfileRequestError,
   resolveProfileRequest,
   socialPreset,
+  socialProfile,
   type ProfileContext,
 } from "./profile-requests.js";
 import { aspectText, describeProfile, orientationOf, parseProfileFile, profileFileText, profileFpsFraction, reducedDisplayRatio, type CatalogProfile } from "./profiles.js";
@@ -78,6 +79,16 @@ describe("resolveProfileRequest", () => {
     expect(socialPreset("tiktok_video")?.key).toBe("tiktok");
     expect(socialPreset("YT Shorts")?.exportPreset).toBe("YouTube Shorts");
     expect(socialPreset("betamax")).toBeNull();
+  });
+
+  it("names the built-in profile of a social preset (agents ask for these, W25a E2E bug 9)", () => {
+    for (const name of ["instagram_reel", "reels", "tiktok", "youtube_short", "shorts"]) {
+      expect(socialProfile(name)?.description, name).toBe("FHD Vertical 1080p 30 fps");
+    }
+    expect(socialProfile("youtube")?.description).toBe("FHD 1080p 30 fps");
+    expect([socialProfile("square_post")?.width, socialProfile("square_post")?.height]).toEqual([1080, 1080]);
+    expect(socialProfile("tiktok", 60)?.description).toBe("FHD Vertical 1080p 60 fps");
+    expect(socialProfile("betamax")).toBeNull();
   });
 });
 

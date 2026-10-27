@@ -9,7 +9,7 @@ import { checkParams } from "../params.js";
 import { createContext, type BlockBuild } from "../runtime/index.js";
 
 /** Blocks that draw only into a canvas, which jsdom does not paint. */
-const CANVAS_ONLY = new Set(["gradient_field"]);
+const CANVAS_ONLY = new Set(["gradient_field", "line_trails"]);
 
 /** The root's HTML with each style attribute's declarations sorted (setting a property again may move it). */
 function normalized(root: HTMLElement): string {
@@ -84,5 +84,17 @@ describe("chart_build's change badge", () => {
   it("is left out when the highlight is the first bar (nothing to compare it with)", async () => {
     expect((await built("chart_build", { values: ["9", "3", "4"] }, 5)).root.querySelector(".cb-badge")).toBeNull();
     expect((await built("chart_build", { values: ["3", "9", "4"] }, 5)).root.querySelector(".cb-badge")?.textContent).toBe("+200% vs Jan");
+  });
+});
+
+describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s with blank list items", (id, manifest) => {
+  const lists = Object.entries(manifest.params).filter(([, spec]) => spec.type === "strings").map(([name]) => name);
+  it.skipIf(lists.length === 0)("builds and seeks", async () => {
+    const mod = (await import(`./${id}/block.ts`)) as { build: BlockBuild };
+    const checked = checkParams(manifest, Object.fromEntries(lists.map((name) => [name, [" "]])));
+    if (!checked.ok) return;
+    const ctx = createContext(document, { block: id, params: checked.params, width: 1080, height: 1920, fps: 30, seconds: manifest.duration.default, alpha: manifest.alpha, media: {}, draft: false });
+    await mod.build(ctx);
+    ctx.tl.seek(manifest.duration.default / 2);
   });
 });
