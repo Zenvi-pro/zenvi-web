@@ -321,6 +321,15 @@ export class WorkerPreview implements PreviewTarget {
 
   private fail(error: PreviewWorkerError): void {
     if (this.failure || this.disposed) return;
+    // A worker that ran may still be alive (a lost message, one frame past the watchdog): free this
+    // player's session there (its renderer, caches, decoders), since nothing will post to it again.
+    if (started.has(this.worker)) {
+      try {
+        this.worker.postMessage({ type: "close", id: this.id } satisfies ToWorker, []);
+      } catch {
+        // The worker is gone; so is the session.
+      }
+    }
     this.failure = error;
     if (!failed.has(this.worker)) {
       failed.set(this.worker, error);
