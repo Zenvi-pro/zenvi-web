@@ -8,6 +8,8 @@ import { addFile } from "../../ops/files.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "../test-support/fake-host.js";
 import { L1, SPOKEN_WORDS, imageInfo, media, snapshotOf, videoInfo } from "../test-support/fixture.js";
+import { pixelFrameHost, solid } from "../test-support/pixel-host.js";
+import type { RgbaImage } from "../../render/types.js";
 import { KINETIC_KEY, cueWords, emphasisArg, kineticTag } from "./kinetic-captions.js";
 
 /** A fake host that probes the SVGs it wrote for their real size (the fake recognizer hears SPOKEN_WORDS). */
@@ -39,6 +41,25 @@ function talking(matte = false): { doc: ProjectDocument; clipId: string } {
     return addClip(tx, { fileId: file.id, position: 2, layer: L1, start: 0, end: 10, id: "TALKCLIP01" }).id;
   });
   return { doc: new ProjectDocument(scratch.project), clipId };
+}
+
+/** A matte frame of someone in the middle of the shot: the head with headroom above it, the shoulders below. */
+function speaker(width: number, height: number): RgbaImage {
+  const image = solid(width, height, [0, 0, 0, 255]);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const head = x >= 0.4 * width && x < 0.6 * width && y >= 0.3 * height && y < 0.45 * height;
+      const body = x >= 0.25 * width && x < 0.75 * width && y >= 0.5 * height;
+      if (head || body) image.data.fill(255, (y * width + x) * 4, (y * width + x) * 4 + 3);
+    }
+  }
+  return image;
+}
+
+/** `h` reads frames with the CPU compositor: the footage dark and calm, its matte showing the speaker. */
+function seesSpeaker(h: FakeHost): FakeHost {
+  h.frames!.renderFrame = pixelFrameHost((path, width, height) => (path.includes("matte") ? speaker(width, height) : solid(width, height, [20, 20, 20, 255]))).renderFrame;
+  return h;
 }
 
 const dataOf = (r: { data?: unknown }) => (r.data as { data: Record<string, unknown> }).data;
@@ -169,7 +190,7 @@ describe("kinetic_captions_tool", () => {
 
   it("puts a matte cut-out of the speaker above the captions for behind_subject", async () => {
     const { doc, clipId } = talking(true);
-    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: true });
+    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: "all" });
     expect(r.ok, r.text).toBe(true);
     const cutouts = doc.project.clips.filter((c) => kineticTag(c)?.role === "cutout");
     expect(cutouts).toHaveLength(1);
@@ -181,12 +202,90 @@ describe("kinetic_captions_tool", () => {
     expect(kineticTag(cut)!.source_clip_ids).toEqual([clipId]);
   });
 
+  it("puts the emphasis words behind the speaker by default when the footage has a matte (auto), else none", async () => {
+    const matted = talking(true);
+    const h = seesSpeaker(host());
+    const r = await runTool({ doc: matted.doc, host: h }, "kinetic_captions_tool", { style: "creator", emphasis: ["cameras"] });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).behind_subject).toBe("emphasis");
+    expect(r.text).toContain("the emphasis words behind the speaker");
+    const doc = matted.doc;
+    const cut = doc.project.clips.find((c) => kineticTag(c)?.role === "cutout")!;
+    const captions = captionClips(doc).filter((c) => kineticTag(c)!.role === "caption");
+    const svgOf = (c: Clip) => {
+      const svg = h.written.get(String(doc.project.files.find((f) => f.id === c.file_id)?.path));
+      return typeof svg === "string" ? svg : new TextDecoder().decode(svg);
+    };
+    // The emphasis word (the accent red drawing) is under the cut-out, the other words above it.
+    const under = captions.filter((c) => Number(c.layer) < Number(cut.layer));
+    expect(under.length).toBeGreaterThan(0);
+    for (const c of under) expect(svgOf(c)).toContain("#ff2d2d");
+    expect(captions.some((c) => Number(c.layer) > Number(cut.layer))).toBe(true);
+
+    const plain = talking();
+    const none = await runTool({ doc: plain.doc, host: host() }, "kinetic_captions_tool", { style: "creator" });
+    expect(none.ok, none.text).toBe(true);
+    expect(dataOf(none).behind_subject).toBe("none");
+    expect(plain.doc.project.clips.some((c) => kineticTag(c)?.role === "cutout")).toBe(false);
+    const asked = await runTool({ doc: plain.doc, host: host() }, "kinetic_captions_tool", { style: "creator", behind_subject: "emphasis" });
+    expect(asked.ok).toBe(false);
+    expect(asked.text).toContain("generate_subject_matte_tool");
+
+    // A matte that shows nobody: nothing to go behind, the words stay in front and the receipt says why.
+    const empty = talking(true);
+    const nobody = await runTool({ doc: empty.doc, host: host() }, "kinetic_captions_tool", { style: "creator", emphasis: ["cameras"], behind_subject: "emphasis" });
+    expect(nobody.ok, nobody.text).toBe(true);
+    expect(dataOf(nobody).behind_subject).toBe("none");
+    expect((nobody.data as { warnings: string[] }).warnings.join(" ")).toContain("stay in front");
+    expect(empty.doc.project.clips.some((c) => kineticTag(c)?.role === "cutout")).toBe(false);
+  });
+
+  it("makes the footage's subject matte for placement where the host can, in the same undo step", async () => {
+    const { doc } = talking();
+    const h = seesSpeaker(host());
+    h.mattes = {
+      subjects: ["person"],
+      async generate(path, request) {
+        h.calls.push(`matte ${path} ${request.scale}`);
+        return { media: media("/media/talk-matte.mp4", videoInfo("/media/talk-matte.mp4", 10, { has_audio: false })), model: "test_matte", version: "0.1", license: "MIT", frames: 300, fps: 60 };
+      },
+    };
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator" });
+    expect(r.ok, r.text).toBe(true);
+    expect(h.calls.filter((c) => c.startsWith("matte "))).toEqual(["matte /media/talk.mp4 1"]);
+    const ids = dataOf(r).matte_file_ids as string[];
+    expect(ids).toHaveLength(1);
+    expect(dataOf(r).behind_subject).toBe("emphasis");
+    const cut = doc.project.clips.find((c) => kineticTag(c)?.role === "cutout")!;
+    expect(cut.effects?.at(-1)).toMatchObject({ type: "Mask", mask_reader: { id: ids[0] } });
+    expect(doc.undoLabels).toEqual(["Add kinetic captions (creator)"]);
+    doc.undo();
+    expect(doc.project.files.some((f) => f.id === ids[0])).toBe(false);
+    // Avoid boxes given: the captions keep off them and no matte is made.
+    h.calls.length = 0;
+    await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "creator", avoid: [{ x: 0.5, y: 0.3, w: 0.3, h: 0.3 }] });
+    expect(h.calls.some((c) => c.startsWith("matte "))).toBe(false);
+  });
+
+  it("reads the shots to place the captions (placement auto), not with placement style", async () => {
+    const { doc } = talking(true);
+    const h = host();
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "documentary" });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).placement).toMatchObject({ scenes: expect.any(Number) });
+    expect(h.calls.filter((c) => c.startsWith("renderFrame")).length).toBeGreaterThan(0);
+    const again = host();
+    const fixed = await runTool({ doc, host: again }, "kinetic_captions_tool", { style: "documentary", placement: "style" });
+    expect(dataOf(fixed).placement).toBe("style");
+    expect(again.calls.some((c) => c.startsWith("renderFrame"))).toBe(false);
+  });
+
   it("cuts out the footage as it plays: its effects (fresh ids) and alpha, the Mask last", async () => {
     const { doc, clipId } = talking(true);
     const grade = { id: "GRADE00001", type: "Saturation", class_name: "Saturation" };
     const fade = { Points: [{ co: { X: 1, Y: 0 }, interpolation: 1 }, { co: { X: 15, Y: 1 }, interpolation: 1 }] };
     doc.transaction("grade", (tx) => tx.update(["clips", { id: clipId }], { effects: [grade], alpha: fade }));
-    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: true, timeline_clip_ids: [clipId, clipId] });
+    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "stack", behind_subject: "all", timeline_clip_ids: [clipId, clipId] });
     expect(r.ok, r.text).toBe(true);
     const cut = doc.project.clips.find((c) => kineticTag(c)?.role === "cutout")!;
     expect(doc.project.clips.filter((c) => kineticTag(c)?.role === "cutout")).toHaveLength(1);
@@ -199,7 +298,7 @@ describe("kinetic_captions_tool", () => {
   it("refuses what it cannot do, leaving the project as it was", async () => {
     const { doc } = talking();
     const before = snapshotOf(doc.project);
-    const noMatte = await runTool({ doc, host: host() }, "kinetic_captions_tool", { behind_subject: true });
+    const noMatte = await runTool({ doc, host: host() }, "kinetic_captions_tool", { behind_subject: "all" });
     expect(noMatte.ok).toBe(false);
     expect(noMatte.text).toContain("subject matte");
     const unknown = await runTool({ doc, host: host() }, "kinetic_captions_tool", { timeline_clip_ids: ["NOPE"] });

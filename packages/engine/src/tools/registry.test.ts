@@ -31,6 +31,7 @@ const DIRECT_TOOLS = [
   "swap_shot_tool",
   "add_motion_template_tool",
   "kinetic_captions_tool",
+  "add_kinetic_title_tool",
   "list_sfx_tool",
   "add_sfx_tool",
   "auto_sound_design_tool",

@@ -76,8 +76,9 @@ match_cut_montage_tool {
    "every_cut"`, with the receipt's `beats`. It puts a hit or whoosh on nearly every cut; check with
    `get_timeline_state_tool` that the opening pose pair has a
    `whoosh_medium` and the payoff an `impact_boom`.
-6. Optional: a small title on the payoff (`add_title_tool` `font: "Instrument
-   Serif"`, `font_style: "italic"`), 2-3 words, never over the subject.
+6. Optional: a small title on the payoff, 2-3 words, never over the subject:
+   `add_kinetic_title_tool` `{"text": "full circle", "style": "editorial",
+   "animation": "rise"}` (it keeps to the shot's calm side).
 
 ## Finish (every run, in this order; never skip it)
 

@@ -1135,6 +1135,18 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
   },
 
+  add_kinetic_title_tool: {
+    happy: {
+      args: { text: "No lights no brakes", position_seconds: "1", duration_seconds: "2", animation: "letters" },
+      summary: /^Added the title "No lights no brakes" \(stack, letters\) at 1\.00-3\.00s: \d+ clip\(s\) on \d+ track\(s\)\.$/,
+      check: ({ doc, host }) => {
+        expect(doc.undoLabels.at(-1)).toBe("Add kinetic title (letters)");
+        expect([...host.written.keys()].some((p) => p.startsWith("/generated/title-letters-"))).toBe(true);
+      },
+    },
+    failure: { args: { text: "one two three four five six seven eight nine ten eleven twelve thirteen" }, status: "refused", summary: /^Error: a title has at most 12 words \(got 13\)/ },
+  },
+
   // --- sound design --------------------------------------------------------------------
   list_sfx_tool: {
     happy: { args: { family: "impact" }, summary: /^\d+ sound effects: impact_punch, /, check: ({ doc, before }) => expect(doc.project).toEqual(before) },

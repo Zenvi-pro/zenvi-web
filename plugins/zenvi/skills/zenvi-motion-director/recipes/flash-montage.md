@@ -67,9 +67,10 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
    `accent_red`, `accent_cyan`...); a centred object on black:
    `add_shape_mask_tool` `shape: "ellipse"`, `feather: 0.15`, then
    `add_vignette_tool` `amount: 0.5`.
-5. End title (1-2 words): `add_title_tool` `text: "THE END"`, `font: "Instrument Serif"` (or `"Anton"` for a harder edit),
-   `font_scale: 1.6`, `fade_in_seconds: 0.4`, plus `add_effect_tool` Glow on
-   that clip. Or `add_motion_block_tool` `block: "kinetic_headline"` with
+5. End title (1-2 words), moving, not fading: `add_kinetic_title_tool`
+   `{"text": "THE END", "style": "editorial", "animation": "letters",
+   "duration_seconds": 1.5}` (`"stack"` + `"slam"` for a harder edit). Or
+   `add_motion_block_tool` `block: "kinetic_headline"` with
    `style: "blur"`, `palette: "dark"`, `display_font: "serif"`.
 6. Sound: `auto_sound_design_tool` `intensity: "hype"`, `density:
    "every_cut"` (a click or hit on every new image), beats from the

@@ -45,7 +45,7 @@ const subject = z.enum(["person"]).optional().describe("What the matte keeps (de
 const color = (what: string, fallback: string) => z.string().optional().describe(`${what} as #rrggbb (default ${fallback}).`);
 
 /** Mattes of footage larger than 720p are made at half size: about 1.5x faster, and the Mask effect scales them up smoothly. */
-function autoScale(file: ProjectFile): 1 | 0.5 {
+export function autoScale(file: ProjectFile): 1 | 0.5 {
   return Math.max(Number(file.width) || 0, Number(file.height) || 0) > 1280 ? 0.5 : 1;
 }
 

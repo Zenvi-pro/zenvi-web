@@ -22,12 +22,12 @@ is the rules every genre shares. Do not plan before you have read it.
 | --- | --- | --- |
 | shapes or poses that line up across cuts | `recipes/match-cut-montage.md` | match_cut_montage_tool, detect_subject_tool |
 | a new image every few frames, "evolution of" | `recipes/flash-montage.md` | gather_stock_footage_tool, match_cut_montage_tool transitions=flash |
-| person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, kinetic_captions_tool (cues, text_size, y, animation), text_behind_subject_tool |
+| person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, generate_subject_matte_tool, kinetic_captions_tool (cues, text_size, animation), add_kinetic_title_tool |
 | app, AI tool, SaaS launch | `recipes/saas-ui-promo.md` | add_motion_block_tool (glass_cards, prompt_bar, kinetic_headline, counter, word_rotator) |
 | one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
 | type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
 | tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
-| voice-over essay, story, explainer | `recipes/documentary.md` | TTS, add_captions_tool, build_reel_tool cinematic, grid collage |
+| voice-over essay, story, explainer | `recipes/documentary.md` | TTS, kinetic_captions_tool documentary, add_kinetic_title_tool, build_reel_tool cinematic, grid collage |
 | sport, cars, launch hype, "fast", "hype", "trailer", "edit to this song" | `recipes/hype-reel.md` | **build_reel_tool hype first** (ramp, glitch drop, whips, flashes, one look built in), auto_sound_design_tool every_cut, review_edit_tool |
 | how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
 | intro, showreel, "about me" | `recipes/showreel-intro.md` | title_3d, word_rotator, grid zoom_into, particle_burst |
@@ -86,11 +86,16 @@ too quiet and nobody has looked at the file.
    cards, counters, rotators, HUD, bursts), `add_3d_scene_tool` (draft first),
    matte composites (`text_behind_subject_tool`, `replace_background_tool`,
    `subject_glow_tool`, `pop_out_tool`), `speed_ramp_tool` on hero shots.
-8. **Captions and type.** `kinetic_captions_tool` for speech (word by word,
-   animated, emphasis words big; `cues` when there is no transcribed voice,
-   `text_size`, `y`, `animation`), `text_behind_subject_tool` for one hero
-   word when the head has a matte; `add_title_tool` with a bundled family (`font: "Anton"`,
-   `"Instrument Serif"`, `"Space Mono"`...) for emphasis words and labels.
+8. **Captions and type: type moves.** `kinetic_captions_tool` for speech
+   (word by word, emphasis words big; `cues` when there is no transcribed
+   voice, `text_size`, `animation`); it places each caption in the shot's
+   negative space and, after `generate_subject_matte_tool` on the footage,
+   puts emphasis words behind the head. Title cards and word cards:
+   `add_kinetic_title_tool` (`animation`: pop, slam, tilt, scramble,
+   letters, typewriter, slide_up, rise; never a bare fade).
+   `text_behind_subject_tool` for one full-width hero word; `add_title_tool`
+   with a bundled family (`font: "Anton"`, `"Instrument Serif"`, `"Space
+   Mono"`...) only for static labels and logo bugs.
 9. **Colour: match first, then the look.** `unify_grade_tool` (no
    arguments: every footage clip toward the cut's median look; or
    `reference_clip_id` = the hero shot) so daylight and night shots stop

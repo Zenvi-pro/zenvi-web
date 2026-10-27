@@ -44,6 +44,16 @@ add_motion_block_tool {"block": "hud_callouts", "position_seconds": 0.2, "durati
 5. Brand variant (playful): `kinetic_headline` `style: "pop"`, `palette:
    "cream"`, one accent (`accent: "#2340D6"`), `word_rotator` for "bake.
    crunch. share."; `pop` sounds allowed here.
+6. Without headless Chrome (motion blocks refuse), or for type the desktop
+   must play natively: `add_kinetic_title_tool` per phrase, `animation:
+   "letters"` (Dd5-sUUoJcW: letters bounce in one by one) or `"scramble"`
+   (labels and numbers decode), `"typewriter"` for HUD lines; `style:
+   "stack"` (condensed capitals) or `"editorial"` (serif, italic accent).
+
+```json
+add_kinetic_title_tool {"text": "LIVING SYMMETRY", "style": "stack", "animation": "scramble",
+  "position_seconds": 5.8, "duration_seconds": 1.2, "accent": "#2340D6"}
+```
 
 ## Finish (every run, in this order; never skip it)
 
