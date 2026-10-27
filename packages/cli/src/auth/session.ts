@@ -126,8 +126,9 @@ export class Auth {
 
   /** What the current sign-in enables, for `mcp_health` and `zenvi whoami`. */
   async features(): Promise<Feature[]> {
-    const signIn = "Run `zenvi login`.";
-    const signedIn = (await this.current()) !== undefined;
+    const who = await this.whoami();
+    const signIn = who.expired ? "The sign-in expired: run `zenvi login`." : "Run `zenvi login`.";
+    const signedIn = who.loggedIn;
     const backendFix = signedIn ? await this.backendUnavailable() : signIn;
     const off = (fix: string | undefined) => ({ enabled: fix === undefined, ...(fix ? { fix } : {}) });
     return [

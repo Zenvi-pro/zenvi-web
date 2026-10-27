@@ -146,6 +146,15 @@ describe("what the sign-in enables", () => {
     expect((await auth.features()).every((f) => f.enabled)).toBe(true);
   });
 
+  it("an expired session whose refresh was refused turns Cloud and the AI features off", async () => {
+    const cfg = config();
+    await new Auth(cfg).save({ kind: "supabase", access_token: jwt({ exp: 1 }), refresh_token: "bad", saved_at: "x" });
+    handler = (_req, _body, res) => json(res, 400, { error: "invalid_grant" });
+    const features = await new Auth(cfg).features();
+    expect(enabled(features)).toEqual(["Local editing and rendering"]);
+    expect(features.find((f) => f.name === "AI voice (text to speech)")?.fix).toMatch(/expired.*zenvi login/);
+  });
+
   it("signed out: only local editing is on, and the fix is to log in; the backend is left to answer", async () => {
     const cfg = config();
     await new Auth(cfg).logout();
