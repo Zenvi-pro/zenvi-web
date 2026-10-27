@@ -125,7 +125,7 @@ export async function missingBlockEvents(call: ToolCall): Promise<{ events: Map<
     const block = motion.blocks().find((b) => b.id === spec.block);
     const media = block ? mediaPaths(project, block, spec.params) : "unknown block";
     if (!block || typeof media === "string") {
-      failures.push(spec.block);
+      failures.push(`${spec.block} (${typeof media === "string" ? media.replace(/^Error: /, "") : "unknown block"})`);
       continue;
     }
     const link = file[LINK_KEY] as { render?: { width?: unknown; height?: unknown } };
@@ -134,8 +134,8 @@ export async function missingBlockEvents(call: ToolCall): Promise<{ events: Map<
     const height = Number(link.render?.height) || ph;
     try {
       events.set(String(file.id), await motion.events({ block: spec.block, params: spec.params, media, width, height, fps: fpsOf(project), seconds: spec.seconds, alpha: spec.alpha, motionBlurSamples: spec.motionBlurSamples, draft: spec.draft }, call.signal));
-    } catch {
-      failures.push(spec.block);
+    } catch (error) {
+      failures.push(`${spec.block} (${error instanceof Error ? error.message : String(error)})`);
     }
   }
   return failures.length > 0 ? { events, note: `The events of ${failures.join(", ")} could not be read, so ${failures.length === 1 ? "it is" : "they are"} spotted by ${failures.length === 1 ? "its" : "their"} edges only.` } : { events };
