@@ -23,7 +23,7 @@ import type { Transaction } from "../../history/document.js";
 import { speechWindowsOf } from "../../mastering/score.js";
 import { createEffect } from "../../effects/registry.js";
 import { loudnessSeries, measureLoudness } from "../../mastering/loudness.js";
-import { median } from "../../mastering/analysis.js";
+import { median, percentile } from "../../mastering/analysis.js";
 import { setClipKeyframes } from "../../ops/clips.js";
 import { setClipEffects } from "../../ops/effects.js";
 import { TRACK_AUDIO_ROLES, setTrackAudioRole } from "../../ops/tracks.js";
@@ -377,7 +377,9 @@ const duck = directTool({
         }
         const vbr = diffs.length ? median(diffs) : Infinity;
         d.vbr = vbr;
-        d.db = Number.isFinite(vbr) ? -Math.min(30, Math.max(0, wantVbr - vbr)) : 0;
+        // METRICS.md B1 wants the median on target and the 10th percentile no more than 6 dB under it.
+        const need = diffs.length ? Math.max(wantVbr - vbr, wantVbr - 6 - percentile(diffs, 10)) : 0;
+        d.db = -Math.min(30, Math.max(0, need));
       }
     }
     const active = depths.filter((d) => d.db <= -0.5);
@@ -563,17 +565,22 @@ interface Dynamics {
   makeup_db: number;
 }
 
-/** CRAFT.md section 4 starting points; limit is DEPLOY.md S3.6's timeline limiter. */
+/**
+ * CRAFT.md section 4 starting points. limit is DEPLOY.md S3.6's timeline
+ * limiter with a 0 ms attack instead of 0.1 ms: libopenshot's Compressor
+ * has no look-ahead and reads the instantaneous sample level, so a 0.1 ms
+ * attack lets a click's first cycles through 2-3 dB over the threshold.
+ */
 const COMPRESS_PRESETS: Record<"voice" | "glue" | "punch" | "limit", Dynamics> = {
   voice: { threshold_db: -20, ratio: 3, attack_ms: 5, release_ms: 120, makeup_db: 3 },
   glue: { threshold_db: -24, ratio: 2, attack_ms: 30, release_ms: 250, makeup_db: 2 },
   punch: { threshold_db: -18, ratio: 4, attack_ms: 15, release_ms: 120, makeup_db: 3 },
-  limit: { threshold_db: -1.5, ratio: 100, attack_ms: 0.1, release_ms: 50, makeup_db: 0 },
+  limit: { threshold_db: -1.5, ratio: 100, attack_ms: 0, release_ms: 50, makeup_db: 0 },
 };
 
 const compressInput = z.strictObject({
   ...targetShape,
-  preset: z.enum(["voice", "glue", "punch", "limit", "none"]).optional().describe("voice: -20 dB, 3:1, 5/120 ms, +3 dB. glue (beds): -24 dB, 2:1, 30/250 ms, +2. punch (SFX): -18 dB, 4:1, 15/120 ms, +3. limit: -1.5 dB, 100:1, 0.1/50 ms (peak safety). none: remove."),
+  preset: z.enum(["voice", "glue", "punch", "limit", "none"]).optional().describe("voice: -20 dB, 3:1, 5/120 ms, +3 dB. glue (beds): -24 dB, 2:1, 30/250 ms, +2. punch (SFX): -18 dB, 4:1, 15/120 ms, +3. limit: -1.5 dB, 100:1, 0/50 ms (sample-peak safety). none: remove."),
   threshold_db: z.number().min(-60).max(0).optional(),
   ratio: z.number().min(1).max(100).optional(),
   attack_ms: z.number().min(0).max(1000).optional(),

@@ -164,13 +164,13 @@ function loudestSample(channels: readonly Float32Array[]): { index: number; peak
   return { index, peak };
 }
 
-/** Where the voice speaks: runs of 100 ms hops with voice M(t) >= voice I - 8 LU (METRICS.md section 0), extended by the 400 ms window, seconds. */
+/** Where the voice speaks: runs of 100 ms hops with voice M(t) >= voice I - 8 LU (METRICS.md section 0), each hop timed at its 400 ms window's centre, seconds. */
 export function speechWindowsOf(voice: readonly Float32Array[], sampleRate: number): [number, number][] {
   const vI = measureLoudness(voice, sampleRate).integrated;
   if (vI === SILENCE_LUFS) return [];
   const series = loudnessSeries(voice, sampleRate);
   const seconds = voice.reduce((m, c) => Math.max(m, c.length), 0) / sampleRate;
-  return runsOf(Array.from(series.momentary, (v) => v >= vI - 8), series.hop).map(([s, e]) => [r2(s), r2(Math.min(seconds, e + 0.4))]);
+  return runsOf(Array.from(series.momentary, (v) => v >= vI - 8), series.hop).map(([s, e]) => [r2(s + 0.2), r2(Math.min(seconds, e + 0.1))]);
 }
 
 /** Score a rendered mix. Stems absent: voice metrics are skipped and the bed is the whole mix. */
