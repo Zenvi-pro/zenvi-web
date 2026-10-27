@@ -84,9 +84,15 @@ const removeInput = z.strictObject({
 type ApplyArgs = z.output<typeof applyInput>;
 
 const round = (t: number): number => Math.round(t * 1000) / 1000;
+const MAX_FRAMES = 120;
 
+/** The op takes 2-120 frames; say the limit in seconds at the project's rate, since the caller gave seconds. */
 function framesOf(project: Project, duration: number | undefined): number | undefined {
-  return duration === undefined ? undefined : Math.max(2, Math.round(duration * rateOf(project)));
+  if (duration === undefined) return undefined;
+  const rate = rateOf(project);
+  const frames = Math.max(2, Math.round(duration * rate));
+  if (frames > MAX_FRAMES) throw new ToolError(`duration ${duration}s is ${frames} frames at ${round(rate)} fps; the most is ${round(MAX_FRAMES / rate)}s`);
+  return frames;
 }
 
 function resultData(project: Project, r: MotionTransitionResult): Record<string, unknown> {
@@ -234,15 +240,16 @@ export const motionTransitionTools: CatalogTool[] = [
       const project = call.doc.project;
       if ((args.preset === undefined) === (args.style === undefined)) return refused(APPLY_ALL, "Error: give preset or style (one of them).");
       let layer: number;
+      let frames: number | undefined;
       try {
         layer = resolveLayer(project, args.track);
+        frames = framesOf(project, args.duration);
       } catch (error) {
         if (error instanceof ToolError) return refused(APPLY_ALL, `Error: ${message(error)}`);
         throw error;
       }
       const cuts = trackCuts(project, layer);
       if (cuts.length === 0) return unchanged(APPLY_ALL, `No cuts on ${trackName(project, layer)}: no clips play back to back there.${cutsElsewhere(project, layer)}`);
-      const frames = framesOf(project, args.duration);
       const inputs = cuts.map((cut, index): MotionTransitionInput => {
         const step = args.style ? styleStep(args.style, index, cuts.length) : { preset: args.preset as MotionTransitionId };
         const intensity = args.intensity !== undefined ? args.intensity : step.intensity;

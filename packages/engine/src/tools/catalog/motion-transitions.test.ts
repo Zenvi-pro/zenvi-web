@@ -83,6 +83,17 @@ describe("motion transition tools", () => {
     expect(doc.undoLabels).toEqual([]);
   });
 
+  it("refuses a duration past the frame limit in seconds, at the project's rate", async () => {
+    const doc = editDoc();
+    doc.project.fps = { num: 60, den: 1 };
+    for (const [name, target] of [["apply_motion_transition_tool", { clip1_id: "CLIP0" }], ["apply_motion_transitions_tool", { track: "1" }]] as const) {
+      const result = await call(doc, name, { preset: "whip", ...target, duration: "4" });
+      expect(result.ok).toBe(false);
+      expect(summaryOf(result)).toBe("Error: duration 4s is 240 frames at 60 fps; the most is 2s");
+    }
+    expect(doc.undoLabels).toEqual([]);
+  });
+
   it("transitions every cut on a track with a style mix, and removes them all", async () => {
     const doc = editDoc();
     const before = JSON.stringify(doc.project.clips);
