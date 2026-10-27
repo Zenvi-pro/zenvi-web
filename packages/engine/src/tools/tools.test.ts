@@ -13,7 +13,7 @@ import type { Project } from "../model/types.js";
 import type { ReceiptStatus, ToolReceipt } from "./receipt.js";
 import { allTools, runTool } from "./registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
-import { IDS, L1, L3, fixtureDoc, imageInfo, media, snapshotOf, videoInfo } from "./test-support/fixture.js";
+import { IDS, L1, L2, L3, fixtureDoc, imageInfo, media, snapshotOf, videoInfo } from "./test-support/fixture.js";
 import { createProject } from "../model/defaults.js";
 import { addClip } from "../ops/clips.js";
 import { addFile, updateFile } from "../ops/files.js";
@@ -1024,6 +1024,57 @@ const SPECS: Record<string, Spec> = {
   probe_media_tool: {
     happy: { args: { path: "/media/interview.mp4" }, summary: /^\/media\/interview\.mp4: 1280x720 30\/1 fps, 2 ch 48000 Hz, 8\.00s\.$/ },
     failure: { args: { path: "/media/missing.mp4" }, summary: /^Error: No media at \/media\/missing\.mp4$/ },
+  },
+  analyze_mix_tool: {
+    happy: {
+      setup: (_doc, host) => {
+        const tone = Float32Array.from({ length: 16000 * 4 }, (_, i) => 0.1 * Math.sin((2 * Math.PI * 440 * i) / 16000));
+        host.audio!.mixPcm = async () => ({ sampleRate: 16000, channels: [tone, Float32Array.from(tone)] });
+      },
+      status: "unchanged",
+      summary: /^Sound Score \d+\/100/,
+      check: ({ receipt }) => expect((receipt.data as { metrics: Record<string, unknown> }).metrics.L1_integrated).toBeDefined(),
+    },
+    failure: { status: "refused", summary: /not available.*cannot render the timeline mix/ },
+  },
+  set_track_role_tool: {
+    happy: { args: { track: String(L2), role: "music" }, summary: /^Track .* now plays in the music stem/ },
+    failure: { args: { track: "Bogus", role: "music" }, summary: /^Error: Unknown track or layer 'Bogus'/ },
+  },
+  set_audio_gain_tool: {
+    happy: { args: { clip_ids: IDS.clipMusic, gain_db: "-3" }, summary: /^-3\.0 dB on 1 clip\(s\): CLIPMUSC01\.$/ },
+    failure: { args: { gain_db: "-3" }, summary: /^Error: name the clips to change/ },
+  },
+  automate_volume_tool: {
+    happy: { args: { clip_ids: IDS.clipMusic, shape: "dip", start_seconds: "2", end_seconds: "3" }, summary: /^dip on 1 clip\(s\): CLIPMUSC01\.$/ },
+    failure: { args: { clip_ids: IDS.clipMusic, shape: "dip" }, summary: /^Error: dip needs start_seconds\.$/ },
+  },
+  duck_tool: {
+    happy: { args: { bed: IDS.clipMusic, depth_db: "-8" }, summary: /^Ducked CLIPMUSC01 under the voice in \d+ window\(s\) by -8\.0 dB/ },
+    failure: { args: { bed: "NOPE" }, summary: /^Error: no timeline clip with id NOPE\.$/ },
+  },
+  eq_tool: {
+    happy: { args: { clip_ids: IDS.clipMusic, preset: "voice_pocket" }, summary: /^EQ \(preset voice_pocket\) on 1 clip\(s\): CLIPMUSC01\.$/ },
+    failure: { args: { clip_ids: IDS.clipMusic }, summary: /^Error: pass bands or a preset/ },
+  },
+  compress_tool: {
+    happy: { args: { clip_ids: IDS.clipMusic, preset: "glue" }, summary: /^Compressor glue: -24 dB, 2:1/ },
+    failure: { args: { clip_ids: "NOPE", preset: "voice" }, summary: /^Error: no timeline clip with id NOPE\.$/ },
+  },
+  space_tool: {
+    happy: { args: { clip_ids: IDS.clipMusic, space: "room" }, summary: /^room \(3 Echo stage\(s\), mix 0\.15\) on 1 clip\(s\)/ },
+    failure: { args: { space: "room" }, summary: /^Error: name the clips to change/ },
+  },
+  pan_tool: {
+    happy: {
+      setup: (_doc, host) => {
+        const tone = Float32Array.from({ length: 16000 * 2 }, (_, i) => 0.1 * Math.sin((2 * Math.PI * 440 * i) / 16000));
+        host.audio!.decodePcm = async () => ({ sampleRate: 16000, samples: tone, right: tone });
+      },
+      args: { clip_ids: IDS.clipMusic, pan: "-0.5" },
+      summary: /^1 clip\(s\) panned left 0\.50: CLIPMUSC01\.$/,
+    },
+    failure: { args: { clip_ids: IDS.clipMusic, pan: "0.5" }, status: "refused", summary: /not available.*cannot decode and write audio/ },
   },
   master_audio_tool: {
     happy: {

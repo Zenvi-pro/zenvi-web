@@ -189,3 +189,19 @@ export function trackDisplayName(project: Project, layerNumber: number): string 
   if (layer?.label) return layer.label;
   return `Track ${index >= 0 ? index + 1 : layerNumber}`;
 }
+
+/** What a track carries in the mix (`layer.zenvi_audio_role`): the stem the mixing tools and analyze_mix_tool file its clips under. */
+export const TRACK_AUDIO_ROLES = ["voice", "music", "sfx", "ambience"] as const;
+export type TrackAudioRole = (typeof TRACK_AUDIO_ROLES)[number];
+
+/** Set (or with null clear) a track's audio role. Unknown layer keys survive the desktop round trip. */
+export function setTrackAudioRole(tx: Transaction, layerNumber: number, role: TrackAudioRole | null): Layer {
+  const layer = requireLayer(tx.project, layerNumber);
+  if (role !== null && !TRACK_AUDIO_ROLES.includes(role)) throw invalid(`role must be one of ${TRACK_AUDIO_ROLES.join(", ")}.`);
+  if ((layer.zenvi_audio_role ?? null) === role) return layer;
+  if (role === null) {
+    const { zenvi_audio_role: _cleared, ...rest } = layer;
+    tx.replace(["layers", { id: layer.id }], rest);
+  } else tx.update(["layers", { id: layer.id }], { zenvi_audio_role: role });
+  return requireLayer(tx.project, layerNumber);
+}

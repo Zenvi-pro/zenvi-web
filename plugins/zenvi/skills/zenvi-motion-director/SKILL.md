@@ -123,10 +123,19 @@ too quiet and nobody has looked at the file.
     `kit: "synth"` for tonal risers and sub drops you shape with pitch.
     Music from `search_freesound_music_tool` is commercial-use by default;
     `licence: "cc0"` for no credit at all. Music at full level unless
-    there is speech (`duck_under_speech_tool`).
-11. **Master, always last.** `master_audio_tool` (`preset: "social"`, -14
-    LUFS / -1 dBTP) after the last audio change; any later audio edit means
-    mastering again. An unmastered edit clips on the platforms.
+    there is speech (`duck_tool` puts the voice 10 dB over the bed).
+11. **Mix by the numbers, then master, always last.** `analyze_mix_tool`
+    (`genre` of the recipe) scores the sound 0-100 against the genre's
+    bands (loudness, voice over bed, masking, hit coverage and timing, cue
+    levels by role, repetition) and names each fix as a tool call:
+    `set_audio_gain_tool` (clip, track or stem by dB), `duck_tool`,
+    `automate_volume_tool` (`suck_out` before the climax, `pre_hit_duck`,
+    fades), `eq_tool`, `compress_tool`, `space_tool`, `pan_tool`. Apply the
+    top fixes and score again (at most 3 rounds, stop at 85+ with no gate);
+    `master_audio_tool` `{"preset": "social", "genre": ..., "iterate": true}`
+    does that loop and the mastering (-14 LUFS / -1 dBTP) as one undo step.
+    Any later audio edit means mastering again. An unmastered edit clips on
+    the platforms.
 12. **Verify** (below), fix, verify again. Then `render_video` and
     **review the file**: `review_render_tool` with the path it wrote. One
     fix pass: every `PROBLEM` line, render again, review again, report.
@@ -229,7 +238,7 @@ The finishing calls, in order (after the picture and the sound are locked):
 
 ```json
 unify_grade_tool {"look": "teal_punch", "look_intensity": 0.6}
-master_audio_tool {"preset": "social"}
+master_audio_tool {"preset": "social", "genre": "hype", "iterate": true}
 review_render_tool {"path": "reel.mp4"}
 ```
 
