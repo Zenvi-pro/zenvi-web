@@ -102,6 +102,26 @@ describe("VideoDecoder", () => {
     }
   });
 
+  it("a primed decoder serves the frame it was primed at from the stream it already started", async () => {
+    const decoder = new VideoDecoder({ path: numbered, fps: { num: 30, den: 1 }, frameCount: 60 }, { width: 64, height: 48 });
+    try {
+      decoder.prime(40);
+      decoder.prime(10); // already running: no second stream
+      expect(decoder.restarts).toBe(1);
+      expect(frameNumber(await decoder.frame(40))).toBe(40);
+      expect(frameNumber(await decoder.frame(41))).toBe(41);
+      expect(decoder.restarts).toBe(1);
+      // primed past the end, it clamps like frame() does
+      const late = new VideoDecoder({ path: numbered, fps: { num: 30, den: 1 }, frameCount: 60 }, { width: 64, height: 48 });
+      late.prime(500);
+      expect(frameNumber(await late.frame(500))).toBe(59);
+      expect(late.restarts).toBe(1);
+      await late.close();
+    } finally {
+      await decoder.close();
+    }
+  });
+
   it("counts frames from the video stream start (non-zero container start time)", async () => {
     const decoder = new VideoDecoder({ path: numberedTs, fps: { num: 25, den: 1 }, frameCount: 50 }, { width: 32, height: 24 });
     try {

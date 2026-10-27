@@ -79,6 +79,9 @@ export interface RenderResult extends ExportResult {
   stats: RenderStats;
 }
 
+/** How many frames ahead a render plans, to start the decoders of upcoming clips early. */
+const DECODE_AHEAD = 12;
+
 export class RenderError extends Error {
   constructor(message: string) {
     super(message);
@@ -252,10 +255,20 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
         stats.composite += performance.now() - t;
         return image;
       };
+      // Frames are planned a little ahead so the decoders of the next cuts start (ffmpeg launch and seek) while
+      // this frame decodes and composites.
+      const plans: FramePlan[] = [];
+      let planned = 0;
       for (let i = 0; i < frames && !encoderGone; i += 1) {
         if (signal?.aborted) throw new AbortedError();
         let t = performance.now();
-        const plan = engine.planFrame(project, first + i, { width, height }, { preview: false });
+        while (planned < frames && planned <= i + DECODE_AHEAD) {
+          const ahead = engine.planFrame(project, first + planned, { width, height }, { preview: false });
+          if (planned > i) sources.warm(ahead, planned - i);
+          plans.push(ahead);
+          planned += 1;
+        }
+        const plan = plans.shift()!;
         stats.plan += performance.now() - t;
         if (plan.layers.length === 0) {
           queue.push(Promise.resolve(background(plan)));
