@@ -10,6 +10,7 @@ import { addMarker } from "../../ops/markers.js";
 import { isAutoSfxClip, isSfxClip } from "../../sfx/moments.js";
 import { PALETTES } from "../../sfx/palettes.js";
 import { SFX_RECIPES } from "../../sfx/recipes.js";
+import { curvePoints, evaluateVolumeCurve } from "../audio-mix.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
 import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
@@ -249,6 +250,7 @@ interface AutoData {
   cues: { clip_id: string; recipe: string; role: string; layer: string; at: number; hit_seconds: number; gain_db: number; reason: string; trimmed_seconds?: number }[];
   replaced_clip_ids: string[];
   removed_file_ids: string[];
+  levelled_over_bed: number;
 }
 
 /** Two 0.9 s shots of one file: one weak cut, no music. */
@@ -342,6 +344,24 @@ describe("auto_sound_design_tool", () => {
     doc.undo(3);
     expect(doc.project.clips.filter(isAutoSfxClip)).toHaveLength(0);
     expect(doc.project.clips.find((c) => c.id === "MUSICCLIP1")!.volume).toEqual(bedBefore);
+  });
+
+  it("levels every cue over the bed as it plays, and a rerun over its own dips lands the same levels", async () => {
+    const doc = editProject();
+    const host = withAudio(fakeHost());
+    // The export's mix of the song clip: its volume curve applied (30 fps, source frame = timeline frame + 1).
+    host.audio!.mixPcm = async (project) => {
+      const music = project.clips.find((c) => c.id === "MUSICCLIP1")!;
+      const points = curvePoints(music);
+      const out = song().slice(0, 20 * SR).map((v, i) => v * evaluateVolumeCurve(points, (i / SR) * FPS + 1, 1));
+      return { sampleRate: SR, channels: [out, Float32Array.from(out)] };
+    };
+    const first = data<AutoData>(await runTool({ doc, host }, "auto_sound_design_tool", { genre: "hype" }));
+    expect(first.levelled_over_bed).toBeGreaterThan(0);
+    expect(first.bed_dips.length).toBeGreaterThan(1);
+    const again = data<AutoData>(await runTool({ doc, host }, "auto_sound_design_tool", { genre: "hype" }));
+    const levels = (d: AutoData) => d.cues.map((c) => `${c.at.toFixed(3)} ${c.layer} ${c.recipe} ${c.gain_db}`).sort();
+    expect(levels(again)).toEqual(levels(first));
   });
 
   it("reads the genre from the edit, and works from given beats and climax where audio cannot be decoded", async () => {

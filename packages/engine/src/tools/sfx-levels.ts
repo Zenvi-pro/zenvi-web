@@ -16,6 +16,7 @@ import { bedLevelAt, envelope50, gainOverBed, peakNear, type LevelRole } from ".
 import { isSfxClip } from "../sfx/moments.js";
 import { fileById } from "./catalog/common.js";
 import type { ToolCall } from "./define.js";
+import { withoutBedDips } from "./sfx-bed.js";
 import type { PreparedSfx } from "./sfx-media.js";
 
 /** Summed peak of layers landing together, dBFS: headroom for the bed and the master (CRAFT.md §4 peaks -1…-3). */
@@ -53,8 +54,8 @@ async function measureSound(call: ToolCall, sound: PreparedSfx): Promise<Measure
   return { peak50: peakNear(envelope50(pcm.samples, pcm.right, pcm.sampleRate), sound.hit), peak: db(peak) };
 }
 
-/** Timeline seconds a cue's hit plays at (a moment too early for its lead-in starts the sound at 0, sfx-media.ts placeSfx). */
-const hitTime = (cue: DesignedCue, sound: PreparedSfx) => (cue.at >= sound.hit ? cue.at : sound.hit);
+/** Timeline seconds a cue's hit plays at (a moment too early for its lead-in starts the sound on it, sound-design.ts). */
+const hitTime = (cue: DesignedCue, sound: PreparedSfx) => (cue.at >= sound.hit ? cue.at : cue.at + sound.hit);
 
 /** Gains for `cues` (played by `sounds`, designed at `gains`), levelled over the bed where the host can measure it. */
 export async function levelCues(call: ToolCall, cues: readonly DesignedCue[], sounds: readonly PreparedSfx[], gains: readonly number[], previous: readonly Clip[]): Promise<LevelResult> {
@@ -74,7 +75,8 @@ export async function levelCues(call: ToolCall, cues: readonly DesignedCue[], so
   const under = call.doc.project.clips.filter((c) => !isSfxClip(c) && !replaced.has(c.id)).map((c) => c.id);
   if (audio.mixPcm && under.length > 0) {
     try {
-      const mix = await audio.mixPcm(call.doc.project, { clipIds: under, signal: call.signal });
+      // The bed without the last run's dips (this run takes them off before writing its own), so a rerun lands the same levels.
+      const mix = await audio.mixPcm(withoutBedDips(call.doc.project), { clipIds: under, signal: call.signal });
       bed = envelope50(mix.channels[0]!, mix.channels[1], mix.sampleRate);
       let peak = 0;
       for (const ch of mix.channels) for (let i = 0; i < ch.length; i += 1) peak = Math.max(peak, Math.abs(ch[i]!));
