@@ -28,9 +28,9 @@ export interface PreviewMeasure {
 
 const db = (linear: number) => Math.round(20 * Math.log10(Math.max(linear, 1e-6)) * 10) / 10;
 
-/** Can this host measure a preview at all. */
+/** Can this host measure a preview at all: it decodes audio from a URL (Zenvi Cloud decodes project media only). */
 export function canMeasurePreviews(call: ToolCall): boolean {
-  return typeof call.host.audio?.decodePcm === "function";
+  return typeof call.host.audio?.decodePcm === "function" && call.host.audio.decodesUrls === true;
 }
 
 /** Measure `url`'s audio, or say why not (a string). */

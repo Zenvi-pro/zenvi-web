@@ -45,7 +45,10 @@ const PREVIEWS: Record<string, Float32Array> = {
   "34": groove(128, 16, 0.02),
 };
 
-function musicHost(options: { decode?: boolean; refuse?: boolean; sounds?: unknown[]; onSearch?: (query: string) => void } = {}): FakeHost {
+/** How many previews the host was asked to decode. */
+let decoded = 0;
+
+function musicHost(options: { decode?: boolean; urls?: boolean; refuse?: boolean; sounds?: unknown[]; onSearch?: (query: string) => void } = {}): FakeHost {
   const host = fakeHost({
     routes: {
       "/api/v1/freesound/search": (_body, path) => {
@@ -55,12 +58,15 @@ function musicHost(options: { decode?: boolean; refuse?: boolean; sounds?: unkno
       },
     },
   });
+  decoded = 0;
   host.audio = {
     analyzeAudio: async () => ({ sampleRate: 16000, frameSize: 480, rms: new Float32Array(0) }),
+    ...(options.urls === false ? {} : { decodesUrls: true }),
     ...(options.decode === false
       ? {}
       : {
           decodePcm: async (url: string) => {
+            decoded += 1;
             if (options.refuse) throw new Error("not media in this project");
             const samples = PREVIEWS[/\/(\d+)-hq/.exec(url)![1]!]!;
             return { sampleRate: SR, samples };
@@ -86,8 +92,25 @@ const search = async (args: Record<string, unknown>, host = musicHost()) => {
 };
 
 describe("search_freesound_music_tool by tempo", () => {
-  it("measures every result: bpm, loudness and energy", async () => {
-    const { result, data } = await search({ query: "loop", count: 4 });
+  it("does not download or measure anything for a plain search", async () => {
+    const host = musicHost();
+    const { result, data } = await search({ query: "loop", count: 4 }, host);
+    expect(result.ok, result.text).toBe(true);
+    expect(decoded).toBe(0);
+    expect(data.results).toHaveLength(4);
+    expect(data.results[0]).not.toHaveProperty("bpm");
+    expect(host.backendCalls[0]?.path).toBe("/api/v1/freesound/search?query=loop&page_size=8");
+  });
+
+  it("does not try to measure on a host that cannot decode URLs (Zenvi Cloud)", async () => {
+    const { data, warnings } = await search({ query: "loop", bpm: 128 }, musicHost({ urls: false }));
+    expect(decoded).toBe(0);
+    expect(data.results).toHaveLength(4);
+    expect(warnings.join(" ")).toMatch(/not applied/);
+  });
+
+  it("measures the results when a tempo is asked for: bpm, loudness and energy", async () => {
+    const { result, data } = await search({ query: "loop", count: 4, bpm_range: "60-200" });
     expect(result.ok, result.text).toBe(true);
     const byId = new Map(data.results.map((r) => [r.sound_id, r]));
     expect(Math.abs(byId.get(32)!.bpm! - 128)).toBeLessThan(3);

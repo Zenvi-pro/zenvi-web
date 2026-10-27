@@ -107,7 +107,7 @@ export const stockTools: CatalogTool[] = [
     title: "Search stock music",
     description:
       "Search Freesound music and sound effects. Returns ids, durations, licences and MP3 preview URLs, open licences first (CC0, then CC BY; " +
-      "non-commercial last), then longer tracks. Each preview is measured where the surface can: tempo (bpm, confidence, other octave readings), level (loudness_db) and energy. " +
+      "non-commercial last), then longer tracks. With bpm, bpm_range or energy, the previews are downloaded and measured (where the surface can) and each result gets its tempo (bpm, confidence, other octave readings), level (loudness_db) and energy; a plain search is not measured. " +
       "Do not put a tempo in the query (Freesound matches words, so '128 bpm' finds pages that mention a number): give bpm or bpm_range and the tracks are filtered by their measured tempo, " +
       "a half- or double-time reading counts. Words like '120 bpm' in the query are moved to bpm_range for you. " +
       "To add one: import_stock_media_tool with source='freesound', its sound_id and preview_url. Credit CC BY sounds (user and link) wherever the video is published.",
@@ -152,11 +152,12 @@ export const stockTools: CatalogTool[] = [
         warnings.push(`Moved the tempo out of the query: searching '${typed.query}' for ${Math.round(wanted[0])}-${Math.round(wanted[1])} BPM.`);
       }
       const filtering = wanted !== undefined || args.energy !== undefined;
-      const measuring = canMeasurePreviews(call);
+      // Previews are downloaded and measured only to filter by tempo or energy: a plain search costs what it always did.
+      const measuring = filtering && canMeasurePreviews(call);
       if (filtering && !measuring) warnings.push("bpm / energy filters are not applied: this surface cannot measure audio previews. Check the results by ear or pick by tags.");
 
       // Mood words narrow the search; Freesound wants every word, so retry without them when nothing matches.
-      const pageSize = filtering && measuring ? 60 : Math.min(30, n * 2);
+      const pageSize = measuring ? 60 : Math.min(30, n * 2);
       const minSeconds = Number(args.min_seconds ?? 0);
       let found = await searchFreesound(call, args.mood ? `${typed.query} ${args.mood}` : typed.query, pageSize, minSeconds);
       if (!("error" in found) && found.sounds.length === 0 && args.mood) {
@@ -178,9 +179,9 @@ export const stockTools: CatalogTool[] = [
         return !args.energy || m.energy === args.energy;
       };
       if (measuring) {
-        const budget = filtering ? MAX_MEASURED : n;
+        const budget = MAX_MEASURED;
         let next = 0;
-        while (next < Math.min(budget, candidates.length) && (!filtering || candidates.filter(fits).length < n) && !(measureError && measures.size === 0 && next >= MEASURE_BATCH)) {
+        while (next < Math.min(budget, candidates.length) && candidates.filter(fits).length < n && !(measureError && measures.size === 0 && next >= MEASURE_BATCH)) {
           const batch = candidates.slice(next, Math.min(next + MEASURE_BATCH, budget));
           next += batch.length;
           const done = await Promise.all(batch.map((s) => measurePreview(call, previewOf(s)!)));

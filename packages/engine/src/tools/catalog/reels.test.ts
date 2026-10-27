@@ -248,6 +248,28 @@ describe("build_reel_tool with the beat grid given", () => {
     expect(doc.undoLabels).toHaveLength(1);
   });
 
+  it("takes the double of a 174 pulse read as 87 for hype and highlight, keeping the half in the receipt", async () => {
+    const pulse = new Float32Array(40 * SR);
+    for (let t = 0; t < 40; t += 60 / 174) {
+      const start = Math.round(t * SR);
+      for (let k = 0; k < SR * 0.1 && start + k < pulse.length; k += 1) pulse[start + k] = 0.9 * Math.exp(-k / (0.02 * SR)) * Math.sin((2 * Math.PI * 900 * k) / SR);
+    }
+    for (const style of ["hype", "highlight", "cinematic"]) {
+      const host = withAudio(fakeHost());
+      host.audio!.decodePcm = async () => ({ sampleRate: SR, samples: pulse });
+      const result = await runTool({ doc: reelProject(), host }, "build_reel_tool", { style, file_ids: FILES, duration_seconds: 12 });
+      expect(result.ok, result.text).toBe(true);
+      const data = (result.data as { data: Reel; warnings?: string[] }).data;
+      if (style === "cinematic") {
+        expect(data.bpm).toBeLessThan(100);
+        continue;
+      }
+      expect(Math.abs(data.bpm - 174)).toBeLessThan(4);
+      expect(data.beat_source).toMatch(/faster reading/);
+      expect((data.music_tempo as unknown as { alternatives: { bpm: number }[] }).alternatives.some((a) => Math.abs(a.bpm - 87) < 3)).toBe(true);
+    }
+  });
+
   it("reports how sure the detected grid is", async () => {
     const { data } = await reel({});
     expect(data.beat_source).toBe("the music, tracked");

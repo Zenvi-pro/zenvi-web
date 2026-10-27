@@ -168,6 +168,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
       decodePcm: (p, o) => decodePcm(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
+      decodesUrls: true,
     },
     storage: {
       async save(project, target) {

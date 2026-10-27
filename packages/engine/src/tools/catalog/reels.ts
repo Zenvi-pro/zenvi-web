@@ -262,7 +262,7 @@ export const reelTools: CatalogTool[] = [
           let movedFrom: number | null = null;
           // A loop read at half speed cuts a hype reel too slowly: use the octave the audio also has that is nearer the style's.
           const styleBpm = isMotionStyleId(styleId) ? MOTION_STYLES[styleId].defaultBpm : REEL_STYLES[styleId].defaultBpm;
-          const nearer = typeof tracked === "string" ? null : octaveNearStyle(tracked, styleBpm);
+          const nearer = typeof tracked === "string" ? null : octaveNearStyle(tracked, styleBpm, styleId === "hype" || styleId === "highlight");
           if (nearer !== null && typeof tracked !== "string") {
             const retracked = await beatsOfFile(call, music, { bpm: nearer });
             if (typeof retracked !== "string" && retracked.beats.length >= 2) {

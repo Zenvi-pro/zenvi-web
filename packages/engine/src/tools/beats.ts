@@ -4,7 +4,7 @@
  * Shared by detect_beats_tool and build_reel_tool.
  */
 
-import { BEAT_SAMPLE_RATE, detectBeats, type BeatAnalysis, type BeatOptions } from "../analysis/beats.js";
+import { BEAT_SAMPLE_RATE, EDIT_BPM_MAX, detectBeats, type BeatAnalysis, type BeatOptions } from "../analysis/beats.js";
 import type { ProjectFile } from "../model/types.js";
 import type { ToolCall } from "./define.js";
 
@@ -63,12 +63,17 @@ export function weakGridWarning(beats: BeatAnalysis): string | null {
  * The octave of a tracked tempo that suits a style: a 80 BPM loop with a real
  * 160 pulse cuts a hype reel at 160, not at half speed. Null keeps the tracked
  * tempo (it is already the nearest, or no other reading is in the audio).
+ * `fast` styles (hype, highlight) take the double tempo whenever it is at most
+ * 180 BPM and the audio carries it (a 174 pulse read as 87 is not a ballad).
  */
-export function octaveNearStyle(beats: BeatAnalysis, styleBpm: number): number | null {
+export function octaveNearStyle(beats: BeatAnalysis, styleBpm: number, fast = false): number | null {
   if (beats.forced) return null;
+  const supported = beats.alternatives.filter((a) => a.support >= 0.8 && a.bpm >= 60 && a.bpm <= 200);
+  if (fast) {
+    const double = supported.find((a) => a.bpm > beats.bpm * 1.9 && a.bpm < beats.bpm * 2.1 && a.bpm <= EDIT_BPM_MAX);
+    if (double) return double.bpm;
+  }
   const distance = (bpm: number) => Math.abs(Math.log2(bpm / styleBpm));
-  const best = beats.alternatives
-    .filter((a) => a.support >= 0.8 && a.bpm >= 60 && a.bpm <= 200)
-    .sort((a, b) => distance(a.bpm) - distance(b.bpm))[0];
+  const best = supported.sort((a, b) => distance(a.bpm) - distance(b.bpm))[0];
   return best && distance(beats.bpm) - distance(best.bpm) >= 0.25 ? best.bpm : null;
 }
