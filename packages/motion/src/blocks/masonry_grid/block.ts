@@ -66,14 +66,20 @@ export async function build(ctx: BlockContext): Promise<void> {
   const pull = Math.min(2.4, (W * 0.62) / hero.w);
   const pullAt = 0.5;
   tl.fromTo(board, { x: W / 2 - heroCx, y: H / 2 - heroCy, scale: pull }, { x: 0, y: 0, scale: 1 }, { at: pullAt, duration: 1.3, ease: "in-out" });
-  tl.fromTo(heroEl, { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1 }, { at: 0.05, duration: 0.5, ease: "out" });
+  const heroAt = 0.05;
+  tl.fromTo(heroEl, { scale: 0.92, opacity: 0 }, { scale: 1, opacity: 1 }, { at: heroAt, duration: 0.5, ease: "out" });
+  ctx.cue(heroAt, "pop", { weight: 0.45, at: heroEl });
+  ctx.cue(pullAt, "whoosh", { weight: 0.5 });
   // The rest fly up into their columns, nearest first, 0.45 s from first to last.
-  tl.fromTo(
-    others.map((k) => els.get(k)!),
-    { y: 180 * scale, opacity: 0, scale: 0.94 },
-    { y: 0, opacity: 1, scale: 1 },
-    { at: pullAt + 0.2, duration: 0.75, ease: "out", stagger: others.length > 1 ? 0.45 / (others.length - 1) : 0 },
-  );
+  const flyAt = pullAt + 0.2;
+  const flyEach = others.length > 1 ? 0.45 / (others.length - 1) : 0;
+  tl.fromTo(others.map((k) => els.get(k)!), { y: 180 * scale, opacity: 0, scale: 0.94 }, { y: 0, opacity: 1, scale: 1 }, { at: flyAt, duration: 0.75, ease: "out", stagger: flyEach });
+  // A cascade of a few pops, not one per card (a board holds dozens inside half a second).
+  const pops = Math.min(8, others.length);
+  for (let k = 0; k < pops; k += 1) {
+    const i = pops > 1 ? Math.round((k * (others.length - 1)) / (pops - 1)) : 0;
+    ctx.cue(flyAt + i * flyEach, "pop", { weight: 0.3, at: els.get(others[i]!)! });
+  }
 
   // The lift: the pointer comes to the hero card, it rises off the board, the rest fall back.
   const hoverAt = Math.min(2.5, S * 0.48);
@@ -94,6 +100,7 @@ export async function build(ctx: BlockContext): Promise<void> {
     const wideW = Math.max(label.getBoundingClientRect().width, done.getBoundingClientRect().width);
     if (wideW > 0) button.style.width = `${wideW + 56}px`;
     tl.fromTo(button, { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1 }, { at: hoverAt + 0.15, duration: 0.3, ease: "back-out" });
+    ctx.cue(hoverAt + 0.15, "pop", { weight: 0.3, at: button });
 
     // Pointer: in from below right, to the card, to the button (frame px: the board is at rest by now).
     const bx = heroRect.x + heroRect.w - 18 * scale - 60 * scale;

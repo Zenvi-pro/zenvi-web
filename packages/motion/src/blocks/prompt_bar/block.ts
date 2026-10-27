@@ -58,6 +58,7 @@ export function build(ctx: BlockContext): void {
 
   // Entrance (TASTE: 0.6-0.8 s, expo-out, from 4 % below with a soft blur).
   tl.fromTo(wrap, { xPercent: -50, y: H * 0.04, scale: 0.96, opacity: 0, blur: 12 }, { xPercent: -50, y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.8, ease: "out" });
+  ctx.cue(0, "pop", { weight: 0.4, at: { x: W / 2, y: top + h / 2 } });
   if (pill) tl.set(pill, { opacity: 0 }, 0);
 
   const startType = 0.9;
@@ -67,6 +68,7 @@ export function build(ctx: BlockContext): void {
   const typing = { at: startType, cps };
   const typedEnd = startType + chars / cps;
   tl.track(typewriter(typed, prompt, typing));
+  if (chars > 0) ctx.cue(startType, "type", { weight: 0.2, at: field, until: typedEnd, rate: cps });
   tl.track((t) => {
     placeholder.style.opacity = typedCount(prompt, t, typing) > 0 ? "0" : "0.7";
   });
@@ -82,15 +84,18 @@ export function build(ctx: BlockContext): void {
     const by = b.top + b.height / 2;
     const ptr = pointer(ctx, { x: bx + 160, y: by + 220 }, Math.max(0.6, sendAt - 1.1));
     ptr.moveTo(bx, by, Math.max(0.8, sendAt - 0.85), 0.75);
-    ptr.click(sendAt);
+    // The send button reports the press, with or without the pointer.
+    ptr.click(sendAt, null);
     tl.to(ptr.el, { opacity: 0 }, { at: sendAt + 0.6, duration: 0.3, ease: "linear" });
   }
   tl.to(send, { scale: 0.88 }, { at: sendAt, duration: 0.08, ease: "out" });
+  ctx.cue(sendAt, "click", { weight: 0.4, at: send });
   tl.to(send, { scale: 1 }, { at: sendAt + 0.08, duration: 0.3, ease: "back-out" });
 
   if (pill && shimmer) {
     const pillAt = sendAt + 0.3;
     tl.fromTo(pill, { y: 24, scale: 0.9, opacity: 0, blur: 6 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: pillAt, duration: 0.5, ease: "back-out" });
+    ctx.cue(pillAt, "pop", { weight: 0.35, at: pill });
     const sh = shimmer;
     tl.track((t) => {
       const phase = ((t - pillAt) / 1.4) % 1;

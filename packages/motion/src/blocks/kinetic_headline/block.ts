@@ -50,22 +50,32 @@ export function build(ctx: BlockContext): void {
   const start = kicker ? 0.15 : 0;
   // TASTE.md: 0.06 s per word, 0.12 s per line.
   let at = start;
+  const CHAR_EACH = 0.025;
+  const WORD_EACH = style === "blur" ? 0.07 : 0.06;
   lines.forEach((_, i) => {
     const lw = words[i]!;
     switch (style) {
       case "blur":
-        tl.fromTo(lw, { opacity: 0, blur: 22, scale: 1.12, y: 10 }, { opacity: 1, blur: 0, scale: 1, y: 0 }, { at, duration: 0.8, ease: "out", stagger: 0.07 });
+        tl.fromTo(lw, { opacity: 0, blur: 22, scale: 1.12, y: 10 }, { opacity: 1, blur: 0, scale: 1, y: 0 }, { at, duration: 0.8, ease: "out", stagger: WORD_EACH });
         break;
       case "pop":
-        tl.fromTo(chars[i]!, { opacity: 0, scale: 0.3, y: 30 }, { opacity: 1, scale: 1, y: 0 }, { at, duration: 0.45, ease: "back-out", stagger: 0.025 });
+        tl.fromTo(chars[i]!, { opacity: 0, scale: 0.3, y: 30 }, { opacity: 1, scale: 1, y: 0 }, { at, duration: 0.45, ease: "back-out", stagger: CHAR_EACH });
         break;
       case "wipe":
         tl.fromTo(inners[i]!, { clipPath: "inset(0% 100% 0% 0%)", x: -30 }, { clipPath: "inset(0% 0% 0% 0%)", x: 0 }, { at, duration: 0.8, ease: "in-out" });
         break;
       default:
-        tl.fromTo(lw, { yPercent: 110, rotate: 4 }, { yPercent: 0, rotate: 0 }, { at, duration: 0.75, ease: "out", stagger: 0.06 });
+        tl.fromTo(lw, { yPercent: 110, rotate: 4 }, { yPercent: 0, rotate: 0 }, { at, duration: 0.75, ease: "out", stagger: WORD_EACH });
     }
-    const perLine = style === "pop" ? chars[i]!.length * 0.025 : style === "wipe" ? 0.25 : lw.length * 0.06;
+    // Each line comes in on a soft swish; a starred word stamps in as it appears.
+    ctx.cue(at, "whoosh", { weight: 0.3, at: inners[i]! });
+    let first = 0;
+    lw.forEach((word, j) => {
+      const wordAt = style === "wipe" ? at : style === "pop" ? at + first * CHAR_EACH : at + j * WORD_EACH;
+      first += word.children.length;
+      if (word.classList.contains("em")) ctx.cue(wordAt, "impact", { weight: 0.8, at: word });
+    });
+    const perLine = style === "pop" ? chars[i]!.length * CHAR_EACH : style === "wipe" ? 0.25 : lw.length * WORD_EACH;
     at += 0.12 + perLine;
   });
   // A slow push on the hold (TASTE.md §3: 100 → 104 %).

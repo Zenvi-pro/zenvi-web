@@ -52,7 +52,11 @@ frames. The same page also answers HyperFrames' `window.__hf = { duration, seek 
    keep text inside `ctx.safe`, lay out for `ctx.portrait` and landscape. Fit the
    block to `ctx.seconds`; the root fades out over the last 0.4 s unless you set
    `ctx.ownExit`. Easings and timings: docs/TASTE.md (`out` for entrances,
-   0.06 s word stagger, back-out ≤ 6 %).
+   0.06 s word stagger, back-out ≤ 6 %). Report what the ear should hear with
+   `ctx.cue(t, kind, { weight, at })` (a click, a toggle, a typing run, a card
+   landing: the engine's `PictureEvent`), timed from the same variables as the
+   tweens; the page lists them as `__zenvi.events` and the renderer caches
+   them beside the render for the sound design.
 3. Optional `block.css` (design px).
 4. One import line in `src/catalog.ts`.
 5. `npx vitest run --project motion` (blocks.test.ts builds every block in

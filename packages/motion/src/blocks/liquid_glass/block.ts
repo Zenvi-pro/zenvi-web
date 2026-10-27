@@ -196,7 +196,17 @@ export async function build(ctx: BlockContext): Promise<void> {
   tl.to(send, { scale: 0.86, backgroundColor: palette.accent }, { at: sendAt, duration: 0.08, ease: "out" });
   tl.to(send, { scale: 1 }, { at: sendAt + 0.08, duration: 0.3, ease: "back-out" });
   if (divider) tl.fromTo(divider, { opacity: 0, scaleX: 0.6 }, { opacity: 1, scaleX: 1 }, { at: openAt + open * 0.5, duration: 0.5, ease: "out" });
-  tl.fromTo(rows, { opacity: 0, y: 18 * scale, blur: 6 }, { opacity: 1, y: 0, blur: 0 }, { at: openAt + open * 0.6, duration: 0.5, ease: "out", stagger: 0.12 });
+  const rowsAt = openAt + open * 0.6;
+  const rowEach = 0.12;
+  tl.fromTo(rows, { opacity: 0, y: 18 * scale, blur: 6 }, { opacity: 1, y: 0, blur: 0 }, { at: rowsAt, duration: 0.5, ease: "out", stagger: rowEach });
+
+  // Sounds: the glass settles with a glint across its rim, the prompt is typed and sent, the card opens on its results.
+  ctx.cue(enterAt, "pop", { weight: 0.4, at: { x: W / 2, y: H / 2 } });
+  ctx.cue(enterEnd - 0.35, "glint", { weight: 0.35, at: { x: W / 2, y: H / 2 } });
+  if (typedEnd > typeAt) ctx.cue(typeAt, "type", { weight: 0.2, at: field, until: typedEnd, rate: cps });
+  ctx.cue(sendAt, "click", { weight: 0.4, at: send });
+  if (results.length > 0) ctx.cue(openAt, "pop", { weight: 0.4, at: { x: W / 2, y: H / 2 } });
+  rows.forEach((r, i) => ctx.cue(rowsAt + i * rowEach, "pop", { weight: 0.25, at: r }));
 
   let image: ImageData | null = null;
   let still: Backdrop | null = null;

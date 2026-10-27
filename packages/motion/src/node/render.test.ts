@@ -1,11 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { probe } from "@zenvi/render-node";
 import { findChrome } from "./chrome.js";
-import { designSize, encodeArgs, fingerprintRender, MotionBlockError, renderBlock, sampleTimes } from "./render.js";
+import { blockEvents, designSize, encodeArgs, fingerprintRender, MotionBlockError, renderBlock, sampleTimes } from "./render.js";
 
 let cache: string;
 let env: NodeJS.ProcessEnv;
@@ -78,7 +78,36 @@ describe("render smoke (headless Chrome)", () => {
     const again = await renderBlock("kinetic_headline", { text: "Hi *there*" }, { width: 192, height: 342, fps: 1, seconds: 3, alpha: true, env });
     expect(again.cached).toBe(true);
     expect(again.fingerprint).toBe(first.fingerprint);
+    // The starred word stamps in; a cache hit returns the events it rendered with.
+    expect(first.events.some((e) => e.kind === "impact")).toBe(true);
+    expect(again.events).toEqual(first.events);
   });
+
+  it("reads a block's events without capturing, from the render's cache when it has them", async (t) => {
+    if (!chrome) t.skip();
+    const dir = await mkdtemp(path.join(tmpdir(), "zenvi-motion-events-"));
+    const scoped = { ...env, ZENVI_CACHE_DIR: dir };
+    const opts = { width: 216, height: 384, fps: 3, seconds: 3, alpha: false, env: scoped };
+    try {
+      const events = await blockEvents("toggle_panel", {}, opts);
+      expect(events.filter((e) => e.kind === "toggle").length).toBeGreaterThan(0);
+      // Real layout: the switches sit right of centre, not at the default 0.5.
+      expect(events.find((e) => e.kind === "toggle")!.x).toBeGreaterThan(0.5);
+      const motion = path.join(dir, "motion");
+      expect((await readdir(motion)).filter((f) => f.endsWith(".events.json"))).toHaveLength(1);
+      expect((await readdir(motion)).some((f) => f.endsWith(".mp4"))).toBe(false);
+      // A render cached before events were recorded has no sidecar: the hit opens the page once for them.
+      const rendered = await renderBlock("toggle_panel", {}, opts);
+      expect(rendered.events).toEqual(events);
+      const sidecar = (await readdir(motion)).find((f) => f.endsWith(".events.json"))!;
+      await unlink(path.join(motion, sidecar));
+      const hit = await renderBlock("toggle_panel", {}, opts);
+      expect(hit.cached).toBe(true);
+      expect(hit.events).toEqual(events);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   // Canvas tracks and traced outlines are only checked here: jsdom has no canvas. logo_build runs
   // its full length: its wordmark reveal is past 3 s, where a CSS-scaled composited stage used to

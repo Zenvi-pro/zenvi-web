@@ -102,11 +102,14 @@ export function build(ctx: BlockContext): void {
   lit.style.height = `${lineH}px`;
 
   tl.fromTo(win, { y: H * 0.04, scale: 0.97, opacity: 0, blur: 12 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.7, ease: "out" });
+  ctx.cue(0, "pop", { weight: 0.4, at: win });
+  if (typedEnd > typeAt) ctx.cue(typeAt, "type", { weight: 0.2, at: body, until: typedEnd, rate: cps });
 
   // After a beat of stillness the run strip opens under the code: the payoff.
   if (run) {
     const runAt = typedEnd + 0.45;
     tl.fromTo(run, { height: 0 }, { height: runH }, { at: runAt, duration: 0.5, ease: "in-out" });
+    ctx.cue(runAt, "pop", { weight: 0.45, at: run });
     const out = run.firstElementChild as HTMLElement;
     tl.fromTo(out, { y: -16, opacity: 0 }, { y: 0, opacity: 1 }, { at: runAt + 0.15, duration: 0.45, ease: "out" });
     tl.to(lit, { opacity: 0 }, { at: runAt, duration: 0.3, ease: "smooth" });

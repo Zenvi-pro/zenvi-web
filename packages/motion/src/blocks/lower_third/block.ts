@@ -31,6 +31,9 @@ export function build(ctx: BlockContext): void {
   const enter = 0.1;
   const out = Math.max(1.6, S - 0.6);
   const sign = right ? -1 : 1;
+  // In on a soft swish; out on another when the block animates its own exit.
+  ctx.cue(enter, "whoosh", { weight: 0.35, at: nameMask });
+  if (ctx.ownExit) ctx.cue(out, "whoosh", { weight: 0.25, at: nameMask });
   if (rule) {
     // The line draws from the safe edge, the name rises out of it and the role drops out under it.
     tl.set(rule, { transformOrigin: right ? "100% 50%" : "0 50%" }, 0);

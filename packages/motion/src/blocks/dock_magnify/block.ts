@@ -109,6 +109,17 @@ export async function build(ctx: BlockContext): Promise<void> {
 
   const rise = (t: number): number => (1 - out((t - riseAt) / 0.7)) * B * 2.2;
   tl.fromTo(dock, { opacity: 0 }, { opacity: 1 }, { at: riseAt, duration: 0.4, ease: "smooth" });
+  ctx.cue(riseAt, "pop", { weight: 0.4, at: { x: cx, y: bottom - B / 2 } });
+  // A soft pop each time the swell moves on to another icon under the gliding pointer (sampled at 60/s).
+  let under = -1;
+  for (let t = glideAt + 0.25; t <= hoverAt; t += 1 / 60) {
+    const x = pointerX(t);
+    const i = rest.reduce((best, r, k) => (Math.abs(r - x) < Math.abs(rest[best]! - x) ? k : best), 0);
+    if (i !== under && Math.abs(rest[i]! - x) < (B + gap) / 2) {
+      ctx.cue(t, "pop", { weight: 0.2, at: { x: rest[i]!, y: iconY } });
+      under = i;
+    }
+  }
   tl.track((t) => {
     const slots = layout(t);
     const dy = rise(t);
@@ -136,7 +147,10 @@ export async function build(ctx: BlockContext): Promise<void> {
   tl.to(tip, { opacity: 0 }, { at: clickAt + 0.1, duration: 0.2, ease: "smooth" });
   tl.fromTo(stage, { scale: 1.05 }, { scale: 1 }, { at: 0, duration: S, ease: "out" });
 
-  if (!open) return;
+  if (!open) {
+    ctx.cue(launchAt, "pop", { weight: 0.3, at: els[target]! });
+    return;
+  }
   // The open: a copy of the icon flies at the camera from where it sits and fills the frame with its colour.
   ctx.ownExit = true;
   const slot = layout(launchAt)[target]!;
@@ -149,6 +163,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   tl.set(launch, { opacity: 0 }, 0);
   tl.set(launch, { opacity: 1 }, launchAt);
   tl.fromTo(launch, { x: 0, y: 0, scale: 1 }, { x: W / 2 - lcx, y: H / 2 - lcy, scale: cover }, { at: launchAt, duration: 0.7, ease: "in" });
+  ctx.cue(launchAt, "whoosh", { weight: 0.6, at: { x: lcx, y: lcy } });
   tl.to([dock, dot, ptr.el], { opacity: 0 }, { at: launchAt + 0.2, duration: 0.3, ease: "smooth" });
   tl.to(stage, { blur: 14 }, { at: launchAt, duration: 0.6, ease: "in" });
 
@@ -159,5 +174,6 @@ export async function build(ctx: BlockContext): Promise<void> {
   const name = ctx.el("div", "dm-name", end, apps[target]!);
   name.style.fontSize = `${120 * scale}px`;
   tl.fromTo(g, { scale: 0.6, opacity: 0, blur: 10 }, { scale: 1, opacity: 1, blur: 0 }, { at: launchAt + 0.5, duration: 0.6, ease: "out" });
+  ctx.cue(launchAt + 0.5, "reveal", { weight: 0.8, at: g });
   tl.fromTo(name, { y: 30 * scale, opacity: 0 }, { y: 0, opacity: 1 }, { at: launchAt + 0.62, duration: 0.6, ease: "out" });
 }
