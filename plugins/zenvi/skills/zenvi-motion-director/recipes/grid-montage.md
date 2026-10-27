@@ -17,9 +17,13 @@ black bars, almost no camera motion (the layout is the motion).
 
 ## Tools
 
-1. Assets: 6-9 clips with strong motion and contrasting colour (city lights,
-   waves, dancer, neon, skate, road). Clips with the action in the centre
-   survive the narrow tiles.
+1. Assets: **source count: one clip per tile of the largest step** (6 for
+   `steps: [3, 4, 6]`, 9 for a 3 x 3), with strong motion and contrasting
+   colour, in one `gather_stock_footage_tool` call (`queries`: city lights,
+   waves, dancer, neon, skate, road; `count` = the tiles). Clips with the
+   action in the centre survive the narrow tiles. Fewer files than tiles
+   shows a clip twice at once: the tool warns (`strict_variety: true`
+   refuses) and says how many more.
 2. Music first (the tiles read the beats from the timeline's music):
    `import_stock_media_tool` the track, `add_clip_to_timeline_tool` on its own
    track at 0, `detect_beats_tool` on that clip.
@@ -43,6 +47,10 @@ add_motion_template_tool {
    last tile is the slideshow moment of this genre. (`merge` grows the tile
    to the whole frame, out of the band; to stay letterboxed end on
    `zoom_into` instead.)
+
+   Each re-cut (3 → 4 → 6) whips every tile left together in the same undo
+   step (`transitions: "auto"`; `"flash"` for an inverted frame and a glitch,
+   `"none"` for plain cuts); `data.transitions` lists them.
 
    `layout: "strips_v"` for vertical strips (hype reels), `film_strip` for a
    sprocketed strip, `mosaic` for an irregular collage, `zoom_into: N` to end

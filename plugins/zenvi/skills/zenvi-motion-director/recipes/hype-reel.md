@@ -23,7 +23,10 @@ fixing single shots after it.
 
 ## Tools
 
-1. Assets: 14-20 clips, close and wide, all with motion. The rule is no clip
+1. Assets: **source count 14-20 clips** (one per ~1 s of the reel), close
+   and wide, all with motion, in one `gather_stock_footage_tool` call (a
+   query per beat of the story: rider, engine, wheel, visor, exhaust, road;
+   `orientation` the reel's). The rule is no clip
    back within 3 s: at this pace that is about one distinct clip per 0.25 s
    of the busiest 3 s (the receipt warns with the number it needs: import
    that many and rebuild with `replace: true`). Music: aggressive trap/house
