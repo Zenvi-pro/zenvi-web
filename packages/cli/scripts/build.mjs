@@ -30,7 +30,7 @@ const pkg = JSON.parse(await readFile(path.join(cliRoot, "package.json"), "utf8"
 const require = createRequire(import.meta.url);
 
 /** Engine asset folders the Node runtime reads (effect icons ship for tools that list effects; colors are the LUTs). */
-const ENGINE_ASSETS = ["transitions", "titles", "effects", "emojis", "colors"];
+const ENGINE_ASSETS = ["transitions", "titles", "effects", "emojis", "colors", "fonts"];
 
 async function exists(p) {
   try {
@@ -48,6 +48,9 @@ const result = await build({
   entryPoints: [path.join(cliRoot, "src", "bin.ts")],
   outfile: path.join(dist, "zenvi.mjs"),
   bundle: true,
+  // onnxruntime-node: native, optional, loaded on first use (subject mattes), resolved next to the bundle at run time.
+  // esbuild: Zenvi Motion builds block pages with it only from source; the bundle ships them prebuilt (dist/motion).
+  external: ["onnxruntime-node", "esbuild"],
   platform: "node",
   format: "esm",
   target: "node22",
@@ -91,6 +94,8 @@ await build({
 // Runtime resources next to the bundle (paths: render-node src/resources.ts).
 await cp(require.resolve("@resvg/resvg-wasm/index_bg.wasm"), path.join(dist, "resvg.wasm"));
 await cp(path.join(repoRoot, "packages", "render-node", "fonts"), path.join(dist, "fonts"), { recursive: true });
+// Zenvi 3D's bpy scripts, run by the person's Blender (packages/scenes3d/src/paths.ts).
+await cp(path.join(repoRoot, "packages", "scenes3d", "blender"), path.join(dist, "scenes3d"), { recursive: true, filter: (src) => !src.includes("__pycache__") });
 const engineAssets = path.join(repoRoot, "packages", "engine", "assets");
 const copiedAssets = [];
 for (const folder of ENGINE_ASSETS) {
@@ -107,6 +112,12 @@ const linkBuild = spawnSync(
   { cwd: repoRoot, stdio: "inherit" },
 );
 if (linkBuild.status !== 0) throw new Error(`building Zenvi Link failed (exit ${linkBuild.status})`);
+// Zenvi Motion: every block page prebuilt, and its OFL fonts (packages/motion/src/node/page.ts motionDir).
+const motionBuild = spawnSync(process.execPath, ["--import", "tsx", path.join(repoRoot, "packages", "motion", "scripts", "build-pages.ts"), "--out", path.join(dist, "motion")], {
+  cwd: repoRoot,
+  stdio: "inherit",
+});
+if (motionBuild.status !== 0) throw new Error(`building the Zenvi Motion pages failed (exit ${motionBuild.status})`);
 
 await writeFile(
   path.join(dist, "LICENSES.md"),
@@ -116,9 +127,12 @@ await writeFile(
     "- zenvi (this CLI): GPL-3.0-or-later.",
     "- resvg-wasm (resvg.wasm): MPL-2.0, https://github.com/yisibl/resvg-js.",
     "- Lato (fonts/Lato-Regular.ttf): SIL Open Font License 1.1, see fonts/OFL.txt.",
+    "- motion/fonts (Inter, Instrument Serif, JetBrains Mono, Anton): SIL Open Font License 1.1, see motion/fonts/OFL-*.txt.",
     "- assets/ (transition masks, title templates, effect icons): from the Zenvi desktop app (zenvi-core, after OpenShot), GPL-3.0-or-later.",
     "- assets/emojis: OpenMoji emoji graphics (https://openmoji.org), CC BY-SA 4.0, as the Zenvi desktop app ships them.",
+    "- assets/fonts (Inter, Anton, Bebas Neue, Archivo Black, Instrument Serif, Space Mono, Varela Round, Caveat Brush, Silkscreen): SIL Open Font License 1.1, each with its OFL.txt.",
     "- assets/colors (colour LUTs): from the Zenvi desktop app, by the freshluts.com community, CC0; see assets/colors/AUTHORS.md.",
+    "- scenes3d/: Zenvi 3D's Blender scene scripts (bpy), GPL-3.0-or-later; they run in the person's own Blender, a separate program.",
     "- composite-worker.mjs: the engine's compositor for worker threads (same terms as zenvi.mjs).",
     "- adobe/pro.zenvi.link: Zenvi Link, the After Effects / Premiere Pro extension, GPL-3.0-or-later; host/*.jsx include Douglas Crockford's json2.js (public domain).",
     "- JavaScript dependencies: license comments at the end of zenvi.mjs.",

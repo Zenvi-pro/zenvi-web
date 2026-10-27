@@ -22,6 +22,7 @@ import type { Transaction } from "../history/document.js";
 import { isOpError } from "../ops/errors.js";
 import { contractInputs, contractMeta, type ContractInput, type ContractToolName } from "./schemas.gen.js";
 import type { JsonSchemaObject } from "./json-schema.js";
+import { aliasArguments } from "./aliases.js";
 import { invalidArgumentsMessage, normalizeArgs } from "./coerce.js";
 import { coerceEditorArgs, isEditorToolHandler } from "./editor-args.js";
 import { pendingArgumentIn, pendingArgumentMessage } from "./pending.js";
@@ -89,9 +90,15 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   exporter: "video rendering",
   frames: "frame rendering",
   backend: "the Zenvi backend (sign in to Zenvi)",
+  stock: "stock search (sign in to Zenvi)",
   storage: "project storage",
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",
+  mattes: "subject matting (onnxruntime-node: the zenvi CLI and Zenvi Cloud)",
+  motion: "Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)",
+  scenes3d: "Zenvi 3D (Blender on this computer)",
+  fx: "Zenvi FX (ffmpeg renders on this computer)",
+  library: "the public sound libraries (Openverse)",
 };
 
 /**
@@ -165,8 +172,26 @@ function receiptForError(tool: string, error: unknown, host: ToolHost): ToolRece
   return failed(tool, message || "tool failed");
 }
 
-/** Run one tool: the whole desktop execute_tool pipeline. Never throws for user errors. */
+/**
+ * Run one tool: the whole desktop execute_tool pipeline. Never throws for
+ * user errors. A wrong argument name with one reading (`clip_id` for
+ * `timeline_clip_id`) is accepted and named in the receipt's warnings.
+ */
 export async function executeTool<I extends z.ZodType>(
+  tool: CatalogTool<I>,
+  impl: ToolImplementation<z.output<I>>,
+  ctx: ToolContext,
+  rawArgs: unknown,
+): Promise<ToolResult<ToolReceipt>> {
+  const aliased = aliasArguments(tool.inputSchema, rawArgs);
+  const result = await runPipeline(tool, impl, ctx, aliased.args);
+  if (aliased.notes.length === 0 || !result.data) return result;
+  const receipt = result.data;
+  receipt.warnings = [...aliased.notes, ...receipt.warnings];
+  return { ...result, text: JSON.stringify(receipt) };
+}
+
+async function runPipeline<I extends z.ZodType>(
   tool: CatalogTool<I>,
   impl: ToolImplementation<z.output<I>>,
   ctx: ToolContext,

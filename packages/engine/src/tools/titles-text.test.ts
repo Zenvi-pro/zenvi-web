@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ProjectDocument } from "../history/document.js";
+import { getAttr } from "../titles/xml.js";
 import { toStoredPaths } from "../io/paths.js";
 import { createProject } from "../model/defaults.js";
 import type { Clip, Effect, Keyframe } from "../model/types.js";
@@ -18,6 +19,7 @@ import { addFile } from "../ops/files.js";
 import { setTrackLocked } from "../ops/tracks.js";
 import {
   BLANK,
+  artboardSize,
   backgroundColor,
   editorFontFamily,
   estimatedTextWidth,
@@ -28,11 +30,11 @@ import {
   rectNodes,
   setFieldText,
   textColor,
+  textZone,
   titleFields,
   titleSvgText,
   tspanNodes,
 } from "../titles/title-svg.js";
-import { getAttr } from "../titles/xml.js";
 import { buildCaptionText, parseCaptionText, displayText, type Cue } from "./caption-cues.js";
 import type { ToolReceipt } from "./receipt.js";
 import { runTool } from "./registry.js";
@@ -458,12 +460,12 @@ function svgOf(h: FakeHost, path: string): string {
 }
 
 describe("list_title_templates_tool", () => {
-  it("lists the 50 templates with their fields, and filters by look", async () => {
+  it("lists the 51 templates with their fields, and filters by look", async () => {
     const doc = newDoc();
     const r = await call(doc, host(), "list_title_templates_tool");
     const templates = data(r).templates as { name: string; zone: string; fields: { role: string }[]; label: string; source: string }[];
-    expect(templates).toHaveLength(50);
-    expect(r.summary).toBe("Found 50 title template(s).");
+    expect(templates).toHaveLength(51);
+    expect(r.summary).toBe("Found 51 title template(s).");
     const gray = templates.find((t) => t.name === "Gray_Box_4")!;
     expect([gray.zone, gray.label, gray.source, gray.fields.map((f) => f.role)]).toEqual(["bottom", "Gray box 4", "bundled", ["title", "subtitle"]]);
     const lower = await call(doc, host(), "list_title_templates_tool", { query: "lower third" });
@@ -496,6 +498,33 @@ describe("list_title_templates_tool", () => {
 });
 
 describe("edit_title_tool", () => {
+  it("sets a title in a bundled family as outlines, and redraws them on the next edit", async () => {
+    const { doc, h, clipA } = twoClipTitle();
+    const r = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 2", font: "Anton" });
+    expect(r.summary).toMatch(/^Updated title/);
+    const first = svgOf(h, String(data(r).path));
+    expect(first).toContain('data-zenvi-outline="anton"');
+    expect(first.match(/<path d=/g)!.length).toBeGreaterThan(0);
+    // The words stay in the file (hidden) for the Title Editor and the next edit.
+    expect(lineTexts(parseTitleSvg(first))).toEqual(["Day 2", "Tokyo"]);
+    const again = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 3" });
+    expect(again.summary).toMatch(/^Updated title/);
+    const second = svgOf(h, String(data(again).path));
+    expect(second.match(/data-zenvi-outline=/g)!.length).toBe(first.match(/data-zenvi-outline=/g)!.length);
+    expect(lineTexts(parseTitleSvg(second))).toEqual(["Day 3", "Tokyo"]);
+    const back = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "Helvetica" });
+    expect(svgOf(h, String(data(back).path))).not.toContain("data-zenvi-outline");
+  });
+
+  it("warns about characters no bundled font can draw", async () => {
+    const { doc, h, clipA } = twoClipTitle();
+    const r = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 漢", font: "Anton" });
+    expect(r.summary).toMatch(/^Updated title/);
+    expect(r.warnings).toEqual(["No bundled font has a glyph for 漢; those characters are left out."]);
+    const plain = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, text: "Day 漢", font: "Helvetica" });
+    expect(plain.warnings).toEqual([]);
+  });
+
   it("changes every clip's title to a new version; undo restores it", async () => {
     const { doc, h, fileId, clipA, clipB, path } = twoClipTitle();
     const undo = doc.undoLabels.length;
@@ -632,16 +661,57 @@ describe("add_title_tool", () => {
     expect(clip(doc, String(d.timeline_clip_id))).toBeDefined();
   });
 
-  it("refuses a locked or busy explicit track before writing anything", async () => {
+  it("refuses a locked explicit track before writing anything", async () => {
     const doc = newDoc();
     addVideo(doc, { position: 0, end: 10, layer: L2 });
     doc.setUntracked(["layers", { number: 3_000_000 }, "lock"], true);
     const h = host();
     await expectRefusal(doc, h, "add_title_tool", { text: "X", track: "3" }, "locked");
-    await expectRefusal(doc, h, "add_title_tool", { text: "X", track: "2", position_seconds: "5" }, "already has");
     expect(h.calls.filter((c) => c.startsWith("writeGenerated"))).toEqual([]);
     const r = await call(doc, h, "add_title_tool", { text: "Y", track: "2", position_seconds: "10.5" });
     expect(clip(doc, String(data(r).timeline_clip_id))!.layer).toBe(L2);
+  });
+
+  it("puts a title for a busy explicit track on the first free track above it, with a warning, in one undo step", async () => {
+    const doc = newDoc();
+    addVideo(doc, { position: 0, end: 10, layer: L2 });
+    const undo = doc.undoLabels.length;
+    const r = await call(doc, host(), "add_title_tool", { text: "X", track: "2", position_seconds: "5" });
+    expect(r.status).toBe("applied");
+    expect(clip(doc, String(data(r).timeline_clip_id))!.layer).toBe(3_000_000);
+    expect(data(r)).toMatchObject({ track: 3, new_track: false });
+    expect(r.warnings).toHaveLength(1);
+    expect(r.warnings[0]).toMatch(/^track 2 already has 'video-0\.mp4' at 0\.00-10\.00s during 5\.00-10\.00s; placed on track 3 instead$/);
+    expect(r.summary).toContain(` Warning: ${r.warnings[0]}.`);
+    expect(data(r).warnings).toEqual(r.warnings);
+    expect(doc.undoLabels.length).toBe(undo + 1);
+  });
+
+  it("opens a new track on top when every track above the busy one is busy too", async () => {
+    const doc = newDoc();
+    for (const layer of [1, 2, 3, 4, 5]) addVideo(doc, { position: 0, duration: 30, layer: layer * 1_000_000 });
+    const r = await call(doc, host(), "add_title_tool", { text: "X", track: "5" });
+    expect(data(r)).toMatchObject({ layer: 6_000_000, new_track: true });
+    expect(r.warnings[0]).toContain("placed on a new track on top (track 6) instead");
+    expect(doc.project.layers.find((l) => l.number === 6_000_000)?.label).toBe("Titles");
+    expect(doc.undoLabels.at(-1)).toBeDefined();
+    doc.undo();
+    expect(doc.project.layers).toHaveLength(5);
+  });
+
+  it("skips a locked free track and still warns", async () => {
+    const doc = newDoc();
+    addVideo(doc, { position: 0, end: 10, layer: L2 });
+    doc.setUntracked(["layers", { number: 3_000_000 }, "lock"], true);
+    const r = await call(doc, host(), "add_title_tool", { text: "X", track: "2" });
+    expect(data(r).layer).toBe(4_000_000);
+    expect(r.warnings).toHaveLength(1);
+  });
+
+  it("says nothing when the named track is free", async () => {
+    const r = await call(newDoc(), host(), "add_title_tool", { text: "X", track: "2" });
+    expect(r.warnings).toEqual([]);
+    expect(data(r)).not.toHaveProperty("warnings");
   });
 
   it("fills a lower third's name and role from subtitle or a newline, anchored at the bottom", async () => {
@@ -678,7 +748,6 @@ describe("add_title_tool", () => {
     [{ text: "A", font_weight: "heavy" }, "font_weight"],
     [{ text: "A", duration_seconds: "0" }, "duration_seconds"],
     [{ text: "A", position_seconds: "-1" }, "position_seconds"],
-    [{ text: "A", template: "Solid_Color" }, "no text"],
     [{ text: "A", font: "Comic Papyrus" }, "font 'Comic Papyrus' is not installed; installed fonts like it: "],
   ])("refuses %j and leaves the project as it was", async (args, needle) => {
     await expectRefusal(newDoc(), host({ fonts: ["Arial", "DejaVu Sans", "Liberation Sans", "Lato"] }), "add_title_tool", args, needle);
@@ -689,6 +758,81 @@ describe("add_title_tool", () => {
     const r = await call(newDoc(), h, "add_title_tool", { template: "Solid_Color", background_color: "#1e90ff" });
     expect(backgroundColor(written(h, r))).toEqual(["#1e90ff", 1]);
     expect(data(r).background_color).toBe("#1e90ff");
+  });
+
+  it("draws text named on Solid_Color with a text template over the colour, with a warning", async () => {
+    const doc = newDoc();
+    const h = host();
+    const r = await call(doc, h, "add_title_tool", { template: "Solid_Color", text: "DOUBT", background_color: "#d4141c", text_color: "#ffffff" });
+    expect(r.status).toBe("applied");
+    expect(data(r)).toMatchObject({ template: "Text_Card", background_color: "#d4141c" });
+    expect(backgroundColor(written(h, r))).toEqual(["#d4141c", 1]);
+    expect(lineTexts(written(h, r))[0]).toBe("DOUBT");
+    expect(r.warnings).toEqual(["Solid_Color has no text; drew the text with Text_Card over the colour #d4141c"]);
+    expect(r.summary).toContain(" Warning: Solid_Color has no text; drew the text with Text_Card over the colour #d4141c.");
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("Text_Card is one centred line on a full-frame colour rect", () => {
+    const doc = parseTitleSvg(readFileSync(new URL("titles/Text_Card.svg", ASSETS), "utf8"));
+    const slots = titleFields(doc);
+    expect(slots.map((f) => f.text)).toEqual(["The Title"]);
+    expect(textZone(slots, artboardSize(doc)[1])).toBe("center");
+    expect(backgroundColor(doc)).toEqual(["#000000", 1]);
+  });
+
+  it("keeps text on a card vertically centred when the font is scaled", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { template: "Solid_Color", text: "DOUBT", font_scale: "2.5" });
+    const doc = written(h, r);
+    const [line] = tspanNodes(doc);
+    expect(nodeStyle(line!).get("font-size")).toBe("400px");
+    expect(Number(getAttr(line!, "y"))).toBeCloseTo(540 + 0.36 * 400, 6);
+  });
+
+  it("carries a translucent card's opacity to the text card", async () => {
+    const card = '<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><g><rect style="opacity:0.5;fill:#112233" width="1920" height="1080" x="0" y="0"/></g></svg>';
+    const h = host({ texts: { "/cards/Glass_Card.svg": card } });
+    const r = await call(newDoc(), h, "add_title_tool", { template: "/cards/Glass_Card.svg", text: "Hi" });
+    expect(r.status).toBe("applied");
+    expect(data(r)).toMatchObject({ template: "Text_Card", background_color: "#112233" });
+    expect(backgroundColor(written(h, r))).toEqual(["#112233", 0.502]);
+    expect(r.warnings).toEqual(["Glass_Card has no text; drew the text with Text_Card over the colour #11223380"]);
+  });
+
+  it("keeps the card's own colour for text on Solid_Color when no background_color is given", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { template: "Solid_Color", text: "Hi" });
+    const [colour, alpha] = backgroundColor(written(h, r));
+    expect(alpha).toBe(1);
+    expect(data(r).background_color).toBe(colour);
+  });
+
+  it("makes a blank title with a background colour a Solid_Color card (a white flash frame)", async () => {
+    const doc = newDoc();
+    const h = host();
+    const r = await call(doc, h, "add_title_tool", { text: " ", background_color: "#FFFFFF", duration_seconds: "0.1" });
+    expect(r.status).toBe("applied");
+    expect(data(r)).toMatchObject({ template: "Solid_Color", background_color: "#ffffff", duration: 0.1 });
+    expect(backgroundColor(written(h, r))).toEqual(["#ffffff", 1]);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("blanks a named text template's fields when only a background colour is given", async () => {
+    const h = host();
+    const r = await call(newDoc(), h, "add_title_tool", { template: "Standard_1", background_color: "black" });
+    expect(r.status).toBe("applied");
+    expect(lineTexts(written(h, r)).every((t) => t.trim() === "")).toBe(true);
+  });
+
+  it("adds the tracks an explicit track one to three past the top names, in the same undo step", async () => {
+    const doc = newDoc();
+    const r = await call(doc, host(), "add_title_tool", { text: "Hi", track: "7" });
+    expect(r.summary).toBe("Added title 'Hi' (Bar_1) on track 7 at 0.00-5.00s on a new track.");
+    expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000, 7_000_000]);
+    expect(doc.project.layers.find((l) => l.number === 7_000_000)?.label).toBe("Titles");
+    expect(doc.undoLabels).toHaveLength(1);
+    await expectRefusal(doc, host(), "add_title_tool", { text: "Hi", track: "11" }, "Unknown track or layer '11'");
   });
 
   it("sets colours, font, weight, size and fades (frames 1-16 in, 91-121 out at 30 fps)", async () => {

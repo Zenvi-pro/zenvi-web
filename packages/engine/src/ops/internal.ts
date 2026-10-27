@@ -99,11 +99,35 @@ export function sameJson(a: unknown, b: unknown): boolean {
   return ka.every((k) => sameJson((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
 }
 
+/**
+ * Clip keys that describe what a tool wrote into the clip's volume curve
+ * (master_audio_tool's peak rides, tools/catalog/master-limit.ts). A volume
+ * written from scratch (a level, a fade, keyframes set by hand) drops them; a
+ * curve reshaped from the one it had (gain, a duck, relative automation)
+ * keeps them.
+ */
+export const PEAK_RIDE_MARK = "zenvi_peak_ride";
+export const VOLUME_CURVE_MARKS: readonly string[] = [PEAK_RIDE_MARK];
+
+export interface PatchClipOptions {
+  /** The patch's `volume` is the clip's own curve reshaped, so VOLUME_CURVE_MARKS still hold. */
+  volumeDerived?: boolean;
+}
+
 /** Record a shallow merge of `patch` into clip `id` when it changes anything. Returns the clip after. */
-export function patchClip(tx: Transaction, id: string, patch: Record<string, unknown>): Clip {
+export function patchClip(tx: Transaction, id: string, patch: Record<string, unknown>, opts: PatchClipOptions = {}): Clip {
   const clip = requireClip(tx.project, id);
   const changed = changedFields(clip as Record<string, unknown>, patch);
   if (Object.keys(changed).length > 0) tx.update(["clips", { id }], changed);
+  if ("volume" in changed && !opts.volumeDerived) {
+    const after = requireClip(tx.project, id) as Record<string, unknown>;
+    const stale = VOLUME_CURVE_MARKS.filter((key) => key in after && !(key in patch));
+    if (stale.length > 0) {
+      const next = { ...after };
+      for (const key of stale) delete next[key];
+      tx.replace(["clips", { id }], next);
+    }
+  }
   return requireClip(tx.project, id);
 }
 
@@ -153,6 +177,32 @@ export function mapKeyframesDeep(value: unknown, fn: (kf: Keyframe) => Keyframe)
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value)) out[k] = mapKeyframesDeep(v, fn);
   return out;
+}
+
+/**
+ * A clip's keyframe X is a frame of its reader counted from the reader's
+ * first frame (the first one shown is round(start * fps) + 1; zenvi-core
+ * editor_tools/clip_props_model.py ClipTime), and a time curve's Y is a
+ * reader frame too. Every curve on the clip and its effects goes through
+ * `frame` when the reader changes under it; points that land on one frame
+ * collapse, last one wins, as libopenshot loads them.
+ */
+export function moveKeyframes(clip: Clip, frame: (x: number) => number): Partial<Clip> {
+  const move = (kf: Keyframe, values: boolean): Keyframe => {
+    // One point holds its value at every frame (and libopenshot ignores a one-point time curve).
+    if (kf.Points.length < 2) return kf;
+    const points = new Map<number, Keyframe["Points"][number]>();
+    for (const p of kf.Points) {
+      const x = frame(Number(p.co.X));
+      points.set(x, { ...p, co: { ...p.co, X: x, ...(values ? { Y: frame(Number(p.co.Y)) } : {}) } });
+    }
+    return { ...kf, Points: [...points.values()] };
+  };
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(clip)) {
+    if (key !== "reader") out[key] = mapKeyframesDeep(value, (kf) => move(kf, key === "time"));
+  }
+  return out as Partial<Clip>;
 }
 
 /** Replace a clip wholesale when anything changed. */

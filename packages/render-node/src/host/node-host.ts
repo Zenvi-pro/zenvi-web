@@ -1,28 +1,40 @@
 /**
  * `createNodeHost`: the ToolHost the CLI, the local MCP server and the cloud
  * render worker give the engine's tools: local media, rendering, frame
- * previews, audio analysis, project storage and the Zenvi backend.
+ * previews, audio analysis, subject mattes, project storage and the Zenvi
+ * backend.
  */
 
 import { mkdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
+import { backendStock } from "@zenvi/engine/tools";
+import { fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
+import { renderMixPcm } from "../audio/mix.js";
+import { measureMix } from "../audio/measure-mix.js";
 import { transcribeMediaFile } from "../audio/speech.js";
 import { engineAssetsDir } from "../resources.js";
 import { encoderNames } from "../ffmpeg/capabilities.js";
 import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
+import { renderContactSheet } from "../render/contact-sheet.js";
 import { inspectRender } from "../render/inspect-render.js";
 import { renderFrame } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
 import { installedFontFamilies } from "../svg/fonts.js";
+import { createNodeMatteHost } from "../matte/host.js";
+import { onnxRuntimeAvailable, rvmModel, type MatteModel } from "../matte/rvm.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
+import { createSfxGenerator } from "./sfx-generate.js";
+import { cacheDir } from "../svg/fonts.js";
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
 import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
+import { createNodeScenes3d } from "./scenes3d.js";
+import { createNodeFx } from "./fx.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
 
 export interface NodeHostOptions {
@@ -45,6 +57,15 @@ export interface NodeHostOptions {
    * where the desktop finds them.
    */
   desktopDir?: string;
+  /**
+   * Subject matting: a model (tests), or false for none. Default Robust
+   * Video Matting when onnxruntime-node is installed.
+   */
+  mattes?: MatteModel | false;
+  /** Zenvi 3D (Blender scenes) when Blender is installed (default true). */
+  scenes3d?: boolean;
+  /** Zenvi FX (ffmpeg footage effects; default true). */
+  fx?: boolean;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -65,13 +86,19 @@ const MAX_TEXT_BYTES = 16 * 1024 * 1024;
  */
 export function createAssetHost(dir: string): AssetHost {
   const root = path.resolve(dir);
+  const inside = async (assetPath: string): Promise<string> => {
+    const file = path.resolve(root, assetPath);
+    const rel = path.relative(root, file);
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
+    if ((await stat(file)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
+    return file;
+  };
   return {
     async readText(assetPath) {
-      const file = path.resolve(root, assetPath);
-      const rel = path.relative(root, file);
-      if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error(`${assetPath} is not a bundled asset.`);
-      if ((await stat(file)).size > MAX_TEXT_BYTES) throw new Error(`${assetPath} is larger than ${MAX_TEXT_BYTES} bytes.`);
-      return readFile(file, "utf8");
+      return readFile(await inside(assetPath), "utf8");
+    },
+    async readBytes(assetPath) {
+      return new Uint8Array(await readFile(await inside(assetPath)));
     },
   };
 }
@@ -164,12 +191,17 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         });
         return { mimeType: format === "jpeg" ? "image/jpeg" : "image/png", data: bytes.toString("base64") };
       },
+      renderSheet: (project, tiles, layout, signal) =>
+        renderContactSheet(project, tiles, layout, { resolveMedia, engine: options.renderEngine, signal: signal ?? options.signal, log: options.log }),
       // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
       fontFamilies: () => installedFontFamilies(),
     },
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
       decodePcm: (p, o) => decodePcm(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),
+      mixPcm: (project, o) => renderMixPcm(project, { ...o, resolveMedia, engine: options.renderEngine, signal: o?.signal ?? options.signal }),
+      measureMix: (project, o) => measureMix(project, { resolveMedia, engine: options.renderEngine, ...o, signal: o?.signal ?? options.signal }),
+      decodesUrls: true,
     },
     storage: {
       async save(project, target) {
@@ -203,9 +235,24 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         }),
       currentPath: () => current() ?? null,
     },
+    // Openverse for the sound tools; OPENVERSE_TOKEN (an Openverse API token) lifts the anonymous 20 a minute / 200 a day.
+    library: fetchLibraryHost({ fetch: globalThis.fetch as unknown as LibraryFetch, openverseToken: (options.env ?? process.env).OPENVERSE_TOKEN?.trim() || undefined, userAgent: "zenvi-cli (https://zenvi.pro)" }),
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
+  // Sound effects generated for cues the recorded kit lacks, where a paid ElevenLabs key is configured.
+  const generateSfx = createSfxGenerator({ env: options.env, cacheRoot: cacheDir(options.env) });
+  if (generateSfx) host.audio!.generateSfx = generateSfx;
+  const matteModel = options.mattes ?? (onnxRuntimeAvailable() ? rvmModel({ env: options.env, signal: options.signal, log: options.log }) : false);
+  if (matteModel) host.mattes = createNodeMatteHost({ projectFile: current, resolveMedia, model: matteModel, signal: options.signal, log: options.log });
+  if (options.scenes3d !== false) {
+    const scenes3d = createNodeScenes3d({ env: options.env, resolveMedia, log: options.log });
+    if (scenes3d) host.scenes3d = scenes3d;
+  }
+  if (options.fx !== false) {
+    const fx = createNodeFx({ env: options.env, resolveMedia, projectFile: current, log: options.log });
+    if (fx) host.fx = fx;
+  }
   const desktopDir = options.desktopDir;
   if (desktopDir) {
     Object.assign(host.storage!, {
@@ -226,6 +273,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   }
   if (options.backend) {
     host.backend = createBackendHost(options.backend);
+    host.stock = backendStock(host.backend);
     // Speech recognition through the Zenvi backend, as the person `zenvi login` signed in.
     const upload = backendSpeechUpload(options.backend);
     host.audio!.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });

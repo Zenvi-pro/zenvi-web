@@ -16,6 +16,10 @@
 
 import { animatedTitleTools } from "./catalog/animated-titles.js";
 import { audioTools } from "./catalog/audio.js";
+import { masteringTools } from "./catalog/mastering.js";
+import { analyzeMixTools } from "./catalog/analyze-mix.js";
+import { mixTools } from "./catalog/mix.js";
+import { panTools } from "./catalog/pan.js";
 import { captionTools } from "./catalog/captions.js";
 import { clipPropsTools } from "./catalog/clip-props.js";
 import { clipTools } from "./catalog/clips.js";
@@ -28,12 +32,22 @@ import { effectsColorLookTools } from "./catalog/effects-color-looks.js";
 import { exportTools } from "./catalog/export.js";
 import { generationTools } from "./catalog/generation.js";
 import { inspectTools } from "./catalog/inspect.js";
+import { matchCutTools } from "./catalog/match-cut.js";
+import { lookMaskTools } from "./catalog/looks-masks.js";
+import { matteTools } from "./catalog/mattes.js";
 import { mediaTools } from "./catalog/media.js";
 import { mediaFilesTools } from "./catalog/media-files.js";
 import { mediaFilesTransitionTools } from "./catalog/media-files-transitions.js";
 import { metadataTools } from "./catalog/metadata.js";
+import { healthTools } from "./catalog/health.js";
 import { motionTools } from "./catalog/motion.js";
+import { motionBlockTools } from "./catalog/motion-blocks.js";
 import { motionTemplateTools } from "./catalog/motion-templates.js";
+import { kineticCaptionTools } from "./catalog/kinetic-captions.js";
+import { kineticTitleTools } from "./catalog/kinetic-titles.js";
+import { motionTransitionTools } from "./catalog/motion-transitions.js";
+import { scenes3dTools } from "./catalog/scenes3d.js";
+import { fxTools } from "./catalog/fx.js";
 import { overlayTools } from "./catalog/overlays.js";
 import { phase3Tools } from "./catalog/phase3.js";
 import { playbackTools } from "./catalog/playback.js";
@@ -43,10 +57,18 @@ import { projectPrefsTools } from "./catalog/project-export-prefs.js";
 import { projectProfileTools } from "./catalog/project-export-profiles.js";
 import { projectRenderTools } from "./catalog/project-export-render.js";
 import { reelTools } from "./catalog/reels.js";
+import { colorUnifyTools } from "./catalog/color-unify.js";
+import { reviewTools } from "./catalog/review.js";
 import { reviewRenderTools } from "./catalog/review-render.js";
+import { swapShotTools } from "./catalog/swap-shot.js";
 import { searchTools } from "./catalog/search.js";
+import { soundDesignTools } from "./catalog/sound-design.js";
+import { speedRampTools } from "./catalog/speed-ramp.js";
+import { soundKitTools } from "./catalog/sound-kit.js";
+import { soundLibraryTools } from "./catalog/sound-library.js";
 import { speechTools } from "./catalog/speech-tools.js";
 import { stockTools } from "./catalog/stock.js";
+import { stockGatherTools } from "./catalog/stock-gather.js";
 import { timelineTools } from "./catalog/timeline.js";
 import { timelineEditTools } from "./catalog/timeline-edit.js";
 import { timelineTimeTools } from "./catalog/timeline-time.js";
@@ -79,6 +101,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...mediaTools,
     ...searchTools,
     ...motionTools,
+    ...healthTools,
     ...metadataTools,
     ...phase3Tools,
     ...inspectTools,
@@ -106,7 +129,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...reelTools, ...reviewRenderTools, ...motionTemplateTools, ...stockTools]) {
+  for (const tool of [...implemented, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -130,7 +153,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...reelTools, ...reviewRenderTools, ...motionTemplateTools, ...stockTools];
+  return [...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */

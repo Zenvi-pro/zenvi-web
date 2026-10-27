@@ -41,6 +41,12 @@ export interface CompositeSources {
   layers: readonly (RgbaImage | null | undefined)[];
   /** Mask images (transitions, effect `mask_reader`) and Displace maps by path, natural size. */
   images?: ReadonlyMap<string, RgbaImage>;
+  /**
+   * Per `plan.layers` index: frames of videos this layer's effects read
+   * (`EffectInstance.imageFrames`), by path, over `images`. Per layer because
+   * two clips of one file on screen at once read different frames of its matte.
+   */
+  layerImages?: readonly (ReadonlyMap<string, RgbaImage> | null | undefined)[];
   /** LUT `.cube` texts by path. */
   texts?: ReadonlyMap<string, string>;
   /** Font hook for Caption and Timer. */
@@ -124,7 +130,9 @@ function applyMasks(image: PremulImage, masks: readonly MaskInstance[], images: 
 function drawLayer(canvas: PremulImage, plan: FramePlan, layer: LayerPlan, index: number, sources: CompositeSources): void {
   let image = sourceImage(layer, sources.layers[index]);
   if (!image) return;
-  const images = sources.images ?? EMPTY_IMAGES;
+  const shared = sources.images ?? EMPTY_IMAGES;
+  const own = sources.layerImages?.[index];
+  const images = own?.size ? new Map([...shared, ...own]) : shared;
   const request = layer.audio;
   const audio = request?.silent
     ? { sampleRate: request.sampleRate, channels: Array.from({ length: request.channels }, () => new Float32Array(request.samples)) }

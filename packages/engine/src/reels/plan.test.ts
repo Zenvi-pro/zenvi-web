@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseMusicStart, cutBeats, MIN_SHOT_SECONDS, planReel, planReelGrid, type MusicBeats, type ReelMedia } from "./plan.js";
+import { chooseMusicStart, cutBeats, dropBeat, freshFrom, MIN_SHOT_SECONDS, planReel, planReelGrid, REUSE_GAP_SECONDS, type MusicBeats, type ReelMedia } from "./plan.js";
 import { REEL_STYLE_IDS, REEL_STYLES } from "./styles.js";
 
 /** 120 BPM from 1 s for 60 s; quiet for the first 8 bars, loud after. */
@@ -53,8 +53,8 @@ describe("planReel", () => {
     expect(plan.lengthNote).toBe("16.00s, ends on a bar line at 120 BPM: the first one at or after the 15s asked for");
     expect(plan.downbeats.some((d) => Math.abs(d - plan.duration) < 1e-3)).toBe(true);
     expectContiguous(plan.shots, plan.duration);
-    // Every cut on a beat or half-beat of the 120 BPM grid (0.25 s steps).
-    for (const shot of plan.shots) expect(Math.abs(shot.start * 4 - Math.round(shot.start * 4))).toBeLessThan(1e-6);
+    // Every cut on a beat, half-beat or (bursts) quarter-beat of the 120 BPM grid.
+    for (const shot of plan.shots) expect(Math.abs(shot.start * 8 - Math.round(shot.start * 8))).toBeLessThan(1e-6);
     expect(plan.shots[0]!.end).toBeCloseTo(1, 6);
     const body = plan.shots.filter((s) => !s.climax).slice(1, -1);
     const climax = plan.shots.filter((s) => s.climax).slice(0, -1);
@@ -70,6 +70,27 @@ describe("planReel", () => {
     const windows = plan.shots.map((s) => s.sourceStart);
     expect(new Set(windows).size).toBe(windows.length);
     for (const shot of plan.shots) expect(shot.sourceEnd - shot.sourceStart).toBeCloseTo(shot.end - shot.start, 6);
+  });
+
+  it("shows a moment of a clip not seen yet before it repeats one, wrapping past the end to the unseen start", () => {
+    const plan = planReel({ style: REEL_STYLES.hype, media: "abcde".split("").map((id) => clip(id, 8)), music: music(), seconds: 15, frameRate: 30 });
+    const byFile = new Map<string, [number, number][]>();
+    for (const s of plan.shots) byFile.set(s.fileId, [...(byFile.get(s.fileId) ?? []), [s.sourceStart, s.sourceEnd]]);
+    // Four body clips over ~55 shots: each comes back a dozen times.
+    expect(plan.shots.length).toBeGreaterThan(40);
+    for (const [, stretches] of byFile) {
+      for (const [i, [a, b]] of stretches.entries()) for (const [c, d] of stretches.slice(i + 1)) expect(Math.min(b, d) - Math.max(a, c)).toBeLessThanOrEqual(1e-6);
+    }
+    expect(freshFrom({ start: 0, end: 4 }, 1, 3.5, [[1.2, 2.2], [2.5, 3.5]])).toBe(0);
+    expect(freshFrom({ start: 0, end: 4 }, 1, 3.5, [[0, 1.2], [1.2, 2.2], [2.5, 3.5]])).toBeNull();
+  });
+
+  it("counts a short clip played whole (slowed) as shown, so rested clips with unseen moments go first", () => {
+    const plan = planReel({ style: REEL_STYLES.cinematic, media: [clip("tiny", 1.1), ..."abcde".split("").map((id) => clip(id, 8)), clip("pay", 8)], music: null, seconds: 30, frameRate: 30 });
+    const tiny = plan.shots.filter((s) => s.fileId === "tiny");
+    // Played whole once it is shown; it does not come back for another part of the same 1.1 s while the others have fresh moments.
+    expect(tiny.length).toBeLessThanOrEqual(2);
+    for (const s of tiny) expect([s.sourceStart, s.sourceEnd]).toEqual([0, 1.1]);
   });
 
   it("splits a shot on the beat, or slows a clip, instead of leaving a gap when clips are short", () => {
@@ -145,5 +166,47 @@ describe("planReelGrid length", () => {
     const grid = planReelGrid({ music: steady(120, 9.5), seconds: 9, fallbackBpm: 120 });
     expect(grid.duration).toBe(8);
     expect(grid.lengthNote).toMatch(/^8\.00s, ends on a bar line at 120 BPM: the (nearest one to|music runs out before) the 9s asked for$/);
+  });
+});
+
+describe("planReel drop and reuse", () => {
+  it("winds a hype reel up into a drop on the first bar line from two thirds in", () => {
+    const plan = planReel({ style: REEL_STYLES.hype, media: "abcdefghijkl".split("").map((id) => clip(id)), music: music(), seconds: 15, frameRate: 30 });
+    // 16 s at 120 BPM = 32 beats; two thirds in is beat 21.3, the next bar line beat 24 = 12 s.
+    expect(dropBeat(REEL_STYLES.hype, 32)).toBe(24);
+    expect(plan.drop).toBe(12);
+    expect(plan.downbeats.some((d) => Math.abs(d - plan.drop!) < 1e-6)).toBe(true);
+    const windups = plan.shots.filter((s) => s.windup);
+    expect(windups).toHaveLength(1);
+    // Two beats (1 s) that end on the drop.
+    expect(windups[0]!.start).toBeCloseTo(11, 6);
+    expect(windups[0]!.end).toBeCloseTo(12, 6);
+    // The climax starts on the drop.
+    expect(plan.shots.find((s) => s.climax)!.start).toBeCloseTo(12, 6);
+    expectContiguous(plan.shots, plan.duration);
+  });
+
+  it("has no drop for a style without a wind-up, or a reel too short for one", () => {
+    expect(planReel({ style: REEL_STYLES.cinematic, media: [clip("a"), clip("b"), clip("c")], music: music(), seconds: 20 }).drop).toBeNull();
+    expect(dropBeat(REEL_STYLES.hype, 12)).toBeNull();
+  });
+
+  it("brings no clip back within 3 s when the bin has enough clips", () => {
+    const plan = planReel({ style: REEL_STYLES.hype, media: "abcdefghijklmnop".split("").map((id) => clip(id)), music: music(), seconds: 15, frameRate: 30 });
+    expect(plan.closeRepeats).toBe(0);
+    const lastEnd = new Map<string, number>();
+    for (const shot of plan.shots) {
+      const seen = lastEnd.get(shot.fileId);
+      if (seen !== undefined) expect(shot.start - seen).toBeGreaterThanOrEqual(REUSE_GAP_SECONDS - 1e-6);
+      lastEnd.set(shot.fileId, shot.end);
+    }
+  });
+
+  it("says how many clips the pace needs when the bin has too few", () => {
+    const plan = planReel({ style: REEL_STYLES.hype, media: ["a", "b", "c", "d"].map((id) => clip(id)), music: music(), seconds: 15, frameRate: 30 });
+    expect(plan.closeRepeats).toBeGreaterThan(0);
+    expect(plan.clipsNeeded).toBeGreaterThan(4);
+    // Still the least recently seen clip each time: never the same clip twice in a row.
+    for (let i = 1; i < plan.shots.length; i += 1) expect(plan.shots[i]!.fileId).not.toBe(plan.shots[i - 1]!.fileId);
   });
 });

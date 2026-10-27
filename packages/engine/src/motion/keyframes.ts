@@ -189,19 +189,30 @@ function mediaLayer(el: Element, source: MediaSource, keys: Key[], frame: Motion
     const aspect = croppedAspect(source);
     const fit = fittedSize(aspect, 1, frame);
     const rest = source.width / fit.width;
+    // A negative scale mirrors a centred clip in place (libopenshot draws it leftward / upward from the centre anchor).
+    const fx = source.flip?.x ? -1 : 1;
+    const fy = source.flip?.y ? -1 : 1;
     props = {
       scale: ScaleMode.FIT,
       gravity: Gravity.CENTER,
       ...keyframeProps(frames, eases, {
-        scale_x: pose((p) => rest * sOf(p) * sxOf(p)),
-        scale_y: pose((p) => rest * sOf(p)),
+        scale_x: pose((p) => fx * rest * sOf(p) * sxOf(p)),
+        scale_y: pose((p) => fy * rest * sOf(p)),
         location_x: pose((p) => (p.x - frame.width / 2) / frame.width),
         location_y: pose((p) => (p.y - frame.height / 2) / frame.height),
         alpha: pose((p) => p.alpha),
         rotation: pose((p) => p.rotation),
       }),
     };
-    if (source.radius > 0) {
+    if (keys.some((k) => k.pose.radius !== undefined)) {
+      // A radius that changes (a tile growing to the full frame squares its corners).
+      const short = rest * Math.min(fit.width, fit.height);
+      props.corner_radius = keyframeThrough(
+        frames,
+        pose((p) => Math.min(0.5, (p.radius ?? source.radius * sOf(p)) / (short * sOf(p)))),
+        eases,
+      );
+    } else if (source.radius > 0) {
       // corner_radius is a share of the drawn picture's short side (Clip.cpp:1416).
       const fraction = Math.min(0.5, source.radius / (rest * Math.min(fit.width, fit.height)));
       props.corner_radius = { Points: [makeKeyframePoint(1, round6(fraction))] };

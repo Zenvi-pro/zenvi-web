@@ -1,0 +1,63 @@
+{
+  "id": "code_card",
+  "version": 2,
+  "title": "Code card",
+  "description": "An editor window typing code with syntax colours: line numbers, the active line lit, a caret, indentation landing at once. After a beat the run strip slides open under the code with its result. For developer tools, APIs, SDK launches and 'it's one call' moments.",
+  "tags": [
+    "ui",
+    "code",
+    "developer",
+    "api",
+    "typing",
+    "terminal",
+    "saas"
+  ],
+  "duration": {
+    "default": 7,
+    "min": 3,
+    "max": 16
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "graphite",
+    "display": "mono",
+    "radius": 26
+  },
+  "params": {
+    "code": {
+      "type": "string",
+      "maxLength": 700,
+      "default": "import { summarize } from \"@notekit/sdk\";\n\nconst brief = await summarize(\"report.pdf\", {\n  pages: 1,\n  keep: [\"findings\", \"next steps\"],\n  tone: \"plain\",\n});\n\nawait brief.save(\"brief.md\");",
+      "description": "The code, lines separated by newlines (\\n); at most 16 lines show."
+    },
+    "language": {
+      "type": "enum",
+      "options": [
+        "ts",
+        "python",
+        "shell",
+        "json"
+      ],
+      "default": "ts",
+      "description": "How to colour it: ts (also JavaScript), python, shell or json."
+    },
+    "filename": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "brief.ts",
+      "description": "Name on the window's tab (empty: none)."
+    },
+    "output": {
+      "type": "string",
+      "maxLength": 80,
+      "default": "Saved brief.md in 2.1 s",
+      "description": "Result shown in the run strip after typing (empty: no strip)."
+    }
+  }
+}

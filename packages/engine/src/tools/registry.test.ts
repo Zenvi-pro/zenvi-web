@@ -20,11 +20,62 @@ const DIRECT_TOOLS = [
   "fade_clip_tool",
   "add_transition_tool",
   "probe_media_tool",
+  "master_audio_tool",
+  "analyze_mix_tool",
+  "set_track_role_tool",
+  "set_audio_gain_tool",
+  "automate_volume_tool",
+  "duck_tool",
+  "eq_tool",
+  "compress_tool",
+  "space_tool",
+  "pan_tool",
   "build_reel_tool",
+  "align_match_cut_tool",
+  "detect_subject_tool",
+  "match_cut_montage_tool",
+  "unify_grade_tool",
+  "review_edit_tool",
   "review_render_tool",
+  "swap_shot_tool",
   "add_motion_template_tool",
+  "kinetic_captions_tool",
+  "add_kinetic_title_tool",
+  "list_sfx_tool",
+  "add_sfx_tool",
+  "spot_sound_tool",
+  "auto_sound_design_tool",
+  "list_motion_transitions_tool",
+  "apply_motion_transition_tool",
+  "apply_motion_transitions_tool",
+  "remove_motion_transition_tool",
+  "speed_ramp_tool",
+  "list_motion_blocks_tool",
+  "setup_motion_runtime_tool",
+  "add_motion_block_tool",
+  "update_motion_block_tool",
+  "list_3d_scenes_tool",
+  "add_3d_scene_tool",
+  "rerender_3d_scene_tool",
+  "list_fx_tool",
+  "apply_fx_tool",
+  "update_fx_tool",
+  "remove_fx_tool",
+  "search_sfx_tool",
+  "list_credits_tool",
+  "create_sound_kit_tool",
+  "search_sound_library_tool",
+  "generate_sfx_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
+  "gather_stock_footage_tool",
+  "generate_subject_matte_tool",
+  "text_behind_subject_tool",
+  "replace_background_tool",
+  "subject_glow_tool",
+  "pop_out_tool",
+  "add_vignette_tool",
+  "add_shape_mask_tool",
 ];
 
 /** A valid string form of a scalar property, the way the Assistant backend sends arguments. */
@@ -45,7 +96,7 @@ function stringForm(schema: JsonSchema): string | undefined {
 describe("tool catalog", () => {
   it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
     const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
-    expect(ported).toHaveLength(163);
+    expect(ported).toHaveLength(164);
     expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
     for (const name of ported) expect(getTool(name)?.contract).toBe(true);
@@ -86,7 +137,9 @@ describe("tool catalog", () => {
         if (key in args) continue;
         const type = tool.inputSchema.properties[key]?.type;
         if (key === "points") args[key] = [{ frame: 1, value: 1 }];
+        else if (key === "effects") args[key] = [{ effect: "bloom", amount: 0.5 }];
         else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
+        else if (key === "clips") args[key] = [{ clip_id: "x", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }];
         else if (type === "array") args[key] = ["x"];
         // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
         else if (type === "object") args[key] = key === "properties" ? { sigma: 1 } : { x: 1 };
@@ -168,9 +221,9 @@ describe("availability matrix", () => {
 
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
-      editor: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
-      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
+      editor: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);

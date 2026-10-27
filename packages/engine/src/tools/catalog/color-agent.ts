@@ -21,6 +21,7 @@
  *   saturation below 0.5) refuses the whole call before anything changes.
  */
 
+import { ASSET_KEY, writeAsset } from "../mattes.js";
 import type { Clip, Effect, Project, ProjectFile } from "../../model/types.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { pyRound } from "../../model/rounding.js";
@@ -166,7 +167,7 @@ function colorTargetError(project: Project, action: string): string {
 }
 
 /** `_filter_unlocked_color_clip_ids`: drop missing and locked-track clips (with warnings) before any change. */
-function filterUnlocked(project: Project, ids: readonly string[], warnings: string[]): string[] {
+export function filterUnlocked(project: Project, ids: readonly string[], warnings: string[]): string[] {
   const kept: string[] = [];
   for (const cid of ids) {
     const clip = project.clips.find((c) => c.id === cid);
@@ -184,7 +185,7 @@ function filterUnlocked(project: Project, ids: readonly string[], warnings: stri
 }
 
 /** `_resolve_lut_file`: a LUT id, bundled path or file → what `lut_path` stores; refused before any change. */
-async function resolveLutFile(call: ToolCall, raw: unknown): Promise<string> {
+export async function resolveLutFile(call: ToolCall, raw: unknown): Promise<string> {
   const value = text(raw);
   const look = resolveLookId(value);
   if (look.kind !== "lut") throw new ColorValueError(`'${value}' is a ${look.kind} look, not a LUT; use apply_look_tool`);
@@ -206,7 +207,7 @@ async function resolveLutFile(call: ToolCall, raw: unknown): Promise<string> {
 // ---------------------------------------------------------------------------
 
 /** `create_color_grade_effect_json` / `_create_film_grain_effect_json`: a fresh effect with a new id. */
-function effectFactory(project: Project): (className: string) => Json {
+export function effectFactory(project: Project): (className: string) => Json {
   const nextId = idFactory(project);
   return (className) => createEffect(className, {}, { id: nextId() }) as unknown as Json;
 }
@@ -230,7 +231,7 @@ function replaceFirstGrade(effects: readonly Effect[], effect: Json): Effect[] {
 }
 
 /** The clip's effects with `existing` grade (created and appended when missing) merged with `patch`. */
-function mergedGradeEffects(effects: Effect[], patch: Json, create: (cn: string) => Json): { effects: Effect[]; merged: Json } {
+export function mergedGradeEffects(effects: Effect[], patch: Json, create: (cn: string) => Json): { effects: Effect[]; merged: Json } {
   let existing = findColorGrade(effects) as Json | null;
   let list = effects;
   if (existing === null) {
@@ -342,7 +343,7 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T, 
   return out;
 }
 
-interface ProfilePack {
+export interface ProfilePack {
   profile: Json;
   scopes_samples: number;
   sample_frames: number[];
@@ -350,15 +351,15 @@ interface ProfilePack {
   duration_s: number;
 }
 
-/** `_profile_clip_dense`: a LookProfile from frames spread across the clip (isolated renders). */
-async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number): Promise<ProfilePack> {
+/** `_profile_clip_dense`: a LookProfile from frames spread across the clip (isolated renders); `preview: false` skips the JPEG for callers that only read the profile. */
+export async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number, opts: { preview?: boolean } = {}): Promise<ProfilePack> {
   const rate = fps(call.doc.project);
   const duration = clipDurationSeconds(clip);
   let n = sampleCountForDuration(duration);
   if (maxSamples !== undefined) n = Math.max(1, Math.min(Math.trunc(maxSamples), n));
   const frames = sampleLocalFrames(duration, rate, n);
   const solo: Clip = { ...clip, position: 0.0 };
-  const pick = previewIndex(frames.length);
+  const pick = opts.preview === false ? -1 : previewIndex(frames.length);
   const rendered = await mapLimit(frames, RENDER_CONCURRENCY, (localFrame, i) => renderClipIsolated(call, solo, localFrame, i === pick), call.signal);
   const scopes = rendered.filter((r): r is Isolated => r !== null && Boolean(r.scopes.present)).map((r) => r.scopes);
   const preview = rendered[pick]?.preview ?? null;
@@ -366,7 +367,7 @@ async function profileClipDense(call: ToolCall, clip: Clip, maxSamples?: number)
 }
 
 /** `_profile_media_path`: a LookProfile of a media-bin file (or a local file the host imports). */
-async function profileMediaFile(call: ToolCall, file: ProjectFile): Promise<ProfilePack> {
+export async function profileMediaFile(call: ToolCall, file: ProjectFile): Promise<ProfilePack> {
   const project = call.doc.project;
   const rate = fps(project);
   const still = Boolean(file.has_single_image) || String(file.media_type ?? "") === "image";
@@ -437,7 +438,7 @@ function jsonResult(call: ToolCall, result: Json, previews: Previews): { receipt
   return { receipt: applied(call.tool, JSON.stringify(result), { data: result }, 0), images: previews.images };
 }
 
-async function colorTool(call: ToolCall, body: () => Promise<ToolReceipt | { receipt: ToolReceipt; images: ToolImage[] } | string>) {
+export async function colorTool(call: ToolCall, body: () => Promise<ToolReceipt | { receipt: ToolReceipt; images: ToolImage[] } | string>) {
   try {
     return await body();
   } catch (error) {
@@ -743,10 +744,19 @@ export const colorAgentTools: CatalogTool[] = [
         } else if (resolved.kind === "film_grain") {
           grainId = resolved.grain_id;
         }
-        const absLut = resolved.kind === "lut" ? await resolveLutFile(call, resolved.lut_path) : "";
+        let absLut = resolved.kind === "lut" ? await resolveLutFile(call, resolved.lut_path) : "";
         const warnings: string[] = [];
         const kept = filterUnlocked(project, ids, warnings);
         if (kept.length === 0) return warnings.length > 0 ? `Error: ${warnings.join("; ")}` : colorTargetError(project, "apply_look");
+        // Written once the call is going ahead: a refused one leaves no file behind.
+        let generatedHash: string | undefined;
+        if (resolved.kind === "generated") {
+          if (!call.host.media?.writeGenerated) return `Error: look '${resolved.id}' is a generated LUT, and this Zenvi surface cannot store generated files.`;
+          const { stem, cube } = resolved.look.make();
+          const asset = await writeAsset(call, stem, "cube", cube, "text/plain");
+          absLut = asset.path;
+          generatedHash = asset.hash;
+        }
         const create = effectFactory(project);
         const receipts: Json[] = [];
         const writes: [string, Effect[]][] = [];
@@ -775,12 +785,14 @@ export const colorAgentTools: CatalogTool[] = [
               receipt.status = "preset";
               receipt.color = summarizeColorGrade(graded);
             }
-          } else if (resolved.kind === "lut") {
+          } else if (resolved.kind === "lut" || resolved.kind === "generated") {
             // ColorGrade applies its LUT after the mix, so for a LUT look mix means the LUT's strength.
-            const strength = lutIntensity ?? mix;
+            const strength = lutIntensity ?? mix ?? (resolved.kind === "generated" ? resolved.look.intensity : null);
             const lut: Json = { path: absLut };
             if (strength !== null) lut.strength = strength;
             const { effects: next, merged } = mergedGradeEffects(effects, { lut }, create);
+            // Marks the file as this look's, so the next clip graded with it reuses the file.
+            if (generatedHash) (merged as Json)[ASSET_KEY] = generatedHash;
             effects = next;
             receipt.status = "lut";
             receipt.lut_path = merged.lut_path ?? null;

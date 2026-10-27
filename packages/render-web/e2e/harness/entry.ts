@@ -18,6 +18,7 @@ import {
   MediaRegistry,
   PreviewPlayer,
   StillCache,
+  canPreviewInWorker,
   defaultEngine,
   exportFrame,
   exportProject,
@@ -516,6 +517,37 @@ const api = {
     };
   },
 
+  /**
+   * Fast cuts: 5-frame shots that jump around two files (one with a single
+   * keyframe), so each cut seeks. Returns each exported frame's code and the
+   * source frame the timeline shows there.
+   */
+  async exportCuts() {
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob: await file("codes.webm") });
+    media.register("gop", { kind: "blob", blob: await file("codesgop.webm") });
+    const starts = [40, 3, 25, 50, 10, 33, 18, 45];
+    const shot = 5;
+    const project = makeProject(
+      starts.map((s, k) =>
+        videoClip({ id: `S${k}`, fileId: k % 2 ? "gop" : "codes", path: k % 2 ? "codesgop.webm" : "codes.webm", position: (k * shot) / 30, start: s / 30, end: (s + shot) / 30 }),
+      ),
+    );
+    const frames = starts.length * shot;
+    const blob = await exportProject(project, media, { format: "webm", width: 160, height: 90, fps: { num: 30, den: 1 }, quality: "lossless" }, { engine: testEngine });
+    media.register("out", { kind: "blob", blob, name: "out.webm" });
+    const reader = new FrameProvider({ media });
+    const codes: number[] = [];
+    for (let k = 1; k <= frames; k += 1) {
+      const picture = await reader.frame({ ref: { fileId: "out" }, sourceTime: (k - 1) / 30, width: 160, height: 90, lane: "o", mode: "sequential" });
+      codes.push(picture ? codeOf(picture.image) : -1);
+      picture?.release();
+    }
+    await reader.dispose();
+    media.dispose();
+    return { codes, expected: Array.from({ length: frames }, (_, i) => starts[Math.floor(i / shot)]! + (i % shot)) };
+  },
+
   /** Streaming export into an OPFS file (and reading it back through an `opfs` source). */
   async exportToOpfs(cancel: boolean) {
     const media = new MediaRegistry();
@@ -799,6 +831,170 @@ const api = {
     canvas.remove();
     media.dispose();
     return { seekCode, size, coalescedCode, advanced: paused.time - 0.2, paused, monotonic, timeEvents: times.length, looped, ended, duration: state.duration, errors, trace };
+  },
+
+  /** PreviewPlayer rendering in a Worker (real engine there): seek, scrub, play, pause, remount, snapshot. */
+  async workerPlayer() {
+    const blob = await file("codes.webm");
+    const info = await probeMedia({ kind: "blob", blob }, { path: "codes.webm" });
+    const profile: Profile = { key: "test", description: "Test 160x90 30 fps", width: 160, height: 90, fps: { num: 30, den: 1 }, progressive: true, pixel_ratio: { num: 1, den: 1 }, display_ratio: { num: 16, den: 9 } };
+    const doc = new ProjectDocument(createProject({ profile }));
+    doc.transaction("Import", (tx) => {
+      const added = addFile(tx, { path: "codes.webm", info, name: "codes.webm" }, { id: "codes" });
+      addClip(tx, { fileId: added.id, position: 0, layer: 1000000, id: "CLIP1" });
+    });
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob });
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "320px";
+    canvas.style.height = "180px";
+    document.body.appendChild(canvas);
+    const worker = new Worker("/preview-worker.js", { type: "module" });
+    const supported = canPreviewInWorker();
+    const errors: string[] = [];
+    const screen = async (p: PreviewPlayer) => {
+      const bitmap = await p.snapshot(160);
+      if (!bitmap) return -1;
+      const code = codeOf(bitmap);
+      bitmap.close();
+      return code;
+    };
+    let player = new PreviewPlayer(canvas, { media, worker });
+    player.onError((e) => errors.push(`${e.kind}:${String("error" in e ? e.error : "")}`));
+    player.setProject(doc.project);
+    await player.seek(1);
+    const seekCode = await screen(player);
+    await Promise.all([0.1, 0.4, 0.8, 1.2, 1.5].map((t) => player.seek(t)));
+    const coalescedCode = await screen(player);
+    await player.seek(0.7, { scrub: true });
+    const scrubCode = await screen(player);
+
+    await player.seek(0.2);
+    const presentedBefore = player.presentedFrames;
+    player.play();
+    await new Promise((r) => setTimeout(r, 600));
+    player.pause();
+    await new Promise((r) => setTimeout(r, 200));
+    const paused = { frame: player.frame, code: await screen(player), presented: player.presentedFrames - presentedBefore };
+
+    // An edit reaches the worker: hide the clip, the frame goes black.
+    doc.transaction("Hide", (tx) => tx.update(["clips", { id: "CLIP1" }], { alpha: { Points: [{ co: { X: 1, Y: 0 }, interpolation: 2 }] } }));
+    player.setProject(doc.project);
+    await player.seek(1);
+    const hiddenCode = await screen(player);
+
+    // A remount (React StrictMode): a new player on the same canvas and worker.
+    player.dispose();
+    player = new PreviewPlayer(canvas, { media, worker });
+    player.setProject(doc.project);
+    doc.transaction("Show", (tx) => tx.update(["clips", { id: "CLIP1" }], { alpha: { Points: [{ co: { X: 1, Y: 1 }, interpolation: 2 }] } }));
+    player.setProject(doc.project);
+    await player.seek(1.5);
+    const remountCode = await screen(player);
+    const inWorker = player.inWorker;
+    player.dispose();
+    worker.terminate();
+    canvas.remove();
+    media.dispose();
+    return { supported, inWorker, seekCode, coalescedCode, scrubCode, paused, hiddenCode, remountCode, errors };
+  },
+
+  /**
+   * A Worker preview whose media goes through the page: a signed URL that has
+   * expired (the page refreshes it) read with the page's custom fetch, and an
+   * SVG title the page rasterizes (workers have no <img>).
+   */
+  async workerMedia() {
+    const blob = await file("codes.webm");
+    const info = await probeMedia({ kind: "blob", blob }, { path: "codes.webm" });
+    // A green band across the top, transparent below (the code bars stay readable mid-frame).
+    const svg = new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90"><rect width="160" height="20" fill="#00ff00"/></svg>'], { type: "image/svg+xml" });
+    const svgInfo = await probeMedia({ kind: "blob", blob: svg }, { path: "title.svg" });
+    const profile: Profile = { key: "test", description: "Test 160x90 30 fps", width: 160, height: 90, fps: { num: 30, den: 1 }, progressive: true, pixel_ratio: { num: 1, den: 1 }, display_ratio: { num: 16, den: 9 } };
+    const doc = new ProjectDocument(createProject({ profile }));
+    doc.transaction("Import", (tx) => {
+      addFile(tx, { path: "codes.webm", info, name: "codes.webm" }, { id: "codes" });
+      addFile(tx, { path: "title.svg", info: svgInfo, name: "title.svg" }, { id: "title" });
+      addClip(tx, { fileId: "codes", position: 0, layer: 1000000, id: "CLIP1" });
+      addClip(tx, { fileId: "title", position: 0, layer: 2000000, id: "TITLE" });
+    });
+    let refreshes = 0;
+    const fetched: { sig: string | null; range: string | null }[] = [];
+    const media = new MediaRegistry();
+    media.register("codes", {
+      kind: "url",
+      url: `${MEDIA}codes.webm?sig=old`,
+      refresh: async () => {
+        refreshes += 1;
+        return `${MEDIA}codes.webm?sig=new`;
+      },
+      fetch: (input, init) => {
+        fetched.push({ sig: new URL(String(input)).searchParams.get("sig"), range: new Headers(init?.headers).get("range") });
+        return fetch(input, init);
+      },
+    });
+    media.register("title", { kind: "blob", blob: svg, name: "title.svg" });
+    const canvas = document.createElement("canvas");
+    canvas.style.width = "320px";
+    canvas.style.height = "180px";
+    document.body.appendChild(canvas);
+    const worker = new Worker("/preview-worker.js", { type: "module" });
+    const errors: string[] = [];
+    const player = new PreviewPlayer(canvas, { media, worker });
+    player.onError((e) => errors.push(`${e.kind}:${String("error" in e ? e.error : "")}`));
+    player.setProject(doc.project);
+    await player.seek(1);
+    const bitmap = await player.snapshot(160);
+    const shot = new OffscreenCanvas(160, 90).getContext("2d", { willReadFrequently: true })!;
+    if (bitmap) shot.drawImage(bitmap, 0, 0, 160, 90);
+    bitmap?.close();
+    const result = { inWorker: player.inWorker, code: readCode(shot, 0, 0, 160, 90), title: pixel(shot, 80, 8), refreshes, fetched, errors };
+    player.dispose();
+    worker.terminate();
+    canvas.remove();
+    media.dispose();
+    return result;
+  },
+
+  /** A Worker whose module fails to load: the player renders on the page instead, on a stand-in canvas. */
+  async workerFails() {
+    const blob = await file("codes.webm");
+    const info = await probeMedia({ kind: "blob", blob }, { path: "codes.webm" });
+    const profile: Profile = { key: "test", description: "Test 160x90 30 fps", width: 160, height: 90, fps: { num: 30, den: 1 }, progressive: true, pixel_ratio: { num: 1, den: 1 }, display_ratio: { num: 16, den: 9 } };
+    const doc = new ProjectDocument(createProject({ profile }));
+    doc.transaction("Import", (tx) => {
+      addFile(tx, { path: "codes.webm", info, name: "codes.webm" }, { id: "codes" });
+      addClip(tx, { fileId: "codes", position: 0, layer: 1000000, id: "CLIP1" });
+    });
+    const media = new MediaRegistry();
+    media.register("codes", { kind: "blob", blob });
+    const box = document.createElement("div");
+    const canvas = document.createElement("canvas");
+    canvas.className = "preview";
+    canvas.style.width = "320px";
+    canvas.style.height = "180px";
+    box.appendChild(canvas);
+    document.body.appendChild(box);
+    const worker = new Worker("/missing-preview-worker.js", { type: "module" });
+    const warnings: string[] = [];
+    const warn = console.warn;
+    console.warn = (...args: unknown[]) => void warnings.push(args.map(String).join(" "));
+    try {
+      const player = new PreviewPlayer(canvas, { media, worker });
+      player.setProject(doc.project);
+      await player.seek(1);
+      const standIn = box.querySelectorAll("canvas")[1];
+      const shown = { inWorker: player.inWorker, code: await player.snapshot(160).then((b) => (b ? codeOf(b) : -1)), frame: player.frame };
+      const layout = { hidden: canvas.style.display, standInClass: standIn?.className ?? null, standInWidth: standIn?.getBoundingClientRect().width ?? 0 };
+      player.dispose();
+      const afterDispose = { canvases: box.querySelectorAll("canvas").length, display: canvas.style.display };
+      return { ...shown, ...layout, afterDispose, warnings };
+    } finally {
+      console.warn = warn;
+      worker.terminate();
+      box.remove();
+      media.dispose();
+    }
   },
 
   /** Scrubbing long-GOP media: a keyframe stands in at once, then the exact frame. */

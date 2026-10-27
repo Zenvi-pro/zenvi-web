@@ -3,6 +3,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
+import { createMotionHost } from "@zenvi/motion/node";
 import { createNodeHost } from "@zenvi/render-node";
 import { missingCapabilities } from "../engine/registry.js";
 import { hostOfTool } from "../hosts/adobe-tools.js";
@@ -47,7 +48,8 @@ export function registerToolCommands(program: Command, ctx: CommandContext): voi
     .option("-a, --all", "include tools this machine cannot run (and why)")
     .option("--schema", "include each tool's JSON input schema (with --json)")
     .action(async (opts: { all?: boolean; schema?: boolean }) => {
-      const host = createNodeHost({ ...hostOptions(ctx) });
+      const node = createNodeHost({ ...hostOptions(ctx) });
+      const host = { ...node, motion: createMotionHost({ projectFile: node.projectFile, resolveMedia: node.resolveMedia, env: ctx.env }) };
       const tools = ctx.registry.list("cli", host, { includeUnavailable: true });
       const rows = tools
         .map((t) => ({ tool: t, missing: missingCapabilities(t, host) }))

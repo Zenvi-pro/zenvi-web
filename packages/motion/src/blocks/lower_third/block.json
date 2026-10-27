@@ -1,0 +1,63 @@
+{
+  "id": "lower_third",
+  "version": 1,
+  "title": "Lower third",
+  "description": "A name and role lower third that opens from a line: an accent rule draws across, the name rises out of it and the role drops out under it; on exit both keep travelling the way they came while the rule wipes away. The 'bar' style wipes a solid accent bar in behind the name instead. Over video; for interviews, talking heads and speaker intros.",
+  "tags": [
+    "text",
+    "lower third",
+    "name",
+    "title",
+    "interview",
+    "speaker",
+    "caption"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 2.5,
+    "max": 12
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": true,
+  "tokens": {
+    "palette": "dark",
+    "display": "serif"
+  },
+  "params": {
+    "name": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "Amara Velasquez",
+      "description": "The person's name (the display face)."
+    },
+    "role": {
+      "type": "string",
+      "maxLength": 60,
+      "default": "Director of photography",
+      "description": "Their role or a short line under the name (empty: none)."
+    },
+    "style": {
+      "type": "enum",
+      "options": [
+        "rule",
+        "bar"
+      ],
+      "default": "rule",
+      "description": "rule (name rises out of a drawn accent line) or bar (a solid accent bar wipes in behind the name)."
+    },
+    "align": {
+      "type": "enum",
+      "options": [
+        "left",
+        "right"
+      ],
+      "default": "left",
+      "description": "Which title-safe edge it hangs from."
+    }
+  }
+}

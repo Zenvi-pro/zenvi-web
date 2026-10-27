@@ -1,0 +1,280 @@
+{
+  "id": "motion-reel",
+  "title": "Motion reel: build_reel (hype), motion transitions, auto sound design, master, review, export",
+  "description": "The one-call reel flow agents use for launches and hype edits, then the polish passes on top of it.",
+  "budgetSeconds": 180,
+  "fixtures": [
+    {
+      "id": "s1",
+      "file": "s1.mp4",
+      "lavfi": [
+        "testsrc2=size=360x640:rate=30:duration=4"
+      ],
+      "output": [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p"
+      ]
+    },
+    {
+      "id": "s2",
+      "file": "s2.mp4",
+      "lavfi": [
+        "smptebars=size=360x640:rate=30:duration=4"
+      ],
+      "output": [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p"
+      ]
+    },
+    {
+      "id": "s3",
+      "file": "s3.mp4",
+      "lavfi": [
+        "mandelbrot=size=360x640:rate=30"
+      ],
+      "output": [
+        "-t",
+        "4",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p"
+      ]
+    },
+    {
+      "id": "s4",
+      "file": "s4.mp4",
+      "lavfi": [
+        "testsrc=size=360x640:rate=30:duration=4"
+      ],
+      "output": [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-pix_fmt",
+        "yuv420p"
+      ]
+    },
+    {
+      "id": "music",
+      "file": "music.wav",
+      "lavfi": [
+        "aevalsrc='0.9*sin(2*PI*55*t)*exp(-25*mod(t,0.5))+0.15*sin(2*PI*220*t)*(0.6+0.4*sin(2*PI*0.25*t))':s=48000:d=16"
+      ],
+      "output": [
+        "-c:a",
+        "pcm_s16le"
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "id": "project",
+      "tool": "open_project_file",
+      "args": {
+        "path": "reel.zvn"
+      },
+      "on": {
+        "desktop": {
+          "tool": "new_project_tool",
+          "args": {
+            "discard_unsaved": true
+          }
+        }
+      }
+    },
+    {
+      "id": "format",
+      "tool": "set_project_setting_tool",
+      "args": {
+        "width": 360,
+        "height": 640,
+        "fps": 30
+      },
+      "expect": {
+        "status": [
+          "applied",
+          "unchanged"
+        ]
+      }
+    },
+    {
+      "id": "import",
+      "tool": "import_files_tool",
+      "args": {
+        "paths": "[\"${fixtures.s1}\", \"${fixtures.s2}\", \"${fixtures.s3}\", \"${fixtures.s4}\", \"${fixtures.music}\"]",
+        "skip_indexing": "true"
+      },
+      "expect": {
+        "receipt": {
+          "data.fileIds": {
+            "length": {
+              "min": 5,
+              "max": 5
+            }
+          }
+        }
+      },
+      "on": {
+        "desktop": {
+          "expect": {
+            "receipt": {
+              "ids": {
+                "length": {
+                  "min": 5
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reel",
+      "tool": "build_reel_tool",
+      "args": {
+        "style": "hype",
+        "duration_seconds": 8,
+        "hook": "Go fast",
+        "end_card": "Zenvi"
+      },
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 8
+            }
+          }
+        }
+      },
+      "checks": [
+        {
+          "kind": "tool",
+          "tool": "get_project_info_tool",
+          "expect": {
+            "receipt": {
+              "summary": {
+                "matches": "."
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "transitions",
+      "tool": "apply_motion_transitions_tool",
+      "after": [
+        "reel"
+      ],
+      "args": {
+        "track": "${reel.data.tracks.video}",
+        "style": "hype"
+      },
+      "expect": {
+        "status": [
+          "applied"
+        ]
+      }
+    },
+    {
+      "id": "sound",
+      "tool": "auto_sound_design_tool",
+      "after": [
+        "reel"
+      ],
+      "args": {
+        "intensity": "normal"
+      },
+      "expect": {
+        "receipt": {
+          "clips": {
+            "length": {
+              "min": 3
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "master",
+      "tool": "master_audio_tool",
+      "after": [
+        "reel"
+      ],
+      "args": {
+        "preset": "social"
+      }
+    },
+    {
+      "id": "review",
+      "tool": "review_edit_tool",
+      "after": [
+        "reel"
+      ],
+      "args": {
+        "pace": "fast"
+      },
+      "expect": {
+        "status": [
+          "applied",
+          "unchanged",
+          "ok"
+        ],
+        "image": true
+      },
+      "checks": [
+        {
+          "kind": "image",
+          "minLuma": 16
+        }
+      ]
+    },
+    {
+      "id": "export",
+      "tool": "render_video",
+      "after": [
+        "master"
+      ],
+      "args": {
+        "output": "reel.mp4",
+        "quality": "low",
+        "loudness": "social"
+      },
+      "timeoutSeconds": 600,
+      "checks": [
+        {
+          "kind": "media",
+          "file": "${work}/reel.mp4",
+          "durationSeconds": {
+            "min": 7,
+            "max": 11
+          },
+          "streams": [
+            "audio",
+            "video"
+          ],
+          "loudnessLufs": {
+            "min": -15.5,
+            "max": -12.5
+          },
+          "frame": {
+            "at": 2.0,
+            "minLuma": 16
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -29,13 +29,16 @@ export type HostMethod =
   | "media.writeGenerated"
   | "media.missing"
   | "media.fetchWebVideo"
+  | "media.kitSample"
   | "media.inspectRender"
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
   | "ui.openExportDialog"
   | "audio.decodePcm"
+  | "audio.mixPcm"
   | "audio.transcribe"
+  | "audio.generateSfx"
   | "ui.selection"
   | "ui.setSelection"
   | "ui.timelineView"
@@ -52,7 +55,9 @@ export type HostMethod =
   | "storage.customProfiles"
   | "media.collect"
   | "exporter.supports"
-  | "frames.fontFamilies";
+  | "frames.fontFamilies"
+  | "frames.renderSheet"
+  | "audio.measureMix";
 
 export interface ToolNeeds {
   /** All of these, or the tool refuses. */
@@ -101,7 +106,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   open_project_tool: { methods: ["storage.open"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
   import_video_url_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
-  import_stock_media_tool: { methods: ["media.importUrl"], optional: ["backend", "media.importPath"], partialNote: "search needs the Zenvi backend; local_path needs local file access" },
+  gather_stock_footage_tool: { methods: ["media.importUrl"] },
+  import_stock_media_tool: { methods: ["media.importUrl"], optional: ["stock", "media.importPath"], partialNote: "search needs stock search; local_path needs local file access" },
   place_motion_graphic_tool: { optional: ["media.importUrl"], partialNote: "url= needs URL downloads; file_id works" },
   fetch_motion_graphics_video_tool: { methods: ["media.importUrl"] },
   fetch_remotion_video_from_supabase_tool: { methods: ["media.importUrl"] },
@@ -190,16 +196,62 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
+  master_audio_tool: { methods: ["audio.mixPcm"] },
+  analyze_mix_tool: { methods: ["audio.mixPcm"] },
+  pan_tool: { methods: ["audio.decodePcm", "media.writeGenerated"] },
+  duck_tool: { optional: ["audio.mixPcm"], partialNote: "without mix rendering a duck under the voice needs depth_db and the voice's transcript or cues" },
+  eq_tool: { webNote: "Zenvi desktop's libopenshot Parametric EQ computes its filters from the samples per frame instead of the sample rate, so the desktop hears these bands at other frequencies until that is fixed" },
+  review_edit_tool: {
+    optional: ["frames.renderSheet", "audio.measureMix", "storage.readText"],
+    partialNote: "without frame composing there is no contact sheet, without audio mixing no loudness, silences or beat alignment, and without file reading no text safe-area check; the timeline numbers always come",
+  },
   build_reel_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated"],
     partialNote:
       "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
+  },
+  add_sfx_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["library", "media.importUrl", "audio.decodePcm", "media.kitSample"],
+    partialNote:
+      "without Openverse, downloads and audio decoding only procedural recipes (and Freesound sounds where they can be downloaded and decoded) can be placed; without the recorded kit's cache recipes are synthesised (kit=synth)",
+  },
+  spot_sound_tool: {
+    optional: ["audio.decodePcm", "motion"],
+    partialNote: "without audio decoding cuts are weighed by `beats` (when given) instead of the music and the climax comes only from `climax_seconds`; without the motion host, blocks placed before blocks recorded their events are spotted by their edges only",
+  },
+  auto_sound_design_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm", "audio.mixPcm", "motion", "library", "media.importUrl", "media.kitSample"],
+    partialNote:
+      "without audio decoding cuts are weighed by `beats` (when given) instead of the music, the climax comes only from `climax_seconds`, effects keep their designed levels instead of being levelled over what plays under them, and sources=library / mixed are refused; without Openverse library sounds come from Freesound (signed in); without the recorded kit's cache the sounds are synthesised (kit=synth)",
+  },
+  add_vignette_tool: { methods: ["media.writeGenerated"] },
+  add_shape_mask_tool: { methods: ["media.writeGenerated"] },
+  search_sound_library_tool: { optional: ["media.kitSample"], partialNote: "without the recorded kit's cache the library is searched but its sounds cannot be placed" },
+  generate_sfx_tool: { methods: ["media.writeGenerated", "audio.decodePcm", "audio.generateSfx"] },
+  search_sfx_tool: { optional: ["library", "stock"], partialNote: "without Openverse only procedural recipes and Freesound (with stock search) are searched" },
+  create_sound_kit_tool: {
+    optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
+    partialNote: "without Openverse (or stock search), downloads and audio decoding only procedural kits are made",
+  },
+  match_cut_montage_tool: {
+    optional: ["audio.decodePcm", "media.writeGenerated", "frames"],
+    partialNote:
+      "without audio decoding the cuts follow 120 BPM, not the music; without generated media there are no flash frames; without frame rendering files need subjects boxes (no circle search)",
   },
   review_render_tool: { methods: ["media.inspectRender"] },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],
     partialNote: "without audio decoding the entrances follow `beats` or `bpm` (default 120 BPM), not the music on the timeline",
+  },
+  // Zenvi FX renders with ffmpeg next to the media (the CLI and local MCP server offer fx).
+  apply_fx_tool: { methods: ["media.importPath"] },
+  update_fx_tool: { methods: ["media.importPath"] },
+  remove_fx_tool: {
+    optional: ["fx", "media.importPath"],
+    partialNote: "removing every effect (back to the original clip) works anywhere; removing one of several re-renders the rest, which needs Zenvi FX",
   },
   diarize_media_tool: { desktopOnly: "on-device speaker diarization" },
   search_media_local_tool: { desktopOnly: "the on-device visual index" },
@@ -239,6 +291,9 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     methods: ["storage.recoveryCopies", "storage.currentPath"],
     webNote: "the copies Zenvi desktop zips each time it saves the project; the CLI's own saves make none",
   },
+  // Zenvi 3D renders with Blender on the person's computer (the host offers scenes3d only when it is installed).
+  add_3d_scene_tool: { methods: ["media.importPath"] },
+  rerender_3d_scene_tool: { methods: ["media.importPath"] },
   import_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
   export_project_file_tool: { desktopOnly: "the EDL / Final Cut Pro XML converters (one implementation per conversion, in the desktop app)" },
   consolidate_project_media_tool: { methods: ["media.collect", "storage.currentPath"] },
@@ -290,6 +345,17 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote: "without file saving the frame is attached to the result",
     webNote: "the CLI writes the file (a relative path starts at the project's folder, the desktop's default is its export folder); the web editor downloads it; Zenvi Cloud answers with a download link and renders PNG only",
   },
+  // Subject mattes: made by the host (the CLI runs Robust Video Matting); composites reuse a matte already in the bin.
+  ...Object.fromEntries(
+    ["text_behind_subject_tool", "replace_background_tool", "subject_glow_tool", "pop_out_tool"].map((name) => [
+      name,
+      {
+        methods: ["media.writeGenerated"],
+        optional: ["mattes"],
+        partialNote: "without subject matting only footage whose matte is already in the bin (made by the zenvi CLI) can be composited",
+      } satisfies ToolNeeds,
+    ]),
+  ),
   export_files_to_folder_tool: {
     methods: ["storage.exportMedia"],
     optional: ["exporter"],
@@ -315,7 +381,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   editor: {
     title: "Web editor (Zenvi Assistant, command palette)",
     host: "apps/editor/src/features/editor/assistant/host.ts",
-    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "storage", "assets", "audio"],
+    capabilities: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio", "library"],
     methods: [
       "media.importUrl",
       "media.pickFiles",
@@ -329,6 +395,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.recentProjects",
       "ui.openExportDialog",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
       "ui.selection",
       "ui.setSelection",
@@ -340,12 +407,12 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "ui.clearPlaybackCache",
       "exporter.supports",
     ],
-    conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi" },
+    conditional: { exporter: "browsers with WebCodecs export", backend: "signed in to Zenvi", stock: "signed in to Zenvi" },
   },
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "assets"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "library"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -353,6 +420,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.writeGenerated",
       "media.missing",
       "media.fetchWebVideo",
+      "media.kitSample",
       "media.inspectRender",
       "storage.open",
       "storage.readText",
@@ -365,16 +433,29 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.customProfiles",
       "media.collect",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
+      "audio.generateSfx",
       "exporter.supports",
       "frames.fontFamilies",
+      "frames.renderSheet",
+      "audio.measureMix",
     ],
-    conditional: { backend: "signed in with zenvi login", "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks" },
+    conditional: {
+      backend: "signed in with zenvi login",
+      stock: "signed in with zenvi login",
+      "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
+      "audio.generateSfx": "ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan",
+      mattes: "onnxruntime-node is installed; the matting model downloads on first use",
+      motion: "headless Chrome is installed: zenvi motion setup",
+      scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
+      fx: "ffmpeg is installed (ZENVI_FX=0 turns it off)",
+    },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "exporter"],
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
     methods: [
       "media.importUrl",
       "media.writeGenerated",
@@ -386,6 +467,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.currentPath",
       "storage.recentProjects",
       "audio.decodePcm",
+      "audio.mixPcm",
       "audio.transcribe",
       "frames.fontFamilies",
       "exporter.supports",
@@ -396,7 +478,11 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       media: "ffprobe is available",
       assets: "the engine's assets (title templates, emoji) are bundled",
       audio: "ffmpeg is available",
+      "audio.mixPcm": "ffprobe is available",
       backend: "the server is set up to call the Zenvi backend",
+      stock: "the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY",
+      mattes: "onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)",
+      motion: "the image has chrome-headless-shell (one block renders at a time)",
     },
     hidden: [
       "new_project_tool",
@@ -416,6 +502,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "set_preference_tool",
       // Slower than a ChatGPT tool call. The cloud server starts generate_video instead.
       "generate_video_and_add_to_timeline_tool",
+      // Zenvi 3D renders with Blender, which the cloud has not: its scenes cannot be added there.
+      "list_3d_scenes_tool",
     ],
   },
 };
@@ -443,13 +531,16 @@ function needName(need: HostCapability | HostMethod): string {
     "media.writeGenerated": "storing generated media",
     "media.missing": "checking for missing media",
     "media.fetchWebVideo": "fetching videos from web pages, which only runs on the person's own computer (the zenvi CLI with yt-dlp)",
+    "media.kitSample": "fetching Zenvi's recorded sound kit (the zenvi CLI and local MCP cache it)",
     "media.inspectRender": "reading a rendered file with ffmpeg (the zenvi CLI and local MCP)",
     "storage.open": "opening project files",
     "storage.readText": "reading files",
     "storage.writeText": "writing files",
     "ui.openExportDialog": "an export dialog",
     "audio.decodePcm": "audio decoding",
+    "audio.mixPcm": "rendering the timeline mix to measure its loudness",
     "audio.transcribe": "speech recognition",
+    "audio.generateSfx": "generating sound effects (the zenvi CLI and local MCP with ELEVENLABS_API_KEY on a paid ElevenLabs plan)",
     "ui.selection": "reading the editor's selection",
     "ui.setSelection": "selecting in the editor",
     "ui.timelineView": "reading the timeline view",
@@ -467,6 +558,8 @@ function needName(need: HostCapability | HostMethod): string {
     "media.collect": "copying media into the project's folder",
     "exporter.supports": "checking which codecs it can encode",
     "frames.fontFamilies": "listing the fonts titles render with",
+    "frames.renderSheet": "composing contact sheets",
+    "audio.measureMix": "mixing and measuring the audio",
   };
   return names[need as HostMethod];
 }

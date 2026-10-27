@@ -27,7 +27,7 @@
 import type { Transaction } from "../../history/document.js";
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
 import { duplicateClip, moveClip, trimClip } from "../../ops/clips.js";
-import { beatsOfFile, canTrackBeats } from "../beats.js";
+import { beatsOfFile, canTrackBeats, tempoReport, weakGridWarning } from "../beats.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { projectFps, snap, toFrame, type Fps } from "../frame-time.js";
 import { pyFixed } from "../pyfmt.js";
@@ -759,18 +759,25 @@ export const speechTools: CatalogTool[] = [
       }
       if (!file) return refused(tool, "Error: Media path missing.");
       if (!canTrackBeats(call)) return unavailable(tool, "this surface cannot decode audio for beat tracking (Zenvi desktop, the CLI and Zenvi Cloud can).");
-      const result = await beatsOfFile(call, file);
+      const given = typeof input.bpm === "number" && input.bpm > 0 ? input.bpm : undefined;
+      const result = await beatsOfFile(call, file, given ? { bpm: given } : {});
       if (typeof result === "string") return failed(tool, result);
       const fps = projectFps(project);
+      const warnings = [weakGridWarning(result)].filter((w): w is string => w !== null);
+      // The other octave, when the audio carries it: what an agent needs to fix a half- or double-time grid.
+      const other = result.alternatives.find((a) => a.support >= 0.8);
+      const hint = other && !given ? ` Also reads as ${other.bpm} BPM (call again with bpm=${other.bpm} to use that).` : "";
       // Same receipt as zenvi-core speech_extra.detect_beats_tool_handler; beats are a tempo grid here (not energy peaks).
       return applied(
         tool,
-        `Detected ${result.beats.length} beat(s), BPM≈${result.bpm.toFixed(1)}.`,
+        `Detected ${result.beats.length} beat(s), BPM≈${result.bpm.toFixed(1)}, confidence ${result.confidence}, ${result.beatsPerBar} beats per bar.${hint}`,
         {
+          warnings,
           data: {
             beats: result.beats.map((b) => ({ timeSec: b.timeSec, frame: toFrame(b.timeSec, fps), strength: b.strength })),
             downbeats: result.downbeats.map((d) => ({ timeSec: d.timeSec, frame: toFrame(d.timeSec, fps) })),
             bpm: result.bpm,
+            tempo: tempoReport(result),
             fileId: fileId || "",
             clipId: clipId || "",
             provider: "local",

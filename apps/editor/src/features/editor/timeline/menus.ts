@@ -11,6 +11,8 @@ import {
   findClip,
   findLayer,
   layoutShowAll,
+  listMotionTransitions,
+  motionRecords,
   removeTrack,
   reverseTransition,
   separateAudio,
@@ -22,7 +24,11 @@ import {
   type SliceKeep,
 } from "@zenvi/engine";
 import type { MenuSpec } from "@/ui/Menu";
+import { addCaptions, addKineticCaptions, CAPTION_STYLES, KINETIC_CAPTION_STYLES } from "../actions/captions";
+import { applyMotionTransition, gridMontage, matchCut, removeMotionTransitions, speedRamp, SPEED_RAMPS } from "../actions/motion";
 import { shortcutFor, type EditorCommand } from "../commands";
+import { targetCut } from "../cuts";
+import { editorToolState } from "../editorTools";
 import type { EditorSession } from "../session/EditorSession";
 import { EMPTY_SELECTION } from "../session/uiStore";
 
@@ -211,6 +217,36 @@ function audioMenu(session: EditorSession, ids: string[]): MenuSpec {
   ]);
 }
 
+/** Motion transitions on the clicked clip's cut (after it, else before it), the clip's ramps, match cut, grid, FX, captions. */
+function motionToolsMenu(session: EditorSession, ids: string[], hasVisual: boolean, hasAudio: boolean): MenuSpec[] {
+  const project = session.project;
+  const first = ids[0]!;
+  const out: MenuSpec[] = [];
+  if (hasVisual) {
+    const cut = targetCut(project, [first], 0);
+    const own = cut && (cut.outClip.id === first || cut.inClip.id === first) ? cut : null;
+    const presets = listMotionTransitions().map((info) => item(info.title, () => void applyMotionTransition(session, info, "auto", [first])));
+    out.push(own ? sub(own.outClip.id === first ? "Motion Transition to Next Clip" : "Motion Transition from Previous Clip", presets) : item("Motion Transition (no cut here)", () => undefined, { disabled: true }));
+    if (motionRecords(findClip(project, first)!).length > 0) out.push(item("Remove Motion Transitions", () => void removeMotionTransitions(session, first)));
+  }
+  if (ids.length === 1) out.push(sub("Speed Ramp", SPEED_RAMPS.map((r) => item(r.label, () => void speedRamp(session, first, r.preset)))));
+  if (hasVisual && ids.length >= 2) {
+    out.push(item("Match Cut (Align Subjects)", () => void matchCut(session, ids)), item("Grid Montage", () => void gridMontage(session, ids)));
+  }
+  const fx = editorToolState("apply_fx_tool");
+  if (hasVisual && fx.kind === "elsewhere") out.push(item(`FX (needs ${fx.where})`, () => undefined, { disabled: true }));
+  if (hasAudio && ids.length === 1) {
+    const kinetic = editorToolState("kinetic_captions_tool").kind === "ready";
+    out.push(
+      sub("Captions", [
+        ...CAPTION_STYLES.map((c) => item(c.label, () => void addCaptions(session, first, c.style))),
+        ...(kinetic ? [sep, ...KINETIC_CAPTION_STYLES.map((c) => item(`Kinetic: ${c.label}`, () => void addKineticCaptions(session, [first], c.style)))] : []),
+      ]),
+    );
+  }
+  return out;
+}
+
 function sliceMenu(session: EditorSession, ids: string[], project: Project): MenuSpec | null {
   const t = session.playback.getState().time;
   const under = clipsAt(project, t).map((c) => c.id);
@@ -271,6 +307,8 @@ export function clipMenu(session: EditorSession, commands: Commands, ids: string
   }
   menu.push(speedMenu(session, ids));
   if (hasAudio) menu.push(audioMenu(session, ids));
+  const motionTools = motionToolsMenu(session, ids, hasVisual, hasAudio);
+  if (motionTools.length) menu.push(sep, ...motionTools);
   const slice = sliceMenu(session, ids, project);
   menu.push(sep);
   if (slice) menu.push(slice);

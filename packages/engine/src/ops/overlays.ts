@@ -18,6 +18,7 @@ import { clipsUsingFile, findLayer } from "../model/query.js";
 import { addClip } from "./clips.js";
 import { invalid, requireClip, requireFile, requireNonNegative, requireObject, requirePositive, requireUnlocked } from "./errors.js";
 import { isRecord, patchClip, requireEditableClip } from "./internal.js";
+import { TRACK_STRIDE } from "./tracks.js";
 
 /** Clip keys `props` may not set: they are the placement itself. */
 const PLACEMENT_KEYS = new Set(["id", "file_id", "position", "layer", "start", "end", "duration", "reader"]);
@@ -39,9 +40,19 @@ export interface PlaceOverlayClipInput {
   props?: Readonly<Record<string, unknown>>;
 }
 
-/** Create track `layer` labelled `label` when no track has that number. */
+/**
+ * Create track `layer` labelled `label` when no track has that number. A
+ * number more than one TRACK_STRIDE above the top also adds the empty tracks
+ * in between, unlabelled (an agent placing on track 11 of 9).
+ */
 export function ensureTrack(tx: Transaction, layer: number, label = ""): void {
   if (findLayer(tx.project, layer)) return;
+  const top = Math.max(0, ...tx.project.layers.map((l) => l.number));
+  for (let number = top + TRACK_STRIDE; number < layer; number += TRACK_STRIDE) insertTrack(tx, number, "");
+  insertTrack(tx, layer, label);
+}
+
+function insertTrack(tx: Transaction, layer: number, label: string): void {
   const id = generateId((candidate) => tx.project.layers.some((l) => l.id === candidate));
   tx.insert(["layers"], createLayer(layer, id, label));
 }

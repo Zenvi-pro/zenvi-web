@@ -5,9 +5,10 @@
  *   project   a new one in the reel's frame (vertical by default), or the
  *             open project when it has media and no edit yet
  *   footage   files attached in the chat, links, and stock clips for the
- *             searches the model writes (Pexels through the Zenvi backend),
+ *             searches the model writes (Pexels, through the Zenvi backend or
+ *             this deployment's own key),
  *             fetched three at a time, all added to the project in one edit
- *   music     a link or a stock search (Freesound through the backend)
+ *   music     a link or a stock search (Freesound, the same way)
  *   edit      the engine's build_reel_tool: cuts on the beat, moves, looks,
  *             flashes, hook title, end card, music bed
  *   editor    the Zenvi editor opens in the chat on the result
@@ -27,7 +28,6 @@ import {
   pickStockVideo,
   REEL_STYLE_IDS,
   REEL_STYLES,
-  type FreesoundSound,
   type MotionStyleId,
   type PexelsVideo,
   type Project,
@@ -43,7 +43,7 @@ import { editorSession, projectIdArg } from "./cloud-tools.js";
 import { defineTool } from "./define.js";
 import { EDITOR_META_KEY, editorWidgetToolMeta } from "./editor-widget.js";
 import { displayText, type EngineRegistry } from "./engine.js";
-import { createCloudHost } from "./host.js";
+import { createCloudHost, stockSearch } from "./host.js";
 import { editProject, resolveProjectId } from "./projects.js";
 import type { McpTool } from "./types.js";
 
@@ -193,7 +193,7 @@ export interface ReelToolOptions {
   fetchDeadlineMs?: number;
 }
 
-export function reelTools(registry: EngineRegistry, backendEnabled: boolean, options: ReelToolOptions = {}): McpTool[] {
+export function reelTools(registry: EngineRegistry, options: ReelToolOptions = {}): McpTool[] {
   const fetchDeadlineMs = options.fetchDeadlineMs ?? FETCH_DEADLINE_MS;
   return [
     defineTool({
@@ -218,8 +218,9 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
         const warnings: string[] = [];
         const wantsStock = (args.stock_queries?.length ?? 0) > 0;
         const wantsStockMusic = !args.no_music && !args.music_url;
-        if ((wantsStock || wantsStockMusic) && !backendEnabled) {
-          warnings.push("Stock search needs the Zenvi backend, which this server is not connected to.");
+        const stock = stockSearch(ctx.services, userId, ctx.signal);
+        if ((wantsStock || wantsStockMusic) && !stock) {
+          warnings.push("Stock search needs the Zenvi backend or stock keys, and this server has neither.");
         }
 
         // The project: the open one (media, no edit yet) or a new one in the reel's frame.
@@ -257,25 +258,23 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
         let sourceIndex = 0;
         for (const file of args.files ?? []) jobs.push({ label: file.file_name ?? "attached file", run: fetch(file.download_url, file.file_name, "visual", undefined, sourceIndex++) });
         for (const url of args.media_urls ?? []) jobs.push({ label: url, run: fetch(url, undefined, "visual", undefined, sourceIndex++) });
-        if (wantsStock && backendEnabled) {
+        if (wantsStock && stock) {
           const used = new Set<number>();
           const queries = args.stock_queries!;
           const perQuery = stockClipsPerQuery(args.style ?? "hype", args.duration_seconds, queries.length);
           const picked: { query: string; clips: { video: PexelsVideo; link: string }[] }[] = [];
           const searches = await Promise.allSettled(
-            args.stock_queries!.map((query) =>
-              ctx.services.backendSessions.request<{ videos?: PexelsVideo[]; error?: string }>(userId, `/api/v1/pexels/search?query=${encodeURIComponent(query)}&per_page=15`, { signal: ctx.signal }),
-            ),
+            args.stock_queries!.map((query) => stock.searchPexelsVideos(query, { perPage: 15, signal: ctx.signal })),
           );
           searches.forEach((result, i) => {
             const query = queries[i]!;
-            if (result.status === "rejected" || result.value.error) {
-              warnings.push(`Stock search "${query}" failed: ${result.status === "rejected" ? message(result.reason) : result.value.error}`);
+            if (result.status === "rejected") {
+              warnings.push(`Stock search "${query}" failed: ${message(result.reason)}`);
               return;
             }
             const clips: { video: PexelsVideo; link: string }[] = [];
             for (let n = 0; n < perQuery; n += 1) {
-              const video = pickStockVideo(result.value.videos ?? [], portrait, used, 4, query);
+              const video = pickStockVideo(result.value.videos, portrait, used, 4, query);
               const link = video ? pickStockFile(video, frameWidth, portrait)?.link : undefined;
               if (!video || !link) break;
               used.add(video.id);
@@ -311,15 +310,11 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
         if (!args.no_music) {
           if (args.music_url) {
             musicJobs.push({ label: "music", run: fetch(args.music_url, undefined, "music") });
-          } else if (backendEnabled) {
+          } else if (stock) {
             const query = args.music_query ?? DEFAULT_MUSIC[args.style ?? "hype"]!;
             try {
-              const found = await ctx.services.backendSessions.request<{ sounds?: FreesoundSound[]; error?: string }>(
-                userId,
-                `/api/v1/freesound/search?query=${encodeURIComponent(query)}&page_size=20&min_duration=${Math.max(20, (args.duration_seconds ?? 15) + 4)}`,
-                { signal: ctx.signal },
-              );
-              const sound = found.error ? undefined : pickMusic(found.sounds ?? [], args.duration_seconds ?? 15);
+              const found = await stock.searchFreesound(query, { pageSize: 20, minSeconds: Math.max(20, (args.duration_seconds ?? 15) + 4), signal: ctx.signal });
+              const sound = pickMusic(found.sounds, args.duration_seconds ?? 15);
               const preview = sound?.previews?.hq_mp3 || sound?.previews?.lq_mp3;
               if (sound && preview) {
                 if (licenceRank(sound.license) === 2) {
@@ -333,7 +328,7 @@ export function reelTools(registry: EngineRegistry, backendEnabled: boolean, opt
                   run: fetch(preview, name, "music", { name: sound.name, credit: sound.username ? `${sound.username} on Freesound` : "Freesound", license: sound.license ?? "", source: `https://freesound.org/s/${sound.id}/` }),
                 });
               } else {
-                warnings.push(`No stock music found for "${query}"${found.error ? ` (${found.error})` : ""}.`);
+                warnings.push(`No stock music found for "${query}".`);
               }
             } catch (error) {
               warnings.push(`Stock music search failed: ${message(error)}`);

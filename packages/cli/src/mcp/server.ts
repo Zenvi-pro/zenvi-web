@@ -15,8 +15,9 @@
  * `structuredContent`. Arguments are coerced like the desktop's
  * `validate_input=False` server, so the SDK does not pre-validate them.
  *
- * Resources: zenvi://hosts, zenvi://taste, zenvi://handoff. Prompts:
- * taste_motion_design, edit_review.
+ * Resources: zenvi://hosts, zenvi://taste, zenvi://handoff, zenvi://director
+ * (and zenvi://director/<genre>), zenvi://sound (and zenvi://sound/<genre>).
+ * Prompts: taste_motion_design, edit_review, motion_director, sound_designer.
  */
 
 import { once } from "node:events";
@@ -40,7 +41,7 @@ import type { ToolImage } from "@zenvi/engine";
 import { failed, parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import type { CommandContext } from "../commands/context.js";
 import { adobeToolDefinitions, callAdobeTool, hostOfTool, hostRefusal, isOkHostStatus } from "../hosts/adobe-tools.js";
-import { HANDOFF_GUIDE, PROMPTS, promptText, RESOURCES, TASTE_MARKDOWN } from "../hosts/guides.js";
+import { guideText, PROMPTS, promptText, RESOURCES } from "../hosts/guides.js";
 import { APP_LABEL, type FamilyDecision, type FamilyDecisions } from "../hosts/policy.js";
 import { findProject } from "../project/select.js";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
@@ -54,7 +55,9 @@ export const SERVER_INSTRUCTIONS = [
   "Picking tools: ae_* tools act inside After Effects and premiere_* tools inside Premiere Pro, on the project open there, with that app's own undo. Unprefixed tools act on the Zenvi project: in the desktop app while it has the project open (the person sees edits live; receipts say engine desktop), otherwise in the portable engine. Never edit a .zvn file or an Adobe project by hand.",
   "Zenvi workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) render_video exports (mp4 by default). (4) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
   "Handoffs run in the Zenvi desktop app on the saved project, which is opened for you: send_to_after_effects_tool / export_to_after_effects_tool, send_to_premiere_tool / export_to_premiere_tool, import_timeline_xml_tool, the Remotion and HyperFrames import and export tools, and linked clips (get_linked_clip_tool, update_linked_clip_tool, rerender_linked_clip_tool, open_linked_source_tool, unlink_clip_tool). bring_from_after_effects renders a comp into the project as a linked clip; bring_from_premiere brings a sequence back as native clips. zenvi://handoff says what survives each direction.",
-  "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again.",
+  "Making a whole video (a reel, ad, promo, montage, a reference to recreate): before the first edit, load the zenvi-motion-director skill when your client has it (the Zenvi Claude Code plugin), else read zenvi://director (the motion_director prompt carries it) and the genre's recipe zenvi://director/<genre>. It plans the edit with timings, gives each genre's exact tool calls and puts a sound on every cut.",
+  "Sound work (sound-design, SFX, music levels, ducking under a voice, mixing, mastering): load the zenvi-sound-designer skill when your client has it, else read zenvi://sound (the sound_designer prompt carries it) and the genre's palette zenvi://sound/<genre>. Its loop spots the edit, designs it in one call, masters with the Sound Score and stops at 85+.",
+  "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again. After cutting a multi-shot edit, call review_edit_tool: one contact sheet of the cut plus pacing, beat and loudness numbers and a ranked problem list; fix what it flags and call it again.",
   "Web videos: for a YouTube or other web page link call ingest_web_video_tool once (intent=timeline only when the person asked to put it on the timeline, reference for a colour or look reference; it needs yt-dlp on this machine). If it answers status=running, call it again with the job_id until completed or failed: each call waits up to about 45 s, and a client timeout is not a failure. On ok=false report the reason once and stop. A direct link to a media file can use import_video_url_and_add_to_timeline_tool.",
   "Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error (read-only Adobe tools: ok), summary, and what changed (clips, shifted, removedClipIds, createdTracks, undoSteps; Adobe tools: ids in data). Patch your view from receipts instead of re-listing everything. Failures start with \"Error:\"; refused means nothing changed, so read the summary and adjust. Each Zenvi call is one undo step (undo_tool); edits autosave to the project file with their undo history. Use these tools instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds.",
 ].join("\n\n");
@@ -178,6 +181,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       const { result } = await state.session.run(name, args, extra.signal);
       const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text);
       if (!receipt) return { content: [{ type: "text", text: result.text }], ...(result.ok ? {} : { isError: true }) };
+      if (name === "review_edit_tool" && result.ok) state.noteReview();
       if (!state.session.file && receipt.undoSteps > 0) {
         receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }
@@ -198,7 +202,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     const uri = request.params.uri;
     const info = RESOURCES.find((r) => r.uri === uri);
     if (!info) throw new McpError(-32002, `Resource not found: ${uri}. Resources: ${RESOURCES.map((r) => r.uri).join(", ")}.`);
-    const text = uri === "zenvi://hosts" ? JSON.stringify(await state.hosts.list(), null, 2) : uri === "zenvi://taste" ? TASTE_MARKDOWN : HANDOFF_GUIDE;
+    const text = uri === "zenvi://hosts" ? JSON.stringify(await state.hosts.list(), null, 2) : (guideText(uri) ?? "");
     return { contents: [{ uri, mimeType: info.mimeType, text }] };
   });
 

@@ -15,17 +15,17 @@ import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/pr
 import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { audioCutNote, defaultExportEnd, frameContaining, isSequenceFormat, lastFrameBefore, projectAtFrameRate, type ExportEnd, type ExportResult, type FramePlan, type Fraction, type Project, type RgbaImage } from "@zenvi/engine";
+import { audioCutNote, defaultExportEnd, exportCeilingDb, frameContaining, isSequenceFormat, lastFrameBefore, projectAtFrameRate, type ExportEnd, type ExportResult, type Fraction, type FramePlan, type Project, type RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
-import { binaryVersion } from "../ffmpeg/capabilities.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
 import { SourceManager, type MediaResolver } from "../decode/sources.js";
 import type { ScaleQuality } from "../decode/video.js";
 import { streamStarts } from "../probe/starts.js";
+import { appendToOutput, normalizeLoudness, truePeakLimiterFilter } from "../audio/mix.js";
 import { buildAudioGraph } from "./audio-graph.js";
 import { processLimits } from "../limits.js";
 import { CompositePool, compositeThreads } from "./composite-pool.js";
-import { encoderCommand, ffmpegMajorVersion, FORMATS, type NodeExportOptions } from "./encoder.js";
+import { encoderCommand, ffmpegMajor, FORMATS, isLossyAudio, type NodeExportOptions } from "./encoder.js";
 import { nodeTextRasterizer } from "../svg/text.js";
 import { defaultRenderEngine, projectNeedsText, type RenderEngine } from "./engine.js";
 
@@ -79,6 +79,9 @@ export interface RenderResult extends ExportResult {
   stats: RenderStats;
 }
 
+/** How many frames ahead a render plans, to start the decoders of upcoming clips early. */
+const DECODE_AHEAD = 12;
+
 export class RenderError extends Error {
   constructor(message: string) {
     super(message);
@@ -116,14 +119,6 @@ function sequencePattern(output: string, extension: string): string {
   const ext = path.extname(output);
   const stem = ext ? output.slice(0, -ext.length) : output;
   return `${stem}_%05d.${extension}`;
-}
-
-let versionPromise: Promise<number> | undefined;
-function ffmpegMajor(): Promise<number> {
-  versionPromise ??= binaryVersion("ffmpeg")
-    .then((v) => ffmpegMajorVersion(v.version))
-    .catch(() => 99);
-  return versionPromise;
 }
 
 export async function renderProject(source: Project, opts: RenderProjectOptions): Promise<RenderResult> {
@@ -195,6 +190,15 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
         })
       : undefined;
     if (audio) warnings.push(...audio.warnings);
+    if (audio && options.loudness) {
+      const skipped = await normalizeLoudness(audio, options.loudness, sampleRate, effectsDir!, info.video ? 1 : 0, signal);
+      if (skipped) warnings.push(skipped);
+    }
+    // Last on the mix, after any normalisation: nothing that reaches the file passes the ceiling.
+    if (audio && options.truePeakLimit !== false) {
+      const ceiling = exportCeilingDb(isLossyAudio(format, options.audioCodec));
+      audio.filter = appendToOutput(audio.filter, truePeakLimiterFilter(sampleRate, ceiling, await ffmpegMajor()));
+    }
 
     const command = encoderCommand({
       format,
@@ -266,10 +270,20 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
         stats.composite += performance.now() - t;
         return image;
       };
+      // Frames are planned a little ahead so the decoders of the next cuts start (ffmpeg launch and seek) while
+      // this frame decodes and composites.
+      const plans: FramePlan[] = [];
+      let planned = 0;
       for (let i = 0; i < frames && !encoderGone; i += 1) {
         if (signal?.aborted) throw new AbortedError();
         let t = performance.now();
-        const plan = engine.planFrame(project, first + i, { width, height }, { preview: false });
+        while (planned < frames && planned <= i + DECODE_AHEAD) {
+          const ahead = engine.planFrame(project, first + planned, { width, height }, { preview: false });
+          if (planned > i) sources.warm(ahead, planned - i);
+          plans.push(ahead);
+          planned += 1;
+        }
+        const plan = plans.shift()!;
         stats.plan += performance.now() - t;
         if (plan.layers.length === 0) {
           queue.push(Promise.resolve(background(plan)));

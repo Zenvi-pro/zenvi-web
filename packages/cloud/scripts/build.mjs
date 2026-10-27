@@ -6,10 +6,12 @@
 //   dist/resvg.wasm   SVG rasterizer (titles, transition masks)
 //   dist/fonts/       bundled fallback fonts (OFL)
 //   dist/assets/      engine assets (transition masks, title templates), when present
+//   dist/motion/      Zenvi Motion block pages, prebuilt, and their OFL fonts
 // `__ZENVI_BUNDLE__` tells render-node to look for them there
 // (packages/render-node/src/resources.ts). The runtime image then needs only
 // Node and ffmpeg.
-import { cp, mkdir, rm, stat } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { cp, mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,4 +59,31 @@ for (const [from, to] of [
   [join(packages, "engine", "assets"), join(outdir, "assets")],
 ]) {
   if (await exists(from)) await cp(from, to, { recursive: true });
+}
+
+// Zenvi Motion: every block page prebuilt, and its fonts (packages/motion/src/node/page.ts motionDir).
+// The page builder is TypeScript: bundle it, then run it on the motion package's sources. Its folder is
+// inside the package, so the esbuild it loads to build each page resolves from the workspace's node_modules.
+const pagesTmp = await mkdtemp(join(root, ".motion-pages-"));
+try {
+  const builder = join(pagesTmp, "build-pages.mjs");
+  await build({
+    entryPoints: [join(packages, "motion", "scripts", "build-pages.ts")],
+    outfile: builder,
+    bundle: true,
+    platform: "node",
+    target: "node22",
+    format: "esm",
+    logLevel: "warning",
+    external: ["esbuild", "onnxruntime-node"],
+    banner: { js: "import { createRequire as __zenviCreateRequire } from 'node:module'; const require = __zenviCreateRequire(import.meta.url);" },
+  });
+  const pages = spawnSync(process.execPath, [builder, "--out", join(outdir, "motion")], {
+    cwd: root,
+    stdio: "inherit",
+    env: { ...process.env, ZENVI_MOTION_DIR: join(packages, "motion") },
+  });
+  if (pages.status !== 0) throw new Error(`building the Zenvi Motion pages failed (exit ${pages.status})`);
+} finally {
+  await rm(pagesTmp, { recursive: true, force: true });
 }

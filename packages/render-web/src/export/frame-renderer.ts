@@ -5,7 +5,7 @@
 
 import type { Project } from "@zenvi/engine";
 import { KernelAudioSource } from "../audio/kernel-audio.js";
-import { Compositor, type LayerError, type LayerResources } from "../compositor/compositor.js";
+import { Compositor, type LayerError, type LayerResources, type PreparedFrame } from "../compositor/compositor.js";
 import { mediaResources } from "../compositor/resources.js";
 import { createCanvas, type Scratch } from "../compositor/scratch.js";
 import { defaultEngine, type RenderEngine } from "../engine.js";
@@ -56,10 +56,51 @@ export class FrameRenderer {
 
   /** Draw timeline `frame` at `size` into `surface(size)`. Returns per-layer errors. */
   async draw(project: Project, frame: number, size: Size, mode: DecodeMode): Promise<LayerError[]> {
+    return this.drawPrepared(await this.prepare(project, frame, size, mode), size);
+  }
+
+  /**
+   * Decode everything timeline `frame` draws at `size`, without drawing it:
+   * an export prepares the next frame while it draws this one. Pass the
+   * result to `drawPrepared` (which releases it).
+   */
+  prepare(project: Project, frame: number, size: Size, mode: DecodeMode): Promise<PreparedFrame> {
     const target = this.surface(size);
     const plan = this.engine.planFrame(project, frame, { width: target.canvas.width, height: target.canvas.height });
+    return this.compositor.prepare(plan, this.resources, { mode });
+  }
+
+  /** Draw a prepared frame into `surface(size)` and release its pictures. Returns per-layer errors. */
+  drawPrepared(prepared: PreparedFrame, size: Size): LayerError[] {
+    const target = this.surface(size);
     target.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    return this.compositor.render(plan, target.ctx, this.resources, { mode });
+    try {
+      this.compositor.draw(prepared, target.ctx);
+      return prepared.errors;
+    } finally {
+      prepared.release();
+    }
+  }
+
+  /**
+   * Start decoding the first picture of each video clip of timeline `frame`
+   * that `warm` has not seen yet, so a cut to it does not wait for the seek.
+   * Call it for the frames of a sequential export in order, a few frames
+   * ahead of the one being drawn: a clip's first appearance is then its
+   * first frame, and its decode lane continues forward from there. Errors are
+   * left for the frame that draws the clip.
+   */
+  warm(project: Project, frame: number, size: Size, seen: Set<string>): void {
+    const target = this.surface(size);
+    const plan = this.engine.planFrame(project, frame, { width: target.canvas.width, height: target.canvas.height });
+    for (const layer of plan.layers) {
+      if (layer.source.kind !== "video" || seen.has(layer.clipId)) continue;
+      seen.add(layer.clipId);
+      this.resources.picture(layer, "sequential").then(
+        (picture) => picture?.release(),
+        () => undefined,
+      );
+    }
   }
 
   /** Close decoders idle for a while (long exports touch many files). */

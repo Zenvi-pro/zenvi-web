@@ -16,7 +16,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Services } from "../container.js";
 import { cloudTools } from "./cloud-tools.js";
-import { engineTools } from "./engine.js";
+import { engineTools, unavailableToolReason } from "./engine.js";
 import { cloudCapabilities } from "./host.js";
 import { reelTools } from "./reels.js";
 import { errorResult } from "./results.js";
@@ -33,7 +33,7 @@ const RESOURCE_NOT_FOUND = -32002;
 export function buildToolList(services: Services): McpTool[] {
   const cloud = cloudTools({ backend: services.backendSessions.enabled });
   if (!services.engine) return cloud;
-  const reels = reelTools(services.engine, services.backendSessions.enabled, { fetchDeadlineMs: services.config.limits.reelFetchDeadlineMs });
+  const reels = reelTools(services.engine, { fetchDeadlineMs: services.config.limits.reelFetchDeadlineMs });
   const reserved = new Set([...cloud, ...reels].map((tool) => tool.name));
   const capabilities = cloudCapabilities(services);
   const engine = engineTools(services.engine, capabilities, reserved, (message) => services.log.warn(message));
@@ -78,7 +78,12 @@ export function createMcpServer(tools: readonly McpTool[], ctx: McpCallContext):
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const tool = byName.get(request.params.name);
-    if (!tool) throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
+    if (!tool) {
+      const engine = ctx.services.engine;
+      const reason = engine ? unavailableToolReason(engine, cloudCapabilities(ctx.services), request.params.name) : undefined;
+      if (reason) return errorResult(reason);
+      throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
+    }
     if (!ctx.principal.scopes.includes(tool.scope)) {
       return errorResult(`This connection was granted without ${tool.scope}. Disconnect and reconnect Zenvi, allowing edits.`);
     }

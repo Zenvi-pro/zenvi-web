@@ -17,20 +17,38 @@
  *           save/open are refused;
  *   backend api.zenvi.pro as the connected person (search, stock, catalog,
  *           TTS; auth/backend-session.ts). AI video is a cloud job, not this host.
+ *   stock   Pexels/Freesound search: through the backend, or with this
+ *           deployment's own keys when it runs without one (services/stock.ts);
  *   exporter export_video_tool's renders as render jobs (`RenderService.startExport`):
- *           the answer carries the render_id, get_render_status the download link.
+ *           the answer carries the render_id, get_render_status the download link;
+ *   motion   Zenvi Motion blocks rendered here with headless Chrome, and
+ *   mattes   subject mattes made here with Robust Video Matting: both render
+ *           in the call's scratch folder and keep the result as
+ *           content-addressed project media, one heavy render at a time.
  */
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { TRANSCRIPTION_PATH, transcriptionHttpError, type CloudMediaRef, type HostCapability, type Project, type ToolHost } from "@zenvi/engine";
+import {
+  TRANSCRIPTION_PATH,
+  transcriptionHttpError,
+  type BackendHost,
+  type CloudMediaRef,
+  type HostCapability,
+  type ImportedMedia,
+  type Project,
+  type StockHost,
+  type ToolHost,
+} from "@zenvi/engine";
+import { backendStock } from "@zenvi/engine/tools";
 import { ffmpegCanWrite } from "@zenvi/render-node";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
 import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
 import { isRenderFormat } from "../render/options.js";
-import { filesByPath } from "../render/resolve.js";
-import { attachmentDisposition, cleanFileName, normalizeContentType } from "../services/media.js";
+import { filesByPath, projectPathResolver } from "../render/resolve.js";
+import { attachmentDisposition, cleanFileName, normalizeContentType, sha256File } from "../services/media.js";
+import { contentTypeForName } from "../services/importer.js";
 import { exportPath, mediaPath } from "../services/paths.js";
 import { sha256Hex } from "../util/crypto.js";
 import type { Services } from "../container.js";
@@ -43,6 +61,20 @@ const BYTES_MAX_BYTES = 64 * 1024 * 1024;
 const EXPORT_URL_SECONDS = 24 * 3600;
 /** File > Recent Projects holds the last 10 (project_data.add_to_recent_files). */
 const RECENT_PROJECTS = 10;
+/**
+ * Longest video one call mattes (10 s at 30 fps): matting runs at 2-4 frames
+ * per second on the service's CPUs, and a call must end well inside the
+ * ingress's 240 s request limit.
+ */
+const MATTE_MAX_FRAMES = 300;
+
+/** One Chrome capture or matting run at a time in this process: each takes the container's CPUs. */
+let heavyRun: Promise<unknown> = Promise.resolve();
+function oneAtATime<T>(run: () => Promise<T>): Promise<T> {
+  const next = heavyRun.then(run, run);
+  heavyRun = next.catch(() => undefined);
+  return next;
+}
 
 export interface CloudHost {
   host: ToolHost;
@@ -58,8 +90,25 @@ export function cloudCapabilities(services: Services): Set<HostCapability> {
   if (services.assets) caps.add("assets");
   if (services.analyzeAudio) caps.add("audio");
   if (services.backendSessions.enabled) caps.add("backend");
+  if (services.backendSessions.enabled || services.stock) caps.add("stock");
   if (services.renders.rendererAvailable) caps.add("exporter");
+  // Both keep what they render as project media, which needs probing.
+  if (services.motion && caps.has("media")) caps.add("motion");
+  if (services.mattes && caps.has("media")) caps.add("mattes");
   return caps;
+}
+
+function backendFor(services: Services, userId: string, signal: AbortSignal): BackendHost {
+  return {
+    baseUrl: services.config.backendUrl,
+    request: (path, init) => services.backendSessions.request(userId, path, { ...init, signal: init?.signal ?? signal }),
+  };
+}
+
+/** Stock search for one person's calls: the backend as them, else this deployment's own keys (none: undefined). */
+export function stockSearch(services: Services, userId: string, signal: AbortSignal): StockHost | undefined {
+  if (services.backendSessions.enabled) return backendStock(backendFor(services, userId, signal));
+  return services.stock ?? undefined;
 }
 
 function baseName(path: string): string {
@@ -126,6 +175,15 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         generated.set(path, { file, cloud: { sha256, size: bytes.byteLength, name: fileName, content_type: type } });
         return path;
       },
+      // The stored bytes stay: they are content-addressed, and another project may use them.
+      discardGenerated: async (paths) => {
+        for (const p of paths) {
+          const made = generated.get(p);
+          if (!made) continue;
+          generated.delete(p);
+          await rm(made.file, { force: true });
+        }
+      },
       // Missing = not uploaded to Zenvi Cloud (what GET /v1/projects/:id lists as missingMedia).
       missing: async (files) => {
         const hashes = [...new Set(files.map((f) => fileSha256(f)).filter((h): h is string => h !== undefined))];
@@ -163,7 +221,10 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
   }
 
   const assets = services.assets;
-  if (assets) host.assets = { readText: (path) => assets.readText(path) };
+  if (assets) {
+    const bytes = assets.readBytes?.bind(assets);
+    host.assets = { readText: (path) => assets.readText(path), ...(bytes ? { readBytes: (path: string) => bytes(path) } : {}) };
+  }
 
   const analyze = services.analyzeAudio;
   const decode = services.decodePcm;
@@ -171,6 +232,15 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     host.audio = {
       analyzeAudio: async (path, options) => analyze(await localCopy(path), { ...options, signal: options?.signal ?? ctx.signal }),
       ...(decode ? { decodePcm: async (path: string, options?: Parameters<typeof decode>[1]) => decode(await localCopy(path), { ...options, signal: options?.signal ?? ctx.signal }) } : {}),
+    };
+  }
+  const mix = services.mixPcm;
+  if (host.audio && mix) {
+    // The project's media as a render reads it: what this call generated, the bin, the renderer's bundled assets.
+    host.audio.mixPcm = (current, options) => {
+      const bin = projectPathResolver(current, { fetchFile: (file) => services.mediaCache.get(userId, file), resolveAsset: services.resolveAsset ?? undefined });
+      const resolveMedia = async (path: string) => generated.get(path)?.file ?? bin(path);
+      return mix(current, { ...options, resolveMedia, signal: options?.signal ?? ctx.signal });
     };
   }
 
@@ -201,12 +271,8 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
     };
   }
 
-  if (caps.has("backend")) {
-    host.backend = {
-      baseUrl: services.config.backendUrl,
-      request: (path, init) => services.backendSessions.request(userId, path, { ...init, signal: init?.signal ?? ctx.signal }),
-    };
-  }
+  if (caps.has("backend")) host.backend = backendFor(services, userId, ctx.signal);
+  host.stock = stockSearch(services, userId, ctx.signal);
 
   /** An export blob of this project and its download link (24 h). */
   const exportLink = async (name: string, type: string): Promise<string> =>
@@ -216,6 +282,69 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
       contentType: type,
       contentDisposition: attachmentDisposition(name),
     });
+
+  /**
+   * Keep a file a local host rendered in this call (a motion block, a matte)
+   * as content-addressed media under `@assets/<folder>/`, as writeGenerated
+   * does: later calls and render jobs read it from Zenvi Cloud.
+   */
+  const keepRendered = async (media: ImportedMedia, folder: string): Promise<ImportedMedia> => {
+    const fileName = cleanFileName(media.name ?? baseName(media.path));
+    const type = contentTypeForName(fileName);
+    if (!type) throw new ApiError(415, "unsupported_media_type", `Zenvi Cloud does not store ${fileName}.`);
+    const { size } = await stat(media.path);
+    if (size > services.config.limits.maxFileBytes) throw tooLarge(`The render is too large to keep (${fileName}).`);
+    const sha256 = await sha256File(media.path);
+    await services.media.storeFile(userId, { sha256, filePath: media.path, size, name: fileName, contentType: type });
+    let path = `@assets/${folder}/${fileName}`;
+    if (project().files.some((f) => f.path === path && f.cloud?.sha256 !== sha256)) path = `@assets/${folder}/${withSuffix(fileName, sha256.slice(0, 8))}`;
+    const cloud: CloudMediaRef = { sha256, size, name: fileName, content_type: type };
+    generated.set(path, { file: media.path, cloud });
+    return { ...media, path, info: { ...media.info, path }, cloud };
+  };
+
+  // Local hosts read media through local copies fetched before they run.
+  const fetched = new Map<string, string>();
+  const resolveFetched = (path: string): string => {
+    const file = fetched.get(path);
+    if (!file) throw new Error(`"${baseName(path)}" was not fetched for this render`);
+    return file;
+  };
+
+  const motion = services.motion;
+  if (motion && caps.has("motion")) {
+    // The catalog and parameter checks render nothing; each render gets the scratch folder.
+    const catalog = motion({ workDir: services.config.renderTmpDir, resolveMedia: resolveFetched });
+    host.motion = {
+      blocks: () => catalog.blocks(),
+      check: (block, params) => catalog.check(block, params),
+      render: async (request, signal) => {
+        for (const path of Object.values(request.media)) fetched.set(path, await localCopy(path));
+        const renderer = motion({ workDir: await scratchDir(), resolveMedia: resolveFetched });
+        const made = await oneAtATime(() => renderer.render(request, signal ?? ctx.signal));
+        return { ...made, media: await keepRendered(made.media, "links/zenvi-motion") };
+      },
+    };
+  }
+
+  const mattes = services.mattes;
+  if (mattes && caps.has("mattes")) {
+    const subjects = mattes({ workDir: services.config.renderTmpDir, resolveMedia: resolveFetched }).subjects;
+    host.mattes = {
+      subjects,
+      generate: async (path, request) => {
+        const file = await localCopy(path);
+        const frames = Number((await services.prober.probe(file)).video_length);
+        if (frames > MATTE_MAX_FRAMES) {
+          throw new Error(`Zenvi Cloud mattes videos up to ${MATTE_MAX_FRAMES} frames per call and this one has ${frames}; a matte covers the whole file, so export the part you need and import it, or make the matte with the zenvi CLI`);
+        }
+        fetched.set(path, file);
+        const maker = mattes({ workDir: await scratchDir(), resolveMedia: resolveFetched });
+        const made = await oneAtATime(() => maker.generate(path, { ...request, signal: request.signal ?? ctx.signal }));
+        return { ...made, media: await keepRendered(made.media, "mattes") };
+      },
+    };
+  }
 
   if (caps.has("exporter")) {
     host.exporter = {

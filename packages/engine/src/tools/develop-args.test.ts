@@ -117,9 +117,18 @@ describe("delete_from_timeline_tool ripple", () => {
     expect(clip(doc, IDS.clipTail).position).toBe(15);
   });
 
-  it("refuses clip_id (not in the desktop's schema) and names timeline_clip_id", async () => {
+  it("takes clip_id for timeline_clip_id, with a warning (W41: N6 / E2E bug 9)", async () => {
     const doc = fixtureDoc();
-    const text = await summary(doc, fakeHost(), "delete_from_timeline_tool", { clip_id: IDS.clipB });
+    const result = await runTool({ doc, host: fakeHost() }, "delete_from_timeline_tool", { clip_id: IDS.clipB });
+    expect(result.ok).toBe(true);
+    expect(result.data?.warnings).toEqual(["'clip_id' is not an argument of this tool; used it as 'timeline_clip_id'. Pass 'timeline_clip_id' next time."]);
+    expect(doc.undoLabels).toHaveLength(1);
+    expect(doc.project.clips.some((c) => c.id === IDS.clipB)).toBe(false);
+  });
+
+  it("still refuses clip_id next to the real name, and names it", async () => {
+    const doc = fixtureDoc();
+    const text = await summary(doc, fakeHost(), "delete_from_timeline_tool", { clip_id: IDS.clipB, timeline_clip_id: IDS.clipB });
     expect(text).toMatch(/^Error: Invalid arguments for delete_from_timeline_tool: .*'clip_id' was unexpected.* pass 'timeline_clip_id' instead of 'clip_id'\.$/);
     expect(doc.undoLabels).toHaveLength(0);
   });

@@ -1,0 +1,64 @@
+{
+  "id": "logo_reveal_end",
+  "version": 1,
+  "title": "Logo reveal end card",
+  "description": "An end card: the mark opens through an expanding iris (counter-scaling like a lens), the wordmark slides out from behind it, then the call to action and the URL land under it and the card holds to the last frame (it does not fade out). Optional glow blooms behind the mark. Give `logo` (an image file id, ideally a transparent PNG) to use your own mark; without one a drawn mark is used. For the last 2-4 seconds of promos and ads.",
+  "tags": [
+    "logo",
+    "end card",
+    "outro",
+    "cta",
+    "brand",
+    "url"
+  ],
+  "duration": {
+    "default": 3.5,
+    "min": 2,
+    "max": 8
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "cobalt",
+    "display": "sans",
+    "radius": 999
+  },
+  "params": {
+    "brand": {
+      "type": "string",
+      "maxLength": 28,
+      "default": "Oarlight",
+      "description": "The wordmark beside the mark (empty: the mark alone)."
+    },
+    "logo": {
+      "type": "media",
+      "accept": [
+        "image"
+      ],
+      "optional": true,
+      "description": "Your logo mark (file id); without one a drawn mark is used."
+    },
+    "cta": {
+      "type": "string",
+      "maxLength": 48,
+      "default": "Start your first cut",
+      "description": "The call to action on the pill under the lockup (empty: none)."
+    },
+    "url": {
+      "type": "string",
+      "maxLength": 48,
+      "default": "oarlight.example",
+      "description": "The address under the call to action (empty: none)."
+    },
+    "glow": {
+      "type": "boolean",
+      "default": false,
+      "description": "A soft accent glow that blooms behind the mark as it opens."
+    }
+  }
+}

@@ -17,7 +17,10 @@ const ALL_CAPABILITIES: HostCapability[] = ["media", "player", "ui", "exporter",
 /** Minimal valid arguments so a refusal comes from the surface, not from validation. */
 const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   search_clips_tool: { query: "cameras" },
+  add_kinetic_title_tool: { text: "Title" },
+  match_cut_montage_tool: { file_ids: [IDS.interview] },
   search_pexels_videos_tool: { query: "coffee" },
+  gather_stock_footage_tool: { queries: ["coffee"] },
   search_freesound_music_tool: { query: "lofi" },
   search_clip_scenes_tool: { query: "cameras" },
   slice_clip_at_best_match_tool: { query: "cameras" },
@@ -25,6 +28,7 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   generate_video_and_add_to_timeline_tool: { prompt: "a sunset over the sea" },
   generate_tts_and_add_to_timeline_tool: { text: "Hello there" },
   generate_image_and_add_to_timeline_tool: { prompt: "a red fox in snow" },
+  generate_sfx_tool: { prompt: "deep cinematic boom", duration_seconds: 2 },
   ingest_web_video_tool: { url: "https://youtu.be/abc" },
   resummarize_project_file_tool: { file_id: IDS.interview },
   reindex_project_file_tool: { file_id: IDS.broll },
@@ -43,6 +47,13 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   add_emoji_tool: { emoji: "fire" },
   import_image_sequence_tool: { path: "/frames" },
   add_motion_template_tool: { template: "end_card", text: "Zenvi" },
+  add_sfx_tool: { recipe: "pop", at_seconds: "1" },
+  add_motion_block_tool: { block: "kinetic_headline" },
+  update_motion_block_tool: { file_id: "MOTIONFILE" },
+  add_3d_scene_tool: { scene: "glass_hero" },
+  rerender_3d_scene_tool: { file_id: IDS.broll },
+  apply_fx_tool: { clip_id: IDS.clipB, effects: [{ effect: "bloom" }] },
+  update_fx_tool: { clip_id: IDS.clipB, amount: 0.8 },
   review_render_tool: { path: "/out/reel.mp4" },
 };
 

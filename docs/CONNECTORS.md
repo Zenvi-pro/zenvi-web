@@ -279,7 +279,9 @@ servers; their egress lists are in §7).
   - `SUPABASE_SERVICE_ROLE_KEY`: the server mints its own Supabase session per
     person (admin recovery link, no email sent) and is the only one that
     refreshes it. Disconnecting the person's last app deletes it.
-  - neither: the backend tools are not offered.
+  - neither: the backend tools are not offered. Stock search still works
+    when the deployment has its own `PEXELS_API_KEY` / `FREESOUND_API_KEY`
+    (a lab or self-hosted copy; Freesound limited to CC0 and CC BY).
 - Redirect URIs known to work: `https://chatgpt.com/connector_platform_oauth_redirect`,
   `https://chatgpt.com/connector/oauth/{id}`, `https://claude.ai/api/mcp/auth_callback`,
   `http://localhost/callback` and `http://127.0.0.1/callback` on any port.
@@ -293,6 +295,8 @@ servers; their egress lists are in §7).
 | 401 right after connecting on a new domain | Tokens are bound to the URL they were issued for; reconnect with the URL you now use. |
 | 403 `forbidden_origin` | A browser-based client from an origin not in `MCP_ALLOWED_ORIGINS`; add it and re-run provision. |
 | Tools say rendering or previews are not available | That Zenvi Cloud build has no renderer yet; `GET /health` shows `renderer` / `frames`. |
+| The motion block or subject matte tools are not listed | `GET /health` `hostCapabilities` lacks `motion` (no chrome-headless-shell: `ZENVI_CHROME`) or `mattes` (no onnxruntime-node). Zenvi 3D never runs on Zenvi Cloud (no Blender): calling `add_3d_scene_tool` answers with that reason; use the zenvi CLI. |
+| A subject matte is refused "up to 300 frames per call" | Matting runs on the server's CPUs at a few frames per second: a matte covers the whole file, so export the part you need (10 s or less) and import it, or make the matte with the zenvi CLI and push the project. |
 | Search, stock, narration or AI video says "Zenvi sign-in refused the server's request" or the backend returned 401 | The server's backend credential is wrong or missing on one side (§8, "Calling the Zenvi backend"). |
 | "… is not in Zenvi Cloud" when rendering | A clip's media was never uploaded; use `get_upload_link` or `import_media_from_url`. |
 | `import_media_from_url` refuses a link | Only direct https links to public hosts, up to 512 MB, video/audio/image types. |
@@ -307,3 +311,16 @@ Not needed for developer mode or custom connectors; needed to publish:
   dedicated `ui.domain` for the preview panel, CSP review;
 - Claude: a public documentation page and review;
 - both: a demo account without MFA for reviewers, and privacy/terms links.
+
+## 11. A lab copy for experiments
+
+`scripts/azure/lab.sh up` deploys this checkout's committed tree as a separate
+Zenvi Cloud in the `zenvi-motion-lab` resource group: its own storage account,
+Basic registry and Container Apps environment (no log workspace), the service
+at 2 vCPU / 4 GiB scaled to zero, the render job beside it, every resource
+tagged `purpose=zenvi-motion-experiments`. `lab.sh token` writes a personal
+token for a lab person to `~/.config/zenvi-dev/lab-pat.env`; connect Claude
+Code with it as in §3 (`lab.sh url` prints the URL; the first request after
+an idle spell waits for the container to start). OAuth connectors are not set
+up for the lab: its consent page would be production's. `lab.sh down` deletes
+it all again.

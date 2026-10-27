@@ -1,0 +1,50 @@
+/* Shared block styles. Sizes are design px: the frame's shorter side is 1080. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+body { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-kerning: normal; }
+.block { font-family: var(--font-sans); color: var(--ink); }
+.block img { display: block; }
+/* A centred absolutely positioned element; animate it with xPercent/yPercent -50 kept in its tweens. */
+.abs { position: absolute; }
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 24px 60px rgba(10, 12, 20, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.is-dark .glass { border-color: rgba(255, 255, 255, 0.14); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.card { background: var(--surface); border-radius: var(--radius); box-shadow: 0 2px 6px rgba(10, 12, 20, 0.06), 0 24px 64px rgba(10, 12, 20, 0.14); }
+.is-dark .card { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 24px 64px rgba(0, 0, 0, 0.45); border: 1.5px solid var(--line); }
+.mono { font-family: var(--font-mono); }
+.label { font-family: var(--font-mono); font-size: 22px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The pointer used by UI blocks (ui.ts pointer); it presses around its tip. */
+.cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; transform-origin: 21% 12.5%; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3)); z-index: 50; }
+/* Over video (alpha) type gets a soft halo of the palette's paper: TASTE.md §4, never bare text over busy footage. */
+.is-alpha .kh-text, .is-alpha .wr, .is-alpha .ct-number, .is-alpha .ts-line, .is-alpha .hud-label, .is-alpha .hud-title, .is-alpha .lt-rule ~ .lt-mask .lt-role, .is-alpha .lt:not(.is-bar) .lt-name {
+  text-shadow: 0 0 28px color-mix(in srgb, var(--paper) 55%, transparent), 0 1px 4px color-mix(in srgb, var(--paper) 45%, transparent);
+}
+
+.tp-panel { position: absolute; border-radius: var(--radius); background: var(--surface); color: var(--ink); padding: 34px 40px 14px; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 30px 80px -24px rgba(0, 0, 0, 0.55); }
+.is-dark .tp-panel { border: 1.5px solid var(--line); }
+.tp-head { display: flex; align-items: center; gap: 22px; padding-bottom: 28px; }
+.tp-tile { position: relative; width: 68px; height: 68px; border-radius: calc(var(--radius) * 0.55); background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); display: grid; place-items: center; flex: none; }
+.tp-tile .icon { position: absolute; width: 36px; height: 36px; display: block; }
+.tp-title { flex: 1; min-width: 0; font-size: 40px; font-weight: 650; letter-spacing: -0.02em; }
+.tp-pill { position: relative; height: 54px; padding: 0 24px; border-radius: 27px; display: flex; align-items: center; font-size: 26px; font-weight: 600; color: var(--muted); background: color-mix(in srgb, var(--ink) 8%, transparent); white-space: nowrap; overflow: hidden; }
+.tp-pill-fill { position: absolute; inset: 0; background: var(--accent); border-radius: inherit; }
+.tp-count { position: relative; }
+.tp-row { display: flex; align-items: center; gap: 28px; padding: 28px 0; border-top: 2px solid var(--line); }
+.tp-text { flex: 1; min-width: 0; }
+.tp-label { font-size: 34px; font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; }
+.tp-detail { font-size: 26px; color: var(--muted); line-height: 1.3; margin-top: 6px; }
+.tp-switch { position: relative; flex: none; width: 108px; height: 62px; border-radius: 31px; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.tp-fill { position: absolute; inset: 0; border-radius: inherit; background: var(--accent); }
+.tp-knob { position: absolute; left: 6px; top: 6px; width: 50px; height: 50px; border-radius: 50%; background: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25); }
+/* Vertical frames: phone-sized type (the panel is the whole picture). */
+.is-portrait .tp-title { font-size: 46px; }
+.is-portrait .tp-label { font-size: 40px; }
+.is-portrait .tp-detail { font-size: 30px; }
+.is-portrait .tp-pill { font-size: 30px; height: 60px; }
+.is-portrait .tp-row { padding: 34px 0; }

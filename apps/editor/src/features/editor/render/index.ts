@@ -2,8 +2,9 @@
  * The editor's only door to `@zenvi/render-web`: probing, the media registry,
  * the preview engine, thumbnails, waveforms, frames and export.
  */
-import { builtinLutForPath, type ExportOptions, type Project, type ToolImage } from "@zenvi/engine";
+import { builtinLutForPath, type ExportOptions, type MixPcm, type Project, type ToolImage } from "@zenvi/engine";
 import {
+  canPreviewInWorker,
   createFrameHost,
   ExportError,
   exportProject,
@@ -12,7 +13,9 @@ import {
   MediaRegistry,
   PreviewPlayer,
   probeMedia,
+  renderMixPcm,
   type ExportProgress,
+  type MixPcmOptions,
 } from "@zenvi/render-web";
 import { browserSupport } from "@/lib/capabilities";
 import { resolveEmojiAsset, resolveTransitionAsset } from "../catalog";
@@ -68,15 +71,33 @@ export interface PreviewEngineOptions {
   media: MediaLibrary;
 }
 
+// One preview Worker for the page, shared by every preview canvas.
+let previewWorker: Worker | null = null;
+
+/**
+ * Composite preview frames in a Worker where the browser can (OffscreenCanvas,
+ * WebCodecs in workers), so effects kernels never block typing or scrubbing.
+ * `localStorage["zenvi.preview"] = "main"` keeps them on the main thread (perf comparisons, bug reports).
+ */
+function previewWorkerOrNull(): Worker | null {
+  try {
+    if (localStorage.getItem("zenvi.preview") === "main") return null;
+  } catch {
+    // Storage blocked: use the default.
+  }
+  if (!canPreviewInWorker()) return null;
+  previewWorker ??= new Worker(new URL("./preview.worker.ts", import.meta.url), { type: "module", name: "zenvi-preview" });
+  return previewWorker;
+}
+
 class PlayerEngine implements PreviewEngine {
   readonly renders = true;
   private readonly player: PreviewPlayer;
 
-  constructor(
-    private readonly canvas: HTMLCanvasElement,
-    registry: MediaRegistry,
-  ) {
-    this.player = new PreviewPlayer(canvas, { media: registry });
+  constructor(canvas: HTMLCanvasElement, registry: MediaRegistry) {
+    const worker = previewWorkerOrNull();
+    // Heavy effects play at a lower resolution rather than a few frames per second; paused frames are exact.
+    this.player = new PreviewPlayer(canvas, { media: registry, adaptiveResolution: true, ...(worker ? { worker } : {}) });
   }
 
   setProject(project: Project): void {
@@ -115,20 +136,26 @@ class PlayerEngine implements PreviewEngine {
     return this.player.onState((s) => listener({ playing: s.playing }));
   }
 
-  captureThumbnail(maxWidth: number): string | null {
-    const { width, height } = this.canvas;
-    if (width < 2 || height < 2) return null;
-    const scale = Math.min(1, maxWidth / width);
-    const thumb = document.createElement("canvas");
-    thumb.width = Math.round(width * scale);
-    thumb.height = Math.round(height * scale);
-    const ctx = thumb.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(this.canvas, 0, 0, thumb.width, thumb.height);
+  /** Preview counters for perf tests (`window.__zenvi`). */
+  stats(): { presented: number; dropped: number; worker: boolean; scale: number } {
+    return { presented: this.player.presentedFrames, dropped: this.player.droppedFrames, worker: this.player.inWorker, scale: this.player.renderScale };
+  }
+
+  async captureThumbnail(maxWidth: number): Promise<string | null> {
+    const bitmap = await this.player.snapshot(maxWidth).catch(() => null);
+    if (!bitmap) return null;
     try {
+      const thumb = document.createElement("canvas");
+      thumb.width = bitmap.width;
+      thumb.height = bitmap.height;
+      const ctx = thumb.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(bitmap, 0, 0);
       return thumb.toDataURL("image/jpeg", 0.72);
     } catch {
       return null;
+    } finally {
+      bitmap.close();
     }
   }
 
@@ -209,4 +236,9 @@ export function exportFailure(error: unknown): ExportFailure {
 
 export async function renderFrame(project: Project, seconds: number, options: { width?: number; format?: "png" | "jpeg" }, media: MediaLibrary): Promise<ToolImage> {
   return createFrameHost(registryOf(media)).renderFrame(project, seconds, options);
+}
+
+/** The timeline's mix (or a stem) as the export mixes it, for master_audio_tool (`AudioHost.mixPcm`). */
+export function mixPcm(project: Project, media: MediaLibrary, options?: Omit<MixPcmOptions, "engine">): Promise<MixPcm> {
+  return renderMixPcm(project, registryOf(media), options);
 }

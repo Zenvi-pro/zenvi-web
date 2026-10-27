@@ -248,5 +248,24 @@ describe("zenvi render options", () => {
     expect(() => exportOptionsFrom(project, undefined, { encoderPreset: "warp" })).toThrow(/--encoder-preset/);
     expect(() => exportOptionsFrom(project, undefined, { quality: "ultra" })).toThrow(/--quality/);
   });
+
+  it("maps --loudness onto a normalisation target and leaves exports alone without it", () => {
+    const project = createProject({ profile: "HD 720p 30 fps" });
+    expect(exportOptionsFrom(project, undefined, {}).loudness).toBeUndefined();
+    expect(exportOptionsFrom(project, undefined, { loudness: "off" }).loudness).toBeUndefined();
+    expect(exportOptionsFrom(project, undefined, { loudness: "social" }).loudness).toEqual({ targetLufs: -14, truePeakDbtp: -1 });
+    expect(exportOptionsFrom(project, undefined, { loudness: "Broadcast" }).loudness).toEqual({ targetLufs: -23, truePeakDbtp: -1 });
+    expect(exportOptionsFrom(project, undefined, { loudness: "-16.5" }).loudness).toEqual({ targetLufs: -16.5, truePeakDbtp: -1 });
+    expect(() => exportOptionsFrom(project, undefined, { loudness: "loud" })).toThrow(/--loudness/);
+    expect(() => exportOptionsFrom(project, undefined, { loudness: "3" })).toThrow(/--loudness/);
+    expect(() => exportOptionsFrom(project, undefined, { loudness: "constructor" })).toThrow(/--loudness/);
+  });
+
+  it("keeps the true-peak limiter on unless --no-limiter", () => {
+    const project = createProject({ profile: "HD 720p 30 fps" });
+    expect(exportOptionsFrom(project, undefined, {}).truePeakLimit).toBeUndefined();
+    expect(exportOptionsFrom(project, undefined, { limiter: true }).truePeakLimit).toBeUndefined();
+    expect(exportOptionsFrom(project, undefined, { limiter: false }).truePeakLimit).toBe(false);
+  });
 });
 

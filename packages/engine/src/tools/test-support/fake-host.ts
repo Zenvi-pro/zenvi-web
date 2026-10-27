@@ -6,6 +6,7 @@
  */
 
 import { TranscriptionError, type Transcription } from "../../analysis/transcription.js";
+import { fxStretch } from "../../fx/catalog.js";
 import type { Project } from "../../model/types.js";
 import { folderAndName, sequenceFramesPresent } from "../../ops/project-files.js";
 import { isDirectMediaUrl, isYoutubeUrl, type WebVideoDownload, type WebVideoRequest } from "../../web-video/web-video.js";
@@ -27,6 +28,9 @@ import type {
   ToolHost,
   ToolImage,
 } from "../types.js";
+import { readBundledFont } from "../../typography/test-fonts.js";
+import { backendStock } from "../backend.js";
+import { fakeMotionHost } from "./fake-motion.js";
 import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
 /** A 1×1 PNG. */
@@ -76,6 +80,8 @@ export interface FakeHostOptions {
   omit?: OptionalMethod[];
   /** Extra backend routes (path prefix → handler); they win over the defaults. */
   routes?: Record<string, (body: unknown, path: string) => unknown>;
+  /** Sound-library answers (URL prefix → handler, or an Error to throw); they win over `OPENVERSE_FIXTURES`. */
+  library?: Record<string, (url: string) => unknown>;
   /** Files `storage.readText` can read. */
   texts?: Record<string, string>;
   /** Bundled assets `assets.readText` can read (default: a minimal Bar_1 title template). */
@@ -288,6 +294,43 @@ function defaultRoutes(): Record<string, (body: unknown, path: string) => unknow
   };
 }
 
+/** Openverse records the fake library serves: a CC0 whoosh, a CC BY hit, a non-commercial riser. */
+export const OPENVERSE_FIXTURES = [
+  openverseRecord("0e8a6e2a-0ac8-4615-9e0d-ebde30523783", "Deep Whoosh #1", "cc0", "1.0", 1200, ["whoosh", "air"]),
+  openverseRecord("1b2c3d4e-0000-4000-8000-000000000002", "Glass impact hit", "by", "4.0", 800, ["impact", "glass"]),
+  openverseRecord("2c3d4e5f-0000-4000-8000-000000000003", "Tension riser", "by-nc", "4.0", 4000, ["riser"]),
+];
+
+/** An Openverse audio record shaped like api.openverse.org's. */
+export function openverseRecord(id: string, title: string, license: string, version: string, durationMs: number, tags: string[] = []): Record<string, unknown> {
+  const path = license === "cc0" ? "publicdomain/zero" : `licenses/${license}`;
+  return {
+    id,
+    title,
+    creator: "maker",
+    license,
+    license_version: version,
+    license_url: `https://creativecommons.org/${path}/${version}/`,
+    url: `https://cdn.freesound.test/previews/${id.slice(0, 4)}-hq.mp3`,
+    foreign_landing_url: `https://freesound.test/s/${id.slice(0, 4)}/`,
+    duration: durationMs,
+    filesize: 50_000,
+    source: "freesound",
+    tags: tags.map((name) => ({ name })),
+  };
+}
+
+function defaultLibrary(): Record<string, (url: string) => unknown> {
+  return {
+    "https://api.openverse.org/v1/audio/?": () => ({ result_count: OPENVERSE_FIXTURES.length, results: OPENVERSE_FIXTURES }),
+    "https://api.openverse.org/v1/audio/": (url) => {
+      const record = OPENVERSE_FIXTURES.find((r) => url.endsWith(`/${String(r.id)}/`));
+      if (!record) throw new Error("no such sound in the library (404).");
+      return record;
+    },
+  };
+}
+
 export function fakeHost(options: FakeHostOptions = {}): FakeHost {
   const without = new Set(options.without ?? []);
   const omit = new Set(options.omit ?? []);
@@ -407,6 +450,10 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         calls.push(`writeGenerated ${name}`);
         written.set(path, bytes);
         return path;
+      };
+      host.media.discardGenerated = async (paths) => {
+        calls.push(`discardGenerated ${paths.join(",")}`);
+        for (const p of paths) written.delete(p);
       };
     }
     if (!omit.has("media.fetchWebVideo")) {
@@ -573,6 +620,7 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       },
     };
   }
+  if (!without.has("stock") && host.backend) host.stock = backendStock(host.backend);
   if (!without.has("storage")) {
     host.storage = {
       save: async (_project, path) => {
@@ -651,6 +699,20 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       };
     }
   }
+  if (!without.has("library")) {
+    const library = { ...defaultLibrary(), ...(options.library ?? {}) };
+    host.library = {
+      getJson: async (url) => {
+        calls.push(`library ${url}`);
+        // Longest matching prefix wins, so a search route never answers a lookup.
+        const prefix = Object.keys(library)
+          .filter((k) => url.startsWith(k))
+          .sort((a, b) => b.length - a.length)[0];
+        if (!prefix) throw new Error(`no fake library route for ${url}`);
+        return structuredClone(library[prefix]!(url));
+      },
+    };
+  }
   if (!without.has("audio")) {
     host.audio = {
       analyzeAudio: async (path): Promise<AudioEnvelope> => {
@@ -676,6 +738,22 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       return { language: opts?.language || "en", model: "whisper-1", words: structuredClone(SPOKEN_WORDS), segments: [], durationSeconds: 8 };
     };
   }
+  if (!without.has("motion")) host.motion = fakeMotionHost();
+  if (!without.has("fx")) {
+    // Renders nothing: names the movie after the request so equal stacks share a path, like the render cache.
+    host.fx = {
+      render: async (r) => {
+        const key = JSON.stringify([r.path, r.start, r.end, r.effects]);
+        let hash = 0;
+        for (const ch of key) hash = (Math.imul(hash, 31) + ch.charCodeAt(0)) >>> 0;
+        const fingerprint = hash.toString(16).padStart(8, "0").repeat(8);
+        calls.push(`fx ${r.path} ${r.start}-${r.end} ${r.effects.map((e) => e.effect).join("+")}`);
+        if (r.path.includes("unrenderable")) throw new Error("ffmpeg failed (exit 1): Invalid data found when processing input");
+        const duration = (r.end - r.start) * fxStretch(r.effects);
+        return { path: `/cache/fx/${fingerprint.slice(0, 16)}.mov`, codec: "prores422", width: 1920, height: 1080, fps: { num: 30, den: 1 }, frames: Math.ceil(duration * 30), duration, fingerprint, cached: false, seconds: 1.5, renderedAt: "2026-10-26T00:00:00Z", ffmpeg: "9.0.2" };
+      },
+    };
+  }
   if (!without.has("assets")) {
     host.assets = {
       readText: async (path) => {
@@ -683,6 +761,12 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         const textValue = assets[path];
         if (textValue === undefined) throw new Error(`No asset ${path}`);
         return textValue;
+      },
+      // The real bundled fonts: the typesetter's tests set real outlines.
+      readBytes: async (path) => {
+        calls.push(`asset ${path}`);
+        if (!path.startsWith("fonts/")) throw new Error(`No asset ${path}`);
+        return readBundledFont(path);
       },
     };
   }

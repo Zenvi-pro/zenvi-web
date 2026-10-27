@@ -5,6 +5,7 @@
  */
 
 import { join } from "node:path";
+import type { StockHost } from "@zenvi/engine";
 import { BackendSessions } from "./auth/backend-session.js";
 import { Authenticator } from "./auth/principal.js";
 import type { SupabaseVerifier } from "./auth/supabase.js";
@@ -21,13 +22,25 @@ import { OAuthService } from "./oauth/service.js";
 import { GenerationService } from "./generation/service.js";
 import { MediaCache } from "./render/cache.js";
 import type { RenderDispatch } from "./render/dispatch.js";
-import type { AssetSource, AudioAnalyzer, FontLister, MediaProber, PcmDecoder, Renderer, SpeechTranscriber } from "./render/renderer.js";
+import type {
+  AssetSource,
+  AudioAnalyzer,
+  FontLister,
+  MatteHostFactory,
+  MediaProber,
+  MixRenderer,
+  MotionHostFactory,
+  PcmDecoder,
+  Renderer,
+  SpeechTranscriber,
+} from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
 import { TokenRepo } from "./repos/tokens.js";
 import { DeviceService } from "./services/device.js";
 import { FrameService } from "./services/frames.js";
 import { MediaImporter } from "./services/importer.js";
+import { directStock } from "./services/stock.js";
 import { MediaService } from "./services/media.js";
 import { MediaVerifier } from "./services/verifier.js";
 import { ProjectService } from "./services/projects.js";
@@ -60,12 +73,20 @@ export interface Dependencies {
   analyzeAudio?: AudioAnalyzer;
   /** Decodes audio to PCM for beat tracking (detect_beats_tool, build_reel_tool); absent = beats from a fixed tempo. */
   decodePcm?: PcmDecoder;
+  /** Renders the timeline mix for master_audio_tool; absent = the tool is unavailable. */
+  mixPcm?: MixRenderer;
   /** Extracts speech audio and transcribes it through the backend (the speech tools); absent = index transcripts only. */
   transcribeMedia?: SpeechTranscriber;
   /** The fonts titles render with (add_title_tool / edit_title_tool check a font against them); absent = any font is taken as given. */
   fontFamilies?: FontLister;
   /** Hands renders to render workers (`render/dispatch.ts`); absent = renders run in this process. */
   renderDispatch?: RenderDispatch;
+  /** Renders Zenvi Motion blocks (headless Chrome); absent = the motion block tools are not listed. */
+  motion?: MotionHostFactory;
+  /** Stock search with this deployment's own keys (default: `config.stockKeys`). */
+  stock?: StockHost | null;
+  /** Makes subject mattes (onnxruntime-node); absent = composites reuse mattes already in the bin. */
+  mattes?: MatteHostFactory;
 }
 
 export interface Services {
@@ -84,6 +105,8 @@ export interface Services {
   clients: ClientRegistry;
   oauth: OAuthService;
   backendSessions: BackendSessions;
+  /** Stock search with this deployment's own keys, used when the backend is off; null without keys. */
+  stock: StockHost | null;
   generations: GenerationService;
   sessions: SessionStore;
   importer: MediaImporter;
@@ -93,8 +116,13 @@ export interface Services {
   assets: AssetSource | null;
   analyzeAudio: AudioAnalyzer | null;
   decodePcm: PcmDecoder | null;
+  mixPcm: MixRenderer | null;
+  /** Built-in renderer assets on disk (what a mix of a project with bundled sounds reads). */
+  resolveAsset: ((projectPath: string) => string | undefined) | null;
   transcribeMedia: SpeechTranscriber | null;
   fontFamilies: FontLister | null;
+  motion: MotionHostFactory | null;
+  mattes: MatteHostFactory | null;
   transcripts: RecentTranscripts;
   limiter: RateLimiter;
   engine: EngineRegistry | null;
@@ -169,6 +197,7 @@ export function createServices(deps: Dependencies): Services {
     devices: new DeviceService(tables, tokens, clock, config.editorUrl, config.tokens.devicePatDays),
     clients,
     backendSessions,
+    stock: deps.stock !== undefined ? deps.stock : directStock(config.stockKeys),
     generations,
     oauth: new OAuthService({
       tables,
@@ -189,8 +218,12 @@ export function createServices(deps: Dependencies): Services {
     assets: deps.assets ?? null,
     analyzeAudio: deps.analyzeAudio ?? null,
     decodePcm: deps.decodePcm ?? null,
+    mixPcm: deps.mixPcm ?? null,
+    resolveAsset: deps.resolveAsset ?? null,
     transcribeMedia: deps.transcribeMedia ?? null,
     fontFamilies: deps.fontFamilies ?? null,
+    motion: deps.motion ?? null,
+    mattes: deps.mattes ?? null,
     transcripts: new RecentTranscripts(clock),
     limiter: new RateLimiter(clock),
     engine: deps.engine ?? null,

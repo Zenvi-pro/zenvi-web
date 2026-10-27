@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { LauncherDeps } from "../desktop/launcher.js";
 import { defaultDetectDeps } from "../hosts/extension.js";
 import { DESKTOP_HANDOFF_TOOLS } from "../hosts/handoff.js";
-import { TASTE_MARKDOWN } from "../hosts/guides.js";
+import { DIRECTOR_RECIPES, DIRECTOR_SKILL, SOUND_PALETTES, SOUND_SKILL, TASTE_MARKDOWN } from "../hosts/guides.js";
 import { createContext } from "../program.js";
 import { fakeLinkHost, realAfterEffects, type FakeLinkHostOptions } from "../test-support/adobe.js";
 import { fakeDesktop, testEnv, writeDiscovery, zenvi, type FakeDesktop, type FakeDesktopOptions } from "../test-support/harness.js";
@@ -688,14 +688,27 @@ describe("bring_from_premiere", () => {
 });
 
 describe("resources and prompts", () => {
-  it("serves zenvi://hosts, zenvi://taste (docs/TASTE.md) and zenvi://handoff", async () => {
+  it("serves zenvi://hosts, zenvi://taste (docs/TASTE.md), zenvi://handoff, the director with its recipes and the sound designer with its palettes", async () => {
     await ae();
     const { client } = await connect();
     expect((await client.listResources()).resources.map((r) => [r.uri, r.mimeType])).toEqual([
       ["zenvi://hosts", "application/json"],
       ["zenvi://taste", "text/markdown"],
       ["zenvi://handoff", "text/markdown"],
+      ["zenvi://director", "text/markdown"],
+      ...DIRECTOR_RECIPES.map((r) => [`zenvi://director/${r.genre}`, "text/markdown"]),
+      ["zenvi://sound", "text/markdown"],
+      ...SOUND_PALETTES.map((r) => [`zenvi://sound/${r.genre}`, "text/markdown"]),
     ]);
+    expect(SOUND_PALETTES.map((r) => r.genre)).toEqual(["3d-product", "editorial", "essay", "flash", "hype", "match-cut", "multiplicity", "saas", "talking-head"]);
+    const sound = ((await client.readResource({ uri: "zenvi://sound" })).contents[0] as { text: string }).text;
+    expect(sound).toMatch(/^# Zenvi sound designer\n/);
+    expect(((await client.readResource({ uri: "zenvi://sound/saas" })).contents[0] as { text: string }).text).toMatch(/^# SaaS \/ UI promo/);
+    expect(DIRECTOR_RECIPES.map((r) => r.genre)).toContain("match-cut-montage");
+    const director = ((await client.readResource({ uri: "zenvi://director" })).contents[0] as { text: string }).text;
+    expect(director).toMatch(/^# Zenvi motion director\n/);
+    const recipe = ((await client.readResource({ uri: "zenvi://director/grid-montage" })).contents[0] as { text: string }).text;
+    expect(recipe).toMatch(/^# Grid montage\n/);
     const hosts = JSON.parse(((await client.readResource({ uri: "zenvi://hosts" })).contents[0] as { text: string }).text) as { hosts: Array<{ id: string }>; active: string };
     expect(hosts.hosts.map((h) => h.id)).toEqual(["zenvi-desktop", "zenvi-portable", "after-effects", "premiere-pro"]);
     expect(hosts.active).toBe("after-effects");
@@ -713,7 +726,20 @@ describe("resources and prompts", () => {
     expect((await client.listPrompts()).prompts.map((p) => [p.name, p.arguments?.map((a) => `${a.name}${a.required ? "!" : ""}`)])).toEqual([
       ["taste_motion_design", ["brief!", "host"]],
       ["edit_review", ["host", "focus"]],
+      ["motion_director", ["brief!", "genre"]],
+      ["sound_designer", ["brief", "genre"]],
     ]);
+    const sounded = ((await client.getPrompt({ name: "sound_designer", arguments: { genre: "hype" } })).messages[0]!.content as { text: string }).text;
+    expect(sounded).toContain(SOUND_SKILL);
+    expect(sounded).toContain(SOUND_PALETTES.find((r) => r.genre === "hype")!.markdown);
+    await expect(client.getPrompt({ name: "sound_designer", arguments: { genre: "opera" } })).rejects.toThrow(/Unknown genre: opera/);
+    const directed = await client.getPrompt({ name: "motion_director", arguments: { brief: "a 12 s app promo", genre: "saas-ui-promo" } });
+    const directedText = (directed.messages[0]!.content as { text: string }).text;
+    expect(directedText).toMatch(/^Make this video with the Zenvi tools: a 12 s app promo/);
+    expect(directedText).toContain(DIRECTOR_SKILL);
+    expect(directedText).toContain(DIRECTOR_RECIPES.find((r) => r.genre === "saas-ui-promo")!.markdown);
+    await expect(client.getPrompt({ name: "motion_director", arguments: { brief: "x", genre: "opera" } })).rejects.toThrow(/Unknown genre: opera/);
+    await expect(client.getPrompt({ name: "motion_director", arguments: {} })).rejects.toThrow(/needs a brief/);
     const motion = await client.getPrompt({ name: "taste_motion_design", arguments: { brief: "a lower third for Ana Ruiz" } });
     const text = (motion.messages[0]!.content as { text: string }).text;
     expect(text).toMatch(/^Design and build this in After Effects: a lower third for Ana Ruiz/);

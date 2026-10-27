@@ -57,6 +57,14 @@ export interface ChangeEvent {
   source: ChangeSource;
   /** Actions in the order they were applied (inverse actions for undo). */
   actions: UpdateAction[];
+  /**
+   * Per action, in the same order: an update recorded with
+   * `Transaction.replace` (the value replaced outright, not merged). Not
+   * part of the desktop action format; set on "apply" and "redo".
+   */
+  replaced?: boolean[];
+  /** For "untracked" from `setUntracked`: the key written (its value is in `project`). */
+  untracked?: KeyPath;
   label?: string;
 }
 
@@ -221,6 +229,7 @@ export class ProjectDocument {
       previous: before,
       source: "apply",
       actions: open.actions.map((a) => a.action),
+      replaced: open.actions.map((a) => a.replace === true),
       label,
     });
     return result;
@@ -233,7 +242,7 @@ export class ProjectDocument {
       (container as Record<string | number, unknown>)[slot] = clone(value);
     }) as Project;
     this.revision += 1;
-    this.emit({ project: this.current, previous: before, source: "untracked", actions: [] });
+    this.emit({ project: this.current, previous: before, source: "untracked", actions: [], untracked: key });
   }
 
   /** Replace the whole project (open/new). Clears history unless `keepHistory`. */
@@ -310,6 +319,7 @@ export class ProjectDocument {
         previous: before,
         source: "redo",
         actions: reapplied.map((a) => a.action),
+        replaced: reapplied.map((a) => a.replace === true),
         label: entry.label,
       });
     }
@@ -317,15 +327,25 @@ export class ProjectDocument {
   }
 
   /**
-   * The project JSON to save: the current snapshot with the last
-   * `historyLimit` actions of each stack serialized in desktop format.
+   * The project JSON to save: the current snapshot with the latest steps of
+   * each stack, up to `historyLimit` actions, serialized in desktop format.
+   * Steps are kept whole (the newest even when it alone is larger): a step
+   * cut short would undo half an edit once reopened.
    */
   toJSON(): Project {
     const limit = this.historyLimit;
-    const flatten = (stack: HistoryEntry[]): UpdateAction[] =>
-      stack.flatMap((entry) => entry.actions.map((a) => stripHistory(a.action)));
-    const undo = limit > 0 ? flatten(this.undoStack).slice(-limit) : [];
-    const redo = limit > 0 ? flatten(this.redoStack).slice(-limit) : [];
+    const flatten = (stack: HistoryEntry[]): UpdateAction[] => {
+      if (limit <= 0) return [];
+      let first = stack.length;
+      let count = 0;
+      while (first > 0 && (first === stack.length || count + stack[first - 1]!.actions.length <= limit)) {
+        first -= 1;
+        count += stack[first]!.actions.length;
+      }
+      return stack.slice(first).flatMap((entry) => entry.actions.map((a) => stripHistory(a.action)));
+    };
+    const undo = flatten(this.undoStack);
+    const redo = flatten(this.redoStack);
     return { ...this.current, history: { ...this.current.history, undo, redo } };
   }
 

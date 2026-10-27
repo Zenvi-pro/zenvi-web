@@ -4,13 +4,16 @@
  */
 
 import type { Writable } from "node:stream";
+import { closeChrome } from "@zenvi/motion/node";
 import { Command, CommanderError } from "commander";
 import { Auth } from "./auth/session.js";
 import { registerAccountCommands } from "./commands/account.js";
+import { registerBridgeCommands } from "./commands/bridge.js";
 import type { CommandContext, GlobalFlags } from "./commands/context.js";
 import { registerEditCommands } from "./commands/edit.js";
 import { registerHostCommands } from "./commands/hosts.js";
 import { registerIntegrationCommands } from "./commands/integrations.js";
+import { registerMotionCommands } from "./commands/motion.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerRenderCommands } from "./commands/render.js";
 import { registerToolCommands } from "./commands/tools.js";
@@ -64,6 +67,8 @@ Examples:
   registerAccountCommands(program, ctx);
   registerIntegrationCommands(program, ctx);
   registerHostCommands(program, ctx);
+  registerBridgeCommands(program, ctx);
+  registerMotionCommands(program, ctx);
   for (const cmd of program.commands) {
     cmd.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
     for (const sub of cmd.commands) sub.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
@@ -116,5 +121,8 @@ export async function runCli(options: RunCliOptions): Promise<number> {
       if (!cli && env.ZENVI_DEBUG && error instanceof Error && error.stack) ctx.out.info(error.stack);
     }
     return cli?.exitCode ?? EXIT.failed;
+  } finally {
+    // A render leaves its Chrome warm for the next one; this process has no next one.
+    await closeChrome();
   }
 }

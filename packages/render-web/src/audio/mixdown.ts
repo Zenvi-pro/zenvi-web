@@ -5,6 +5,7 @@
 
 import type { Fraction } from "@zenvi/engine";
 import type { AudioPlan } from "@zenvi/engine/render";
+import { windowEnd } from "./channels.js";
 import type { AudioRenderer } from "./renderer.js";
 import { scheduleVoice } from "./voice.js";
 
@@ -36,4 +37,30 @@ export async function mixWindow(renderer: AudioRenderer, plan: AudioPlan, from: 
     if (piece) scheduleVoice(context, context.destination, piece, anchor);
   }
   return context.startRendering();
+}
+
+/**
+ * Mix timeline `[from, to)` of `plan` window by window (about `window`
+ * seconds each, ending on audio frame boundaries), handing each mixed
+ * window to `onWindow` in order and releasing the clips that ended. `until`
+ * may stop it early; call again with the time it returned to continue.
+ */
+export async function mixRange(
+  renderer: AudioRenderer,
+  plan: AudioPlan,
+  range: { from: number; to: number; until?: number },
+  format: { sampleRate: number; channels: number; fps: Fraction; window: number; signal?: AbortSignal },
+  onWindow: (buffer: AudioBuffer, from: number) => Promise<void> | void,
+): Promise<number> {
+  let at = range.from;
+  const until = range.until ?? range.to;
+  while (at < until - 1e-9) {
+    if (format.signal?.aborted) throw format.signal.reason ?? new DOMException("Aborted", "AbortError");
+    const to = windowEnd(at, format.window, range.to, format.sampleRate, format.fps, format.channels);
+    const buffer = await mixWindow(renderer, plan, at, to, format.sampleRate, format.channels, format.fps);
+    await onWindow(buffer, at);
+    await renderer.releaseEnded(plan, to);
+    at = to;
+  }
+  return at;
 }

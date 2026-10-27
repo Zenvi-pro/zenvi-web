@@ -163,10 +163,22 @@ export class MediaRegistry {
       return;
     }
     this.entries.set(key, newEntry(key, spec));
+    // Refs that carry this id and a path may have been read through the path until now.
+    this.emit(key);
   }
 
   unregister(fileId: string): void {
     const key = fileKey(fileId);
+    const entry = this.entries.get(key);
+    if (!entry) return;
+    this.entries.delete(key);
+    this.retire(entry);
+    this.emit(key);
+  }
+
+  /** Drop what `resolvePath` gave for `path` (its caches too); the next lookup resolves it again. */
+  forgetPath(path: string): void {
+    const key = pathKey(path);
     const entry = this.entries.get(key);
     if (!entry) return;
     this.entries.delete(key);
@@ -180,7 +192,7 @@ export class MediaRegistry {
     if (entry) this.bump(entry);
   }
 
-  /** Called with the cache key of media whose bytes changed or went away. */
+  /** Called with the cache key of media whose bytes changed, appeared or went away. */
   onInvalidate(listener: (key: string) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

@@ -91,6 +91,19 @@ describe("add_motion_template_tool", () => {
     expect(doc.project.clips.map((c) => c.id)).toEqual(["SONGCLIP01"]);
   });
 
+  it("puts the first beat of a given bpm at offset_seconds", async () => {
+    const doc = verticalProject("none");
+    const result = await runTool({ doc, host: motionHost() }, "add_motion_template_tool", { template: "end_card", text: "Northwind", bpm: 150, offset_seconds: 0.3 });
+    expect(result.ok, result.text).toBe(true);
+    const data = dataOf(result) as { bpm: number; beats: number[] };
+    expect(data.bpm).toBe(150);
+    expect(data.beats[0]).toBeCloseTo(0.3, 2);
+    expect(data.beats[1]! - data.beats[0]!).toBeCloseTo(0.4, 2);
+    const refused = await runTool({ doc, host: motionHost() }, "add_motion_template_tool", { template: "end_card", text: "Northwind", offset_seconds: 0.3 });
+    expect(refused.ok).toBe(false);
+    expect(refused.text).toMatch(/offset_seconds goes with bpm/);
+  });
+
   it("lands over an edit on the lowest free tracks above every picture there", async () => {
     const doc = fixtureDoc();
     const result = await runTool({ doc, host: motionHost() }, "add_motion_template_tool", { template: "grid_background", variant: "paper", position_seconds: "2", duration_seconds: "2" });
@@ -154,6 +167,30 @@ describe("add_motion_template_tool", () => {
     expect(doc.undoLabels).toHaveLength(0);
     expect(snapshotOf(doc.project)).toEqual(before);
     expect(host.written.size).toBe(0);
+  });
+
+  it("sets its type in a bundled family as outlines, keeping the layout", async () => {
+    const plain = verticalProject();
+    const plainHost = motionHost();
+    await runTool({ doc: plain, host: plainHost }, "add_motion_template_tool", { template: "kinetic_type", text: "Brew better coffee" });
+    const doc = verticalProject();
+    const host = motionHost();
+    const result = await runTool({ doc, host }, "add_motion_template_tool", { template: "kinetic_type", text: "Brew better coffee", font_family: "Bebas Neue" });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Add motion template kinetic_type"]);
+    const svgs = [...host.written.values()].map((v) => (typeof v === "string" ? v : new TextDecoder().decode(v)));
+    expect(svgs.some((svg) => svg.includes('data-zenvi-outline="bebas-neue"'))).toBe(true);
+    // Same drawings, same sizes, same clips: only the letters change.
+    const sizes = (h: FakeHost) => [...h.written.values()].map((v) => /width="(\d+)" height="(\d+)"/.exec(typeof v === "string" ? v : new TextDecoder().decode(v))?.slice(1).join("x"));
+    expect(sizes(host)).toEqual(sizes(plainHost));
+    expect(doc.project.clips.map((c) => [c.position, c.layer])).toEqual(plain.project.clips.map((c) => [c.position, c.layer]));
+
+    const unknown = await runTool({ doc, host }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "Comic Sans" });
+    expect(unknown.ok).toBe(false);
+    expect(unknown.text).toContain("bundled families: inter, anton");
+    const noFonts = await runTool({ doc: verticalProject(), host: motionHost({ without: ["assets"] }) }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "anton" });
+    expect(noFonts.ok).toBe(false);
+    expect(noFonts.text).toContain("cannot read the bundled fonts");
   });
 
   it("is not available where generated drawings cannot be stored", async () => {

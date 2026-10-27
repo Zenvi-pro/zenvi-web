@@ -23,7 +23,9 @@ const LEFT: Readonly<Record<LeftTab, string>> = {
   files: "Project Files",
   effects: "Effects",
   transitions: "Transitions",
+  sound: "Sound",
   titles: "Titles",
+  motion: "Motion and 3D",
   stock: "Stock",
   generate: "Generate",
 };

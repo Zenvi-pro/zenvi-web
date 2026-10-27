@@ -1,0 +1,76 @@
+{
+  "id": "prompt_bar",
+  "version": 2,
+  "title": "Prompt bar",
+  "description": "An AI prompt box that types a prompt with a blinking caret, the pointer clicks send, and a shimmering 'Generating…' pill appears. For AI product promos and app demos.",
+  "tags": [
+    "ui",
+    "saas",
+    "ai",
+    "typing",
+    "prompt"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 2.5,
+    "max": 12
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": true,
+  "tokens": {
+    "palette": "light",
+    "radius": 36
+  },
+  "params": {
+    "prompt": {
+      "type": "string",
+      "maxLength": 140,
+      "default": "Summarise this week's updates in three bullets",
+      "description": "The prompt that gets typed."
+    },
+    "placeholder": {
+      "type": "string",
+      "maxLength": 60,
+      "default": "Type a message…",
+      "description": "Grey text in the empty box before typing starts (the default is neutral; use the product's own words)."
+    },
+    "chip": {
+      "type": "string",
+      "maxLength": 20,
+      "default": "",
+      "description": "A small mode pill next to the plus button, e.g. \"Search\" or \"Agent mode\" (empty: none)."
+    },
+    "status": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "Working on it…",
+      "description": "The pill shown after sending (empty: no pill)."
+    },
+    "brand": {
+      "type": "string",
+      "maxLength": 32,
+      "default": "",
+      "description": "Small label above the box, e.g. the product name (empty: none)."
+    },
+    "cursor": {
+      "type": "boolean",
+      "default": true,
+      "description": "Show a pointer that clicks the send button."
+    },
+    "position": {
+      "type": "enum",
+      "options": [
+        "center",
+        "lower",
+        "upper"
+      ],
+      "default": "center",
+      "description": "Where the box sits in the frame."
+    }
+  }
+}
