@@ -196,6 +196,9 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
   master_audio_tool: { methods: ["audio.mixPcm"] },
+  analyze_mix_tool: { methods: ["audio.mixPcm"] },
+  duck_tool: { optional: ["audio.mixPcm"], partialNote: "without mix rendering a duck under the voice needs depth_db and the voice's transcript or cues" },
+  eq_tool: { webNote: "Zenvi desktop's libopenshot Parametric EQ computes its filters from the samples per frame instead of the sample rate, so the desktop hears these bands at other frequencies until that is fixed" },
   review_edit_tool: {
     optional: ["frames.renderSheet", "audio.measureMix", "storage.readText"],
     partialNote: "without frame composing there is no contact sheet, without audio mixing no loudness, silences or beat alignment, and without file reading no text safe-area check; the timeline numbers always come",

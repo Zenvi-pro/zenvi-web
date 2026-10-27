@@ -164,6 +164,15 @@ function loudestSample(channels: readonly Float32Array[]): { index: number; peak
   return { index, peak };
 }
 
+/** Where the voice speaks: runs of 100 ms hops with voice M(t) >= voice I - 8 LU (METRICS.md section 0), extended by the 400 ms window, seconds. */
+export function speechWindowsOf(voice: readonly Float32Array[], sampleRate: number): [number, number][] {
+  const vI = measureLoudness(voice, sampleRate).integrated;
+  if (vI === SILENCE_LUFS) return [];
+  const series = loudnessSeries(voice, sampleRate);
+  const seconds = voice.reduce((m, c) => Math.max(m, c.length), 0) / sampleRate;
+  return runsOf(Array.from(series.momentary, (v) => v >= vI - 8), series.hop).map(([s, e]) => [r2(s), r2(Math.min(seconds, e + 0.4))]);
+}
+
 /** Score a rendered mix. Stems absent: voice metrics are skipped and the bed is the whole mix. */
 export function scoreMix(input: ScoreInput): MixScore {
   const sr = input.sampleRate;
@@ -302,7 +311,7 @@ export function scoreMix(input: ScoreInput): MixScore {
     const vM = loudnessSeries(voice, sr).momentary;
     const bM = loudnessSeries(bed, sr).momentary;
     speech = Array.from(vM, (v) => v >= vI - 8);
-    speechWindows = runsOf(speech, series.hop).map(([s, e]) => [r2(s), r2(Math.min(dur, e + 0.4))]);
+    speechWindows = speechWindowsOf(voice, sr);
     const idx = speech.flatMap((on, i) => (on ? [i] : []));
     if (idx.length > 5) {
       const d = idx.map((i) => vM[i]! - bM[i]!);
