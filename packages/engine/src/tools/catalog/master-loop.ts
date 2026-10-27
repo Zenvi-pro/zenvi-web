@@ -35,8 +35,14 @@ const blocking = (s: MixScore): string[] => s.gatesFailed.filter((g) => g !== "L
 type Collection = "clips" | "files" | "layers" | "effects";
 const COLLECTIONS: Collection[] = ["layers", "files", "clips", "effects"];
 
-/** Make `tx.project`'s clips, files, tracks and transitions equal `target`'s, item by item. */
+/** Make `tx.project` equal `target`: clips, files, tracks and transitions item by item, any other top-level key it has whole. */
 export function applyProjectState(tx: Transaction, target: Project): void {
+  const record = target as unknown as Record<string, unknown>;
+  const current = tx.project as unknown as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if ((COLLECTIONS as string[]).includes(key) || !(key in current) || JSON.stringify(record[key]) === JSON.stringify(current[key])) continue;
+    tx.replace([key], structuredClone(record[key]));
+  }
   for (const key of COLLECTIONS) {
     const want = (target[key] ?? []) as { id: string }[];
     const have = (tx.project[key] ?? []) as { id: string }[];
