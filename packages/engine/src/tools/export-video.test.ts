@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import { setProfile } from "../ops/project.js";
 import { planExport, resolveExportPreset } from "../presets/plan.js";
 import { EditHarness } from "./test-support/edit-harness.js";
+import { L2 } from "./test-support/fixture.js";
 import type { FakeHostOptions } from "./test-support/fake-host.js";
 import type { ContainerFormat } from "./types.js";
 
@@ -336,5 +337,57 @@ describe("export settings (set_export_setting_tool, get_export_settings_tool)", 
     const settings = await empty.call("get_export_settings_tool");
     expect(settings.summary).toBe("Nothing to export yet: the timeline is empty; add clips before exporting");
     expect((settings.data as Row).effective).toBeNull();
+  });
+});
+
+describe("export end and size (W25a E2E bugs 2 and 5)", () => {
+  /** The studio plus a sound effect on another track that runs 1.5 s past the last picture (to 12.5 s). */
+  function withTail(): EditHarness {
+    const ed = studio();
+    const boom = ed.addFile("audio", { duration: 4 });
+    ed.addClip(boom, { position: 8.5, layer: L2 });
+    ed.mark();
+    return ed;
+  }
+
+  it("ends a video at the last picture, not at the last sound, and says what it left out", async () => {
+    const data = await render(withTail(), {});
+    expect([data.start_seconds, data.end_seconds, data.end_frame]).toEqual([1, 11, 330]);
+    expect(data.notes).toContain(
+      "the video ends with the last picture at 11.00s: 1.50s of sound after it (to 12.50s) is left out instead of playing over black; pass end=12.50 to keep it",
+    );
+  });
+
+  it("keeps the whole sound when an end is given, and for audio exports", async () => {
+    const asked = await render(withTail(), { end: "12.5" });
+    expect(asked.end_seconds).toBe(12.5);
+    expect((asked.notes as string[]).some((n) => n.includes("left out"))).toBe(false);
+    const mp3 = await render(withTail(), { preset: "MP3" });
+    expect(mp3.end_seconds).toBe(12.5);
+  });
+
+  it("reads 1080p as the short side on vertical and square projects", async () => {
+    const ed = studio();
+    ed.doc.transaction("vertical", (tx) => setProfile(tx, "FHD Vertical 1080p 30 fps"));
+    const vertical = await render(ed, { preset: "mp4-1080p" });
+    expect([vertical.preset, vertical.width, vertical.height]).toEqual(["MP4 (h.264)", 1080, 1920]);
+    const byProfile = await render(ed, { profile: "720p" });
+    expect([byProfile.width, byProfile.height]).toEqual([720, 1280]);
+    ed.doc.transaction("square", (tx) => setProfile(tx, "HD Square 1080p 30 fps"));
+    const square = await render(ed, { preset: "1080p" });
+    expect([square.width, square.height]).toEqual([1080, 1080]);
+  });
+
+  it("keeps 1080p landscape on a landscape project, and refuses a short side that cannot fit", async () => {
+    const ed = studio();
+    const landscape = await render(ed, { profile: "1080p" });
+    expect([landscape.width, landscape.height]).toEqual([1920, 1080]);
+    // Zenvi Cloud's preset name works on every shape, not only turned ones.
+    const cloudName = await render(ed, { preset: "mp4-1080p" });
+    expect([cloudName.preset, cloudName.width, cloudName.height]).toEqual(["MP4 (h.264)", 1920, 1080]);
+    ed.doc.transaction("tall", (tx) => setProfile(tx, "FHD Vertical 1080p 30 fps"));
+    ed.doc.setUntracked(["height"], 8000);
+    ed.mark();
+    await ed.refused("export_video_tool", { show_dialog: "false", preset: "4k" }, "'4k' means a 2160-pixel short side, which on this 1080x8000 project is 2160x16000, larger than Zenvi renders");
   });
 });

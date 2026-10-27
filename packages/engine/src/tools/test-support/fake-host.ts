@@ -41,6 +41,7 @@ export type OptionalMethod =
   | "media.writeGenerated"
   | "media.missing"
   | "media.fetchWebVideo"
+  | "media.inspectRender"
   | "storage.readText"
   | "storage.writeText"
   | "audio.transcribe"
@@ -414,6 +415,25 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
       host.media.fetchWebVideo = async (request) => {
         calls.push(`fetchWebVideo ${request.url} ${request.intent} subs=${request.writeSubs}`);
         return fetchWebVideo(request);
+      };
+    }
+    if (!omit.has("media.inspectRender")) {
+      // A clean 8 s render: two shots, a hold at the end, mastered audio.
+      host.media.inspectRender = async (path) => {
+        calls.push(`inspectRender ${path}`);
+        return {
+          path,
+          duration: 8,
+          width: 1280,
+          height: 720,
+          fps: 30,
+          hasAudio: true,
+          black: [],
+          frozen: [{ start: 7, end: 8 }],
+          cuts: [{ time: 4, score: 40 }],
+          silences: [],
+          loudness: { integratedLufs: -14, rangeLu: 3, truePeakDb: -1.5 },
+        };
       };
     }
   }
