@@ -44,7 +44,7 @@ function fmt(v: number): string {
 }
 
 /** A 3D cube file of `size`³ entries, red fastest (the order ColorMap reads). */
-function cube(title: string, size: number, map: (r: number, g: number, b: number) => [number, number, number]): string {
+export function cubeLut(title: string, size: number, map: (r: number, g: number, b: number) => [number, number, number]): string {
   const lines = [`TITLE "${title.replace(/"/g, "")}"`, `LUT_3D_SIZE ${size}`];
   const step = 1 / (size - 1);
   for (let b = 0; b < size; b += 1) {
@@ -61,7 +61,7 @@ function cube(title: string, size: number, map: (r: number, g: number, b: number
 /** Every colour → `hex`: a flat silhouette fill. */
 export function solidLut(hex: string): string {
   const rgb = hexToRgb01(hex);
-  return cube(`Zenvi solid ${hex.toLowerCase()}`, 2, () => rgb);
+  return cubeLut(`Zenvi solid ${hex.toLowerCase()}`, 2, () => rgb);
 }
 
 /** The ramp's colour at `t` (0..1), linear between stops. */
@@ -84,5 +84,5 @@ export function rampColor(stops: readonly GradientStop[], t: number): [number, n
 
 /** Rec. 709 luminance → the ramp (a gradient map). 33³ like common grading LUTs. */
 export function gradientMapLut(title: string, stops: readonly GradientStop[], size = 33): string {
-  return cube(title, size, (r, g, b) => rampColor(stops, 0.2126 * r + 0.7152 * g + 0.0722 * b));
+  return cubeLut(title, size, (r, g, b) => rampColor(stops, 0.2126 * r + 0.7152 * g + 0.0722 * b));
 }

@@ -29,6 +29,7 @@ export type HostMethod =
   | "media.writeGenerated"
   | "media.missing"
   | "media.fetchWebVideo"
+  | "media.kitSample"
   | "media.inspectRender"
   | "storage.open"
   | "storage.readText"
@@ -205,15 +206,18 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   },
   add_sfx_tool: {
     methods: ["media.writeGenerated"],
-    optional: ["library", "media.importUrl", "audio.decodePcm"],
-    partialNote: "without Openverse, downloads and audio decoding only procedural recipes (and Freesound sounds where they can be downloaded and decoded) can be placed",
+    optional: ["library", "media.importUrl", "audio.decodePcm", "media.kitSample"],
+    partialNote:
+      "without Openverse, downloads and audio decoding only procedural recipes (and Freesound sounds where they can be downloaded and decoded) can be placed; without the recorded kit's cache recipes are synthesised (kit=synth)",
   },
   auto_sound_design_tool: {
     methods: ["media.writeGenerated"],
-    optional: ["audio.decodePcm", "library", "media.importUrl"],
+    optional: ["audio.decodePcm", "library", "media.importUrl", "media.kitSample"],
     partialNote:
-      "without audio decoding cuts are weighed by `beats` (when given) instead of the music, the climax comes only from `climax_seconds`, and sources=library / mixed are refused; without Openverse library sounds come from Freesound (signed in)",
+      "without audio decoding cuts are weighed by `beats` (when given) instead of the music, the climax comes only from `climax_seconds`, and sources=library / mixed are refused; without Openverse library sounds come from Freesound (signed in); without the recorded kit's cache the sounds are synthesised (kit=synth)",
   },
+  add_vignette_tool: { methods: ["media.writeGenerated"] },
+  add_shape_mask_tool: { methods: ["media.writeGenerated"] },
   search_sfx_tool: { optional: ["library", "stock"], partialNote: "without Openverse only procedural recipes and Freesound (with stock search) are searched" },
   create_sound_kit_tool: {
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
@@ -404,6 +408,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.writeGenerated",
       "media.missing",
       "media.fetchWebVideo",
+      "media.kitSample",
       "media.inspectRender",
       "storage.open",
       "storage.readText",
@@ -512,6 +517,7 @@ function needName(need: HostCapability | HostMethod): string {
     "media.writeGenerated": "storing generated media",
     "media.missing": "checking for missing media",
     "media.fetchWebVideo": "fetching videos from web pages, which only runs on the person's own computer (the zenvi CLI with yt-dlp)",
+    "media.kitSample": "fetching Zenvi's recorded sound kit (the zenvi CLI and local MCP cache it)",
     "media.inspectRender": "reading a rendered file with ffmpeg (the zenvi CLI and local MCP)",
     "storage.open": "opening project files",
     "storage.readText": "reading files",

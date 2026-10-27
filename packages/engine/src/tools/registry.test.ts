@@ -60,6 +60,8 @@ const DIRECT_TOOLS = [
   "replace_background_tool",
   "subject_glow_tool",
   "pop_out_tool",
+  "add_vignette_tool",
+  "add_shape_mask_tool",
 ];
 
 /** A valid string form of a scalar property, the way the Assistant backend sends arguments. */

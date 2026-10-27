@@ -21,6 +21,7 @@
  *   saturation below 0.5) refuses the whole call before anything changes.
  */
 
+import { ASSET_KEY, writeAsset } from "../mattes.js";
 import type { Clip, Effect, Project, ProjectFile } from "../../model/types.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { pyRound } from "../../model/rounding.js";
@@ -743,7 +744,15 @@ export const colorAgentTools: CatalogTool[] = [
         } else if (resolved.kind === "film_grain") {
           grainId = resolved.grain_id;
         }
-        const absLut = resolved.kind === "lut" ? await resolveLutFile(call, resolved.lut_path) : "";
+        let absLut = resolved.kind === "lut" ? await resolveLutFile(call, resolved.lut_path) : "";
+        let generatedHash: string | undefined;
+        if (resolved.kind === "generated") {
+          if (!call.host.media?.writeGenerated) return `Error: look '${resolved.id}' is a generated LUT, and this Zenvi surface cannot store generated files.`;
+          const { stem, cube } = resolved.look.make();
+          const asset = await writeAsset(call, stem, "cube", cube, "text/plain");
+          absLut = asset.path;
+          generatedHash = asset.hash;
+        }
         const warnings: string[] = [];
         const kept = filterUnlocked(project, ids, warnings);
         if (kept.length === 0) return warnings.length > 0 ? `Error: ${warnings.join("; ")}` : colorTargetError(project, "apply_look");
@@ -775,12 +784,14 @@ export const colorAgentTools: CatalogTool[] = [
               receipt.status = "preset";
               receipt.color = summarizeColorGrade(graded);
             }
-          } else if (resolved.kind === "lut") {
+          } else if (resolved.kind === "lut" || resolved.kind === "generated") {
             // ColorGrade applies its LUT after the mix, so for a LUT look mix means the LUT's strength.
-            const strength = lutIntensity ?? mix;
+            const strength = lutIntensity ?? mix ?? (resolved.kind === "generated" ? resolved.look.intensity : null);
             const lut: Json = { path: absLut };
             if (strength !== null) lut.strength = strength;
             const { effects: next, merged } = mergedGradeEffects(effects, { lut }, create);
+            // Marks the file as this look's, so the next clip graded with it reuses the file.
+            if (generatedHash) (merged as Json)[ASSET_KEY] = generatedHash;
             effects = next;
             receipt.status = "lut";
             receipt.lut_path = merged.lut_path ?? null;

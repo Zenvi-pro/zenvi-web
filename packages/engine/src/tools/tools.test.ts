@@ -979,6 +979,14 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { clip_id: IDS.clipA }, setup: withMattes, summary: /^Letterboxed clip CLIPINTV01 at 2\.39:1 with the subject popping out/ },
     failure: { args: { clip_id: IDS.clipA, band_aspect: "1.2" }, setup: withMattes, summary: /no bars/ },
   },
+  add_vignette_tool: {
+    happy: { args: { clip_ids: [IDS.clipA], amount: 0.5 }, summary: /^Vignette \(amount 0\.5, feather 0\.5\) on 1 clip\(s\)\.$/ },
+    failure: { args: { clip_ids: ["NOPE"] }, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
+  add_shape_mask_tool: {
+    happy: { args: { clip_ids: [IDS.clipA], shape: "ellipse", keyframes: [{ seconds: 0, grow: -0.5 }, { seconds: 1, grow: 0 }] }, summary: /^Masked 1 clip\(s\) to an ellipse, 2 keyframes\.$/ },
+    failure: { args: { clip_ids: ["NOPE"], shape: "ellipse" }, summary: /^Error: no timeline clip with id='NOPE'$/ },
+  },
   move_clip_tool: {
     happy: { args: { clip_id: IDS.clipLogo, position_seconds: "6", track: "4" }, summary: /^Moved clip CLIPLOGO01\.$/, check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipLogo)).toMatchObject({ position: 6, layer: 4_000_000 }) },
     failure: { args: { clip_id: "NOPE", position_seconds: "6" }, summary: /^Error: No timeline clip with id='NOPE'\.$/ },

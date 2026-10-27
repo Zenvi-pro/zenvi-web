@@ -168,11 +168,13 @@ export interface GeneratedAsset {
 function knownAsset(project: Project, hash: string): string | undefined {
   const file = project.files.find((f) => (f as Record<string, unknown>)[ASSET_KEY] === hash);
   if (file) return file.path;
-  const lut = project.clips.flatMap((c) => c.effects ?? []).find((e) => (e as Record<string, unknown>)[ASSET_KEY] === hash)?.lut_path;
-  return typeof lut === "string" && lut ? lut : undefined;
+  const effect = project.clips.flatMap((c) => c.effects ?? []).find((e) => (e as Record<string, unknown>)[ASSET_KEY] === hash) as Record<string, unknown> | undefined;
+  const path = effect?.lut_path || (effect?.mask_reader as { path?: unknown } | undefined)?.path;
+  return typeof path === "string" && path ? path : undefined;
 }
 
-async function writeAsset(call: ToolCall, stem: string, ext: string, text: string, contentType: string): Promise<{ hash: string; path: string }> {
+/** Write (or reuse: same content, same file) a generated asset; effects that read it carry `ASSET_KEY: hash`. */
+export async function writeAsset(call: ToolCall, stem: string, ext: string, text: string, contentType: string): Promise<{ hash: string; path: string }> {
   const hash = contentHash(`${contentType}\n${text}`);
   const known = knownAsset(call.doc.project, hash);
   if (known) return { hash, path: known };

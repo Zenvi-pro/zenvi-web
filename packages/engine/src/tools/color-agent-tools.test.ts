@@ -142,6 +142,25 @@ describe("apply_color_tool", { timeout: 30_000 }, () => {
 });
 
 describe("apply_look_tool", { timeout: 30_000 }, () => {
+  it("applies stylised looks as generated LUTs, written once and reused, any duotone pair or accent colour", async () => {
+    const ed = painted();
+    const f = ed.addFile("video");
+    const a = ed.addClip(f, { position: 0, end: 5 });
+    const b = ed.addClip(f, { position: 5, end: 10 });
+    const { data } = await json(ed, "apply_look_tool", { clipIds: `["${a}"]`, lookId: "solarize" });
+    expect((data.clips as Row[])[0]).toMatchObject({ status: "lut", look: "solarize" });
+    const lut = (findColorGrade(ed.clip(a)!.effects ?? []) as Effect).lut_path as string;
+    expect(lut).toMatch(/look-solarize-[0-9a-f]{8}\.cube$/);
+    await json(ed, "apply_look_tool", { clipIds: `["${b}"]`, lookId: "solarize" });
+    expect((findColorGrade(ed.clip(b)!.effects ?? []) as Effect).lut_path).toBe(lut);
+    expect(ed.host.calls.filter((c) => c.startsWith("writeGenerated look-solarize"))).toHaveLength(1);
+    await json(ed, "apply_look_tool", { clipIds: `["${a}"]`, lookId: "duotone #1A1A40 #FFCC00" });
+    expect((findColorGrade(ed.clip(a)!.effects ?? []) as Effect).lut_path).toMatch(/look-duotone-1a1a40-ffcc00-/);
+    for (const lookId of ["chrome", "bleach_bypass", "duotone_navy_red", "accent_red", "accent #00aaff"]) await json(ed, "apply_look_tool", { clipIds: `["${a}"]`, lookId });
+    const listed = (await json(ed, "list_looks_tool", { query: "solarized" })).data.looks as Row[];
+    expect(listed.map((l) => l.id)).toContain("solarize");
+  });
+
   it("applies a soft preset under one undo step and keeps the other effects", async () => {
     const ed = painted();
     const f = ed.addFile("video");
@@ -236,7 +255,8 @@ describe("list_looks_tool", () => {
     const ed = new EditHarness();
     const all = await json(ed, "list_looks_tool", {});
     expect(all.data).toMatchObject({ ok: true, query: "" });
-    expect(all.data.count).toBe(7 + 50 + 7);
+    // 7 presets, 50 LUTs, 16 stylised looks (3 + 6 duotones + 7 accents), 7 grains.
+    expect(all.data.count).toBe(7 + 50 + 16 + 7);
     const sunny = await json(ed, "list_looks_tool", { query: "sunny" });
     expect((sunny.data.looks as Row[]).map((e) => e.id)).toContain("sunny");
     const both = await json(ed, "list_looks_tool", { query: "teal", vibe: "horror" });
