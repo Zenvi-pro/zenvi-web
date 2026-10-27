@@ -24,6 +24,7 @@ import type { CloudMediaRef, FileFingerprint, Project, ProjectFile, ReaderInfo }
 import type { Scene3dId, Scene3dParams } from "../scenes3d/catalog.js";
 import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { Scene3dQuality, Scene3dRender } from "../scenes3d/link.js";
+import type { PictureEvent } from "../sfx/events.js";
 import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
 export type ToolSurface = "assistant" | "mcp" | "cli" | "editor";
@@ -898,6 +899,8 @@ export interface MotionRender {
   /** True when an identical render was reused. */
   cached: boolean;
   renderSeconds: number;
+  /** What happens on screen that the ear expects to hear, from the block's own timeline (hosts that cannot read them leave it out). */
+  events?: PictureEvent[];
 }
 
 /** Whether this host can render blocks right now (the CLI and `zenvi mcp` need headless Chrome on the computer). */
@@ -917,6 +920,8 @@ export interface MotionHost {
   /** Params checked against the block and completed with defaults, or why they are wrong. */
   check(block: string, params: Readonly<Record<string, unknown>>): MotionParamsCheck;
   render(request: MotionRenderRequest, signal?: AbortSignal): Promise<MotionRender>;
+  /** The picture events of a block as `render` would make it, without rendering frames (for files placed before events were recorded). */
+  events?(request: MotionRenderRequest, signal?: AbortSignal): Promise<PictureEvent[]>;
   /** Whether renders can run now. Hosts that render elsewhere (the cloud) leave it out. */
   runtime?(): Promise<MotionRuntimeStatus>;
   /**
