@@ -47,12 +47,23 @@ add_motion_template_tool {
    `layout: "strips_v"` for vertical strips (hype reels), `film_strip` for a
    sprocketed strip, `mosaic` for an irregular collage, `zoom_into: N` to end
    by pushing into one tile instead of `merge`.
-4. Look: one LUT on every tile (`apply_look_tool` `all_clips: true`,
-   `look_id: "city_neon_cinema"` or `"teal_punch"`, 0.6).
+4. Look: one LUT on matched tiles: `unify_grade_tool` `{"look":
+   "city_neon_cinema", "look_intensity": 0.6}` (or `"teal_punch"`).
 5. Sound: `auto_sound_design_tool` `intensity: "hype"` with the same
    `beats`; then make sure each tile reveal has a transient: `add_sfx_tool`
    `impact_punch` on the first tile of each layout step and on the merge
    (`swoosh_hit`), `seed` and `pitch` varied. Music at full level.
+
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 5 above (`intensity: "hype"`, `density: "every_cut"`).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
 
 ## Checks
 

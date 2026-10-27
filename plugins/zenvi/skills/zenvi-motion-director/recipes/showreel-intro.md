@@ -40,6 +40,17 @@ add_motion_block_tool {"block": "word_rotator", "position_seconds": 5.6, "durati
    `whoosh_rise` on the 3D tumble, `ui_tap` per tile, `whoosh_long` on the
    zoom-into. Music: punchy electronic, full level.
 
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 4 above, then `auto_sound_design_tool` `{"intensity": "normal"}` for the cuts it did not cover.
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
+
 ## Checks
 
 The 3D title's final frame sharp and centred; the rotator's words never

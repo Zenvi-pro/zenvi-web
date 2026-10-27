@@ -22,7 +22,7 @@ is the rules every genre shares. Do not plan before you have read it.
 | --- | --- | --- |
 | shapes or poses that line up across cuts | `recipes/match-cut-montage.md` | match_cut_montage_tool, detect_subject_tool |
 | a new image every few frames, "evolution of" | `recipes/flash-montage.md` | match_cut_montage_tool / add_clip_to_timeline_tool, flash presets |
-| person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, add_captions_tool, add_title_tool, text_behind_subject_tool |
+| person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, kinetic_captions_tool (cues, text_size, y, animation), text_behind_subject_tool |
 | app, AI tool, SaaS launch | `recipes/saas-ui-promo.md` | add_motion_block_tool (glass_cards, prompt_bar, kinetic_headline, counter, word_rotator) |
 | one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
 | type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
@@ -34,6 +34,11 @@ is the rules every genre shares. Do not plan before you have read it.
 
 Mixed asks: take the structure from the genre of the *first five seconds*
 and borrow single techniques from the others.
+
+Every recipe ends with **Finish**: sound on every cut, `master_audio_tool`,
+`render_video`, `review_render_tool`, one fix pass. A run that stops before
+it is not done, however good the picture: unmastered edits arrive 9-17 dB
+too quiet and nobody has looked at the file.
 
 ## The director loop
 
@@ -58,22 +63,32 @@ and borrow single techniques from the others.
    `add_motion_template_tool template=grid`), otherwise
    `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
    (`data.beats`) or `detect_beats_tool` and reuse them everywhere below.
-6. **Transitions.** On the final cut only (they are keyframes on the clips):
-   `apply_motion_transitions_tool` for a track, `apply_motion_transition_tool`
-   for one cut. Two or three presets per piece, repeated; one direction.
+6. **Transitions, on by default** where the genre moves between shots
+   (hype, trailer, SaaS, 3D ad, documentary, showreel: the recipe says which):
+   one call on the final cut, `apply_motion_transitions_tool` `track`,
+   `style: "hype"` or `"cinematic"`, `direction: "left"` (they are keyframes
+   on the clips); `apply_motion_transition_tool` for one cut. Two or three
+   presets per piece, repeated; one direction. A cut list of hard cuts plus
+   whooshes is the commonest gap against the references. Match cuts and
+   editorial type stay hard cuts.
 7. **Motion and 3D.** `add_motion_block_tool` (headlines, prompt bars, glass
    cards, counters, rotators, HUD, bursts), `add_3d_scene_tool` (draft first),
    matte composites (`text_behind_subject_tool`, `replace_background_tool`,
    `subject_glow_tool`, `pop_out_tool`), `speed_ramp_tool` on hero shots.
-8. **Captions and type.** `add_captions_tool` (word-by-word: `maxWords: 1`)
-   for speech; `add_title_tool` with a bundled family (`font: "Anton"`,
+8. **Captions and type.** `kinetic_captions_tool` for speech (word by word,
+   animated, emphasis words big; `cues` when there is no transcribed voice,
+   `text_size`, `y`, `animation`), `text_behind_subject_tool` for one hero
+   word when the head has a matte; `add_title_tool` with a bundled family (`font: "Anton"`,
    `"Instrument Serif"`, `"Space Mono"`...) for emphasis words and labels.
 9. **Colour: match first, then the look.** `unify_grade_tool` (no
    arguments: every footage clip toward the cut's median look; or
    `reference_clip_id` = the hero shot) so daylight and night shots stop
    jumping on the cut. Then one look for the whole piece: pass a LUT as
    `look` with `look_intensity` 0.5-0.7 in the same call, or `apply_look_tool`
-   with a LUT id (ids from `list_looks_tool`). Soft presets (`sunny`,
+   with a LUT id (ids from `list_looks_tool`). Flash montages, trailers and
+   anything cut from many sources always go through this pass
+   (`build_reel_tool`'s hype and highlight styles do it in their own step).
+   Soft presets (`sunny`,
    `warm_up`...) replace the corrective grade: not after unifying. Grain
    only on cinematic pieces.
 10. **Sound, last.** When the picture is locked: `auto_sound_design_tool`
@@ -84,8 +99,8 @@ and borrow single techniques from the others.
     LUFS / -1 dBTP) after the last audio change; any later audio edit means
     mastering again. An unmastered edit clips on the platforms.
 12. **Verify** (below), fix, verify again. Then `render_video` and
-    **review the file**: `review_render_tool` with the path it wrote. Fix
-    every `PROBLEM` line, render again, review again.
+    **review the file**: `review_render_tool` with the path it wrote. One
+    fix pass: every `PROBLEM` line, render again, review again, report.
 
 Order matters: speed ramps change clip lengths (`ripple: true`), transitions
 read the cuts, sound design reads cuts, transitions and titles. Anything that
@@ -122,8 +137,11 @@ that track (`remove_motion_transition_tool track=...`) and re-running sound.
   before the look; a bright shot next to a near-black one reads as two
   videos, whatever LUT is on top.
 - **Variety.** No source clip within 3 s of itself; at least one distinct
-  clip per ~1.5 s for hype and montage. The same five shots every second is
-  the slideshow tell viewers notice first.
+  clip per ~1.5 s for hype and montage. Each strong shot at most twice;
+  vary the order of a match-cut chain instead of looping it. The same five
+  shots every second is the slideshow tell viewers notice first. A review
+  that finds a repeat lists the `swap_shot_tool` call that fixes it (an
+  unused clip, or a part of the clip not shown yet): make those calls.
 - **A clean end.** End on a hold, an end card or a settled final shot of 1 s
   or more, never on black and never cut off mid-motion. Sound effects and
   music end with the picture (trim what runs past the last frame), or the
@@ -175,7 +193,8 @@ frozen frames, the end (hold or black), true peak and loudness, and shots
 repeated too soon, with a contact sheet of every shot and the last frame
 (problems framed red). Fix every `PROBLEM`: ends on black → trim what runs
 past the last picture and render again; true peak → `master_audio_tool`;
-repeated shot → swap in another clip. Report the final review's numbers.
+repeated shot → the `swap_shot_tool` calls it lists (one per repeat; none
+listed means import more footage). Report the final review's numbers.
 
 The finishing calls, in order (after the picture and the sound are locked):
 

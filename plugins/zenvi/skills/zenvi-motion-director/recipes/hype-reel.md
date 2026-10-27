@@ -69,6 +69,17 @@ fixing single shots after it.
    rebuild with `replace: true`), but they do not block. Call it again; stop
    when no `high` or `medium` problem is left.
 
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 8 above (the receipt's `sound_design` call, `density: "every_cut"`).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
+
 ## Checks
 
 Contact sheet: no clip back within 3 s, no black frames at whip peaks
