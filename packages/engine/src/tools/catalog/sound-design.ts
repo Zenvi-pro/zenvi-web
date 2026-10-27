@@ -27,6 +27,7 @@ import { KINETIC_CAPTIONS_KEY, isAutoSfxClip, isSfxClip, type BeatGrid } from ".
 import { PALETTES, PALETTE_IDS, guessPalette, traitsOf, type PaletteId } from "../../sfx/palettes.js";
 import { CLIMAX_TAIL, SFX_DENSITIES, SFX_INTENSITIES, musicClimax, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
 import { spotHitPoints, type HitPoint } from "../../sfx/spot.js";
+import type { HitPoint as ScoreHit } from "../../mastering/score.js";
 import { KIT_SLOTS, KIT_SLOT_SPECS, applyKit, guessSlot, kitFileIds, proceduralKit, rawSoundKit, readSoundKit, slotOfRecipe, slotRecipe, type KitPick, type KitSlot, type SoundKit } from "../../sfx/kit.js";
 import { SFX_PROVIDERS, allowsCommercialUse } from "../../sfx/library.js";
 import { SFX_RECIPES, SFX_RECIPE_IDS, sfxRecipe, type SfxFamily } from "../../sfx/recipes.js";
@@ -700,6 +701,13 @@ interface CueSheet {
   grid: BeatGrid | null;
   bpm?: number;
   warnings: string[];
+}
+
+/** The cue sheet's hit points as the Sound Score reads them (analyze_mix_tool, master_audio_tool): the dry ones count as tied, not as wanting a cue. */
+export async function spottedHits(call: ToolCall): Promise<ScoreHit[]> {
+  const duration = pictureEnd(call.doc.project) ?? 0;
+  if (duration <= 0) return [];
+  return (await cueSheet(call, {}, duration)).points.map((p) => ({ t: p.t, kind: p.kind, needsCue: p.needsCue }));
 }
 
 /** The cue sheet both tools read: music analysed, speech found, block events filled in, the genre picked. */

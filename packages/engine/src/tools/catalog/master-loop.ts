@@ -18,6 +18,7 @@ import type { Project } from "../../model/types.js";
 import type { ToolCall } from "../define.js";
 import { applied, unchanged, type ToolReceipt } from "../receipt.js";
 import { measureMix } from "./analyze-mix.js";
+import { spottedHits } from "./sound-design.js";
 
 export const MAX_ROUNDS = 3;
 export const TARGET_SCORE = 85;
@@ -62,7 +63,9 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
   const scratch = new ProjectDocument(structuredClone(call.doc.project));
   const run = async (doc: ProjectDocument, name: string, args: Record<string, unknown>) => (await runTool({ doc, host: call.host, signal: call.signal }, name, args)).data;
   const rounds: Round[] = [];
-  const measure = async (): Promise<MixScore> => (await measureMix(call, scratch.project, genre)).score;
+  // The rounds only touch sound, so the picture's cue sheet is spotted once.
+  const hits = await spottedHits(call);
+  const measure = async (): Promise<MixScore> => (await measureMix(call, scratch.project, genre, hits)).score;
   let score = await measure();
   const first = score;
   for (let i = 0; i < MAX_ROUNDS; i += 1) {

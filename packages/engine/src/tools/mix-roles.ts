@@ -16,7 +16,6 @@ import type { HitPoint, MixCue, CueRole, StemName } from "../mastering/score.js"
 import type { Clip, Project } from "../model/types.js";
 import { TRACK_AUDIO_ROLES, type TrackAudioRole } from "../ops/tracks.js";
 import { isSfxClip } from "../sfx/moments.js";
-import { soundMoments } from "../sfx/moments.js";
 import { sfxRecipe } from "../sfx/recipes.js";
 import { MUSIC_MIN_DURATION, hasVideoStream, type AudioRole } from "./audio-mix.js";
 import { collectTimelineAudio, type AudioEntry } from "./catalog/audio.js";
@@ -157,10 +156,9 @@ export function cuesOf(project: Project): MixCue[] {
   return cues.sort((a, b) => a.t - b.t);
 }
 
-/** The edit's hit points: cuts, transitions, title entrances and flashes (sfx/moments.ts), or the caller's times. */
-export function hitPointsOf(project: Project, times?: readonly number[]): HitPoint[] {
-  if (times && times.length > 0) return [...times].sort((a, b) => a - b).map((t) => ({ t, kind: "hit", needsCue: true }));
-  return soundMoments(project).map((m) => ({ t: m.time, kind: m.kind, needsCue: true }));
+/** The caller's hit times (analyze_mix_tool hit_times), each wanting a sound. */
+export function hitPointsAt(times: readonly number[]): HitPoint[] {
+  return [...times].sort((a, b) => a - b).map((t) => ({ t, kind: "hit", needsCue: true }));
 }
 
 export interface StemRenders {
