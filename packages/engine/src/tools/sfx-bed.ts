@@ -9,11 +9,11 @@
  */
 
 import type { Transaction } from "../history/document.js";
-import { Interpolation, type Clip, type Keyframe, type Project } from "../model/types.js";
-import { setClipKeyframes } from "../ops/clips.js";
+import type { Clip, Keyframe, Project } from "../model/types.js";
 import { patchClip } from "../ops/internal.js";
 import type { BedDip } from "../sfx/design.js";
-import { curvePoints, evaluateVolumeCurve, timelineToSourceFrame } from "./audio-mix.js";
+import { splitKeyframeAt } from "../transitions/motion/splice.js";
+import { timelineToSourceFrame } from "./audio-mix.js";
 
 export const BED_MARK = "zenvi_sfx_bed";
 
@@ -50,8 +50,12 @@ export function restoreBed(tx: Transaction, clip: Clip): "restored" | "edited" |
  * Dip the bed under each window: one frame down, held, one frame back
  * (CRAFT.md §3 suck-out: a 20 ms fall, a 10 ms return). Where two windows
  * overlap (a hero's room running into the next one's pre-hit duck) the
- * deeper wins; the curve's own points inside a window come down with it.
- * Returns the points written.
+ * deeper wins. The curve keeps its shape: keys at the window edges are
+ * inserted where the curve already is (the motion transitions' splitKeyframeAt,
+ * transitions/motion/splice.ts: a bezier fade stays the same bezier), every existing point keeps its interpolation and
+ * handles, and the points inside a window come down with it (a gain on both
+ * ends of a segment scales the whole segment, linear or bezier). Returns
+ * the points written.
  */
 export function applyBedDips(tx: Transaction, clipId: string, dips: readonly BedDip[], fps: { num: number; den: number }): number {
   const clip = tx.project.clips.find((c) => c.id === clipId);
@@ -62,16 +66,19 @@ export function applyBedDips(tx: Transaction, clipId: string, dips: readonly Bed
     .filter((w) => w.b > w.a);
   if (windows.length === 0) return 0;
   const before = clip.volume === undefined ? null : structuredClone(clip.volume);
-  const existing = curvePoints(clip);
+  // No curve plays at 1 (libopenshot's Clip volume default).
+  let curve: Keyframe = clip.volume ?? { Points: [] };
+  for (const w of windows) for (const frame of [w.a - 1, w.a, w.b - 1, w.b]) if (frame >= 1) curve = splitKeyframeAt(curve, frame, 1);
   const gainAt = (frame: number) => windows.reduce((g, w) => (frame >= w.a && frame < w.b ? Math.min(g, w.gain) : g), 1);
-  const keys = new Set<number>(existing.map((p) => Math.round(p.co.X)));
-  for (const w of windows) for (const frame of [w.a - 1, w.a, w.b - 1, w.b]) keys.add(frame);
-  const frames = [...keys].filter((f) => f >= 1).sort((x, y) => x - y);
-  const value = (frame: number) => Math.round(evaluateVolumeCurve(existing, frame, 1) * gainAt(frame) * 1e6) / 1e6;
-  const updated = setClipKeyframes(tx, clipId, "volume", frames.map((frame) => ({ frame, value: value(frame), interpolation: Interpolation.LINEAR })), { mode: "replace" });
-  const mark: SfxBedMark = { before, after: structuredClone(updated.volume), dips: [...dips] };
+  const points = curve.Points.map((p) => {
+    const g = gainAt(Number(p.co.X));
+    return g === 1 ? p : { ...p, co: { ...p.co, Y: Math.round(Number(p.co.Y) * g * 1e6) / 1e6 } };
+  });
+  const volume: Keyframe = { ...curve, Points: points };
+  patchClip(tx, clipId, { volume } as Partial<Clip>);
+  const mark: SfxBedMark = { before, after: structuredClone(volume), dips: [...dips] };
   patchClip(tx, clipId, { [BED_MARK]: mark } as Partial<Clip>);
-  return frames.length;
+  return points.length;
 }
 
 /**

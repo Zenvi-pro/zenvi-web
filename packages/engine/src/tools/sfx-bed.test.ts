@@ -4,6 +4,8 @@ import { createProject } from "../model/defaults.js";
 import type { Clip } from "../model/types.js";
 import { addClip, setClipKeyframes } from "../ops/clips.js";
 import { addFile } from "../ops/files.js";
+import { evaluate } from "../keyframe/evaluate.js";
+import { Interpolation } from "../model/types.js";
 import { applyBedDips, readBedMark, restoreBed, withoutBedDips } from "./sfx-bed.js";
 import { curvePoints, evaluateVolumeCurve } from "./audio-mix.js";
 import { audioInfo, media } from "./test-support/fixture.js";
@@ -23,6 +25,32 @@ const gainAt = (doc: ProjectDocument, frame: number) => evaluateVolumeCurve(curv
 const db = (x: number) => 20 * Math.log10(x);
 
 describe("applyBedDips", () => {
+  it("keeps a user's bezier fade and constant step as they were outside the dips, and scales them inside", () => {
+    const doc = bedProject();
+    const fps = doc.project.fps;
+    const fade = {
+      Points: [
+        { co: { X: 1, Y: 1 }, interpolation: Interpolation.BEZIER, handle_left: { X: 0.5, Y: 1 }, handle_right: { X: 0.8, Y: 0.1 }, handle_type: 1 },
+        { co: { X: 150, Y: 0.2 }, interpolation: Interpolation.BEZIER, handle_left: { X: 0.3, Y: 0.95 }, handle_right: { X: 0.5, Y: 0 }, handle_type: 1 },
+        { co: { X: 240, Y: 0.6 }, interpolation: Interpolation.CONSTANT },
+      ],
+    };
+    doc.transaction("fade", (tx) => tx.update(["clips", { id: "MUSICCLIP1" }], { volume: structuredClone(fade) }));
+    doc.transaction("dips", (tx) => {
+      applyBedDips(tx, "MUSICCLIP1", [
+        { from: 2, to: 2.25, db: -6, reason: "room" },
+        { from: 6, to: 6.2, db: -10, reason: "pre-hit" },
+      ], fps);
+    });
+    const after = bed(doc).volume!;
+    // Source frames [round(t·30) + 1, …): 2.0-2.25 s is frames 61-68, 6.0-6.2 s is 181-186.
+    const dipped = (f: number) => (f >= 61 && f < 69 ? 10 ** (-6 / 20) : f >= 181 && f < 187 ? 10 ** (-10 / 20) : 1);
+    for (let frame = 1; frame <= 300; frame += 1) expect(evaluate(after, frame), `frame ${frame}`).toBeCloseTo(evaluate(fade, frame) * dipped(frame), 2);
+    // The user's points are still there with their interpolation; the step at 240 stays a step.
+    for (const p of fade.Points) expect(after.Points.find((q) => q.co.X === p.co.X)!.interpolation).toBe(p.interpolation);
+    expect(evaluate(after, 239)).toBeCloseTo(0.2, 6);
+  });
+
   it("holds the deeper of two overlapping dips instead of popping back up between them", () => {
     const doc = bedProject();
     const fps = doc.project.fps;
