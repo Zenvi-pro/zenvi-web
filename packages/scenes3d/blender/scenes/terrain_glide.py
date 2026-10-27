@@ -17,14 +17,14 @@ from zenvi3d import camera, core, lights, motion
 
 # (zenith, horizon, sun haze, sun colour, sun strength, sun elevation, world light) per time of day.
 TIMES = {
-    "day": ("#6E9BD6", "#DCE6EF", "#FFF4DE", "#FFF6EA", 4.2, 38.0, 1.0),
+    "day": ("#5F8FD0", "#D6E2EE", "#FFF4DE", "#FFF6EA", 4.4, 30.0, 0.9),
     "golden": ("#5C7FB5", "#F2D3AE", "#FFC27A", "#FFC98F", 3.4, 9.0, 0.8),
     "dusk": ("#1C2340", "#6B5A7A", "#FF9A5C", "#FF9F6B", 1.8, 5.0, 0.9),
 }
 SURFACES = {
     # ground colours (near, far), roughness
     "grass": ("#2F4A1C", "#55693A", 0.8),
-    "sand": ("#D9B98A", "#E8CFA6", 0.85),
+    "sand": ("#C8955A", "#DDAF76", 0.85),
     "snow": ("#E4EAF3", "#F3F6FA", 0.55),
 }
 LENGTH = 140.0  # metres of field ahead of the start
@@ -391,11 +391,15 @@ def build(job):
     scene = bpy.context.scene
     scene.render.film_transparent = False  # the sky is part of the picture
     scene.view_settings.look = "AgX - Base Contrast"
-    fog = 0.004 + 0.05 * float(p.get("haze", 0.4)) ** 1.5
+    # Clear days see further than golden hours.
+    fog = (0.004 + 0.05 * float(p.get("haze", 0.4)) ** 1.5) * (0.5 if time_of_day == "day" else 1.0)
 
     # A low sun ahead of the camera, a little to the side: backlight through the grass.
     # On a vertical frame the view is narrow: keep the sun inside it.
+    # By day the sun is off to the side instead: it models the ground in light and shade.
     side = 18 if camera.frame_aspect() >= 1 else 7
+    if time_of_day == "day":
+        side = 75
     sun_az = 180 + (side if rng.random() < 0.5 else -side)
     elevation = look[5]
     sun_vec = lights.orbit_point(1.0, sun_az, elevation)
