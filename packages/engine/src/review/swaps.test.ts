@@ -3,7 +3,7 @@ import { ProjectDocument } from "../history/document.js";
 import { runTool } from "../tools/registry.js";
 import { fakeHost } from "../tools/test-support/fake-host.js";
 import { repeatedCut } from "../tools/test-support/repeated-cut.js";
-import { L1 } from "../tools/test-support/fixture.js";
+import { L1, L2 } from "../tools/test-support/fixture.js";
 import { addClip, fadeClip } from "../ops/clips.js";
 import { freeInPoint, swapSuggestions } from "./swaps.js";
 import { reviewTimeline } from "./timeline.js";
@@ -30,6 +30,16 @@ describe("swap suggestions", () => {
     // A still in the bin is used from 0.
     const still = repeatedCut(["still"]);
     expect(swapSuggestions(still, reviewTimeline(still), [repeat])[0]).toMatchObject({ to_file_id: "FILEXTRA00", start_seconds: 0 });
+  });
+
+  it("offers one swap for a clip seen in two shots around an overlay", () => {
+    const doc = new ProjectDocument(repeatedCut(["video", "video"]));
+    // B's still on top of A's repeat at 4.5-5 s splits it into two shots of CLIPA00002.
+    doc.transaction("overlay", (tx) => addClip(tx, { fileId: "FILEBBBBBB", position: 4.5, layer: L2, start: 0, end: 0.5, id: "CLIPOVER01" }));
+    const review = reviewTimeline(doc.project);
+    const repeats = review.shots.filter((s) => s.clipId === "CLIPA00002").map((s) => s.index);
+    expect(repeats).toHaveLength(2);
+    expect(swapSuggestions(doc.project, review, repeats).map((s) => s.clip_id)).toEqual(["CLIPA00002"]);
   });
 
   it("the suggested call fixes the repeat in one undo step, keeping the cut", async () => {

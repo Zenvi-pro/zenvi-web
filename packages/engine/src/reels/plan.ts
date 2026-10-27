@@ -414,7 +414,6 @@ export function planReel(input: PlanInput): ReelPlan {
   };
 }
 
-/** How many shots bring a clip back within `REUSE_GAP_SECONDS`, and how many clips the busiest stretch needs. */
 /**
  * The earliest in-point at or after `from` (else at or after the clip's own
  * start) of a `seconds`-long stretch of `m` that overlaps no `shown` stretch;
@@ -427,6 +426,7 @@ export function freshFrom(m: Pick<ReelMedia, "start" | "end">, seconds: number, 
   return [from, ...ends.filter((e) => e >= from), m.start, ...ends].find(fits) ?? null;
 }
 
+/** How many shots bring a clip back within `REUSE_GAP_SECONDS`, and how many clips the busiest stretch needs. */
 export function reuseStats(shots: readonly Pick<PlannedShot, "fileId" | "start" | "end">[]): { closeRepeats: number; clipsNeeded: number } {
   let closeRepeats = 0;
   let clipsNeeded = 0;

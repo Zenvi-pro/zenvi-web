@@ -72,8 +72,8 @@ export function freeInPoint(duration: number, used: readonly [number, number][],
 
 /**
  * One swap per shot in `toFix` (`ReviewShot.index`es), in time order,
- * each with a different replacement. Shots with nothing left to swap in are
- * left out.
+ * each with a different replacement; a clip seen in two shots (around an
+ * overlay) gets one. Shots with nothing left to swap in are left out.
  */
 export function swapSuggestions(project: Project, review: TimelineReview, toFix: readonly number[]): ShotSwap[] {
   const files = new Map((project.files ?? []).map((f) => [String(f.id), f]));
@@ -87,7 +87,8 @@ export function swapSuggestions(project: Project, review: TimelineReview, toFix:
   const wanted = new Set(toFix);
   const shots = review.shots.filter((s) => wanted.has(s.index)).sort((a, b) => a.start - b.start);
   for (const shot of shots) {
-    // The swap changes the whole clip, which may run on under other shots.
+    // The swap changes the whole clip, which may run on under other shots: one swap per clip.
+    if (out.some((s) => s.clip_id === shot.clipId)) continue;
     const clip = (project.clips ?? []).find((c) => String(c.id) === shot.clipId);
     const length = clip ? Number(clip.end) - Number(clip.start) : shot.sourceEnd - shot.sourceStart;
     let swap: Pick<ShotSwap, "to_file_id" | "to_name" | "start_seconds" | "why"> | null = null;
