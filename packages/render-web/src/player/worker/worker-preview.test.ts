@@ -274,6 +274,8 @@ describe("PreviewPlayer when the worker fails", () => {
       await pending;
       expect(player.inWorker).toBe(false);
       expect(String(warn.mock.calls.at(-1)![0])).toMatch(/stopped answering/);
+      // Told to close its session there, in case it is only slow.
+      expect(sent.filter((m) => m.type === "close")).toHaveLength(1);
       // Playback carries on, on the page.
       expect(player.isPlaying).toBe(true);
       const drawn = onPage.length;
