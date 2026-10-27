@@ -30,6 +30,15 @@ describe("parseTempoRange", () => {
     expect(parseTempoRange("150–130")).toEqual([130, 150]);
     expect(parseTempoRange("fast")).toBeNull();
   });
+
+  it("reads the string forms agents send: quoted twice, bracketed, in words", () => {
+    // Bench round 3 (product3d): bpm_range "\"130-150\"" was refused.
+    expect(parseTempoRange('"130-150"')).toEqual([130, 150]);
+    expect(parseTempoRange("[120, 130]")).toEqual([120, 130]);
+    expect(parseTempoRange("120 to 130 bpm")).toEqual([120, 130]);
+    expect(parseTempoRange("120")).toBeNull();
+    expect(parseTempoRange("120-130-140")).toBeNull();
+  });
 });
 
 describe("matchTempo", () => {

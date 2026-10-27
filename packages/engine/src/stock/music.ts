@@ -54,9 +54,13 @@ export function splitTempoFromQuery(text: string): TempoQuery {
   return { query: cleaned || "music", ...(range ? { range } : {}) };
 }
 
-/** A range from the tool's `bpm_range` argument: [lo, hi], or "lo-hi". */
+/**
+ * A range from the tool's `bpm_range` argument: [lo, hi], or a string with
+ * two tempos in it: "lo-hi", "[lo, hi]", "lo to hi bpm", or one of those
+ * quoted again by an agent that serialised it twice ('"130-150"').
+ */
 export function parseTempoRange(value: readonly number[] | string): [number, number] | null {
-  const pair = typeof value === "string" ? value.split(/\s*[-–]\s*/).map(Number) : value;
+  const pair = typeof value === "string" ? (value.match(/\d+(?:\.\d+)?/g) ?? []).map(Number) : value;
   const [lo, hi] = pair;
   if (pair.length !== 2 || !(Number.isFinite(lo) && Number.isFinite(hi) && lo! >= BPM_MIN && hi! <= BPM_MAX && hi! >= BPM_MIN && lo! <= BPM_MAX)) return null;
   return lo! <= hi! ? [lo!, hi!] : [hi!, lo!];
