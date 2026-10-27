@@ -308,6 +308,28 @@ function groupFlashRuns(points: HitPoint[]): void {
   close();
 }
 
+/** A block's staggered events of one kind closer than this are one event (word-by-word slams, a burst of pops): they blur into one at < 100 ms (CRAFT.md §1 precedence). */
+const STAGGER_GAP = 0.15;
+
+/** Staggered runs of one block's events merge into their first, as strong as the strongest. */
+function mergeStaggers(points: HitPoint[]): HitPoint[] {
+  const out: HitPoint[] = [];
+  const last = new Map<string, { point: HitPoint; t: number }>();
+  for (const p of [...points].sort((a, b) => a.t - b.t)) {
+    const staggered = (p.kind === "block" || p.kind === "scene3d") && p.until === undefined;
+    const key = `${p.ids[0]}:${p.event}`;
+    const run = staggered ? last.get(key) : undefined;
+    if (run && p.t - run.t < STAGGER_GAP) {
+      run.point.weight = Math.max(run.point.weight, p.weight);
+      run.t = p.t;
+      continue;
+    }
+    out.push(p);
+    if (staggered) last.set(key, { point: p, t: p.t });
+  }
+  return out;
+}
+
 /** One cue per event: points within a frame merge into the highest-priority one. */
 function mergeSameEvent(points: HitPoint[], frame: number): HitPoint[] {
   const sorted = [...points].sort((a, b) => a.t - b.t || ROLE_RANK[a.role] - ROLE_RANK[b.role]);
@@ -372,7 +394,7 @@ export function spotHitPoints(project: Project, input: SpotInput = {}): HitPoint
     p.x = Math.round(p.x * 100) / 100;
   }
   groupFlashRuns(inside);
-  const merged = mergeSameEvent(inside, 1 / fps);
+  const merged = mergeSameEvent(mergeStaggers(inside), 1 / fps);
   spaceHeroes(merged);
   return merged.sort((a, b) => a.t - b.t || ROLE_RANK[a.role] - ROLE_RANK[b.role]);
 }

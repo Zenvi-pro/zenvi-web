@@ -54,7 +54,7 @@ export const PALETTES: Readonly<Record<PaletteId, Palette>> = {
     hit: HITS,
     whoosh: { short: ["whip", "whoosh_short"], long: ["whoosh_medium", "whoosh_rise"] },
     ui: ["camera_shutter", "glitch_burst"],
-    micro: ["sparkle"],
+    micro: ["camera_shutter", "ui_tap", "sparkle"],
     sub: true,
     riser: "noise",
     suckOut: 0.2,

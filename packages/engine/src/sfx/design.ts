@@ -86,7 +86,7 @@ const SAME_BAND_GAP = 0.08;
 const MAX_TICKS_PER_SECOND = 10;
 const MAX_TICKS_PER_RUN = 16;
 
-/** subtle: points weaker than this stay dry (a downbeat cut to a new shot is 0.9, a cut on a beat 0.7). */
+/** subtle: points weaker than this stay dry (a downbeat cut to a new shot is 0.9, a cut on a beat 0.7); transitions the editor placed always sound. */
 const SUBTLE_FLOOR = 0.75;
 /** Where each intensity sits in the genre's density band. */
 const INTENSITY_SPAN: Readonly<Record<SfxIntensity, number>> = { subtle: 0, normal: 0.5, hype: 1 };
@@ -121,7 +121,7 @@ function choose(input: DesignInput): { keep: Set<number>; dry: Map<number, strin
   const everyCut = input.density === "every_cut";
   points.forEach((p, i) => {
     if (!p.needsCue) return dry.set(i, p.dry ?? "left dry");
-    if (input.intensity === "subtle" && p.role !== "hero" && p.role !== "slam" && p.weight < SUBTLE_FLOOR) return dry.set(i, "subtle: only the big moments");
+    if (input.intensity === "subtle" && p.role !== "hero" && p.role !== "slam" && p.kind !== "transition" && p.weight < SUBTLE_FLOOR) return dry.set(i, "subtle: only the big moments");
     if (p.kind === "cut" && p.role === "transition" && !everyCut) {
       if (palette.cuts === "none") return dry.set(i, "the music carries cuts in this genre");
       if (palette.cuts === "strong" && p.weight < 0.6) return dry.set(i, "an ordinary cut: this genre sounds only the strong ones");
@@ -168,7 +168,12 @@ function choose(input: DesignInput): { keep: Set<number>; dry: Map<number, strin
 }
 
 /** The design for a cue sheet. */
-export function designSound(input: DesignInput): SoundDesign {
+export function designSound(given: DesignInput): SoundDesign {
+  // every_cut asks for a sound on every cut: a flash run's inner cuts get ticks pitch-walking up the run, locked to the cut rate (CRAFT.md §10 flash montage).
+  const input: DesignInput =
+    given.density === "every_cut"
+      ? { ...given, points: given.points.map((p) => (p.dry === "inside a flash run" ? { ...p, needsCue: true, dry: undefined, role: "micro" as const, label: `${p.label} (flash run tick)` } : p)) }
+      : given;
   const { points, palette, duration } = input;
   const rng = new Rng(Math.imul(input.seed | 0, 2654435761) ^ 0x5d2);
   const pool = new Pool(rng.fork(1));

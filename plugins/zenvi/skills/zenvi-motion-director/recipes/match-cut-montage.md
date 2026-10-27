@@ -72,10 +72,9 @@ match_cut_montage_tool {
    "teal_&_orange_cinema", "look_intensity": 0.6}` (or `"warm_cinema"`), so
    the moon and the cup sit in one world; then grain only: `apply_look_tool`
    `all_clips: true`, `look_id: "grain:35mm_fine"`.
-5. Sound: `auto_sound_design_tool` `intensity: "hype"`, `density:
-   "every_cut"`, with the receipt's `beats`. It puts a hit or whoosh on nearly every cut; check with
-   `get_timeline_state_tool` that the opening pose pair has a
-   `whoosh_medium` and the payoff an `impact_boom`.
+5. Sound: `auto_sound_design_tool` `genre: "match_cut"`, `intensity: "hype"`, `density:
+   "every_cut"`, with the receipt's `beats` (the genre is not read from the edit: name it). It puts a whoosh
+   on every match and a layered hit on the payoff; check the receipt's `cues`.
 6. Optional: a small title on the payoff, 2-3 words, never over the subject:
    `add_kinetic_title_tool` `{"text": "full circle", "style": "editorial",
    "animation": "rise"}` (it keeps to the shot's calm side).

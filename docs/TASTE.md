@@ -145,9 +145,11 @@ Named easings every tool understands (cubic-bezier control points):
   cut and is as long as the move; an impact's transient lands on hard cuts,
   downbeats and flash frames, at most about once a bar; clicks and pops go on
   UI moments and title entrances; a riser builds into the drop and an impact
-  lands on it. Never two transients within 80 ms; vary seed and pitch so
-  repeats do not machine-gun. Effects peak around −8…−14 dBFS under the
-  music and further under dialogue; no clicks over speech.
+  lands on it a beat after a suck-out. Never two transients within 80 ms;
+  never the same sample twice in a row. Levels by role over what plays under
+  the cue (hero +6…+12 dB, sweetener 0…+6, micro −6…+3); under speech only
+  micro sounds. The numbers and genre palettes are the sound doctrine
+  (`sfx/palettes.ts`, `sfx/design.ts`).
 - Pace by genre (average shot length): flash montage 0.1–0.2 s (3–6
   frames), match-cut chain 0.1–0.27 s (3–8 frames), hype reel 0.2–0.25 s,
   documentary / video-essay b-roll 0.5–1.5 s, kinetic-caption talking head
