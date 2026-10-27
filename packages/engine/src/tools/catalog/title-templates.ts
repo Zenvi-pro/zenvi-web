@@ -117,6 +117,7 @@ const TEMPLATE_PURPOSE: Readonly<Record<string, string>> = {
   Standard_3: "three centred lines",
   Standard_4: "four centred lines (credits)",
   Sunset: "glowing gradient title, centre",
+  Text_Card: "solid colour card with one centred line of text (set background_color)",
   TV_Rating: "small TV rating badge (TV / G), top left",
 };
 

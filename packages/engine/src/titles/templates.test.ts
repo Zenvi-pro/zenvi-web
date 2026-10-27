@@ -6,8 +6,8 @@ import { setSvgText, titleLines } from "./svg.js";
 const asset = (assetPath: string): string => readFileSync(new URL(`../../assets/${assetPath}`, import.meta.url), "utf8");
 
 describe("title templates", () => {
-  it("lists the desktop's 50 templates, sorted, with Bar_1 as the default", () => {
-    expect(TITLE_TEMPLATES).toHaveLength(50);
+  it("lists the desktop's 51 templates, sorted, with Bar_1 as the default", () => {
+    expect(TITLE_TEMPLATES).toHaveLength(51);
     expect(TITLE_TEMPLATES.map((t) => t.file)).toEqual([...TITLE_TEMPLATES.map((t) => t.file)].sort());
     expect(TITLE_TEMPLATES.filter((t) => t.default)).toEqual([DEFAULT_TITLE_TEMPLATE]);
     expect(DEFAULT_TITLE_TEMPLATE).toEqual({ id: "Bar_1", name: "Bar 1", file: "Bar_1.svg", assetPath: "titles/Bar_1.svg", default: true });

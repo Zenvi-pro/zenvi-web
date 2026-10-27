@@ -33,6 +33,7 @@ import { getTitleTemplate, suggestTitleTemplates } from "../../titles/templates.
 import {
   artboardSize,
   backgroundColor,
+  centerLines,
   parseTitleSvg,
   setFieldText,
   textZone,
@@ -69,8 +70,8 @@ import { TitleStyle, assignTexts, fieldRows, readProjectSvg, writeTitle } from "
 /** #183's add_title_tool tried these in order when no template was named (titles_text.DEFAULT_TEMPLATES). */
 const DEFAULT_TEMPLATES = ["Bar_1", "Standard_1", "Footer_1"] as const;
 
-/** The plain two-line template text is drawn with when the named template is a colour card (no text field). */
-const TEXT_OVER_CARD = "Standard_1";
+/** The one-centred-line template text is drawn with when the named template is a colour card (no text field). */
+const TEXT_OVER_CARD = "Text_Card";
 
 /** Where a template's text zone anchors its artboard (titles_text.ZONE_POSITION). */
 const ZONE_POSITION: Readonly<Record<"top" | "center" | "bottom", ScreenPosition>> = {
@@ -171,16 +172,19 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   let doc = parse(template);
   let slots = titleFields(doc);
   const warnings: string[] = [];
+  let card = false;
   let colour = String(input.background_color ?? "");
   if (slots.length === 0 && given) {
     // Agents name Solid_Color for "this text on a coloured frame": draw the text on a text template over the card's colour.
-    const card = template;
+    card = true;
+    const cardTemplate = template;
     const [cardColour, cardAlpha] = backgroundColor(doc);
     template = await loadTemplate(call, TEXT_OVER_CARD);
     doc = parse(template);
     slots = titleFields(doc);
-    if (!colour.trim() && cardAlpha > 0) colour = cardColour;
-    warnings.push(`${card.name} has no text; drew the text with ${template.name} over ${colour.trim() ? `the colour ${colour.trim()}` : "the video"}`);
+    // '#rrggbb', plus the card's opacity as '#rrggbbaa' when it is not opaque.
+    if (!colour.trim() && cardAlpha > 0) colour = cardColour + (cardAlpha >= 1 ? "" : pyRound(cardAlpha * 255).toString(16).padStart(2, "0"));
+    warnings.push(`${cardTemplate.name} has no text; drew the text with ${template.name} over ${colour.trim() ? `the colour ${colour.trim()}` : "the video"}`);
   }
   const name = template.name;
   if (slots.length > 0 && !given && !colourCard) toolError("add_title_tool needs text (or subtitle / lines), or a background_color for a blank colour card");
@@ -202,6 +206,7 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
 
   for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index)!);
   const styleInfo = style.apply(doc, families);
+  if (card) centerLines(doc);
   const zone = textZone(slots, artboardSize(doc)[1]);
   const wanted = input.screen_position ?? "auto";
   const posKey: ScreenPosition = ZONE_POSITION[wanted === "auto" ? zone : wanted] ?? "center";
