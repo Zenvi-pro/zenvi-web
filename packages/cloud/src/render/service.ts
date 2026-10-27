@@ -27,7 +27,7 @@ import type { MediaService } from "../services/media.js";
 import { attachmentDisposition } from "../services/media.js";
 import { renderPath, renderSnapshotPath } from "../services/paths.js";
 import type { LoadedProject, ProjectService } from "../services/projects.js";
-import { CONTENT_TYPES, isRenderFormat, type PresetName, RENDER_FORMATS, type RenderFormat, type RenderOverrides, resolveRenderOptions } from "./options.js";
+import { CONTENT_TYPES, isRenderFormat, type PresetName, RENDER_FORMATS, type RenderFormat, type RenderOverrides, renderNotes, resolveRenderOptions } from "./options.js";
 import type { RenderDispatch } from "./dispatch.js";
 import type { PathResolver, Renderer } from "./renderer.js";
 import { projectPathResolver } from "./resolve.js";
@@ -169,9 +169,11 @@ export class RenderService {
    * concurrency: the (project, revision, options) key is claimed with an
    * insert-if-absent row, so simultaneous retries get the same job.
    */
-  async start(userId: string, projectId: string, input: { preset?: PresetName; options?: RenderOverrides }): Promise<RenderJob> {
+  async start(userId: string, projectId: string, input: { preset?: PresetName; options?: RenderOverrides }): Promise<RenderJob & { notes: string[] }> {
     const loaded = await this.options.projects.get(userId, projectId);
-    return this.startResolved(userId, projectId, loaded, resolveRenderOptions(loaded.project, input.preset, input.options ?? {}));
+    const options = resolveRenderOptions(loaded.project, input.preset, input.options ?? {});
+    const job = await this.startResolved(userId, projectId, loaded, options);
+    return { ...job, notes: renderNotes(loaded.project, options) };
   }
 
   /**
