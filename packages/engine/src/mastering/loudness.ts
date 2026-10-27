@@ -310,6 +310,25 @@ export function measureLoudness(channels: readonly Float32Array[], sampleRate: n
   };
 }
 
+/** Momentary (400 ms) and short-term (3 s) loudness, LUFS, one value per 100 ms hop from the start: METRICS.md's M(t) and S(t). */
+export interface LoudnessSeries {
+  /** Seconds between values. */
+  hop: number;
+  momentary: Float64Array;
+  shortTerm: Float64Array;
+}
+
+export function loudnessSeries(channels: readonly Float32Array[], sampleRate: number): LoudnessSeries {
+  const { energies } = hopEnergies(channels, sampleRate);
+  const toLufs = (powers: Float64Array): Float64Array => powers.map((p) => (p > 0 ? powerToLufs(p) : -120));
+  const pad = (powers: Float64Array): Float64Array => (powers.length > 0 ? powers : slidingPower(energies, Math.max(1, energies.length)));
+  return {
+    hop: HOP_SECONDS,
+    momentary: toLufs(pad(slidingPower(energies, Math.round(BLOCK_SECONDS / HOP_SECONDS)))),
+    shortTerm: toLufs(pad(slidingPower(energies, Math.round(SHORT_TERM_SECONDS / HOP_SECONDS)))),
+  };
+}
+
 /** The parts of the signal inside `windows` (seconds), joined: what a role sounds like while something else is on. */
 export function sliceWindows(channels: readonly Float32Array[], sampleRate: number, windows: readonly (readonly [number, number])[]): Float32Array[] {
   const spans = windows
