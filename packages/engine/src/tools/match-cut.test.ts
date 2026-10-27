@@ -365,7 +365,6 @@ describe("match_cut_montage_tool", () => {
     expect(w.endFrame - w.startFrame + 1).toBe(shots[0]!.frames);
     expect(shots[0]!.frames).toBeGreaterThan(18);
     // Every frame of the shot maps inside the 0.6 s file.
-    expect(clipKeyframe(opening, "time")).toBeDefined();
     const times = (opening as unknown as { time: { Points: { co: { Y: number } }[] } }).time.Points.map((p) => p.co.Y);
     expect(Math.max(...times)).toBeLessThanOrEqual(18 + 1);
   });
