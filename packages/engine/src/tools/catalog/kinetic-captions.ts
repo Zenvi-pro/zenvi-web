@@ -137,7 +137,8 @@ export function kineticTag(item: Clip | ProjectFile): KineticTag | undefined {
   return isRecord(t) && Array.isArray(t.source_clip_ids) ? (t as unknown as KineticTag) : undefined;
 }
 
-function matteOf(project: Project, clip: Clip): ProjectFile | undefined {
+/** The subject matte the subject matte tools made of `clip`'s footage, if the bin has one. */
+export function matteOf(project: Project, clip: Clip): ProjectFile | undefined {
   const source = project.files.find((f) => f.id === clip.file_id);
   return project.files.filter((f) => {
     const m = (f as Record<string, unknown>)[MATTE_KEY];

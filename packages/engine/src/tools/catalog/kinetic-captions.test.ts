@@ -181,6 +181,49 @@ describe("kinetic_captions_tool", () => {
     expect(kineticTag(cut)!.source_clip_ids).toEqual([clipId]);
   });
 
+  it("puts the emphasis words behind the speaker by default when the footage has a matte (auto), else none", async () => {
+    const matted = talking(true);
+    const h = host();
+    const r = await runTool({ doc: matted.doc, host: h }, "kinetic_captions_tool", { style: "creator", emphasis: ["cameras"] });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).behind_subject).toBe("emphasis");
+    expect(r.text).toContain("the emphasis words behind the speaker");
+    const doc = matted.doc;
+    const cut = doc.project.clips.find((c) => kineticTag(c)?.role === "cutout")!;
+    const captions = captionClips(doc).filter((c) => kineticTag(c)!.role === "caption");
+    const svgOf = (c: Clip) => {
+      const svg = h.written.get(String(doc.project.files.find((f) => f.id === c.file_id)?.path));
+      return typeof svg === "string" ? svg : new TextDecoder().decode(svg);
+    };
+    // The emphasis word (the accent red drawing) is under the cut-out, the other words above it.
+    const under = captions.filter((c) => Number(c.layer) < Number(cut.layer));
+    expect(under.length).toBeGreaterThan(0);
+    for (const c of under) expect(svgOf(c)).toContain("#ff2d2d");
+    expect(captions.some((c) => Number(c.layer) > Number(cut.layer))).toBe(true);
+
+    const plain = talking();
+    const none = await runTool({ doc: plain.doc, host: host() }, "kinetic_captions_tool", { style: "creator" });
+    expect(none.ok, none.text).toBe(true);
+    expect(dataOf(none).behind_subject).toBe("none");
+    expect(plain.doc.project.clips.some((c) => kineticTag(c)?.role === "cutout")).toBe(false);
+    const asked = await runTool({ doc: plain.doc, host: host() }, "kinetic_captions_tool", { style: "creator", behind_subject: "emphasis" });
+    expect(asked.ok).toBe(false);
+    expect(asked.text).toContain("generate_subject_matte_tool");
+  });
+
+  it("reads the shots to place the captions (placement auto), not with placement style", async () => {
+    const { doc } = talking(true);
+    const h = host();
+    const r = await runTool({ doc, host: h }, "kinetic_captions_tool", { style: "documentary" });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).placement).toMatchObject({ scenes: expect.any(Number) });
+    expect(h.calls.filter((c) => c.startsWith("renderFrame")).length).toBeGreaterThan(0);
+    const again = host();
+    const fixed = await runTool({ doc, host: again }, "kinetic_captions_tool", { style: "documentary", placement: "style" });
+    expect(dataOf(fixed).placement).toBe("style");
+    expect(again.calls.some((c) => c.startsWith("renderFrame"))).toBe(false);
+  });
+
   it("cuts out the footage as it plays: its effects (fresh ids) and alpha, the Mask last", async () => {
     const { doc, clipId } = talking(true);
     const grade = { id: "GRADE00001", type: "Saturation", class_name: "Saturation" };

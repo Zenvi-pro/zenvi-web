@@ -326,7 +326,8 @@ function drawWords(p: Painted, width: number, height: number, k: number, colours
 function keysFor(from: number, to: number, rest: Pose, style: CaptionStyle, fps: number, H: number, entrance = true, travel = 1, turn = rest.rotation): Key[] {
   const m = style.motion;
   const last = to - 1;
-  const e = Math.max(1, Math.round(m.enter * fps));
+  // A word said late in its group is on screen briefly: its entrance shortens to fit rather than being dropped.
+  const e = Math.max(1, Math.min(Math.round(m.enter * fps), Math.floor((last - from) * 0.6)));
   const x = Math.round(m.exit * fps);
   if (last - from < 2) return [{ frame: from, pose: rest, ease: "linear" }];
   const keys: Key[] = [];
@@ -670,6 +671,16 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
       const width = gb.width + 2 * pad;
       const height = gb.height + 2 * pad;
       const name = `g${gi}`;
+      // Typed: a one-line group types across its words (a crop cannot type line by line); more lines appear whole.
+      const glyphs = [...b.words].sort((x, y) => x.x - y.x).flatMap((w) => w.block.glyphs.filter((g) => g.commands.length > 0).map((g) => ({ w, g })));
+      const typed = letters?.kind === "type" && new Set(b.words.map((w) => w.baseline)).size === 1 && glyphs.length > 1;
+      const span = to - from;
+      const steps = Math.max(1, Math.min(glyphs.length, Math.floor(span * 0.6)));
+      const every = typed ? Math.max(1, Math.min(Math.round(letters.step * fps), Math.floor((span * 0.6) / steps))) : 1;
+      const edges = Array.from({ length: steps }, (_, i) => {
+        const { w, g } = glyphs[Math.ceil(((i + 1) * glyphs.length) / steps) - 1]!;
+        return (w.x - left + g.x + g.advance) / width;
+      });
       elements.push({
         name,
         track: TRACK.front,
@@ -677,6 +688,7 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
         to,
         source: { kind: "svg", name, width, height, cx: width / 2, cy: height / 2, draw: (k) => drawWords({ words: b.words, x: left, y: top }, width, height, k, colours, style, false, u) },
         keys: keysFor(from, to, { x: gb.x + gb.width / 2, y: gb.y + gb.height / 2, s: 1, alpha: 1, rotation: 0 }, style, fps, H, true, travel, tilt ? -tilt.from * 0.5 : 0),
+        ...(typed ? { effects: [typingCrop(edges, every)] } : {}),
       });
       if (style.marker) {
         b.words.forEach((w, j) => {

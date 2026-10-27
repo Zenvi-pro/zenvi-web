@@ -21,7 +21,7 @@ import { loadFamilies } from "../fonts.js";
 import { projectFps } from "../frame-time.js";
 import { applied, failed, refused } from "../receipt.js";
 import { colorHexAlpha, projectSize, trackInfo } from "../titles-text.js";
-import { emphasisArg, kineticTag } from "./kinetic-captions.js";
+import { emphasisArg, kineticTag, matteOf } from "./kinetic-captions.js";
 import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
 
 const TOOL = "add_kinetic_title_tool";
@@ -42,7 +42,10 @@ const STYLE_LINES: Readonly<Record<TitleStyleId, string>> = {
 };
 const ANIMATION_LINES = CAPTION_ANIMATION_IDS.map((id) => `${id}: ${CAPTION_ANIMATIONS[id].summary}`).join("; ");
 const unit = z.number().min(0).max(1);
-const baseShare = (style: CaptionStyleId): number => CAPTION_STYLES[style].base.size / 1080;
+/** A title is set larger than a caption in the same style: it is read at once, not word by word. */
+const TITLE_SCALE: Readonly<Record<TitleStyleId, number>> = { stack: 1.5, creator: 1.6, editorial: 1.5, documentary: 1.5 };
+const baseShare = (style: TitleStyleId): number => (CAPTION_STYLES[style].base.size / 1080) * TITLE_SCALE[style];
+const share = (style: TitleStyleId): string => baseShare(style).toFixed(3).replace(/0+$/, "");
 
 const input = z.strictObject({
   text: z.string().min(1).max(120).describe("The title, 1-12 words."),
@@ -57,7 +60,7 @@ const input = z.strictObject({
     .describe("Words set in the emphasis face and accent: auto (default: the strongest word), none, or a list."),
   accent: z.string().max(40).optional().describe("Emphasis colour (#rrggbb or a name; default per style)."),
   ink: z.string().max(40).optional().describe("Colour of the other words (default white)."),
-  text_size: z.number().min(0.015).max(0.3).optional().describe("Size of the plain words, share of the frame's short side (style default: stack 0.11, creator 0.046, editorial 0.074, documentary 0.043); emphasis words keep their ratio."),
+  text_size: z.number().min(0.015).max(0.3).optional().describe(`Size of the plain words, share of the frame's short side (style default: ${TITLE_STYLE_IDS.map((id) => `${id} ${share(id)}`).join(", ")}); emphasis words keep their ratio.`),
   y: unit.optional().describe("Vertical centre, 0 top - 1 bottom (default: the style's spots, in the shot's calmest area). Kept inside the title-safe area."),
   avoid: z
     .array(z.strictObject({ x: unit, y: unit, w: unit.gt(0), h: unit.gt(0) }))
@@ -108,7 +111,7 @@ export const kineticTitleTools: CatalogTool[] = [
       const [width, height] = projectSize(project);
       const fpsFraction = projectFps(project);
       const fps = fpsFraction.num / fpsFraction.den;
-      const scenes = await captionScenes(call, project, start, start + duration, (c) => kineticTag(c) !== undefined, () => undefined);
+      const scenes = await captionScenes(call, project, start, start + duration, (c) => kineticTag(c) !== undefined, (c) => matteOf(project, c));
       let built: KineticCaptionPlan;
       try {
         built = buildKineticCaptions({
@@ -118,7 +121,7 @@ export const kineticTitleTools: CatalogTool[] = [
           emphasis: emphasisArg(args.emphasis),
           avoid: (args.avoid ?? []) as AvoidBox[],
           ...colours,
-          ...(args.text_size !== undefined ? { size: args.text_size / baseShare(style) } : {}),
+          size: (args.text_size ?? baseShare(style)) / (CAPTION_STYLES[style].base.size / 1080),
           ...(args.y !== undefined ? { y: args.y } : {}),
           motion: CAPTION_ANIMATIONS[animation].motion,
           groups: [{ first: 0, end: words.length, start, stop: start + duration }],
