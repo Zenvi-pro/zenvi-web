@@ -34,6 +34,17 @@ always something drawing on or popping in.
    label, `swish_airy` on each card entrance, `camera_shutter` on the
    before/after, `sparkle` on "Save this". Music light and upbeat.
 
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 5 above (`intensity: "normal"`).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
+
 ## Checks
 
 Every caption readable at phone size and out of the bottom fifth; arrows land

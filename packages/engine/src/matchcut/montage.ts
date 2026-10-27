@@ -130,16 +130,28 @@ function bodyCuts(from: number, to: number, min: number, max: number, weights: F
   return cuts.reverse();
 }
 
-/** Which clip fills each body shot: cycle through the middle clips, never the same twice in a row. */
-function bodyOrder(clips: number, shots: number): number[] {
-  const middle = clips >= 3 ? Array.from({ length: clips - 2 }, (_, i) => i + 1) : clips === 2 ? [1, 0] : [0];
-  // After the first pass the opener joins the cycle too.
-  const later = clips >= 3 ? [0, ...middle] : middle;
+/**
+ * Which clip fills each body shot: the middle clips in chain order, then
+ * back and forth through the chain (the opener joins after the first pass),
+ * never the same twice in a row. Neighbours stay neighbours, so the shapes
+ * still rhyme, but the chain does not loop: a loop of the same 7 shapes
+ * read as repetitive in the full-circle E2E reel.
+ */
+export function bodyOrder(clips: number, shots: number): number[] {
+  if (clips === 1) return Array.from({ length: shots }, () => 0);
+  if (clips === 2) return Array.from({ length: shots }, (_, i) => (i % 2 === 0 ? 1 : 0));
+  const middle = Array.from({ length: clips - 2 }, (_, i) => i + 1);
+  const later = [0, ...middle];
   const out: number[] = [];
-  for (let i = 0; i < shots; i += 1) {
-    const cycle = i < middle.length ? middle : later;
-    const k = i < middle.length ? i : (i - middle.length) % later.length;
-    out.push(cycle[k]!);
+  let pass = middle;
+  let forward = true;
+  while (out.length < shots) {
+    for (const clip of pass) {
+      if (out.length >= shots) break;
+      if (out[out.length - 1] !== clip) out.push(clip);
+    }
+    forward = !forward;
+    pass = forward ? later : [...later].reverse();
   }
   return out;
 }
@@ -183,7 +195,7 @@ export function planMontage(input: MontageInput): MontagePlan {
   if (input.clips === 2 && cuts.length % 2 === 0) cuts.pop();
   const bounds = [0, ...cuts, total];
   const bodyCount = bounds.length - 3;
-  const order = input.clips === 1 ? Array.from({ length: bodyCount }, () => 0) : bodyOrder(input.clips, bodyCount);
+  const order = bodyOrder(input.clips, bodyCount);
   const uses = new Map<number, number>();
   const shots: MontageShot[] = [];
   for (let i = 0; i + 1 < bounds.length; i += 1) {

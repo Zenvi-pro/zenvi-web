@@ -26,20 +26,42 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    `includeWords: true` for word times.
 2. Picture: talking-head clip on track 1 for the whole length; inserts on the
    same track at the noun times, 0.8-1.5 s each.
-3. Rail captions (connectors): `add_captions_tool` `clipId` = the narration
-   clip (or `cues`, one word each, without a voice), `maxWords: 1`, `style:
-   "minimal"`, `font: "Arial Black"`, `text_size: 0.065`, `position:
-   "center"`. Leave the emphasis words out of the rail (`edit_captions_tool`)
-   so they only appear big.
-4. Emphasis words, each **once**, for as long as it is spoken (0.4-0.9 s):
-   `add_title_tool` `text: "IDEA"`, `font: "Anton"`, `text_color:
-   "#E0201B"`, `font_scale` 3-4 for a 4-letter word, 2 for "DEAD LINE"
-   (aim for 35-50 % of the frame height), `position_seconds` = word start;
-   then `set_clip_property_tool` `property: "rotation"`, `value` -6…6, and
-   `property: "location_x"`, `value` within ±0.2 to sit beside the head. `preview_frame` it: every letter must be
-   inside the frame; a cut-off word is the most visible failure. On the CLI,
-   `text_behind_subject_tool` (`clip_id`, `text`, `color: "#e0201b"`,
-   `font: "Anton"`, `y: 0.36`) for the one hero word. One embed per sentence.
+3. Captions, one call: `kinetic_captions_tool` `style: "creator"` (word by
+   word, connectors white, the emphasis words huge red condensed capitals,
+   each popping in on its word). `emphasis`: the 3-6 words that carry the
+   line, each once. `avoid`: the face box, read off `preview_frame grid:
+   true`. `text_size: 0.06` (connectors readable on a phone; emphasis keeps
+   its ratio), `y: 0.62` on 9:16 (under the face; the tool keeps every group
+   inside the safe area, out of the bottom fifth), `animation: "pop"`
+   (`"slam"` for a harder edit, `"slide_up"` with `style: "stack"`). The
+   captions sit on their own tracks, so they stay on screen over the
+   inserts. `timeline_clip_ids`: the talking-head clip (the captions belong
+   to it). The words: `cues` in timeline seconds. With a TTS narration, the
+   word times from step 1's `get_transcript_tool` (one cue per word, start
+   + the narration clip's position); with no voice or a failed TTS, one cue
+   per phrase of the script at about 2.5 words a second (the tool times each
+   word inside its cue). Footage that speaks itself needs no cues: the tool
+   transcribes the clip.
+
+```json
+kinetic_captions_tool {"timeline_clip_ids": ["<head clip>"], "style": "creator", "animation": "pop",
+  "text_size": 0.06, "y": 0.62, "emphasis": ["deadline", "idea", "today"],
+  "avoid": [{"x": 0.5, "y": 0.32, "w": 0.36, "h": 0.3}],
+  "cues": [{"text": "Stop chasing the", "start": 0, "end": 1.1}, {"text": "deadline", "start": 1.1, "end": 1.8}]}
+```
+
+   Check 2 frames: the emphasis word whole and off the mouth, the connector
+   line readable. Too small or too low: run it again with other `text_size`
+   or `y` (it replaces its own captions, one undo step).
+4. The hero word behind the head, once: `generate_subject_matte_tool`
+   `clip_id` = the head clip; when it works (CLI), `text_behind_subject_tool`
+   `{"clip_id": "<head clip>", "text": "IDEA", "color": "#e0201b", "font":
+   "Anton", "y": 0.36}` for the one word the piece is about (leave it out of
+   `emphasis`). A refusal (no matting here) means the word stays in the
+   captions beside the head. Without `kinetic_captions_tool` (it refuses
+   when the host cannot store drawings): `add_captions_tool` (`cues`,
+   `maxWords: 1`, `text_size: 0.065`) for the connectors and `add_title_tool`
+   (`font: "Anton"`, red, `font_scale` 3-4) per emphasis word.
 5. Card: real words, never grey placeholder lines: `add_motion_block_tool`
    `block: "glass_cards"`, `placement: "full_frame"`, the talking head as
    `background`, `headline: ""` (else the block's sample headline shows),
@@ -48,11 +70,25 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    "ui_cards"` with `labels` and `subtitle`. 1.5-2 s.
 6. Transition: `apply_motion_transition_tool` `preset: "whip"`, `direction:
    "up"` on the one cut where the scene changes.
-7. Grade `warm_pop` or `bold_red_cinema` at 0.5. Music: lofi bed under the
+7. Grade the head and the inserts into one world: `unify_grade_tool`
+   `{"reference_clip_id": "<head clip>", "look": "bold_red_cinema",
+   "look_intensity": 0.5}` (or `"warm_pop"`). Music: lofi bed under the
    voice, `duck_under_speech_tool` `duck_db: -10`.
 8. Sound: `auto_sound_design_tool` `intensity: "normal"`, then `add_sfx_tool`
    `pop` on each emphasis word (`at_seconds` = word start, `seed` varied,
    `gain_db: -16`: it ducks under speech anyway) and `whip` on the pan.
+
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 8 above (`intensity: "normal"`, a pop on each
+   emphasis word), the music ducked under the voice.
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
 
 ## Checks
 
@@ -66,8 +102,8 @@ the frame at its start shows it.
 - A subtitle bar of 6 words: not this genre. One word at a time.
 - All words big, or the same big word twice: emphasis is scarce (3-6 in
   20 s) and each appears once.
-- Rail words tiny at the bottom edge: they sit near the subject, centred,
-  big enough to read on a phone.
+- Rail words tiny at the bottom edge: `text_size` 0.055-0.07 and `y` near
+  the subject, centred, big enough to read on a phone.
 - Captions where the subject's face is: read face position off a
   `preview_frame grid: true` first.
 - Music over the voice at full level: duck it.

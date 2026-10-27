@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planMontage, type MontageMusic } from "./montage.js";
+import { bodyOrder, planMontage, type MontageMusic } from "./montage.js";
 
 /** 120 BPM for `seconds`, bars from 0, an off-beat hit every beat (a hat just before each beat). */
 function music(seconds: number, bpm = 120): MontageMusic {
@@ -75,5 +75,15 @@ describe("planMontage", () => {
     const single = planMontage({ clips: 1, fps: 30, music: music(10), seconds: 4 });
     expect(single.shots.every((s) => s.clip === 0)).toBe(true);
     expect(single.shots[single.shots.length - 1]!.end).toBe(single.duration);
+  });
+});
+
+describe("bodyOrder", () => {
+  it("runs the chain once, then back and forth through it with the opener, never the same clip twice in a row", () => {
+    // 7 files: 0 opens, 6 closes, 1-5 are the chain.
+    expect(bodyOrder(7, 20)).toEqual([1, 2, 3, 4, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0]);
+    expect(bodyOrder(3, 5)).toEqual([1, 0, 1, 0, 1]);
+    expect(bodyOrder(2, 3)).toEqual([1, 0, 1]);
+    expect(bodyOrder(1, 2)).toEqual([0, 0]);
   });
 });

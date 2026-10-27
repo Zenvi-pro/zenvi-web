@@ -50,8 +50,11 @@ add_motion_block_tool {"block": "word_rotator", "position_seconds": 11.5, "durat
    Each block renders at ~5-10 s per second of block; `draft: true` while
    iterating, then `update_motion_block_tool` `draft: false`, `motion_blur: 4`
    on cards and headlines.
-3. Transitions: between full-frame scenes one kind, `blur_dissolve` (0.33 s)
-   or `slide` `direction: "left"`; never a crossfade.
+3. Transitions, on by default: once the scenes are on track 1 back to back,
+   one call, `apply_motion_transitions_tool` `{"track": "1", "style":
+   "cinematic", "direction": "left"}` (slide and blur dissolve, the last cut
+   a zoom-through); or one kind, `preset: "blur_dissolve"` (0.33 s) or
+   `"slide"`. Never a crossfade, never hard cuts between whole scenes.
 4. Sound: `auto_sound_design_tool` `intensity: "normal"`, then `add_sfx_tool`
    per UI event: `mouse_click` on the click (in `glass_cards` at ~55 % of the
    block; check the frame), `toggle` right after it, `typing_burst` for the
@@ -65,6 +68,17 @@ add_motion_block_tool {"block": "word_rotator", "position_seconds": 11.5, "durat
 `end_card`, or single `add_motion_template_tool` templates (`type_search`,
 `ui_cards` with `button`, `word_scroll`, `end_card` `variant: "logo"`), all
 with `palette: "ui_light"` and `font_family: "inter"`.
+
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 4 above (`intensity: "normal"` plus the UI sounds).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
 
 ## Checks
 
