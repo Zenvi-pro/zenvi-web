@@ -240,3 +240,23 @@ describe("master_audio_tool iterate", { timeout: 120_000 }, () => {
     expect((await score(p)).rawScore).toBe(before.rawScore);
   });
 });
+
+describe("mix roles", () => {
+  it("reads the stem from a text-to-speech file or the track's name when nothing says otherwise", async () => {
+    const { mixEntries } = await import("../mix-roles.js");
+    const p = mixProject();
+    p.doc.transaction("unrole", (tx) => {
+      const layer = tx.project.layers.find((l) => l.number === 3_000_000)!;
+      const { zenvi_audio_role: _r, ...rest } = layer;
+      tx.replace(["layers", { id: layer.id }], { ...rest, label: "Music bed" });
+      const music = tx.project.layers.find((l) => l.number === 1_000_000)!;
+      tx.update(["layers", { id: music.id }], { label: "Room tone" });
+      const voiceFile = tx.project.files.find((f) => String(f.path).endsWith("voice.wav"))!;
+      tx.update(["files", { id: voiceFile.id }], { path: "/media/zenvi_tts_abc.mp3" });
+    });
+    const roles = Object.fromEntries(mixEntries(p.doc.project).map((e) => [e.id, e.mixRole]));
+    expect(roles[p.voice]).toBe("voice");
+    expect(roles[p.music]).toBe("ambience");
+    expect(roles[p.hits[0]!]).toBe("sfx");
+  });
+});
