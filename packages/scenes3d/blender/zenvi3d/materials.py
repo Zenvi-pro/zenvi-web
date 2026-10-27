@@ -1,5 +1,6 @@
 """Materials: chrome, glass, plastic, matte, clay, iridescent, gradient
-emission, x-ray and wireframe looks, and media (image or video) surfaces."""
+emission, media (image or video) surfaces, and `finish`, the hero material
+by style name."""
 
 import bpy
 
