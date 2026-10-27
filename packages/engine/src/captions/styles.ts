@@ -47,6 +47,19 @@ export interface CaptionFace {
   fillTo?: number;
 }
 
+/**
+ * How a word's letters arrive, on top of the word's own entrance:
+ *   type      typed left to right, a letter every `step` seconds (a Crop
+ *             effect whose right margin steps letter by letter: one clip)
+ *   scramble  `steps` drawings of random letters, each `step` long, resolving
+ *             from the left into the word (consecutive clips on its track)
+ *   stagger   each letter its own clip, entering `step` after the one before
+ * Scramble and stagger act on the emphasis words (every word of a title):
+ * on a run of connectors they would be noise, and each costs a clip per
+ * letter or step.
+ */
+export type LetterMotion = { kind: "type"; step: number } | { kind: "scramble"; step: number; steps: number } | { kind: "stagger"; step: number };
+
 /** How words arrive and leave. */
 export interface CaptionMotion {
   /** Entrance length, seconds. */
@@ -59,6 +72,13 @@ export interface CaptionMotion {
   exit: number;
   toScale: number;
   exitEase: Ease;
+  /**
+   * Rotation, degrees: the start pose's and the rest pose's of an emphasis
+   * word (connectors rest level). Words alternate the sign, so a line of
+   * them reads as tossed, not as one slanted block.
+   */
+  tilt?: { from: number; rest: number };
+  letters?: LetterMotion;
 }
 
 export type CaptionArrangement =
@@ -107,7 +127,7 @@ const POP: CaptionMotion = { enter: 0.2, fromScale: 0.55, fromY: 0, enterEase: "
 const FADE_RISE: CaptionMotion = { enter: 0.3, fromScale: 1, fromY: 0.012, enterEase: "out", exit: 0.2, toScale: 1, exitEase: "in" };
 const SLIDE_UP: CaptionMotion = { enter: 0.3, fromScale: 1, fromY: 0.03, enterEase: "out_strong", exit: 0.15, toScale: 1, exitEase: "in" };
 
-export const CAPTION_ANIMATION_IDS = ["pop", "slam", "slide_up", "rise", "fade"] as const;
+export const CAPTION_ANIMATION_IDS = ["pop", "slam", "slide_up", "rise", "fade", "tilt", "typewriter", "scramble", "letters"] as const;
 export type CaptionAnimationId = (typeof CAPTION_ANIMATION_IDS)[number];
 
 /**
@@ -115,7 +135,10 @@ export type CaptionAnimationId = (typeof CAPTION_ANIMATION_IDS)[number];
  * reference reel uses: pop (creator, Dc3mgNJO73W: from small, overshooting
  * out), slam (hype titles: from big, landing hard in 4 frames, cut away),
  * slide_up (stack, DekLMhxqrFE: up 3 % of the frame), rise (editorial: a
- * soft rise and fade), fade (documentary).
+ * soft rise and fade), fade (documentary), tilt (Dc3mgNJO73W: emphasis words
+ * swing in and stay turned with the camera), typewriter (UI and HUD text),
+ * scramble (DekLMhxqrFE "491GB": random letters decode into the word),
+ * letters (Dd5-sUUoJcW / Dcs-MiOpO2V: letters bounce in one after another).
  */
 export const CAPTION_ANIMATIONS: Readonly<Record<CaptionAnimationId, { summary: string; motion: CaptionMotion }>> = {
   pop: { summary: "scales up from half size with an overshoot", motion: { ...POP, enterEase: "out_back" } },
@@ -123,6 +146,10 @@ export const CAPTION_ANIMATIONS: Readonly<Record<CaptionAnimationId, { summary: 
   slide_up: { summary: "slides up 3 % of the frame", motion: SLIDE_UP },
   rise: { summary: "rises softly as it fades in", motion: FADE_RISE },
   fade: { summary: "fades in place", motion: { enter: 0.2, fromScale: 1, fromY: 0, enterEase: "out", exit: 0.15, toScale: 1, exitEase: "in" } },
+  tilt: { summary: "swings in rotated and overshoots; emphasis words stay turned 7 degrees", motion: { enter: 0.25, fromScale: 0.7, fromY: 0.01, enterEase: "out_back", exit: 0.1, toScale: 0.94, exitEase: "in", tilt: { from: 18, rest: 7 } } },
+  typewriter: { summary: "typed letter by letter, no fade", motion: { enter: 0, fromScale: 1, fromY: 0, enterEase: "linear", exit: 0, toScale: 1, exitEase: "in", letters: { kind: "type", step: 0.04 } } },
+  scramble: { summary: "emphasis words decode from random letters; the rest pop", motion: { ...POP, letters: { kind: "scramble", step: 0.067, steps: 4 } } },
+  letters: { summary: "emphasis words bounce in letter by letter; the rest pop", motion: { ...POP, enterEase: "out_back", letters: { kind: "stagger", step: 0.035 } } },
 };
 
 export const CAPTION_STYLES: Readonly<Record<CaptionStyleId, CaptionStyle>> = {
