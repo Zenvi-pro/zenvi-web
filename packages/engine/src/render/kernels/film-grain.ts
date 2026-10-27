@@ -45,11 +45,6 @@ function clamp01(v: number): number {
   return v < 1 ? (v > 0 ? v : 0) : 1;
 }
 
-function clampByte(v: number): number {
-  if (v <= 0) return 0;
-  if (v >= 255) return 255;
-  return Math.trunc(f32(v + 0.5));
-}
 
 /** `t*t*(3 - 2t)` (the fused `3 - 2t`). */
 function smooth(t: number): number {
@@ -139,6 +134,7 @@ export const filmGrain: KernelSpec = {
     const useVariation = colorAmount > EPSILON && colorVariation > EPSILON;
     const numTimes = useTemporal ? 2 : 1;
     const numSalts = useVariation ? 4 : 1;
+    const allStages = useTemporal && useSoft && useClump && useVariation;
     const buckets = [time0, time1];
 
     // Noise coordinates follow the timeline size, not the image (FilmGrain.cpp:175-189).
@@ -256,26 +252,46 @@ export const filmGrain: KernelSpec = {
       }
 
       // Per-salt grain (FilmGrain.cpp:321-344).
-      for (let s = 0; s < numSalts; s += 1) {
-        const out = s * width;
+      if (allStages) {
+        // Every stage on, four salts (the defaults): one pass, each column's cell lookups shared by the salts.
         for (let x = 0; x < width; x += 1) {
-          const fine = fineIxOf[x]! * 8 + s;
-          let g0 = fineNoise[fine]!;
-          let g1 = useTemporal ? fineNoise[fine + 4]! : 0;
-          if (useSoft) {
-            const soft = softIxOf[x]! * 8 + s;
-            const softSx = softSxOf[x]!;
-            g0 = f32(f32(f32(softStep[soft]! * softSx + softRow[soft]!) - g0) * softness + g0);
-            if (useTemporal) g1 = f32(f32(f32(softStep[soft + 4]! * softSx + softRow[soft + 4]!) - g1) * softness + g1);
-          }
-          let grain = useTemporal ? f32(f32(g1 - g0) * smoothMix + g0) : g0;
-          if (useClump) {
-            const at = clumpIxOf[x]! * 4 + s;
-            const cluster = f32(clumpStep[at]! * clumpSxOf[x]! + clumpRow[at]!);
+          const fine = fineIxOf[x]! * 8;
+          const soft = softIxOf[x]! * 8;
+          const at = clumpIxOf[x]! * 4;
+          const softSx = softSxOf[x]!;
+          const clumpSx = clumpSxOf[x]!;
+          for (let s = 0; s < 4; s += 1) {
+            let g0 = fineNoise[fine + s]!;
+            let g1 = fineNoise[fine + 4 + s]!;
+            g0 = f32(f32(f32(softStep[soft + s]! * softSx + softRow[soft + s]!) - g0) * softness + g0);
+            g1 = f32(f32(f32(softStep[soft + 4 + s]! * softSx + softRow[soft + 4 + s]!) - g1) * softness + g1);
+            const cluster = f32(clumpStep[at + s]! * clumpSx + clumpRow[at + s]!);
             const target = f32(Math.abs(cluster) * CLUSTER_SCALE + CLUSTER_BASE);
-            grain = f32(grain * f32(f32(target - 1) * clump + 1));
+            const grain = f32(f32(f32(g1 - g0) * smoothMix + g0) * f32(f32(target - 1) * clump + 1));
+            grainRows[x * 4 + s] = grain;
           }
-          grainRows[out + x] = grain;
+        }
+      } else {
+        for (let s = 0; s < numSalts; s += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const fine = fineIxOf[x]! * 8 + s;
+            let g0 = fineNoise[fine]!;
+            let g1 = useTemporal ? fineNoise[fine + 4]! : 0;
+            if (useSoft) {
+              const soft = softIxOf[x]! * 8 + s;
+              const softSx = softSxOf[x]!;
+              g0 = f32(f32(f32(softStep[soft]! * softSx + softRow[soft]!) - g0) * softness + g0);
+              if (useTemporal) g1 = f32(f32(f32(softStep[soft + 4]! * softSx + softRow[soft + 4]!) - g1) * softness + g1);
+            }
+            let grain = useTemporal ? f32(f32(g1 - g0) * smoothMix + g0) : g0;
+            if (useClump) {
+              const at = clumpIxOf[x]! * 4 + s;
+              const cluster = f32(clumpStep[at]! * clumpSxOf[x]! + clumpRow[at]!);
+              const target = f32(Math.abs(cluster) * CLUSTER_SCALE + CLUSTER_BASE);
+              grain = f32(grain * f32(f32(target - 1) * clump + 1));
+            }
+            grainRows[x * numSalts + s] = grain;
+          }
         }
       }
 
@@ -308,11 +324,12 @@ export const filmGrain: KernelSpec = {
 
         // Apply (FilmGrain.cpp:346-360).
         const strength = f32(tone * intensityScale);
-        const lumaGrain = grainRows[x]!;
+        const at = x * numSalts;
+        const lumaGrain = grainRows[at]!;
         if (useVariation) {
-          const redGrain = f32(f32(grainRows[width + x]! - lumaGrain) * colorVariation + lumaGrain);
-          const greenGrain = f32(f32(grainRows[2 * width + x]! - lumaGrain) * colorVariation + lumaGrain);
-          const blueGrain = f32(f32(grainRows[3 * width + x]! - lumaGrain) * colorVariation + lumaGrain);
+          const redGrain = f32(f32(grainRows[at + 1]! - lumaGrain) * colorVariation + lumaGrain);
+          const greenGrain = f32(f32(grainRows[at + 2]! - lumaGrain) * colorVariation + lumaGrain);
+          const blueGrain = f32(f32(grainRows[at + 3]! - lumaGrain) * colorVariation + lumaGrain);
           R = f32(f32(f32(redGrain - lumaGrain) * colorAmount + lumaGrain) * strength + R);
           G = f32(f32(f32(greenGrain - lumaGrain) * colorAmount + lumaGrain) * strength + G);
           B = f32(f32(f32(blueGrain - lumaGrain) * colorAmount + lumaGrain) * strength + B);
@@ -335,7 +352,7 @@ export const filmGrain: KernelSpec = {
           g = f32(ap * g);
           b = f32(ap * b);
         }
-        // clampByte, written out.
+        // 0, 255, else rounded to the nearest byte.
         d[i] = r <= 0 ? 0 : r >= 255 ? 255 : Math.trunc(f32(r + 0.5));
         d[i + 1] = g <= 0 ? 0 : g >= 255 ? 255 : Math.trunc(f32(g + 0.5));
         d[i + 2] = b <= 0 ? 0 : b >= 255 ? 255 : Math.trunc(f32(b + 0.5));
