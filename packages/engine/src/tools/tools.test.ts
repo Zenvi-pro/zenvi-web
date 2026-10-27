@@ -1331,6 +1331,23 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { style: "cinematic" }, status: "refused", summary: /^Error: style goes with source=library or mixed\.$/ },
   },
 
+  search_sound_library_tool: {
+    happy: { args: { category: "whoosh", length: "short" }, summary: /^\d+ kit sounds for whoosh, short( \(best 8\))?:\n {2}kit:\d+ {2}whoosh /, check: ({ doc, before }) => expect(doc.project).toEqual(before) },
+    failure: { args: { category: "click", min_seconds: 2, max_seconds: 1 }, status: "refused", summary: /^Error: min_seconds is more than max_seconds\.$/ },
+  },
+  generate_sfx_tool: {
+    happy: {
+      args: { prompt: "deep cinematic boom", duration_seconds: 2, role: "boom" },
+      setup: (_doc, host) => {
+        host.audio!.decodePcm = async () => ({ sampleRate: 48000, samples: Float32Array.from({ length: 48000 }, (_, i) => 0.5 * Math.exp(-i / 9600) * Math.sin(i / 20)) });
+        host.audio!.generateSfx = async () => ({ path: "/cache/sfx-gen/x.mp3", provider: "elevenlabs", model: "eleven_text_to_sound_v2", key: "c".repeat(64), cached: false, costUsd: 0.015, licence: "Paid plan.", termsUrl: "https://elevenlabs.io/terms-of-use" });
+      },
+      summary: /^Generated 'deep cinematic boom' \(boom, 2 s\) for about \$0\.015; it is in the media bin as file \w+\. Paid plan\.$/,
+      check: ({ doc }) => expect(doc.undoLabels.at(-1)).toBe("Generate sound 'deep cinematic boom'"),
+    },
+    failure: { args: { prompt: "deep cinematic boom", duration_seconds: 2 }, status: "refused", summary: /^Error: generate_sfx_tool is not available.*no sound generator is configured/ },
+  },
+
   // --- stock search (web) -------------------------------------------------------------
   search_pexels_videos_tool: {
     happy: {

@@ -38,6 +38,7 @@ export type HostMethod =
   | "audio.decodePcm"
   | "audio.mixPcm"
   | "audio.transcribe"
+  | "audio.generateSfx"
   | "ui.selection"
   | "ui.setSelection"
   | "ui.timelineView"
@@ -219,6 +220,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   },
   add_vignette_tool: { methods: ["media.writeGenerated"] },
   add_shape_mask_tool: { methods: ["media.writeGenerated"] },
+  search_sound_library_tool: { optional: ["media.kitSample"], partialNote: "without the recorded kit's cache the library is searched but its sounds cannot be placed" },
+  generate_sfx_tool: { methods: ["media.writeGenerated", "audio.decodePcm", "audio.generateSfx"] },
   search_sfx_tool: { optional: ["library", "stock"], partialNote: "without Openverse only procedural recipes and Freesound (with stock search) are searched" },
   create_sound_kit_tool: {
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
@@ -424,6 +427,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "audio.decodePcm",
       "audio.mixPcm",
       "audio.transcribe",
+      "audio.generateSfx",
       "exporter.supports",
       "frames.fontFamilies",
       "frames.renderSheet",
@@ -433,6 +437,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       backend: "signed in with zenvi login",
       stock: "signed in with zenvi login",
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
+      "audio.generateSfx": "ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
       motion: "headless Chrome is installed: zenvi motion setup",
       scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
@@ -527,6 +532,7 @@ function needName(need: HostCapability | HostMethod): string {
     "audio.decodePcm": "audio decoding",
     "audio.mixPcm": "rendering the timeline mix to measure its loudness",
     "audio.transcribe": "speech recognition",
+    "audio.generateSfx": "generating sound effects (the zenvi CLI and local MCP with ELEVENLABS_API_KEY on a paid ElevenLabs plan)",
     "ui.selection": "reading the editor's selection",
     "ui.setSelection": "selecting in the editor",
     "ui.timelineView": "reading the timeline view",

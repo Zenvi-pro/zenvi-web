@@ -1,8 +1,10 @@
 /**
  * Generate packages/engine/src/sfx/recorded-kit.data.ts, the recorded SFX
  * kit's list (sfx/recorded.ts), from a curated JSON list of Freesound
- * sounds: one object per sound with group, id, name, username, license_url,
- * duration, preview_url, sha256 and bytes (the preview file's).
+ * sounds (sound-library/curate-kit.ts writes it): one object per sound with
+ * group, id, name, username, tags, license_url, license_checked_at,
+ * duration, preview_url, samplerate, sha256 and bytes (the preview file's)
+ * and its measurement (sfx/analyse.ts, made from that preview).
  *
  *   npx tsx packages/engine/scripts/gen-recorded-kit.ts curated.json
  *   FREESOUND_API_KEY=... npx tsx packages/engine/scripts/gen-recorded-kit.ts curated.json --verify
@@ -17,6 +19,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { KitAnalysis } from "../src/sfx/analyse.js";
 import { RECORDED_GROUPS, type RecordedGroup, type RecordedSample } from "../src/sfx/recorded.js";
 
 const OUT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src/sfx/recorded-kit.data.ts");
@@ -33,7 +36,17 @@ interface Curated {
   preview_url: string;
   sha256: string;
   bytes: number;
+  tags: string[];
+  license_checked_at: string;
+  samplerate: number;
+  analysis: KitAnalysis;
 }
+
+/** Loudest 400 ms of every kit sound after its gain, LUFS: a common level to place and search from. */
+const REFERENCE_LUFS = -18;
+const CEILING_DBTP = -1;
+const r1 = (x: number): number => Math.round(x * 10) / 10;
+const r3 = (x: number): number => Math.round(x * 1000) / 1000;
 
 function read(file: string): RecordedSample[] {
   const rows = JSON.parse(readFileSync(file, "utf8")) as Curated[];
@@ -44,7 +57,9 @@ function read(file: string): RecordedSample[] {
     if (!CDN.test(r.preview_url)) throw new Error(`${r.id}: preview not on cdn.freesound.org (${r.preview_url})`);
     if (!/^[0-9a-f]{64}$/.test(r.sha256)) throw new Error(`${r.id}: bad sha256`);
     if (seen.has(r.id)) throw new Error(`${r.id}: listed twice`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.license_checked_at)) throw new Error(`${r.id}: no licence check date`);
     seen.add(r.id);
+    const a = r.analysis;
     return {
       group: r.group as RecordedGroup,
       id: r.id,
@@ -55,6 +70,20 @@ function read(file: string): RecordedSample[] {
       sha256: r.sha256,
       bytes: r.bytes,
       license: "CC0",
+      licenseCheckedAt: r.license_checked_at,
+      tags: r.tags.slice(0, 12),
+      onsetMs: Math.round(a.onsetMs),
+      peakMs: Math.round(a.peakMs),
+      endMs: Math.round(a.endMs),
+      attackMs: Math.round(a.attackMs),
+      lufs: r1(a.lufs),
+      truePeakDb: r1(a.truePeakDb),
+      gainDb: r1(Math.min(REFERENCE_LUFS - a.lufsMax, CEILING_DBTP - a.truePeakDb)),
+      crestDb: r1(a.crestDb),
+      centroidHz: Math.round(a.centroidHz),
+      lowShare: r3(a.lowShare),
+      stereo: a.sideDb > -30,
+      sourceRate: r.samplerate,
     };
   });
 }

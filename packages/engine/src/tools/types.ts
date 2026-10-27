@@ -546,6 +546,42 @@ export interface AudioHost {
    * without speech recognition…).
    */
   transcribe?(path: string, options?: TranscribeOptions): Promise<Transcription>;
+  /**
+   * Generate a sound effect from a text prompt (sfx/generate.ts checks the
+   * request first) into a local audio file, cached by request: the same
+   * request is never paid for twice. Present only where a provider whose
+   * output may be used commercially is configured (the zenvi CLI with
+   * ELEVENLABS_API_KEY on a paid plan). Rejects with words (the provider's
+   * refusal, no credits, offline).
+   */
+  generateSfx?(request: SfxGenerationRequest, options?: { signal?: AbortSignal }): Promise<GeneratedSfx>;
+}
+
+export interface SfxGenerationRequest {
+  prompt: string;
+  /** 0.5..30 s: always set, so the provider bills per second and the cue fits. */
+  durationSeconds: number;
+  /** 0..1: how literally the prompt is followed (0.6..0.8 repeats best). */
+  promptInfluence: number;
+  /** A seamless loop (ambience beds). */
+  loop: boolean;
+}
+
+export interface GeneratedSfx {
+  /** Local path of the generated audio. */
+  path: string;
+  /** Who made it and with what, for the credit (e.g. elevenlabs, eleven_text_to_sound_v2). */
+  provider: string;
+  model: string;
+  /** The cache key (sha256 of provider, model and request). */
+  key: string;
+  /** Served from the cache: nothing was paid. */
+  cached: boolean;
+  /** What it cost when it was made, US dollars, when known. */
+  costUsd?: number;
+  /** The provider's terms for its output, and where they are. */
+  licence: string;
+  termsUrl: string;
 }
 
 /** The project's audio mixed down and measured, for reviewing an edit by ear. */

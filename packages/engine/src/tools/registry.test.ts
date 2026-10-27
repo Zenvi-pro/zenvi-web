@@ -54,6 +54,8 @@ const DIRECT_TOOLS = [
   "search_sfx_tool",
   "list_credits_tool",
   "create_sound_kit_tool",
+  "search_sound_library_tool",
+  "generate_sfx_tool",
   "search_pexels_videos_tool",
   "search_freesound_music_tool",
   "gather_stock_footage_tool",
