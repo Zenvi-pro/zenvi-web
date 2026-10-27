@@ -21,6 +21,7 @@ const DIRECT_TOOLS = [
   "add_transition_tool",
   "probe_media_tool",
   "build_reel_tool",
+  "review_render_tool",
   "add_motion_template_tool",
   "list_motion_transitions_tool",
   "apply_motion_transition_tool",

@@ -4,8 +4,12 @@ Zenvi Cloud runs a remote MCP server. Any MCP client that speaks Streamable
 HTTP can use it to list, create and edit the person's cloud video projects,
 import media, preview frames and start renders.
 
-**Server URL:** `https://zenvi-cloud.whitesky-da3c8402.eastus.azurecontainerapps.io/mcp`
-(after the custom domain is set up, §7: `https://cloud.zenvi.pro/mcp`).
+**Server URL:** `https://zenvi.pro/plugin`
+
+The server's own address, `https://zenvi.pro/plugin`,
+keeps working, and connections made with it stay connected. zenvi.pro/plugin
+is the same server behind a Cloudflare Worker (§7a). Opened in a browser, it
+shows the website's page about connecting Zenvi.
 
 Sign-in is OAuth 2.1 through zenvi.pro: the client opens a Zenvi page, the
 person signs in with their Zenvi account (the same one as the desktop app and
@@ -103,14 +107,14 @@ The connector added on claude.ai is available in Claude Desktop and mobile too.
 OAuth (recommended):
 
 ```bash
-claude mcp add --transport http zenvi https://zenvi-cloud.whitesky-da3c8402.eastus.azurecontainerapps.io/mcp
+claude mcp add --transport http zenvi https://zenvi.pro/plugin
 # then inside Claude Code: /mcp → zenvi → Authenticate (opens the browser)
 ```
 
 With a personal token instead (headless machines, CI):
 
 ```bash
-claude mcp add --transport http zenvi https://zenvi-cloud.whitesky-da3c8402.eastus.azurecontainerapps.io/mcp \
+claude mcp add --transport http zenvi https://zenvi.pro/plugin \
   --header "Authorization: Bearer $ZENVI_TOKEN"
 ```
 
@@ -123,7 +127,7 @@ mcp`, stdio) is the better fit; this remote server edits cloud projects.
 
 ```toml
 [mcp_servers.zenvi]
-url = "https://zenvi-cloud.whitesky-da3c8402.eastus.azurecontainerapps.io/mcp"
+url = "https://zenvi.pro/plugin"
 # either sign in with OAuth:  codex mcp login zenvi
 # or use a personal token from the environment:
 bearer_token_env_var = "ZENVI_TOKEN"
@@ -136,7 +140,7 @@ bearer_token_env_var = "ZENVI_TOKEN"
 ```json
 {
   "mcpServers": {
-    "zenvi": { "url": "https://zenvi-cloud.whitesky-da3c8402.eastus.azurecontainerapps.io/mcp" }
+    "zenvi": { "url": "https://zenvi.pro/plugin" }
   }
 }
 ```
@@ -147,7 +151,7 @@ Cursor shows "Needs login" → click it to sign in. With a token, add
 **VS Code** (`.vscode/mcp.json`):
 
 ```json
-{ "servers": { "zenvi": { "type": "http", "url": "https://zenvi-cloud.whitesky-da3c8402.eastus.azurecontainerapps.io/mcp" } } }
+{ "servers": { "zenvi": { "type": "http", "url": "https://zenvi.pro/plugin" } } }
 ```
 
 **MCP Inspector** (debugging): `npx @modelcontextprotocol/inspector`, transport
@@ -156,7 +160,7 @@ Cursor shows "Needs login" → click it to sign in. With a token, add
 
 ## 5. Personal access tokens
 
-A `zvn_pat_…` token works as a bearer token on `/mcp` and on the REST API.
+A `zvn_pat_…` token works as a bearer token on `/mcp` (and zenvi.pro/plugin) and on the REST API.
 Get one:
 
 - `zenvi login` in the CLI (device login; the CLI keeps the token), or
@@ -223,6 +227,32 @@ The container app answers on its Azure name today. To serve it as
 Keep Cloudflare's proxy off for `cloud`: certificate renewal validates the
 CNAME, and hosts must reach the server without a WAF in between (ChatGPT
 egress: `openai.com/chatgpt-connectors.json`; Claude: `160.79.104.0/21`).
+
+## 7a. zenvi.pro/plugin
+
+zenvi.pro is an Azure Static Web App, which can't forward a path to another
+server with the `Authorization` header intact, so Cloudflare does it:
+
+- **Cloudflare** (zone `zenvi.pro`): the apex record is **Proxied** and
+  SSL/TLS is **Full (strict)** (Azure keeps serving its zenvi.pro certificate
+  to Cloudflare; keep the `@` TXT record for its renewals).
+- **Worker** `zenvi-plugin-proxy` (`scripts/cloudflare/plugin-proxy/`) on
+  `zenvi.pro/plugin` and `zenvi.pro/.well-known/oauth-protected-resource/plugin`
+  only. It forwards those requests to Zenvi Cloud with the path unchanged,
+  except a browser page load (GET with `Accept: text/html` and no
+  `Authorization`), which falls through to the website's `/plugin` page.
+  Deploy: `npx wrangler@4 deploy -c scripts/cloudflare/plugin-proxy/wrangler.toml`.
+- **Zenvi Cloud**: `MCP_URL_ALIASES=https://zenvi.pro/plugin` mounts the MCP
+  server at `/plugin` too. Requests there use the resource
+  `https://zenvi.pro/plugin` (tokens are bound to it and refused on `/mcp`,
+  and the reverse); the metadata at
+  `zenvi.pro/.well-known/oauth-protected-resource/plugin` names Zenvi Cloud's
+  own origin as the authorization server, so sign-in, token and registration
+  requests go straight to Zenvi Cloud, not through Cloudflare.
+
+Cloudflare's bot protection must not challenge server-to-server MCP traffic:
+keep Bot Fight Mode off for the zone (ChatGPT and Claude call from their
+servers; their egress lists are in §7).
 
 ## 8. How the sign-in works (for client developers)
 
