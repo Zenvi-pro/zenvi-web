@@ -58,7 +58,7 @@ a small logo bug, low impacts on topic changes and a quiet music bed.
 ## Finish (every run, in this order; never skip it)
 
 1. Sound on every cut: step 7 above (`intensity: "subtle"`, ducked under the voice).
-2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+2. `master_audio_tool` `{"preset": "social", "genre": "video_essay", "iterate": true}` (fixes what analyze_mix_tool finds, then masters), after the last audio change (any later
    audio edit means mastering again).
 3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
 4. One fix pass: every `PROBLEM` line with the tool it names (a repeated

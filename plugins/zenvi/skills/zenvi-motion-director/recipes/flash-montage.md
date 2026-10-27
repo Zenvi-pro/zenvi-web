@@ -85,7 +85,7 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
 ## Finish (every run, in this order; never skip it)
 
 1. Sound on every cut: step 6 above (`auto_sound_design_tool` `intensity: "hype"`, `density: "every_cut"`).
-2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+2. `master_audio_tool` `{"preset": "social", "genre": "flash_montage", "iterate": true}` (fixes what analyze_mix_tool finds, then masters), after the last audio change (any later
    audio edit means mastering again).
 3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
 4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
