@@ -1,4 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
@@ -63,8 +65,15 @@ describe("zenvi mcp", () => {
     expect(tool.annotations).toMatchObject({ readOnlyHint: true });
   });
 
-  it("says how to sign in, without calling the backend, when the sign-in is a personal token", async () => {
-    const env = testEnv(home, { ZENVI_BACKEND_URL: "http://127.0.0.1:9" });
+  it("says how to sign in, without sending the token, when the sign-in is a personal token", async () => {
+    // Stands in for the backend: every route needs a Supabase session.
+    const seen: Array<string | undefined> = [];
+    const stub = createServer((req, res) => {
+      seen.push(req.headers.authorization);
+      res.writeHead(401, { "Content-Type": "application/json" }).end(JSON.stringify({ detail: "auth required: missing Authorization: Bearer header" }));
+    });
+    await new Promise<void>((resolve) => stub.listen(0, "127.0.0.1", resolve));
+    const env = testEnv(home, { ZENVI_BACKEND_URL: `http://127.0.0.1:${(stub.address() as AddressInfo).port}` });
     const configDir = env.ZENVI_CONFIG_DIR!;
     await mkdir(configDir, { recursive: true });
     await writeFile(path.join(configDir, "auth.json"), JSON.stringify({ kind: "pat", token: "zvn_pat_abc", user_email: "p@q.r", saved_at: "x" }));
@@ -86,8 +95,10 @@ describe("zenvi mcp", () => {
 
       const tts = await call(client, "generate_tts_and_add_to_timeline_tool", { text: "hello" });
       expect(tts.receipt.summary).toMatch(/personal tokens \(zvn_…\).*zenvi login/);
-      expect(tts.receipt.summary).not.toMatch(/Cannot reach/);
+      expect(seen.length).toBeGreaterThan(0);
+      expect(seen.every((auth) => auth === undefined)).toBe(true);
     } finally {
+      stub.close();
       await rm(path.join(configDir, "auth.json"), { force: true });
     }
   });

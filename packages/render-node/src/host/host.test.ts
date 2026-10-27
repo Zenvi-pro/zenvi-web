@@ -238,11 +238,11 @@ describe("backend host", () => {
     await expect(down.request("/api/v1/ok")).rejects.toThrow(/Cannot reach/);
   });
 
-  it("says why it cannot be used before sending anything", async () => {
-    const before = requests.length;
+  it("says why it cannot be used when the backend refuses, and still reaches open routes without the token", async () => {
     const backend = createBackendHost({ baseUrl, token: async () => "tok", unavailable: async () => "Sign in with `zenvi login`." });
-    await expect(backend.request("/api/v1/ok")).rejects.toMatchObject({ status: 401, message: "Sign in with `zenvi login`." });
-    expect(requests.length).toBe(before);
+    await expect(backend.request("/api/v1/private")).rejects.toMatchObject({ status: 401, message: "Sign in with `zenvi login`." });
+    expect(await backend.request("/api/v1/ok", { body: {} })).toEqual({ ok: true, echo: {} });
+    expect(requests.at(-1)?.auth).toBeUndefined();
     const usable = createBackendHost({ baseUrl, unavailable: async () => undefined });
     expect(await usable.request("/api/v1/ok", { body: {} })).toEqual({ ok: true, echo: {} });
   });
