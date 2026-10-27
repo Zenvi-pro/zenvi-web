@@ -54,6 +54,12 @@ export interface MixCue {
   sample?: string;
   /** The clip's timeline start, seconds (to move it by a timing error). */
   position?: number;
+  /**
+   * Placed by auto sound design: a fix may delete or move it. Anything else
+   * on the timeline is the user's (or an explicit add_sfx_tool's) and only
+   * gets the advice, never a remove or a move.
+   */
+  auto?: boolean;
 }
 
 /** One call of a Zenvi tool that applies a fix. */
@@ -438,9 +444,12 @@ export function scoreMix(input: ScoreInput): MixScore {
       calls: uncovered.slice(0, 5).map((h) => ({ tool: "add_sfx_tool", args: { recipe: recipe(h.kind), at_seconds: r2(h.t) } })),
     });
     const untiedCues = cues.filter((c) => c.role !== "micro" && !hits.some((h) => Math.abs(h.t - c.t) <= tol));
+    const placed = untiedCues.filter((c) => !c.auto);
     put("H2_untied_per_s", dur > 0 ? untiedCues.length / dur : null, 0, 0.3, "placement", {
-      text: `${untiedCues.length} cue(s) sit on no hit point: delete them or move them onto one (${untiedCues.slice(0, 5).map((c) => `${c.id} @${c.t.toFixed(2)}`).join(", ")})`,
-      calls: untiedCues.slice(0, 3).map((c) => ({ tool: "remove_clip_tool", args: { timeline_clip_id: c.id } })),
+      text:
+        `${untiedCues.length} cue(s) sit on no hit point: delete them or move them onto one (${untiedCues.slice(0, 5).map((c) => `${c.id} @${c.t.toFixed(2)}`).join(", ")})` +
+        (placed.length ? `; ${placed.map((c) => c.id).slice(0, 5).join(", ")} were placed by hand: decide yourself` : ""),
+      calls: untiedCues.filter((c) => c.auto).slice(0, 3).map((c) => ({ tool: "remove_clip_tool", args: { timeline_clip_id: c.id } })),
     });
   }
   if (cues.length > 0 && sfx) {
@@ -472,7 +481,7 @@ export function scoreMix(input: ScoreInput): MixScore {
       const worst = [...errs].sort((a, b) => Math.abs(b.err) - Math.abs(a.err)).filter((e) => Math.abs(e.err) > frameMs).slice(0, 5);
       put("H3_timing_within_1f", within, 0.9, 1, "placement", {
         text: `move the late/early cues by -err: ${worst.map((e) => `${e.cue.id} ${e.err >= 0 ? "+" : ""}${Math.round(e.err)} ms`).join(", ")}`,
-        calls: worst.filter((e) => e.cue.position !== undefined).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
+        calls: worst.filter((e) => e.cue.auto && e.cue.position !== undefined).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
       }, { medianAbsMs: r1(median(errs.map((e) => Math.abs(e.err)))), worst: worst.map((e) => ({ cue: e.cue.id, errMs: Math.round(e.err) })) });
     }
     for (const role of ["hero", "sweetener", "micro"] as const) {

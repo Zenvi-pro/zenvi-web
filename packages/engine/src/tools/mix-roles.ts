@@ -15,7 +15,7 @@ import type { StemRole } from "../mastering/gain-stage.js";
 import type { HitPoint, MixCue, CueRole, StemName } from "../mastering/score.js";
 import type { Clip, Project } from "../model/types.js";
 import { TRACK_AUDIO_ROLES, type TrackAudioRole } from "../ops/tracks.js";
-import { isSfxClip } from "../sfx/moments.js";
+import { isAutoSfxClip, isSfxClip } from "../sfx/moments.js";
 import { soundMoments } from "../sfx/moments.js";
 import { sfxRecipe } from "../sfx/recipes.js";
 import { MUSIC_MIN_DURATION, hasVideoStream, type AudioRole } from "./audio-mix.js";
@@ -152,6 +152,7 @@ export function cuesOf(project: Project): MixCue[] {
       role,
       sample: clipMark.library ?? (fileMark?.library ? `${fileMark.library.provider}:${fileMark.library.id}` : fileMark?.key ?? String(clip.file_id ?? "")),
       position,
+      auto: isAutoSfxClip(clip),
     });
   }
   return cues.sort((a, b) => a.t - b.t);

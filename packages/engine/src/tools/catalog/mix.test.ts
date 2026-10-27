@@ -13,7 +13,7 @@ import { runTool } from "../registry.js";
 import type { ToolReceipt } from "../receipt.js";
 import { addClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
-import { audioInfo, media } from "../test-support/fixture.js";
+import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
 import { MIX_RATE, decodeWav, mixProject, type MixProject } from "../test-support/mix-host.js";
 import { measureMix } from "./analyze-mix.js";
 
@@ -316,6 +316,33 @@ describe("master_audio_tool iterate", { timeout: 120_000 }, () => {
   });
 });
 
+describe("iterate and the user's clips", { timeout: 120_000 }, () => {
+  it("never removes or moves an SFX clip the user placed; only auto sound design's cues are the fixes' to move", async () => {
+    const p = mixProject({ transcript: true });
+    // Two shots with a cut at 4 s: every click is off the hit point, so H2 wants them gone.
+    p.doc.transaction("shots", (tx) => {
+      for (const [position, end] of [[0, 4], [4, 4]] as const) {
+        const file = addFile(tx, media(`/media/shot${position}.mp4`, videoInfo(`/media/shot${position}.mp4`, 8)), { dedupe: false }).id;
+        tx.update(["files", { id: file }], { path: `/media/shot${position}-shot.mp4` });
+        addClip(tx, { fileId: file, position, layer: 5_000_000, start: 0, end });
+      }
+      for (const id of p.hits.slice(0, 3)) tx.update(["clips", { id }], { zenvi_sfx: { recipe: "impact_punch", auto: true } });
+    });
+    const user = p.hits.slice(3);
+    const before = new Map(user.map((id) => [id, Number(p.doc.project.clips.find((c) => c.id === id)!.position)]));
+    const s = await score(p);
+    expect(s.metrics.H2_untied_per_s!.status).toBe("high");
+    expect(s.metrics.H2_untied_per_s!.calls!.every((c) => !user.includes(String(c.args.timeline_clip_id)))).toBe(true);
+    expect(s.metrics.H2_untied_per_s!.fix).toMatch(/placed by hand/);
+    await run(p, "master_audio_tool", { iterate: true, genre: "saas_ui" });
+    for (const id of user) {
+      const clip = p.doc.project.clips.find((c) => c.id === id);
+      expect(clip, id).toBeDefined();
+      expect(Number(clip!.position)).toBeCloseTo(before.get(id)!, 6);
+    }
+  });
+});
+
 describe("mix roles", () => {
   it("reads the stem from a text-to-speech file or the track's name when nothing says otherwise", async () => {
     const { mixEntries } = await import("../mix-roles.js");
@@ -333,5 +360,14 @@ describe("mix roles", () => {
     expect(roles[p.voice]).toBe("voice");
     expect(roles[p.music]).toBe("ambience");
     expect(roles[p.hits[0]!]).toBe("sfx");
+  });
+});
+
+describe("iterate's scratch media", () => {
+  it("names the files a dropped round wrote that nothing keeps", async () => {
+    const { orphanedPaths } = await import("./master-loop.js");
+    const project = (paths: string[]) => ({ files: paths.map((path, i) => ({ id: `F${i}`, path })) }) as unknown as import("../../model/types.js").Project;
+    const before = project(["/media/a.wav", "/generated/sfx-1.wav", "/generated/pan-2.wav"]);
+    expect(orphanedPaths(before, [project(["/media/a.wav"]), project(["/media/a.wav", "/generated/pan-2.wav"])])).toEqual(["/generated/sfx-1.wav"]);
   });
 });

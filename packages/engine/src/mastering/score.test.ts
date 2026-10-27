@@ -102,7 +102,9 @@ describe("scoreMix", () => {
     expect(b5.calls![0]).toMatchObject({ tool: "set_audio_gain_tool", args: { clip_ids: ["c0", "c1", "c2", "c3", "c4", "c5"] } });
     expect((b5.calls![0]!.args.gain_db as number)).toBeLessThan(-3);
 
-    const late = scoreMix({ ...atTarget({ late: 0.08 }), cues: input().cues!.map((c) => ({ ...c, position: c.t })) });
+    const late = scoreMix({ ...atTarget({ late: 0.08 }), cues: input().cues!.map((c, i) => ({ ...c, position: c.t, auto: i !== 1 })) });
+    // c1 was placed by hand: it is named in the text, never moved by a call.
+    expect(late.metrics.H3_timing_within_1f!.calls!.some((c) => c.args.clip_id === "c1")).toBe(false);
     const h3 = late.metrics.H3_timing_within_1f!;
     const first = h3.calls!.find((c) => c.args.clip_id === "c0")!;
     expect(first.tool).toBe("move_clip_tool");

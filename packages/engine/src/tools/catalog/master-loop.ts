@@ -9,11 +9,13 @@
  * run on a scratch copy of the project through the same tools an agent would
  * call; a round that lowers the score is dropped and the loop stops. The
  * result lands in the real project as one transaction: one undo step for
- * the whole run.
+ * the whole run. Media a dropped step wrote is discarded; a fix never
+ * removes or moves a clip auto sound design did not place.
  */
 
 import { ProjectDocument, type Transaction } from "../../history/document.js";
-import type { MixGenre, MixScore } from "../../mastering/score.js";
+import type { FixCall, MixGenre, MixScore } from "../../mastering/score.js";
+import { isAutoSfxClip } from "../../sfx/moments.js";
 import type { Project } from "../../model/types.js";
 import type { ToolCall } from "../define.js";
 import { applied, unchanged, type ToolReceipt } from "../receipt.js";
@@ -22,6 +24,23 @@ import { measureMix } from "./analyze-mix.js";
 export const MAX_ROUNDS = 3;
 export const TARGET_SCORE = 85;
 const PEAK_MARGIN_DB = 0.2;
+
+/** Media paths of `before`'s files that none of `keep` still has (hosts delete only paths their writeGenerated returned). */
+export function orphanedPaths(before: Project, keep: readonly Project[]): string[] {
+  const kept = new Set(keep.flatMap((p) => p.files.map((f) => String(f.path))));
+  return [...new Set(before.files.map((f) => String(f.path)).filter((path) => !kept.has(path)))];
+}
+
+/** Tools that take a clip off the timeline or move it in time. */
+const CLIP_MOVERS = new Set(["remove_clip_tool", "move_clip_tool", "move_clips_tool", "delete_from_timeline_tool", "delete_clips_on_track_tool", "trim_clip_tool"]);
+
+/** A call iterate may make: anything but removing or moving a clip auto_sound_design_tool did not place. */
+function ownsTarget(project: Project, call: FixCall): boolean {
+  if (!CLIP_MOVERS.has(call.tool)) return true;
+  const id = String(call.args.timeline_clip_id ?? call.args.clip_id ?? "");
+  const clip = project.clips.find((c) => String(c.id) === id);
+  return Boolean(clip && isAutoSfxClip(clip));
+}
 
 /** `a` scores higher than `b`: the capped score, then the raw score. */
 function isBetter(a: MixScore, b: MixScore): boolean {
@@ -67,6 +86,16 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
   const { runTool } = await import("../registry.js");
   const scratch = new ProjectDocument(structuredClone(call.doc.project));
   const run = async (doc: ProjectDocument, name: string, args: Record<string, unknown>) => (await runTool({ doc, host: call.host, signal: call.signal }, name, args)).data;
+  /** Files a reverted step wrote (add_sfx_tool renders, pan renders) that no longer back any project file: deleted, like a failed tool's. */
+  const discardFrom = async (before: Project, after: Project): Promise<void> => {
+    const orphans = orphanedPaths(before, [after, call.doc.project]);
+    if (orphans.length > 0) await call.host.media?.discardGenerated?.(orphans);
+  };
+  const revert = async (saved: Project, label: string): Promise<void> => {
+    const before = structuredClone(scratch.project);
+    scratch.transaction(label, (tx) => applyProjectState(tx, saved));
+    await discardFrom(before, scratch.project);
+  };
   const rounds: Round[] = [];
   const measure = async (): Promise<MixScore> => (await measureMix(call, scratch.project, genre)).score;
   let score = await measure();
@@ -79,6 +108,8 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     const done: string[] = [];
     for (const fix of fixes) {
       for (const c of fix.calls) {
+        // An automatic fix only removes or moves cues the sound tools placed; the user's clips get the advice in the text.
+        if (!ownsTarget(scratch.project, c)) continue;
         const receipt = await run(scratch, c.tool, c.args);
         if (receipt && (receipt.status === "applied" || receipt.status === "unchanged")) done.push(`${fix.metric}: ${c.tool} ${JSON.stringify(c.args)}`);
       }
@@ -88,7 +119,7 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     const better = isBetter(next, score);
     rounds.push({ before: score.rawScore, after: next.rawScore, fixes: done, kept: better });
     if (!better) {
-      scratch.transaction("revert round", (tx) => applyProjectState(tx, saved));
+      await revert(saved, "revert round");
       break;
     }
     score = next;
@@ -127,7 +158,7 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     const remastered = await run(scratch, tool, masterCall);
     const next = await measure();
     if (!isBetter(next, final)) {
-      scratch.transaction("revert peak step", (tx) => applyProjectState(tx, saved));
+      await revert(saved, "revert peak step");
       break;
     }
     trimmed.push(step);
@@ -151,9 +182,15 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
   const summary =
     `Sound Score ${first.score} -> ${final.score} (raw ${first.rawScore} -> ${final.rawScore}) in ${rounds.filter((r) => r.kept).length} fix round(s)` +
     `${trimmed.length ? `, peaks: ${trimmed.join(", ")}` : ""}, then ${mastered?.summary ?? "mastering failed"}`;
-  if (!changed) return unchanged(tool, `${summary} Nothing changed.`, { data });
+  if (!changed) {
+    await discardFrom(scratch.project, call.doc.project);
+    return unchanged(tool, `${summary} Nothing changed.`, { data });
+  }
   // DEPLOY.md S3.6: no mix comes out worse than it went in.
-  if (isBetter(first, final)) return unchanged(tool, `${summary} That scores lower than before, so nothing was changed.`, { data });
+  if (isBetter(first, final)) {
+    await discardFrom(scratch.project, call.doc.project);
+    return unchanged(tool, `${summary} That scores lower than before, so nothing was changed.`, { data });
+  }
   call.commit((tx) => applyProjectState(tx, scratch.project), "Master audio (iterate)");
   return applied(tool, summary, { data, warnings: mastered?.warnings ?? [], notes: mastered?.notes ?? [] });
 }
