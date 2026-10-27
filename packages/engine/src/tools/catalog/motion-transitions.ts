@@ -39,7 +39,7 @@ import {
 } from "../../transitions/motion/index.js";
 import { directTool, type CatalogTool } from "../define.js";
 import { applied, refused, unchanged } from "../receipt.js";
-import { ToolError, resolveLayer, trackName } from "./timeline-edit-common.js";
+import { ToolError, clipById, clipTitle, resolveLayer, trackName } from "./timeline-edit-common.js";
 
 const READ = { readOnlyHint: true, destructiveHint: false, openWorldHint: false } as const;
 const WRITE = { readOnlyHint: false, destructiveHint: false, openWorldHint: false } as const;
@@ -102,6 +102,12 @@ function resultData(project: Project, r: MotionTransitionResult): Record<string,
     sfx_cues: r.sfxCues,
     ...(r.replaced ? { replaced: r.replaced } : {}),
   };
+}
+
+/** A clip as people know it (its file name or label), for summaries; the receipt's data keeps the ids. */
+function titleOf(project: Project, id: string): string {
+  const clip = clipById(project, id);
+  return clip ? clipTitle(clip) : id;
 }
 
 function message(error: unknown): string {
@@ -194,7 +200,7 @@ export const motionTransitionTools: CatalogTool[] = [
       const r = call.commit((tx) => applyMotionTransition(tx, input), `Motion transition ${args.preset}`);
       const after = call.doc.project;
       const dir = r.direction ? ` ${r.direction}` : "";
-      return applied(APPLY, `${r.replaced ? "Replaced with" : "Added"} ${r.preset}${dir} on the cut at ${r.cut.toFixed(2)}s (${r.frames} frames) between ${r.clips[0]!.id} and ${r.clips[1]!.id}.`, { data: resultData(after, r) });
+      return applied(APPLY, `${r.replaced ? "Replaced with" : "Added"} ${r.preset}${dir} on the cut at ${r.cut.toFixed(2)}s (${r.frames} frames) between ${titleOf(after, r.clips[0]!.id)} and ${titleOf(after, r.clips[1]!.id)}.`, { data: resultData(after, r) });
     },
   }),
 

@@ -28,6 +28,7 @@ import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged, type ReceiptClip } from "../receipt.js";
 import { placeSfx, prepareSfx, removeUnusedSfxFiles, snapToFrame, type PreparedSfx } from "../sfx-media.js";
 import { fileById } from "./common.js";
+import { clipTitle } from "./timeline-edit-common.js";
 
 const LIST = "list_sfx_tool";
 const ADD = "add_sfx_tool";
@@ -237,7 +238,7 @@ export const soundDesignTools: CatalogTool[] = [
         if (!clip) return refused(ADD, `Error: no clip with id ${args.clip_id}.`);
         const edge = args.edge ?? "start";
         at = edge === "start" ? clip.position : clip.position + (clip.end - clip.start);
-        moment = `the ${edge} of clip ${clip.id}`;
+        moment = `the ${edge} of ${clipTitle(clip)}`;
       } else if (args.marker_id !== undefined) {
         const marker = project.markers.find((m) => m.id === args.marker_id);
         if (!marker) return refused(ADD, `Error: no marker with id ${args.marker_id}.`);
@@ -264,7 +265,7 @@ export const soundDesignTools: CatalogTool[] = [
       const clip = call.commit((tx) => placeSfx(tx, sound, { at, align, gainDb, auto: false }), `Add ${recipe.title.toLowerCase()}`);
       if (!clip) return refused(ADD, "Error: nothing of the sound is left on the timeline at that moment.");
       const hitAt = align === "peak" ? at : at + sound.hit;
-      return applied(ADD, `Added ${recipe.title.toLowerCase()} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (clip ${clip.id}, ${gainDb} dB).`, {
+      return applied(ADD, `Added ${recipe.title.toLowerCase()} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (${gainDb} dB).`, {
         clips: [clipRow(call.doc.project, clip, { recipe: recipe.id, hit_seconds: hitAt, gain_db: gainDb })],
         data: { clip_id: clip.id, file_id: clip.file_id, recipe: recipe.id, params: sound.params, hit_seconds: hitAt, gain_db: gainDb, cached },
       });
