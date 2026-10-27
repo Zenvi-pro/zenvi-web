@@ -8,6 +8,11 @@
  * data.beats), else `bpm` from the timeline's start, else the beats of the
  * music already on the timeline (when the host can decode audio), else
  * 120 BPM.
+ *
+ * A grid's re-cuts (`steps`) carry a motion transition in the same undo
+ * step: every kept tile plays back to back on its own track, so the same
+ * preset on each of those cuts moves the whole field as one
+ * (transitions/motion/montage.ts gridRecutPresets).
  */
 
 import { z } from "zod";
@@ -20,14 +25,16 @@ import type { Clip, Project, ProjectFile } from "../../model/types.js";
 import { addClip, setClipProperty, setClipSpeed } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
+import { applyFittedMotionTransition, type MotionTransitionResult } from "../../ops/motion-transitions.js";
 import { placeOverlayClip } from "../../ops/overlays.js";
 import { buildMotionTemplate } from "../../motion/build.js";
 import { gridFromBeats, tempoGrid } from "../../motion/grid.js";
 import { PALETTES, withAccent } from "../../motion/palettes.js";
 import { GRID_DRIFTS, GRID_REVEALS, MOTION_TEMPLATE_IDS, MotionInputError, type GridOptions, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
-import { GRID_LAYOUTS } from "../../motion/tiles.js";
+import { FIELD_LAYOUTS, GRID_LAYOUTS } from "../../motion/tiles.js";
 import { TEMPLATES } from "../../motion/templates/index.js";
 import { bundledFamily } from "../../typography/families.js";
+import { GRID_TRANSITIONS, fitMontageFrames, gridRecutPresets, type GridTransitions } from "../../transitions/motion/montage.js";
 import { PALETTE_IDS, type BeatGrid, type MotionLayer, type MotionMedia, type MotionPlan, type PaletteId } from "../../motion/types.js";
 import { beatOverrideProblem } from "../beat-override.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
@@ -64,7 +71,7 @@ const input = z.strictObject({
   duration_seconds: z.number().min(0.5).max(120).optional().describe("Length, seconds (default: the template's natural length in beats)."),
   palette: z.enum(PALETTE_IDS).optional().describe("Colours: ui_light, ui_dark, editorial (paper, ink, red, one blue), callout (dark, hot accent), tutorial (grid paper, ink, highlighter). Default per template."),
   accent: z.string().max(40).optional().describe("Replace the palette's accent colour (a brand colour): #rrggbb, #rgb, rgb(r,g,b) or a colour name."),
-  bpm: z.number().min(40).max(400).optional().describe("Tempo of the beat grid, beats from the timeline's start or from offset_seconds (when there is no `beats`)."),
+  bpm: z.number().min(40).max(480).optional().describe("Tempo of the beat grid, beats from the timeline's start or from offset_seconds (when there is no `beats`)."),
   offset_seconds: z.number().min(0).max(3600).optional().describe("With bpm: timeline seconds of the first beat (default 0)."),
   beats: z.array(z.number().min(0)).min(2).max(4000).optional().describe("Beat times on the timeline, seconds (build_reel_tool's data.beats, detect_beats_tool's beats moved to the music clip's position)."),
   text: z.string().max(200).optional().describe("Main text: the typed phrase (type_search), the headline (kinetic_type; * stands for an image tile), the title (end_card), the caption (step_card), the product name (callout)."),
@@ -96,12 +103,20 @@ const input = z.strictObject({
   phase: z.number().min(0).max(2).optional().describe("grid repeat: seconds each copy runs ahead of the one before, so copies move out of phase (default 0: in step; narrowed when the clip is too short)."),
   mirror: z.boolean().optional().describe("grid repeat: mirror alternate copies so their edges meet as mirrors (a kaleidoscope always is)."),
   drift: z.enum(GRID_DRIFTS).optional().describe("grid: a slow camera move over the whole field for the template's length: in (push in 12 %), out (pull out), left, right, up, down (pan). Not with merge, zoom_into, band or film_strip."),
+  transitions: z
+    .enum(GRID_TRANSITIONS)
+    .optional()
+    .describe("grid with steps: a motion transition on each re-cut, every kept tile moving together, in the same undo step: auto (default) = whip, one direction on every re-cut; flash: inverted frame, then glitch; none: plain cuts."),
+  strict_variety: z
+    .boolean()
+    .optional()
+    .describe("grid: refuse (nothing changes) when there are fewer file_ids than tiles on screen at once, so a clip would show in two tiles; the error says how many more. Default false: a warning."),
 });
 
 type Input = z.infer<typeof input>;
 
 /** Arguments only the grid template reads. */
-const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift"] as const satisfies readonly (keyof Input)[];
+const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift", "transitions", "strict_variety"] as const satisfies readonly (keyof Input)[];
 
 function displaySize(file: ProjectFile): { width: number; height: number } | null {
   const w = Number(file.width);
@@ -253,6 +268,43 @@ export function placeMotionPlan(
   return placed;
 }
 
+const TILE = /^tile-(\d+)-\d+$/;
+
+/**
+ * A grid's re-cuts, in time order: on each, every kept tile's clip cut back
+ * to back with its next stage's on the same track (motion/templates/montage-grid.ts).
+ */
+function tileRecuts(placed: readonly { layer: MotionLayer; clip: Clip }[]): { outClipId: string; inClipId: string; outFrames: number; inFrames: number }[][] {
+  const tiles = placed.filter((p) => TILE.test(p.layer.name) && p.layer.source.kind === "media");
+  const starting = new Map(tiles.map((p) => [`${p.layer.track}@${p.layer.start}`, p]));
+  const cuts = new Map<number, { outClipId: string; inClipId: string; outFrames: number; inFrames: number }[]>();
+  for (const p of tiles) {
+    const at = p.layer.start + p.layer.frames;
+    const next = starting.get(`${p.layer.track}@${at}`);
+    if (!next) continue;
+    const list = cuts.get(at) ?? [];
+    list.push({ outClipId: String(p.clip.id), inClipId: String(next.clip.id), outFrames: p.layer.frames, inFrames: next.layer.frames });
+    cuts.set(at, list);
+  }
+  return [...cuts.entries()].sort(([a], [b]) => a - b).map(([, list]) => list);
+}
+
+/** Tiles that show a clip another tile of the same stage shows, at the busiest stage, and how many tiles that stage has. */
+function repeatedTiles(plan: MotionPlan): { repeats: number; tiles: number; files: number } {
+  const stages = new Map<string, string[]>();
+  for (const layer of plan.layers) {
+    const stage = TILE.exec(layer.name)?.[1];
+    if (stage === undefined || layer.source.kind !== "media") continue;
+    stages.set(stage, [...(stages.get(stage) ?? []), layer.source.fileId]);
+  }
+  let worst = { repeats: 0, tiles: 0, files: 0 };
+  for (const files of stages.values()) {
+    const distinct = new Set(files).size;
+    if (files.length - distinct > worst.repeats) worst = { repeats: files.length - distinct, tiles: files.length, files: distinct };
+  }
+  return worst;
+}
+
 export const motionTemplateTools: CatalogTool[] = [
   directTool({
     name: TOOL,
@@ -363,17 +415,45 @@ export const motionTemplateTools: CatalogTool[] = [
         warnings.push(...missingGlyphWarnings(typed.missing));
       }
       warnings.push(...(plan.warnings ?? []));
+      const field = (FIELD_LAYOUTS as readonly string[]).includes(args.layout ?? "grid");
+      const repeated = args.template === "grid" && !field ? repeatedTiles(plan) : { repeats: 0, tiles: 0, files: 0 };
+      if (repeated.repeats > 0) {
+        const short = `${repeated.repeats} of ${repeated.tiles} tiles show a clip another tile shows at the same time (${repeated.files} different files): give ${repeated.repeats} more file_ids (gather_stock_footage_tool imports several in one call).`;
+        if (args.strict_variety) return refused(TOOL, `Error: ${short}`);
+        warnings.push(short);
+      }
+      const recutChoice: GridTransitions = args.template === "grid" ? (args.transitions ?? "auto") : "none";
       const end = start + plan.frames / fps;
       const stack = planOverlayStack(project, start, end, plan.tracks);
       const written = await writeDrawings(call, plan, args.template);
       if (typeof written === "string") return failed(TOOL, written);
 
-      const placed = await commitDrawn(call, written, (tx) => placeMotionPlan(tx, plan, written, start, fps, stack.layers, `Motion ${args.template}`), `Add motion template ${args.template}`);
+      const { placed, recuts } = await commitDrawn(
+        call,
+        written,
+        (tx) => {
+          const placed = placeMotionPlan(tx, plan, written, start, fps, stack.layers, `Motion ${args.template}`);
+          if (recutChoice === "none") return { placed, recuts: [] };
+          const groups = tileRecuts(placed);
+          const presets = gridRecutPresets(recutChoice === "auto" ? "whip" : recutChoice, groups.length);
+          const recuts = groups.flatMap((group, k): MotionTransitionResult[][] => {
+            const done = group.flatMap((cut): MotionTransitionResult[] => {
+              const frames = fitMontageFrames(presets[k]!, cut.outFrames, cut.inFrames, fps);
+              const r = frames === null ? null : applyFittedMotionTransition(tx, { outClipId: cut.outClipId, inClipId: cut.inClipId, preset: presets[k]!, frames, direction: "auto" });
+              return r ? [r] : [];
+            });
+            return done.length > 0 ? [done] : [];
+          });
+          return { placed, recuts };
+        },
+        `Add motion template ${args.template}`,
+      );
       const doc = call.doc.project;
       const g = grid;
       const beatsIn = g.beats.filter((t) => t >= start - 1e-6 && t <= end + 1e-6);
       const round = (t: number) => Math.round(t * 1000) / 1000;
-      return applied(TOOL, `Added ${args.template} at ${start.toFixed(2)}-${end.toFixed(2)}s on ${plan.tracks} track(s), entrances on ${gridSource}.`, {
+      const recutLine = recuts.length > 0 ? ` ${recuts.length} re-cut(s) with ${recuts.map((r) => `${r[0]!.preset}@${r[0]!.cut.toFixed(2)}s`).join(", ")}.` : "";
+      return applied(TOOL, `Added ${args.template} at ${start.toFixed(2)}-${end.toFixed(2)}s on ${plan.tracks} track(s), entrances on ${gridSource}.${recutLine}`, {
         warnings,
         data: {
           template: args.template,
@@ -386,6 +466,7 @@ export const motionTemplateTools: CatalogTool[] = [
           cues: plan.cues.map((f) => round(start + f / fps)),
           tracks: stack.layers.map((layer) => trackInfo(doc, layer)),
           new_tracks: stack.created.length,
+          ...(args.template === "grid" ? { transitions: recuts.map((r) => ({ preset: r[0]!.preset, direction: r[0]!.direction, cut: r[0]!.cut, frames: r[0]!.frames, tiles: r.length, ids: r.map((t) => t.id) })) } : {}),
           layers: placed.map(({ layer, clip, fileId }) => ({
             name: layer.name,
             timeline_clip_id: clip.id,

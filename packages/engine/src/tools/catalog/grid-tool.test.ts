@@ -4,6 +4,7 @@ import { createProject } from "../../model/defaults.js";
 import { findProfile } from "../../model/profiles.js";
 import type { Project } from "../../model/types.js";
 import { addFile } from "../../ops/files.js";
+import { listProjectMotionTransitions } from "../../ops/motion-transitions.js";
 import { planFrame } from "../../render/plan/frame-plan.js";
 import type { Affine } from "../../render/types.js";
 import { runTool } from "../registry.js";
@@ -89,6 +90,45 @@ describe("add_motion_template_tool grid", () => {
 
     doc.undo();
     expect(doc.project.clips).toEqual([]);
+  });
+
+  it("whips every kept tile together on each re-cut, one direction, in the same undo step; transitions none keeps plain cuts", async () => {
+    const doc = verticalProject();
+    const args = { template: "grid", file_ids: FILES, steps: [3, 4, 6], bpm: 120 };
+    const result = await runTool({ doc, host: host() }, "add_motion_template_tool", args);
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Add motion template grid"]);
+    const transitions = (result.data as { data: { transitions: { preset: string; direction: string; tiles: number; cut: number }[] } }).data.transitions;
+    expect(transitions.map((t) => [t.preset, t.direction, t.tiles])).toEqual([
+      ["whip", "left", 3],
+      ["whip", "left", 4],
+    ]);
+    const records = listProjectMotionTransitions(doc.project);
+    expect(records).toHaveLength(7);
+    // Each re-cut moves its tiles on the same frames.
+    for (const t of transitions) expect(new Set(records.filter((r) => Math.abs(r.cut - t.cut) < 1e-3).map((r) => r.frames)).size).toBe(1);
+
+    const flash = await runTool({ doc: verticalProject(), host: host() }, "add_motion_template_tool", { ...args, transitions: "flash" });
+    expect((flash.data as { data: { transitions: { preset: string }[] } }).data.transitions.map((t) => t.preset)).toEqual(["flash_invert", "glitch"]);
+
+    const plainDoc = verticalProject();
+    const plain = await runTool({ doc: plainDoc, host: host() }, "add_motion_template_tool", { ...args, transitions: "none" });
+    expect((plain.data as { data: { transitions: unknown[] } }).data.transitions).toEqual([]);
+    expect(listProjectMotionTransitions(plainDoc.project)).toEqual([]);
+  });
+
+  it("warns when tiles outnumber the files, and refuses with strict_variety without touching the project", async () => {
+    const doc = verticalProject();
+    const args = { template: "grid", file_ids: FILES, tiles: 6, bpm: 120 };
+    const strict = await runTool({ doc, host: host() }, "add_motion_template_tool", { ...args, strict_variety: true });
+    expect((strict.data as { summary: string }).summary).toMatch(/^Error: 3 of 6 tiles show a clip another tile shows at the same time \(3 different files\): give 3 more file_ids/);
+    expect(doc.undoLabels).toEqual([]);
+    const loose = await runTool({ doc, host: host() }, "add_motion_template_tool", args);
+    expect(loose.ok, loose.text).toBe(true);
+    expect((loose.data as { warnings?: string[] }).warnings?.join(" ")).toMatch(/3 of 6 tiles show a clip/);
+    // One clip copied over a field is the point of a repeat: no warning.
+    const field = await runTool({ doc: verticalProject(), host: host() }, "add_motion_template_tool", { template: "grid", layout: "repeat", file_ids: [FILES[0]!], bpm: 120 });
+    expect((field.data as { warnings?: string[] }).warnings?.join(" ") ?? "").not.toMatch(/tiles show a clip/);
   });
 
   it("refuses a layout it cannot cut, and tiles too small to read, without touching the project", async () => {

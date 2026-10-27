@@ -72,28 +72,33 @@ export function fitMontageFrames(preset: MotionTransitionId, outFrames: number, 
   return fit >= 2 ? fit : null;
 }
 
-/** The genre rule's transitions on a montage's cuts. `beatSeconds` spaces the accents (one every two beats at most). */
+/**
+ * The genre rule's transitions on a montage's cuts. `beatSeconds` spaces
+ * the accents: two beats at least from any other accent (a downbeat, a
+ * flash, the landing), before or after.
+ */
 export function planMontageTransitions(rule: MontageRule, cuts: readonly MontageCut[], beatSeconds: number, fps: number): PlannedMontageTransition[] {
   const def = MONTAGE_RULES[rule];
   const last = cuts.length - 1;
   const spacing = 2 * beatSeconds - 0.5 / fps;
+  const landing = cuts.length >= 3 ? last : -1;
+  const accented = (i: number) => cuts[i]!.onDownbeat || cuts[i]!.flashed || i === landing;
+  // The next accent the rule does not choose, from each cut on.
+  const next: number[] = new Array<number>(cuts.length).fill(Infinity);
+  for (let i = last - 1; i >= 0; i -= 1) next[i] = accented(i + 1) ? cuts[i + 1]!.time : next[i + 1]!;
   const out: PlannedMontageTransition[] = [];
-  let lastAccent = -Infinity;
+  let previous = -Infinity;
   let n = 0;
   cuts.forEach((cut, i) => {
-    // A downbeat (flashed or not) is an accent already: the next one waits half a bar.
-    if (cut.onDownbeat || cut.flashed) {
-      lastAccent = cut.time;
-      if (i !== last) return;
-    }
     let preset: MotionTransitionId | null = null;
-    if (i === last && cuts.length >= 3) preset = def.landing;
-    else if (cut.onBeat && cut.time - lastAccent >= spacing) preset = def.pattern[n++ % def.pattern.length]!;
+    if (i === landing) preset = def.landing;
+    else if (accented(i)) previous = cut.time;
+    else if (cut.onBeat && cut.time - previous >= spacing && next[i]! - cut.time >= spacing) preset = def.pattern[n++ % def.pattern.length]!;
     if (!preset) return;
     const frames = fitMontageFrames(preset, cut.outFrames, cut.inFrames, fps);
     if (frames === null) return;
     out.push({ cut: i, preset, frames });
-    lastAccent = cut.time;
+    previous = cut.time;
   });
   return out;
 }
