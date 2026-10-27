@@ -3883,6 +3883,7 @@ Arguments of ported tools that only Zenvi desktop takes so far. A call that sets
 
 Deliberate differences from the zenvi-core handlers:
 
+- **tools that take timeline_clip_id**: A call that sends `clip_id` instead is accepted (the desktop refuses it) when the tool has no `clip_id` and the call does not also send `timeline_clip_id`; the receipt's warnings say to use `timeline_clip_id`. The same for `clip_ids` and `timeline_clip_ids`.
 - **add_clip_to_timeline_tool**: Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2726), leaving a one-frame black/silent gap.
 - **add_clip_to_timeline_tool and the tools that place through it**: A host that cannot watch frames (no frame rendering or no Zenvi backend) counts as "not watched": a duration-only trim of a full video is refused instead of placing the first N seconds, and the result never says "(watched)". The desktop's watch falls back softly and places the window.
 - **watch (add_clip_to_timeline_tool, slice_clip_at_best_match_tool, search_clip_scenes_tool, watch_clip_window_tool)**: Up to 12 frames rendered by the host; no ffmpeg scene-cut detection (shot cuts are always reported as none) and no near-duplicate frame dedupe (watch_window.py extract_watch_window).

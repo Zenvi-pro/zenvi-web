@@ -26,6 +26,10 @@ const OUT = path.join(ROOT, "docs", "TOOLS.md");
  */
 const DIVERGENCES: [string, string][] = [
   [
+    "tools that take timeline_clip_id",
+    "A call that sends `clip_id` instead is accepted (the desktop refuses it) when the tool has no `clip_id` and the call does not also send `timeline_clip_id`; the receipt's warnings say to use `timeline_clip_id`. The same for `clip_ids` and `timeline_clip_ids`.",
+  ],
+  [
     "add_clip_to_timeline_tool",
     "Appending (no position_seconds) butts the clip against the last clip on the track. The desktop places it at `last_end + _one_frame` (tool_handlers.py:2726), leaving a one-frame black/silent gap.",
   ],
