@@ -745,6 +745,10 @@ export const colorAgentTools: CatalogTool[] = [
           grainId = resolved.grain_id;
         }
         let absLut = resolved.kind === "lut" ? await resolveLutFile(call, resolved.lut_path) : "";
+        const warnings: string[] = [];
+        const kept = filterUnlocked(project, ids, warnings);
+        if (kept.length === 0) return warnings.length > 0 ? `Error: ${warnings.join("; ")}` : colorTargetError(project, "apply_look");
+        // Written once the call is going ahead: a refused one leaves no file behind.
         let generatedHash: string | undefined;
         if (resolved.kind === "generated") {
           if (!call.host.media?.writeGenerated) return `Error: look '${resolved.id}' is a generated LUT, and this Zenvi surface cannot store generated files.`;
@@ -753,9 +757,6 @@ export const colorAgentTools: CatalogTool[] = [
           absLut = asset.path;
           generatedHash = asset.hash;
         }
-        const warnings: string[] = [];
-        const kept = filterUnlocked(project, ids, warnings);
-        if (kept.length === 0) return warnings.length > 0 ? `Error: ${warnings.join("; ")}` : colorTargetError(project, "apply_look");
         const create = effectFactory(project);
         const receipts: Json[] = [];
         const writes: [string, Effect[]][] = [];

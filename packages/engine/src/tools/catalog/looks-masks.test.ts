@@ -27,6 +27,22 @@ describe("add_vignette_tool", () => {
     expect(looksOf(ed, a, "vignette")).toHaveLength(0);
     expect(looksOf(ed, b, "vignette")).toHaveLength(0);
   });
+
+  it("leaves titles alone by default, adds no step when nothing changes, and refuses a locked clip", async () => {
+    const ed = new EditHarness();
+    const a = ed.addClip(ed.addFile("video"), { position: 0, end: 5, layer: 1 });
+    const title = ed.addClip(ed.addFile("image", { name: "title.svg" }), { position: 0, end: 5, layer: 2 });
+    await ed.receipt("add_vignette_tool", {});
+    expect(looksOf(ed, a, "vignette")).toHaveLength(1);
+    expect(looksOf(ed, title, "vignette")).toHaveLength(0);
+    ed.mark();
+    expect((await ed.call("add_vignette_tool", {})).status).toBe("unchanged");
+    expect((await ed.call("add_shape_mask_tool", { remove: true })).status).toBe("unchanged");
+    expect(ed.stepsSinceMark()).toBe(0);
+    ed.lockTrack(1);
+    await ed.refused("add_shape_mask_tool", { clip_ids: [a] }, "locked");
+    await ed.refused("add_vignette_tool", { clip_ids: ["nope"] }, "no timeline clip");
+  });
 });
 
 describe("add_shape_mask_tool", () => {
