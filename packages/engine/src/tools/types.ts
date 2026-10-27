@@ -140,6 +140,56 @@ export interface MediaHost {
    * `WebVideoError` in words (no yt-dlp, a private address, a failed pull).
    */
   fetchWebVideo?(request: WebVideoRequest): Promise<WebVideoDownload>;
+  /**
+   * Run detectors over a rendered video file (`path` as an export was given
+   * it): black and frozen picture, picture cuts, silence, and EBU R128
+   * loudness with true peak, for review_render_tool. The engine sets the
+   * thresholds and reads the verdicts. Hosts with ffmpeg have it (the CLI,
+   * Zenvi Cloud's workers).
+   */
+  inspectRender?(path: string, options: RenderInspectOptions): Promise<RenderInspection>;
+}
+
+/** Detector thresholds for `MediaHost.inspectRender`. */
+export interface RenderInspectOptions {
+  /** Shortest black stretch reported, seconds. */
+  blackMinSeconds: number;
+  /** A pixel at or below this brightness (0-1) counts as black. */
+  blackPixel: number;
+  /** Shortest frozen stretch reported, seconds. */
+  freezeMinSeconds: number;
+  /** Frame-to-frame change below this (dB) counts as frozen. */
+  freezeNoiseDb: number;
+  /** Scene-change score (0-100) at or above which a frame starts a new shot. */
+  sceneThreshold: number;
+  /** Audio below this (dBFS) counts as silent. */
+  silenceDb: number;
+  /** Shortest silence reported, seconds. */
+  silenceMinSeconds: number;
+  signal?: AbortSignal;
+}
+
+export interface TimeRange {
+  start: number;
+  end: number;
+}
+
+/** What `MediaHost.inspectRender` found in a file. Times are seconds from its start. */
+export interface RenderInspection {
+  /** The file as the host resolved it: where `probe` and the frame renderer find it. */
+  path: string;
+  duration: number;
+  width: number;
+  height: number;
+  fps: number;
+  hasAudio: boolean;
+  black: TimeRange[];
+  frozen: TimeRange[];
+  /** Frames that start a new shot, with their scene-change score (0-100). */
+  cuts: { time: number; score: number }[];
+  silences: TimeRange[];
+  /** EBU R128 of the mix; null without an audio stream. A value is null when the audio is silent. */
+  loudness: { integratedLufs: number | null; rangeLu: number | null; truePeakDb: number | null } | null;
 }
 
 export interface PlayerHost {

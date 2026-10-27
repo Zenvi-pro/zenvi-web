@@ -19,6 +19,7 @@
  */
 
 import type { z } from "zod";
+import { getCloseMatches } from "./difflib.js";
 import type { JsonSchema, JsonSchemaObject } from "./json-schema.js";
 
 /** Params never exposed to models and stripped before validation (schema.py HIDDEN_PARAMS). */
@@ -198,8 +199,37 @@ export function formatIssue(issue: z.core.$ZodIssue, payload: unknown): { messag
   }
 }
 
-/** The desktop's refusal text for invalid arguments (schema.py validate_args). */
-export function invalidArgumentsMessage(tool: string, issue: z.core.$ZodIssue, payload: unknown): string {
+/**
+ * The schema's own name for each unexpected argument, so a model's next call
+ * is right: the property that ends in `_<key>` ("clip_id" → "timeline_clip_id",
+ * the one name 200+ other tools use for it), else the closest name. The
+ * desktop's schema stays the contract: the alias is named, not accepted.
+ */
+export function argumentNameHint(schema: JsonSchemaObject | undefined, keys: readonly string[]): string {
+  const names = Object.keys(schema?.properties ?? {});
+  const hints: string[] = [];
+  for (const key of keys) {
+    const suffixed = names.filter((name) => name.endsWith(`_${key}`));
+    const match = suffixed.length === 1 ? suffixed[0] : getCloseMatches(key, names, 1, 0.75)[0];
+    if (match) hints.push(`pass ${pyRepr(match)} instead of ${pyRepr(key)}`);
+  }
+  return hints.length > 0 ? ` For this tool, ${hints.join("; ")}.` : "";
+}
+
+/**
+ * The desktop's refusal text for invalid arguments (schema.py validate_args),
+ * plus `argumentNameHint` for unexpected top-level ones among `issues`
+ * (a missing `timeline_clip_id` is reported first; `clip_id` was the cause).
+ */
+export function invalidArgumentsMessage(
+  tool: string,
+  issue: z.core.$ZodIssue,
+  payload: unknown,
+  schema?: JsonSchemaObject,
+  issues: readonly z.core.$ZodIssue[] = [issue],
+): string {
   const { message, path } = formatIssue(issue, payload);
-  return `Error: Invalid arguments for ${tool}: ${message} (at ${path}).`;
+  const unexpected = issues.flatMap((i) => (i.code === "unrecognized_keys" && i.path.length === 0 ? i.keys : []));
+  const hint = argumentNameHint(schema, unexpected);
+  return `Error: Invalid arguments for ${tool}: ${message} (at ${path}).${hint}`;
 }

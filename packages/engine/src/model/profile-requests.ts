@@ -30,7 +30,8 @@ export const SOCIAL_PRESETS: Readonly<Record<string, readonly [number, number, n
   snapchat: [1080, 1920, null, "Snapchat", ["snap", "snapchat spotlight"]],
   facebook_reel: [1080, 1920, null, "Facebook", ["facebook reels", "fb reel", "facebook story"]],
   vertical: [1080, 1920, null, "MP4 (h.264)", ["9:16", "portrait", "vertical video", "phone", "9x16"]],
-  instagram_post: [1080, 1080, null, "Instagram", ["instagram square", "ig post", "instagram feed", "square", "1:1", "1x1", "instagram"]],
+  // "square post" is a web addition (agents ask for it; zenvi-core lacks it).
+  instagram_post: [1080, 1080, null, "Instagram", ["instagram square", "ig post", "instagram feed", "square", "1:1", "1x1", "instagram", "square post"]],
   instagram_portrait: [1080, 1350, null, "MP4 (h.264)", ["4:5", "4x5", "instagram 4:5", "ig portrait", "portrait post", "instagram feed portrait"]],
   youtube: [1920, 1080, null, "YouTube", ["youtube 1080p", "youtube hd", "yt", "youtube_1080p", "youtube_hd", "1080p"]],
   youtube_2k: [2560, 1440, null, "YouTube (2K)", ["youtube 1440p", "1440p", "2k", "qhd", "wqhd"]],
@@ -67,6 +68,17 @@ export function socialPreset(name: string): { key: string; width: number; height
   if (!found) return null;
   const [k, [width, height, fps, exportPreset]] = found;
   return { key: k, width, height, fps, exportPreset };
+}
+
+/**
+ * The built-in profile a social preset name means ("instagram_reel",
+ * "shorts", "youtube", "square_post"), at `fps` when the preset leaves the
+ * rate to the project, or null for a name that is not a social preset.
+ */
+export function socialProfile(name: string, fps = 30): CatalogProfile | null {
+  const preset = socialPreset(name);
+  if (!preset) return null;
+  return matchProfile(profileCatalog(), preset.width, preset.height, preset.fps ?? fps);
 }
 
 const pyCompare = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);

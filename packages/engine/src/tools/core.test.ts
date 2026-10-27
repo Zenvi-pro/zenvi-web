@@ -167,6 +167,27 @@ describe("argument coercion (schema.py normalize_args)", () => {
     const r = s.safeParse({ query: "q", n: 1.5 });
     if (!r.success) expect(formatIssue(r.error.issues[0]!, { query: "q", n: 1.5 }).message).toBe("1.5 is not of type 'integer'");
   });
+
+  it("names the schema's argument for an unexpected one (W25a E2E bug 9: clip_id for timeline_clip_id)", () => {
+    const s = z.strictObject({ timeline_clip_id: z.string(), text: z.string().optional() });
+    const schema = { type: "object", properties: { timeline_clip_id: { type: "string" }, text: { type: "string" } }, additionalProperties: false } as JsonSchemaObject;
+    const message = (payload: Record<string, unknown>) => {
+      const r = s.safeParse(payload);
+      return r.success ? "" : invalidArgumentsMessage("edit_title_tool", r.error.issues.find((i) => i.code === "unrecognized_keys")!, payload, schema);
+    };
+    expect(message({ timeline_clip_id: "A", clip_id: "A" })).toBe(
+      "Error: Invalid arguments for edit_title_tool: Additional properties are not allowed ('clip_id' was unexpected) (at (root)). For this tool, pass 'timeline_clip_id' instead of 'clip_id'.",
+    );
+    expect(message({ timeline_clip_id: "A", txt: "x" })).toMatch(/pass 'text' instead of 'txt'\.$/);
+    expect(message({ timeline_clip_id: "A", banana: 1 })).toMatch(/\(at \(root\)\)\.$/);
+    // The missing required argument is reported first; the hint still names it.
+    const missing = s.safeParse({ clip_id: "A" });
+    if (!missing.success) {
+      expect(invalidArgumentsMessage("edit_title_tool", missing.error.issues[0]!, { clip_id: "A" }, schema, missing.error.issues)).toBe(
+        "Error: Invalid arguments for edit_title_tool: 'timeline_clip_id' is a required property (at (root)). For this tool, pass 'timeline_clip_id' instead of 'clip_id'.",
+      );
+    }
+  });
 });
 
 describe("Python formatting", () => {
