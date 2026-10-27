@@ -25,7 +25,7 @@ SURFACES = {
     # ground colours (near, far), roughness
     "grass": ("#2F4A1C", "#55693A", 0.8),
     "sand": ("#D9B98A", "#E8CFA6", 0.85),
-    "snow": ("#EEF2F7", "#F6F8FB", 0.55),
+    "snow": ("#E4EAF3", "#F3F6FA", 0.55),
 }
 LENGTH = 140.0  # metres of field ahead of the start
 HALF_WIDTH = 60.0
@@ -50,7 +50,7 @@ class Ground:
         h = 0.0
         for kx, ky, ph, a in self.waves:
             s = math.sin(kx * x + ky * y + ph)
-            if self.surface == "sand" and a > 0.6:
+            if self.surface == "sand" and a == 1.0:
                 s = 1.0 - 2.0 * abs(s) ** 1.3  # the two long waves get crests: dunes
             h += a * s
         away = min(1.0, max(0.0, (abs(x) - 2.5) / 18.0))
@@ -157,7 +157,7 @@ def haze_color(tree, direction, look, toward=1.0):
     return mix.outputs[2]
 
 
-def sky_world(look, sun_dir):
+def sky_world(look, sun_dir, ambient=1.0):
     """The visible sky: zenith to horizon gradient, haze warming toward the
     sun, a soft sun glow; below the horizon the haze colour (the ground
     hides it). Also lights the field (ambient)."""
@@ -197,7 +197,8 @@ def sky_world(look, sun_dir):
     tree.links.new(sun_col.outputs[2], bg.inputs["Color"])
     # The camera sees the sky as it is; the field is lit by a dimmer copy (the sun lamp does the rest).
     path = tree.nodes.new("ShaderNodeLightPath")
-    strength = core.math_node(tree, "ADD", core.math_node(tree, "MULTIPLY", path.outputs["Is Camera Ray"], 1.0 - look[6] * 0.6), look[6] * 0.6)
+    lit = min(1.0, look[6] * 0.6 * ambient)
+    strength = core.math_node(tree, "ADD", core.math_node(tree, "MULTIPLY", path.outputs["Is Camera Ray"], 1.0 - lit), lit)
     tree.links.new(strength, bg.inputs["Strength"])
     tree.links.new(bg.outputs[0], out.inputs["Surface"])
 
@@ -242,6 +243,16 @@ def ground_material(surface, look, density):
         tree.links.new(spark, bsdf.inputs["Emission Strength"])
         bsdf.inputs["Emission Color"].default_value = (1, 1, 1, 1)
         noise.inputs["Scale"].default_value = 0.15
+        # Wind-carved drifts: soft bumps that the low sun picks out.
+        drift = tree.nodes.new("ShaderNodeTexNoise")
+        drift.inputs["Scale"].default_value = 1.2
+        drift.inputs["Detail"].default_value = 4.0
+        tree.links.new(coord.outputs["Object"], drift.inputs["Vector"])
+        bump = tree.nodes.new("ShaderNodeBump")
+        bump.inputs["Strength"].default_value = 0.35
+        bump.inputs["Distance"].default_value = 0.08
+        tree.links.new(drift.outputs["Fac"], bump.inputs["Height"])
+        tree.links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
     out = tree.nodes["Material Output"]
     tree.links.new(haze(tree, bsdf.outputs[0], look, density), out.inputs["Surface"])
     return mat
@@ -389,7 +400,8 @@ def build(job):
     sun_vec = lights.orbit_point(1.0, sun_az, elevation)
     SUN_DIR[:] = list(sun_vec)
     lights.sun("Sun", elevation, sun_az, strength=look[4], angle_deg=2.0, color=look[3])
-    sky_world(look, sun_vec)
+    # Snow is lit mostly by the sky (blue in its shadows); grass and sand by the sun.
+    sky_world(look, sun_vec, ambient=1.25 if surface == "snow" else 1.0)
 
     height = Ground(surface, seed)
     ground = ground_mesh(height)

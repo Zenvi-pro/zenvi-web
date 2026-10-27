@@ -28,7 +28,7 @@ def fading(mat, radius, axis_y):
     sep = tree.nodes.new("ShaderNodeSeparateXYZ")
     tree.links.new(info.outputs["Location"], sep.inputs["Vector"])
     facing = core.math_node(tree, "DIVIDE", core.math_node(tree, "SUBTRACT", axis_y, sep.outputs["Y"]), radius)
-    fac = core.map_range(tree, facing, 0.86, 0.985)
+    fac = core.map_range(tree, facing, 0.9, 0.99)
     clear = tree.nodes.new("ShaderNodeBsdfTransparent")
     mix = tree.nodes.new("ShaderNodeMixShader")
     tree.links.new(fac, mix.inputs["Fac"])
@@ -125,9 +125,9 @@ def build(job):
         suf.data.offset_y = -(b[2]) + (min(i[2] for i in inks) - y_mid)
         suf.data.offset_x = -b[0]
         suf.rotation_euler = (math.radians(90), 0, 0)
-        suf.location = (digits_right + advance * 0.1, -radius, 0)
+        suf.location = (digits_right + advance * 0.18, -radius, 0)
         suf.parent = counter
-        right = digits_right + advance * 0.1 + (b[1] - b[0])
+        right = digits_right + advance * 0.18 + (b[1] - b[0])
     width = right - left
     counter.location = (-(left + right) / 2, radius, 0)  # the front face of the drums at y = 0
 
@@ -146,11 +146,14 @@ def build(job):
         digits = digits.rjust(len(drums), " ")
         return [BLANK if ch == " " else int(ch) for ch in digits]
 
-    roll = max(2, int(round(ROLL * fps)))
+    # Each value gets an equal step (its roll, then a hold); the last value
+    # holds longest (at least 30 % of the clip): it is the one that reads.
     enter = 2
-    first_hold = int(round(0.25 * fps))
-    span = max(1, frames - enter - roll - first_hold)
-    changes = [enter + int(round(i * span / max(1, len(values)))) for i in range(len(values))]
+    stagger = int(round(STAGGER * fps))
+    last_hold = int(round(0.3 * frames))
+    step = max(3, (frames - enter - last_hold) / len(values))
+    roll = max(2, min(int(round(ROLL * fps)), int(step * 0.8) - stagger * (len(drums) - 1)))
+    changes = [enter + int(round(i * step)) for i in range(len(values))]
     # Every drum starts on its blank and rolls in to the first value.
     angle = [-BLANK * STEP] * len(drums)  # current rotation (radians) of each drum
     current = [BLANK] * len(drums)
@@ -167,7 +170,7 @@ def build(job):
             n = (target[k] - current[k]) % SLOTS if up else -((current[k] - target[k]) % SLOTS)
             if k == len(drums) - 1 and previous is not None and abs(values[i] - previous) >= 10:
                 n += SLOTS if up else -SLOTS  # the units spin a full turn more, like a counter counting
-            start = f0 + int(round(k * STAGGER * fps))
+            start = f0 + k * stagger
             keys[k].append((start, angle[k]))
             eases[k].append("hold")
             angle[k] -= n * STEP

@@ -95,16 +95,16 @@ def xray(color, name="XRay"):
     tree.nodes.clear()
     out = tree.nodes.new("ShaderNodeOutputMaterial")
     weight = tree.nodes.new("ShaderNodeLayerWeight")
-    weight.inputs["Blend"].default_value = 0.55
-    edge = core.map_range(tree, weight.outputs["Facing"], 0.15, 1.0)
+    weight.inputs["Blend"].default_value = 0.4
+    edge = core.map_range(tree, weight.outputs["Facing"], 0.3, 1.0)
     wire = tree.nodes.new("ShaderNodeWireframe")
     wire.use_pixel_size = True
     wire.inputs["Size"].default_value = 1.0
-    glow = core.math_node(tree, "ADD", core.math_node(tree, "MULTIPLY", edge, 0.9), core.math_node(tree, "MULTIPLY", wire.outputs[0], 0.25))
+    glow = core.math_node(tree, "ADD", core.math_node(tree, "MULTIPLY", edge, 0.9), core.math_node(tree, "MULTIPLY", wire.outputs[0], 0.6))
     glow = core.math_node(tree, "ADD", glow, 0.04)
     em = tree.nodes.new("ShaderNodeEmission")
     em.inputs["Color"].default_value = rgb_of(color)
-    tree.links.new(core.math_node(tree, "MULTIPLY", glow, 1.1), em.inputs["Strength"])
+    tree.links.new(core.math_node(tree, "MULTIPLY", glow, 1.8), em.inputs["Strength"])
     clear = tree.nodes.new("ShaderNodeBsdfTransparent")
     add = tree.nodes.new("ShaderNodeAddShader")
     tree.links.new(clear.outputs[0], add.inputs[0])
@@ -209,7 +209,7 @@ def build(job):
             if o.type == "MESH" and len(o.data.materials) == 0:
                 o.data.materials.append(materials.clay("#E3E1DC"))
     if look != "solid":
-        core.glow(threshold=0.9, size=5, strength=0.3)
+        core.glow(threshold=1.0, size=4, strength=0.25)
 
     # Lights: three-point (studio), rims only (dark), warm window light (table).
     key_energy = {"studio": 1.0, "dark": 0.35, "table": 0.8}[stage]
