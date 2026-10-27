@@ -78,6 +78,20 @@ describe("analyseKitSound", () => {
     expect(a.truePeakDb).toBeLessThan(0);
   });
 
+  it("runs a steady bed to the end of its file", () => {
+    // Regression: a bed's level counted as its noise floor, so nothing was 6 dB over it and the end read 10 ms (kit sounds 248103, 481964).
+    const bed = silence(3);
+    let seed = 7;
+    for (let i = 0; i < bed.length; i += 1) {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      bed[i] = 0.2 * (1 + 0.1 * Math.sin((2 * Math.PI * i) / SR)) * (seed / 2147483648 - 0.5);
+    }
+    const a = analyseKitSound([bed, bed], SR);
+    expect(a.endMs).toBeGreaterThan(2950);
+    expect(a.lufs).toBeGreaterThan(-40);
+    expect(a.lufs).toBeLessThan(-10);
+  });
+
   it("tells true stereo from mono", () => {
     const l = hit(0.5, 0, 800, 0.1);
     const r = hit(0.5, 0.004, 1300, 0.1);

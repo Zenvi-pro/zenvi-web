@@ -15,7 +15,7 @@ export interface KitAnalysis {
   onsetMs: number;
   /** Centre of the loudest 50 ms RMS window, ms from the file's start (a whoosh's peak goes on the cut). */
   peakMs: number;
-  /** Last 10 ms frame within 50 dB of the loudest one (or 6 dB over the floor), ms from the file's start. */
+  /** Last 10 ms frame within 50 dB of the loudest one (or 6 dB over a floor 20 dB or more under it), ms from the file's start. */
   endMs: number;
   /** Onset to the first sample within 3 dB of the peak sample, ms: a hit's attack is a few ms, a swell's a second. */
   attackMs: number;
@@ -140,7 +140,9 @@ export function analyseKitSound(channels: readonly Float32Array[], sampleRate: n
   // The head counts only when there are 20 ms of it: a tightly trimmed file has none.
   const headFrames = Math.floor(onset / tenMs) - 1;
   const floor = Math.min(tail, headFrames >= 2 ? mean(0, headFrames) : Number.POSITIVE_INFINITY);
-  const endThreshold = Math.max(loudest * 10 ** (-50 / 10), floor * 10 ** (6 / 10));
+  // 6 dB over the floor ends a one-shot at its hiss; a steady bed's "floor" (within 20 dB of its loudest) is the sound itself, which runs to the file's end.
+  const overFloor = floor * 10 ** (6 / 10);
+  const endThreshold = Math.max(loudest * 10 ** (-50 / 10), overFloor < loudest * 10 ** (-20 / 10) ? overFloor : 0);
   let lastFrame = frames.length - 1;
   while (lastFrame > 0 && frames[lastFrame]! < endThreshold) lastFrame -= 1;
   const end = Math.max(onset + 1, Math.min(length, (lastFrame + 1) * tenMs));
