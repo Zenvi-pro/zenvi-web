@@ -259,7 +259,7 @@ export const reelTools: CatalogTool[] = [
           beatSource = given.source;
         } else if (canTrackBeats(call)) {
           let tracked = await beatsOfFile(call, music, args.bpm ? { bpm: args.bpm } : {});
-          let moved = false;
+          let movedFrom: number | null = null;
           // A loop read at half speed cuts a hype reel too slowly: use the octave the audio also has that is nearer the style's.
           const styleBpm = isMotionStyleId(styleId) ? MOTION_STYLES[styleId].defaultBpm : REEL_STYLES[styleId].defaultBpm;
           const nearer = typeof tracked === "string" ? null : octaveNearStyle(tracked, styleBpm);
@@ -267,18 +267,24 @@ export const reelTools: CatalogTool[] = [
             const retracked = await beatsOfFile(call, music, { bpm: nearer });
             if (typeof retracked !== "string" && retracked.beats.length >= 2) {
               warnings.push(`The music reads as ${tracked.bpm} BPM and also as ${nearer}: cutting at ${nearer} to suit ${styleId} (pass bpm to choose).`);
+              movedFrom = tracked.bpm;
               tracked = retracked;
-              moved = true;
             }
           }
-          if (typeof tracked === "string") warnings.push(`${tracked} Cut to the style's tempo instead.`);
+          const instead = args.bpm ? `${args.bpm} BPM` : "the style's tempo";
+          if (typeof tracked === "string") warnings.push(`${tracked} Cut to ${instead} instead.`);
           else if (tracked.beats.length >= 2) {
             beats = { ...tracked, beats: tracked.beats.map((b) => b.timeSec), downbeats: tracked.downbeats.map((d) => d.timeSec), duration: Math.max(musicLength, tracked.duration) };
-            beatSource = args.bpm ? `the music tracked at ${args.bpm} BPM` : moved ? `the music, tracked at ${tracked.bpm} BPM (its faster reading)` : "the music, tracked";
-            tempo = tempoReport(tracked);
+            beatSource = args.bpm
+              ? `the music tracked at ${args.bpm} BPM`
+              : movedFrom !== null
+                ? `the music, tracked at ${tracked.bpm} BPM (its ${tracked.bpm > movedFrom ? "faster" : "slower"} reading)`
+                : "the music, tracked";
+            // The octave move was ours, not the caller's: the receipt must not say the tempo was given.
+            tempo = tempoReport(movedFrom !== null ? { ...tracked, forced: false } : tracked);
             const weak = weakGridWarning(tracked);
             if (weak) warnings.push(weak);
-          } else warnings.push("No steady beat in the music: cut to the style's tempo instead.");
+          } else warnings.push(`No steady beat in the music: cut to ${instead} instead.`);
         } else if (args.bpm) {
           const grid = explicitBeats({ bpm: args.bpm, offset_seconds: 0 }, musicLength)!;
           beats = musicFromBeats(grid.beats, musicLength, args.bpm);
@@ -290,7 +296,8 @@ export const reelTools: CatalogTool[] = [
       } else if (args.beats || args.offset_seconds !== undefined) {
         warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow the style's tempo (bpm applies).");
       }
-      const fallbackBpm = !music ? args.bpm : undefined;
+      // No grid from the music (none, or tracking failed): the caller's bpm still sets the cut tempo.
+      const fallbackBpm = beats ? undefined : args.bpm;
       if (fallbackBpm) beatSource = `${fallbackBpm} BPM`;
 
       if (isMotionStyleId(styleId)) {

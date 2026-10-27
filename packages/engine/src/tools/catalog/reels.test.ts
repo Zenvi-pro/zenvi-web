@@ -229,6 +229,23 @@ describe("build_reel_tool with the beat grid given", () => {
     const data = (result.data as { data: Reel; warnings?: string[] }).data;
     expect(data.bpm).toBeGreaterThan(155);
     expect(data.beat_source).toMatch(/faster reading/);
+    // The octave was moved by the tool, not given by the caller.
+    expect((data as { music_tempo?: { given_bpm?: boolean } }).music_tempo?.given_bpm).toBeUndefined();
+  });
+
+  it("cuts to the given bpm when the music cannot be tracked", async () => {
+    const host = withAudio(fakeHost());
+    host.audio!.decodePcm = async () => {
+      throw new Error("ffmpeg exited 1");
+    };
+    const doc = reelProject();
+    const result = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12, bpm: 150 });
+    expect(result.ok, result.text).toBe(true);
+    const out = result.data as { data: Reel; warnings?: string[] };
+    expect(out.data.bpm).toBe(150);
+    expect(out.data.beat_source).toBe("150 BPM");
+    expect(out.warnings?.join(" ")).toContain("Cut to 150 BPM instead");
+    expect(doc.undoLabels).toHaveLength(1);
   });
 
   it("reports how sure the detected grid is", async () => {
