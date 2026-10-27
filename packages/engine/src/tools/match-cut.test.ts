@@ -8,6 +8,7 @@ import { addClip, addFile, setClipKeyframes } from "../ops/index.js";
 import { listProjectMotionTransitions } from "../ops/motion-transitions.js";
 import { clipKeyframe } from "../render/plan/transform.js";
 import type { RgbaImage } from "../render/types.js";
+import { frameWindow } from "../timeline/windows.js";
 import { runTool } from "./registry.js";
 import { hasDarkEdges } from "./subjects.js";
 import { fakeHost } from "./test-support/fake-host.js";
@@ -333,6 +334,18 @@ describe("match_cut_montage_tool", () => {
     const none = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 8, transitions: "none", replace: true });
     expect((none.data?.data as { transitions: unknown[] }).transitions).toEqual([]);
     expect(listProjectMotionTransitions(doc.project)).toEqual([]);
+  });
+
+  it("cuts every shot back to back on the frame grid: no black frame, no overlap, so every cut can take a transition", async () => {
+    // Source windows that start between frames once lost or gained a frame (a 1-frame gap or overlap) on some cuts.
+    const base = project();
+    base.clips = [];
+    const doc = new ProjectDocument(base);
+    const result = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 10, min_frames: 4, max_frames: 7, bpm: 120, transitions: "none" });
+    const shots = (result.data?.data as { shots: { clip_id: string; frames: number }[] }).shots;
+    const windows = shots.map((s) => frameWindow(doc.project.clips.find((c) => c.id === s.clip_id)!, doc.project.fps));
+    shots.forEach((s, i) => expect(windows[i]!.endFrame - windows[i]!.startFrame + 1, `shot ${i}`).toBe(s.frames));
+    for (let i = 1; i < windows.length; i += 1) expect(windows[i]!.startFrame, `cut ${i}`).toBe(windows[i - 1]!.endFrame + 1);
   });
 
   it("warns when the files are too few for the pace and refuses with strict_variety, saying how many more", async () => {

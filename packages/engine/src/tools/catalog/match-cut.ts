@@ -311,18 +311,20 @@ const CENTRED: SubjectBox = { x: 0.3, y: 0.3, w: 0.4, h: 0.4 };
  * moment. Files with an end box are followed instead: each return shows a
  * later moment and the box is interpolated there.
  */
-function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>, followed: ReadonlySet<string>): Array<{ start: number; end: number }> {
+function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>, followed: ReadonlySet<string>, fps: number): Array<{ start: number; end: number }> {
   const cursor = new Map<string, number>();
   return plan.shots.map((shot) => {
     const id = ids[shot.clip]!;
     const file = files.get(id)!;
-    const length = shot.end - shot.start;
+    const length = shot.frames / fps;
     if (visualKind(file) === "image") return { start: 0, end: length };
     const [a, b] = usableRange(file);
     const room = Math.max(0, b - a - length);
     let start = cursor.get(id) ?? times.get(id) ?? a + room * 0.3;
     if (start + length > b + 1e-6) start = a;
     start = Math.max(0, Math.min(start, Math.max(a, b - length)));
+    // On the frame grid: a window between frames rounds to one frame more or less than the shot (a black frame or an overlap on the cut).
+    start = Math.max(0, Math.floor(start * fps + 0.5) / fps);
     cursor.set(id, followed.has(id) ? start + length + 0.25 : start);
     return { start, end: start + length };
   });
@@ -429,7 +431,7 @@ const montageTool = directTool({
     // Every shot's source window and subject box, before anything is recorded.
     const boxTimes = new Map([...given].filter(([, s]) => s.time !== undefined).map(([id, s]) => [id, s.time!]));
     const followed = new Set([...given].filter(([, g]) => g.end_box !== undefined).map(([id]) => id));
-    const windows = sourceWindows(plan, ids, files, boxTimes, followed);
+    const windows = sourceWindows(plan, ids, files, boxTimes, followed, frameRate);
     const firstStart = new Map<string, number>();
     for (const [i, shot] of plan.shots.entries()) if (!firstStart.has(ids[shot.clip]!)) firstStart.set(ids[shot.clip]!, windows[i]!.start);
     const unused = ids.filter((id) => !firstStart.has(id));

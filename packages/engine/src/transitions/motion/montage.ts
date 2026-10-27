@@ -6,8 +6,8 @@
  *
  * The rules follow the references and HeyGen HyperFrames' motion doctrine
  * (Apache-2.0, .claude/skills/motion-doctrine/SKILL.md): accents are
- * punctuation, one per bar between the downbeats a montage already flashes,
- * never on consecutive cuts; two or three presets repeat; pans keep one
+ * punctuation, one a bar half-way between the downbeats a montage already
+ * flashes, never on neighbouring cuts; two or three presets repeat; pans keep one
  * direction for the whole sequence (`direction: "auto"` when applied); the
  * reserved vector (a zoom-through, deeper into the same thought) is spent
  * once, on the last cut. Match cuts stay hard between the accents: the
@@ -72,34 +72,58 @@ export function fitMontageFrames(preset: MotionTransitionId, outFrames: number, 
   return fit >= 2 ? fit : null;
 }
 
+/** Beats a bar: the rule adds one accent per bar between the ones a montage has (its flashed downbeats). */
+const BAR_BEATS = 4;
+
 /**
- * The genre rule's transitions on a montage's cuts. `beatSeconds` spaces
- * the accents: two beats at least from any other accent (a downbeat, a
- * flash, the landing), before or after.
+ * The genre rule's transitions on a montage's cuts: one a bar, half a bar
+ * from the accents already there (downbeats, flashes, the landing on the
+ * last cut), on the cut nearest that point within a beat (one on the beat
+ * counts half a beat nearer), never on a cut next to another accent.
  */
 export function planMontageTransitions(rule: MontageRule, cuts: readonly MontageCut[], beatSeconds: number, fps: number): PlannedMontageTransition[] {
   const def = MONTAGE_RULES[rule];
   const last = cuts.length - 1;
-  const spacing = 2 * beatSeconds - 0.5 / fps;
   const landing = cuts.length >= 3 ? last : -1;
-  const accented = (i: number) => cuts[i]!.onDownbeat || cuts[i]!.flashed || i === landing;
-  // The next accent the rule does not choose, from each cut on.
-  const next: number[] = new Array<number>(cuts.length).fill(Infinity);
-  for (let i = last - 1; i >= 0; i -= 1) next[i] = accented(i + 1) ? cuts[i + 1]!.time : next[i + 1]!;
+  const fixed = cuts.flatMap((c, i) => (c.onDownbeat || c.flashed || i === landing ? [i] : []));
+  // Stretches between fixed accents, the montage's first frame counting as one.
+  const bounds = [{ time: 0, index: -1 }, ...fixed.map((i) => ({ time: cuts[i]!.time, index: i }))];
+  const chosen = new Set<number>(fixed);
+  const picks: number[] = [];
+  for (let k = 0; k + 1 < bounds.length; k += 1) {
+    const a = bounds[k]!;
+    const b = bounds[k + 1]!;
+    const beats = (b.time - a.time) / beatSeconds;
+    if (beats < BAR_BEATS - 1e-6) continue;
+    const n = Math.max(1, Math.round(beats / BAR_BEATS));
+    for (let j = 0; j < n; j += 1) {
+      const target = a.time + ((j + 0.5) * (b.time - a.time)) / n;
+      // How far a cut is from the point, a cut on the beat counting half a beat nearer.
+      const miss = (cut: MontageCut) => Math.abs(cut.time - target) - (cut.onBeat ? beatSeconds / 2 : 0);
+      let best = -1;
+      // The montage's first frame is no cut: the cut right after it may take an accent.
+      for (let i = a.index < 0 ? 0 : a.index + 2; i <= b.index - 2; i += 1) {
+        const cut = cuts[i]!;
+        if (Math.abs(cut.time - target) > beatSeconds + 0.5 / fps || chosen.has(i - 1) || chosen.has(i + 1) || chosen.has(i)) continue;
+        if (best < 0 || miss(cut) < miss(cuts[best]!)) best = i;
+      }
+      if (best >= 0) {
+        chosen.add(best);
+        picks.push(best);
+      }
+    }
+  }
+  picks.sort((x, y) => x - y);
   const out: PlannedMontageTransition[] = [];
-  let previous = -Infinity;
-  let n = 0;
-  cuts.forEach((cut, i) => {
-    let preset: MotionTransitionId | null = null;
-    if (i === landing) preset = def.landing;
-    else if (accented(i)) previous = cut.time;
-    else if (cut.onBeat && cut.time - previous >= spacing && next[i]! - cut.time >= spacing) preset = def.pattern[n++ % def.pattern.length]!;
-    if (!preset) return;
-    const frames = fitMontageFrames(preset, cut.outFrames, cut.inFrames, fps);
-    if (frames === null) return;
-    out.push({ cut: i, preset, frames });
-    previous = cut.time;
+  picks.forEach((i, n) => {
+    const preset = def.pattern[n % def.pattern.length]!;
+    const frames = fitMontageFrames(preset, cuts[i]!.outFrames, cuts[i]!.inFrames, fps);
+    if (frames !== null) out.push({ cut: i, preset, frames });
   });
+  if (landing >= 0) {
+    const frames = fitMontageFrames(def.landing, cuts[landing]!.outFrames, cuts[landing]!.inFrames, fps);
+    if (frames !== null) out.push({ cut: landing, preset: def.landing, frames });
+  }
   return out;
 }
 

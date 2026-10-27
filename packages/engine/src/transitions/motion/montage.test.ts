@@ -16,8 +16,8 @@ describe("planMontageTransitions", () => {
     const all = cuts(45);
     const planned = planMontageTransitions("punch", all, 0.5, 30);
     const times = planned.map((t) => Math.round(all[t.cut]!.time * 100) / 100);
-    // Two beats clear of every downbeat (2, 4, 6 s) and of the landing (7.5 s): one beat a bar.
-    expect(times).toEqual([0.5, 3, 5, 7.5]);
+    // Half-way between the flashed downbeats (0, 2, 4, 6 s); 6-7.5 s is shorter than a bar and stays plain until the landing.
+    expect(times).toEqual([1, 3, 5, 7.5]);
     expect(planned.map((t) => t.preset)).toEqual(["zoom_in", "glitch", "zoom_in", "zoom_through"]);
     for (const t of planned) expect(all[t.cut]!.flashed && t.cut !== all.length - 1).toBe(false);
   });
