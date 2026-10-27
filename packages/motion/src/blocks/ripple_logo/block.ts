@@ -62,6 +62,10 @@ export async function build(ctx: BlockContext): Promise<void> {
   const dissolveAt = dissolve ? Math.max(ringsAt + 0.5, S - 1.4) : Infinity;
   const ringColor = tint(palette.accent, 0.16);
   const haloColor = tint(palette.accent, 0.08);
+  // The field sweeps open, the badge lands (the hero beat), and the picture breaks apart at the end.
+  ctx.cue(0, "whoosh", { weight: 0.5 });
+  ctx.cue(badgeAt, "reveal", { weight: 0.85 });
+  if (dissolve) ctx.cue(dissolveAt, "burst", { weight: 0.8 });
 
   const compose = (g: CanvasRenderingContext2D, t: number): void => {
     g.setTransform(1, 0, 0, 1, 0, 0);

@@ -21,6 +21,8 @@ export function build(ctx: BlockContext): void {
   const beat = Number(p.beat) > 0 ? Number(p.beat) : n > 1 ? Math.max(0.3, (ctx.seconds - ENTER - 0.8) / (n - 1)) : ctx.seconds;
   const m = Math.min(Number(p.morph), beat * 0.8);
   const starts = words.slice(1).map((_, k) => ENTER + (k + 1) * beat - m);
+  ctx.cue(0, "whoosh", { weight: 0.35, at: { x: cx, y: cy } });
+  for (const s of starts) ctx.cue(s, "swap", { weight: 0.5, at: { x: cx, y: cy } });
 
   if (traced.some((t) => t === null)) {
     // No canvas to trace with (jsdom): the words crossfade as text.

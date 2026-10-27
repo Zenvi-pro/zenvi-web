@@ -35,6 +35,7 @@ import { buildKineticCaptions, type AvoidBox, type KineticCaptionPlan } from "..
 import { CAPTION_ANIMATIONS, CAPTION_ANIMATION_IDS, CAPTION_STYLES, CAPTION_STYLE_IDS, type CaptionStyleId } from "../../captions/styles.js";
 import type { CaptionWord } from "../../captions/words.js";
 import { defaultEffectJson } from "../../effects/registry.js";
+import { KINETIC_CAPTIONS_KEY } from "../../sfx/moments.js";
 import type { Transaction } from "../../history/document.js";
 import { idFactory } from "../../model/ids.js";
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
@@ -59,7 +60,7 @@ import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from ".
 const TOOL = "kinetic_captions_tool";
 const TRACK_LABEL = "Captions";
 /** Tag on the clips and drawing files this tool makes. */
-export const KINETIC_KEY = "zenvi_kinetic_captions";
+export const KINETIC_KEY = KINETIC_CAPTIONS_KEY;
 /** `zenvi_matte` on a subject matte file (the subject matte tools' record). */
 const MATTE_KEY = "zenvi_matte";
 
@@ -70,6 +71,9 @@ export interface KineticTag {
   role: "caption" | "cutout";
   /** A caption: timeline seconds its first and last words start. */
   said?: [number, number];
+  /** A caption word's clip: the word, and whether it is an emphasis word (sound design spots those, sfx/spot.ts). */
+  word?: string;
+  emphasis?: true;
 }
 
 /** What a new run covers: its footage clips, its range, and whether it remakes their cut-outs. */
@@ -421,7 +425,8 @@ export const kineticCaptionTools: CatalogTool[] = [
         for (const p of placed) {
           const group = groupOf(p.layer.name);
           const tag: KineticTag = { source_clip_ids: group.sources, style, role: "caption", said: group.said };
-          patchClip(tx, p.clip.id, { [KINETIC_KEY]: tag });
+          const word = group.words[Number(/w(\d+)/.exec(p.layer.name)?.[1])];
+          patchClip(tx, p.clip.id, { [KINETIC_KEY]: word ? { ...tag, word: word.text, ...(word.emphasis ? { emphasis: true } : {}) } : tag });
           if (!files.has(p.fileId)) updateFile(tx, p.fileId, { [KINETIC_KEY]: tag } as Partial<ProjectFile>);
           files.add(p.fileId);
         }

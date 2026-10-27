@@ -20,7 +20,8 @@ import { clipsUsingFile } from "../../model/query.js";
 import { addFile, updateFile, writeFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
 import { placeOverlayClip } from "../../ops/overlays.js";
-import { LINK_KEY, motionLink, readMotionLink, type MotionLinkSpec } from "../../links/zenvi-link.js";
+import { LINK_KEY, motionLink, readMotionEvents, readMotionLink, type MotionLinkSpec } from "../../links/zenvi-link.js";
+import type { PictureEvent } from "../../sfx/events.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged } from "../receipt.js";
 import type { MotionBlockInfo, MotionHost, MotionRender } from "../types.js";
@@ -104,8 +105,44 @@ async function renderSpec(call: ToolCall, motion: MotionHost, project: Project, 
   }
 }
 
+/**
+ * Picture events of block files placed before blocks recorded them
+ * (sfx/spot.ts reads the recorded ones from the link): the motion host
+ * builds each block's page once, without rendering frames. Read-only; an
+ * empty map (and a note) where the host cannot.
+ */
+export async function missingBlockEvents(call: ToolCall): Promise<{ events: Map<string, PictureEvent[]>; note?: string }> {
+  const project = call.doc.project;
+  const events = new Map<string, PictureEvent[]>();
+  const used = new Set(project.clips.map((c) => String(c.file_id)));
+  const missing = project.files.filter((f) => used.has(String(f.id)) && readMotionEvents(f) === null && readMotionLink(f) !== null);
+  if (missing.length === 0) return { events };
+  const motion = call.host.motion;
+  if (!motion?.events) return { events, note: `${missing.length} motion ${missing.length === 1 ? "block was" : "blocks were"} placed before blocks recorded their events and this surface cannot read them, so their clicks and lands are not spotted (update_motion_block_tool re-renders one).` };
+  const failures: string[] = [];
+  for (const file of missing) {
+    const spec = readMotionLink(file)!;
+    const block = motion.blocks().find((b) => b.id === spec.block);
+    const media = block ? mediaPaths(project, block, spec.params) : "unknown block";
+    if (!block || typeof media === "string") {
+      failures.push(`${spec.block} (${typeof media === "string" ? media.replace(/^Error: /, "") : "unknown block"})`);
+      continue;
+    }
+    const link = file[LINK_KEY] as { render?: { width?: unknown; height?: unknown } };
+    const [pw, ph] = projectSize(project);
+    const width = Number(link.render?.width) || pw;
+    const height = Number(link.render?.height) || ph;
+    try {
+      events.set(String(file.id), await motion.events({ block: spec.block, params: spec.params, media, width, height, fps: fpsOf(project), seconds: spec.seconds, alpha: spec.alpha, motionBlurSamples: spec.motionBlurSamples, draft: spec.draft }, call.signal));
+    } catch (error) {
+      failures.push(`${spec.block} (${error instanceof Error ? error.message : String(error)})`);
+    }
+  }
+  return failures.length > 0 ? { events, note: `The events of ${failures.join(", ")} could not be read, so ${failures.length === 1 ? "it is" : "they are"} spotted by ${failures.length === 1 ? "its" : "their"} edges only.` } : { events };
+}
+
 function linkOf({ render, spec }: Rendered): Record<string, unknown> {
-  return motionLink(spec, { codec: render.codec, width: render.width, height: render.height, fps: render.fps, frames: render.frames, output: render.media.path, fingerprint: render.fingerprint, renderedAt: new Date().toISOString() });
+  return motionLink(spec, { codec: render.codec, width: render.width, height: render.height, fps: render.fps, frames: render.frames, output: render.media.path, fingerprint: render.fingerprint, renderedAt: new Date().toISOString(), events: render.events });
 }
 
 function renderData({ render, spec }: Rendered): Record<string, unknown> {

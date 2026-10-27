@@ -43,6 +43,7 @@ const DIRECT_TOOLS = [
   "add_kinetic_title_tool",
   "list_sfx_tool",
   "add_sfx_tool",
+  "spot_sound_tool",
   "auto_sound_design_tool",
   "list_motion_transitions_tool",
   "apply_motion_transition_tool",

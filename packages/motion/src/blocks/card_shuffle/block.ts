@@ -67,6 +67,7 @@ export async function build(ctx: BlockContext): Promise<void> {
   swaps.push(at + pause * fit);
 
   tl.fromTo(card, { y: H * 0.05, opacity: 0, blur: 12 }, { y: 0, opacity: 1, blur: 0 }, { at: 0, duration: enter, ease: "out" });
+  ctx.cue(0, "pop", { weight: 0.4, at: card });
   tl.fromTo(shadow, { opacity: 0 }, { opacity: 1 }, { at: 0.1, duration: enter, ease: "out" });
   layers.forEach((l, i) => tl.set(l, { opacity: i === 0 ? 1 : 0 }, 0));
   nameEls.forEach((el) => tl.set(el, { opacity: 0 }, 0));
@@ -77,6 +78,8 @@ export async function build(ctx: BlockContext): Promise<void> {
     const half = last ? 0.16 : 0.09;
     const land = last ? 0.34 : 0.17;
     const mid = s + half;
+    // Each flip a swish; the last lands with a pop and a glint.
+    ctx.cue(s, "whoosh", { weight: last ? 0.4 : 0.3, at: card });
     tl.to(card, { rotateY: 90 }, { at: s, duration: half, ease: "in" });
     tl.set(card, { rotateY: -90 }, mid);
     tl.to(card, { rotateY: 0 }, { at: mid, duration: land, ease: last ? "back-out" : "out" });
@@ -93,6 +96,8 @@ export async function build(ctx: BlockContext): Promise<void> {
       tl.to(card, { scale: 1.06 }, { at: mid, duration: 0.14, ease: "out" });
       tl.to(card, { scale: 1 }, { at: mid + 0.14, duration: 0.4, ease: "back-out" });
       tl.fromTo(shine, { xPercent: -110 }, { xPercent: 110 }, { at: mid + 0.1, duration: 0.7, ease: "in-out" });
+      ctx.cue(mid, "land", { weight: 0.6, at: card });
+      ctx.cue(mid + 0.1, "glint", { weight: 0.4, at: card });
     }
   });
   tl.set(shine, { xPercent: -110 }, 0);

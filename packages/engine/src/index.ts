@@ -37,6 +37,7 @@ export * from "./sfx/recipes.js";
 export * from "./sfx/render.js";
 export * from "./sfx/plan.js";
 export * from "./sfx/moments.js";
+export * from "./sfx/events.js";
 export * from "./sfx/library.js";
 export * from "./sfx/kit.js";
 export * from "./sfx/condition.js";

@@ -14,6 +14,9 @@ import type { SoundMoment } from "./plan.js";
 /** `zenvi_role` of sound-effect files and the clips that play them. */
 export const SFX_ROLE = "sfx";
 
+/** Tag on kinetic caption clips (tools/catalog/kinetic-captions.ts KINETIC_KEY): their words are spotted one by one (sfx/spot.ts), not as titles. */
+export const KINETIC_CAPTIONS_KEY = "zenvi_kinetic_captions";
+
 /** What a sound-effect clip records about itself (`clip.zenvi_sfx`). */
 export interface SfxClipMark {
   recipe: string;
@@ -22,6 +25,10 @@ export interface SfxClipMark {
   reason?: string;
   /** Library sounds: `provider:id` of the sound it plays. */
   library?: string;
+  /** auto_sound_design_tool: its job in the mix, which layer of its cue it is, and the cue it belongs to (layers of one hit share it). */
+  role?: "hero" | "sweetener" | "micro" | "bed";
+  layer?: string;
+  cue?: string;
 }
 
 /** True for a clip a sound-design tool placed. */
@@ -54,6 +61,21 @@ function isFlash(file: ProjectFile | undefined, clip: Clip): boolean {
   return isGraphic(file, clip) && length <= 0.5 && (/^flash$/i.test(String(clip.title ?? "")) || /flash/i.test(baseName(file, clip)));
 }
 
+/**
+ * Fills the frame where it enters: scaled to at least 90 % (libopenshot
+ * scale_x/scale_y at the first key) and not cropped to a window (a Crop
+ * effect, libopenshot/src/effects/Crop.cpp, trimming over 5 % off an edge).
+ * A grid tile or an inset does neither.
+ */
+function coversFrame(clip: Clip): boolean {
+  const first = (k: unknown, fallback: number) => Math.abs(Number((k as { Points?: { co?: { Y?: unknown } }[] } | undefined)?.Points?.[0]?.co?.Y ?? fallback));
+  const cropped = (clip.effects ?? []).some((e) => {
+    const fx = e as Record<string, unknown>;
+    return (fx.class_name === "Crop" || fx.type === "Crop") && ["left", "right", "top", "bottom"].some((edge) => first(fx[edge], 0) > 0.05);
+  });
+  return !cropped && first(clip.scale_x, 1) >= 0.9 && first(clip.scale_y, 1) >= 0.9;
+}
+
 const near = (list: readonly number[], t: number, within: number) => list.some((x) => Math.abs(x - t) <= within);
 
 /** The last cut before `t` (0 when none): how long the picture has held. */
@@ -78,9 +100,12 @@ export function soundMoments(project: Project, grid: BeatGrid | null = null): So
   const shots: Clip[] = [];
   for (const clip of visual) {
     const file = files.get(String(clip.file_id));
+    if (clip[KINETIC_CAPTIONS_KEY]) continue;
     if (isFlash(file, clip)) flashes.push(clip.position);
     else if (isGraphic(file, clip)) titles.push(clip.position);
-    else shots.push(clip);
+    else if (coversFrame(clip)) shots.push(clip);
+    // A tile, a picture-in-picture: it enters on top without hiding the shot under it (CRAFT.md §10 multiplicity: a ping per tile).
+    else titles.push(clip.position);
   }
 
   // Transitions: the move peaks halfway through.

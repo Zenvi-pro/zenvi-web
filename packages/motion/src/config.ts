@@ -1,5 +1,6 @@
 /** What the renderer hands a block page (`window.__ZENVI_BLOCK__`): shared by the page and the Node side. */
 
+import type { PictureEvent } from "@zenvi/engine";
 import type { Params } from "./params.js";
 
 /** A video param as the page sees it: frames extracted at the render's frame rate. */
@@ -42,5 +43,7 @@ export interface ZenviPageApi {
   duration: number;
   /** Put the page in its state at t seconds; resolves when the frame is ready to capture. */
   seek(t: number): Promise<void>;
+  /** The block's picture events (set once ready): where the sound design puts a click, a tick, a land. */
+  events?: PictureEvent[];
   error?: string;
 }

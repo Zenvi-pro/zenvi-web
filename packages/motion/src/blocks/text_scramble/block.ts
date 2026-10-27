@@ -37,6 +37,9 @@ export function build(ctx: BlockContext): void {
   rows.forEach((row, i) => {
     const at = 0.15 + i * decode * 0.55;
     const options = { at, duration: decode, seed: ctx.seed + i * 101, glyphs: GLYPHS[String(p.glyphs)] ?? GLYPHS.letters, rate: 22 };
+    // The letters chatter while they scramble, then the line locks.
+    ctx.cue(at, "swap", { weight: 0.3, at: row.line, until: at + decode, rate: options.rate });
+    ctx.cue(at + decode, "land", { weight: 0.35, at: row.line });
     tl.track((t) => {
       const shown = scrambledText(row.text, t, options);
       if (row.live.textContent !== shown) row.live.textContent = shown;

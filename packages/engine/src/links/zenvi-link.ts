@@ -13,6 +13,8 @@
  * (`{"$zenvi_json": "…"}`, linked_media.encode_props).
  */
 
+import { readPictureEvents, type PictureEvent } from "../sfx/events.js";
+
 export const LINK_KEY = "zenvi_link";
 export const LINK_VERSION = 1;
 export const MOTION_LINK_KIND = "zenvi-motion";
@@ -76,6 +78,8 @@ export interface LinkRender {
   fingerprint: string;
   /** ISO 8601. */
   renderedAt: string;
+  /** The block's picture events (sfx/events.ts), when the host reported them. */
+  events?: readonly PictureEvent[];
 }
 
 /** The `zenvi_link` record of a rendered motion block. */
@@ -97,8 +101,26 @@ export function motionLink(spec: MotionLinkSpec, render: LinkRender): Record<str
     },
     state: "fresh",
     error: null,
-    motion: { block: spec.block, seconds: spec.seconds, alpha: spec.alpha, motion_blur_samples: spec.motionBlurSamples, draft: spec.draft },
+    motion: {
+      block: spec.block,
+      seconds: spec.seconds,
+      alpha: spec.alpha,
+      motion_blur_samples: spec.motionBlurSamples,
+      draft: spec.draft,
+      ...(render.events ? { events: render.events.map((e) => ({ ...e })) } : {}),
+    },
   };
+}
+
+/**
+ * The picture events recorded with a motion block's render; null when none
+ * were (another kind of file, or a block placed before events were recorded:
+ * an empty list means the block has nothing to sound).
+ */
+export function readMotionEvents(file: Readonly<Record<string, unknown>>): PictureEvent[] | null {
+  const link = file[LINK_KEY];
+  if (!isRecord(link) || link.kind !== MOTION_LINK_KIND || !isRecord(link.motion) || !Array.isArray(link.motion.events)) return null;
+  return readPictureEvents(link.motion.events);
 }
 
 /** The motion spec of a file rendered from a block, or null for any other file. */

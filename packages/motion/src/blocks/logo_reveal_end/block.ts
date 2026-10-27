@@ -48,9 +48,11 @@ export function build(ctx: BlockContext): void {
   const clip = glow ? iris : markBox;
   tl.fromTo(clip, { clipPath: "circle(0% at 50% 50%)" }, { clipPath: "circle(72% at 50% 50%)" }, { at: open, duration: 0.85, ease: "out" });
   tl.fromTo(iris, { scale: 1.6, blur: 8 }, { scale: 1, blur: 0 }, { at: open, duration: 1.0, ease: "out" });
+  ctx.cue(open, "reveal", { weight: 0.9, at: markBox });
   if (bars.length > 0) tl.fromTo(bars, { x: -18 }, { x: 0 }, { at: open + 0.05, duration: 0.7, ease: "out", stagger: 0.06 });
   if (glow) {
     tl.fromTo(glow, { opacity: 0, scale: 0.5 }, { opacity: 1, scale: 1.1 }, { at: open + 0.1, duration: 0.7, ease: "out" });
+    ctx.cue(open + 0.1, "glint", { weight: 0.4, at: markBox });
     tl.to(glow, { opacity: 0.55, scale: 1 }, { at: open + 0.8, duration: 1.2, ease: "in-out" });
   }
   // The wordmark slides out from behind the mark (its mask edge is the mark's side).
@@ -59,9 +61,13 @@ export function build(ctx: BlockContext): void {
     const from: Props = { [axis]: stacked ? -100 : -104 };
     const to: Props = { [axis]: 0 };
     tl.fromTo(word, from, to, { at: open + 0.6, duration: 0.8, ease: "out" });
+    ctx.cue(open + 0.6, "whoosh", { weight: 0.35, at: wordMask! });
   }
   // Then the call to action and the address, after the lockup has landed.
   const tail = open + 1.2;
-  if (cta) tl.fromTo(cta, { y: 30, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1 }, { at: tail, duration: 0.6, ease: "out" });
+  if (cta) {
+    tl.fromTo(cta, { y: 30, opacity: 0, scale: 0.96 }, { y: 0, opacity: 1, scale: 1 }, { at: tail, duration: 0.6, ease: "out" });
+    ctx.cue(tail, "pop", { weight: 0.35, at: cta });
+  }
   if (url) tl.fromTo(url, { y: 16, opacity: 0 }, { y: 0, opacity: 0.75 }, { at: tail + 0.12, duration: 0.55, ease: "out" });
 }

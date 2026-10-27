@@ -1214,8 +1214,12 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { recipe: "pop" }, status: "refused", summary: /^Error: give exactly one of at_seconds, clip_id or marker_id\.$/ },
   },
+  spot_sound_tool: {
+    happy: { args: {}, status: "unchanged", summary: /^\d+ hit points over [\d.]+ s, \d+ that want a sound/, check: ({ doc }) => expect(doc.undoLabels).toHaveLength(0) },
+    failure: { args: { genre: "polka" }, status: "refused", summary: /^Error: / },
+  },
   auto_sound_design_tool: {
-    happy: { args: { intensity: "hype" }, summary: /^Sound-designed the edit \(hype\): \d+ effects/, check: ({ doc }) => expect(doc.undoLabels.at(-1)).toBe("Automatic sound design") },
+    happy: { args: { intensity: "hype" }, summary: /^Sound-designed the edit as .*: \d+ of \d+ hit points have a sound/, check: ({ doc }) => expect(doc.undoLabels.at(-1)).toBe("Automatic sound design") },
     failure: { args: { climax_seconds: "999" }, status: "refused", summary: /^Error: climax_seconds \(999\) is after the end of the edit/ },
   },
 

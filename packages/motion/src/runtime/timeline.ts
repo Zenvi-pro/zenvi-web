@@ -8,6 +8,7 @@
  * HyperFrames) owns time.
  */
 
+import type { PictureEvent, PictureEventKind } from "@zenvi/engine";
 import { resolveEase, type Ease, type EaseName } from "./easing.js";
 import { interpolate, type Value } from "./interpolate.js";
 import { random01 } from "./rng.js";
@@ -31,6 +32,19 @@ export interface TweenOptions {
   duration?: number;
   ease?: EaseName | Ease;
   stagger?: number | StaggerOptions;
+}
+
+/** A picture event's details besides its time and kind (sfx/events.ts in the engine). */
+export interface CueOptions {
+  /** 0..1, how big it is on screen (default 0.5). */
+  weight?: number;
+  /** 0..1 of the frame (default 0.5, the centre). */
+  x?: number;
+  y?: number;
+  /** Runs (`type`, `tick`): seconds the run ends. */
+  until?: number;
+  /** Runs: events per second. */
+  rate?: number;
 }
 
 /** A function of time run after the tweens on every seek; it must depend on `t` only. */
@@ -97,6 +111,7 @@ function kebab(prop: string): string {
 export class Timeline {
   private readonly tweens = new Map<Target, Tween[]>();
   private readonly tracks: Track[] = [];
+  private readonly events: PictureEvent[] = [];
   private order = 0;
   private end = 0;
 
@@ -130,6 +145,20 @@ export class Timeline {
     this.tracks.push(track);
     this.end = Math.max(this.end, until);
     return this;
+  }
+
+  /** Record a picture event: something on screen the ear expects to hear (not drawn; the sound design reads it). */
+  cue(at: number, kind: PictureEventKind, options: CueOptions = {}): this {
+    const event: PictureEvent = { t: at, kind, weight: options.weight ?? 0.5, x: options.x ?? 0.5, y: options.y ?? 0.5 };
+    if (options.until !== undefined && options.until > at) event.until = options.until;
+    if (options.rate !== undefined && options.rate > 0) event.rate = options.rate;
+    this.events.push(event);
+    return this;
+  }
+
+  /** The picture events, by time (ties keep the order they were cued in). */
+  get cues(): PictureEvent[] {
+    return this.events.map((e) => ({ ...e })).sort((a, b) => a.t - b.t);
   }
 
   private add(targets: Targets, from: Props | undefined, to: Props, options: TweenOptions): this {

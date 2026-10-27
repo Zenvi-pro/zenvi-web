@@ -341,12 +341,15 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
     render: (v) => {
       const d = v.duration;
       const osc = new SineOsc();
+      const harm2 = new SineOsc();
+      const harm3 = new SineOsc();
       const s = sr(v);
       for (let i = 0; i < v.out.length; i += 1) {
         const t = i / s;
         const f = (26 + 74 * Math.exp(-t / (0.28 * d))) * v.tune;
         const env = attackDecay(t, 0.004, 0.42 * d) * clamp01((d - t) / (0.25 * d));
-        const x = saturate(osc.next(f) * env, 1.8 + 1.5 * v.intensity);
+        // The phone layer: an octave and a twelfth up at -8 dB, so the drop reads where there is no sub (CRAFT.md §5).
+        const x = saturate(osc.next(f) * env, 1.8 + 1.5 * v.intensity) + (harm2.next(f * 2) * 0.3 + harm3.next(f * 3) * 0.2) * env;
         v.out.addStereo(i, x, x);
       }
       noiseBurst(v, { at: 0, mode: "low", freq: 240, attack: 0.002, decay: 0.03, level: 0.35, pink: true, tracksBrightness: false });
@@ -685,6 +688,103 @@ export const SFX_RECIPES: readonly SfxRecipe[] = [
       }
       addReverb(v.out, { room: 0.82, damp: 0.3, wet: 1.2, predelay: 0.01 });
       return 0;
+    },
+  },
+  {
+    id: "hit_transient",
+    family: "impact",
+    title: "Hit transient",
+    use: "The crack on top of a layered hit (5-30 ms, 2-8 kHz): it sets the timing of a body and sub that would otherwise feel late. A layer, rarely alone.",
+    hit: "onset",
+    duration: { default: 0.12, min: 0.04, max: 0.4 },
+    mixDb: -12,
+    render: (v) => {
+      noiseBurst(v, { at: 0, mode: "band", freq: 4200, q: 0.9, attack: 0.0002, decay: 0.006 + 0.004 * v.intensity, level: 1, width: 0.2 });
+      noiseBurst(v, { at: 0, mode: "high", freq: 6500, attack: 0.0001, decay: 0.0025, level: 0.6 });
+      modal(v, { at: 0, freqs: [1900, 3100], decays: [0.008, 0.005], amps: [0.5, 0.3], level: 0.5, attack: 0.0002 });
+      return 0;
+    },
+  },
+  {
+    id: "tail_bloom",
+    family: "texture",
+    title: "Tail bloom",
+    use: "The room after a hero hit: one shared reverb world for the edit (its length is the space's decay). Layered under a hit's onset, never alone; high-passed so the low end stays clean.",
+    hit: "onset",
+    duration: { default: 1.6, min: 0.4, max: 4 },
+    mixDb: -16,
+    render: (v) => {
+      const sr0 = sr(v);
+      const dry = new StereoBuffer(v.out.length, sr0);
+      const d: Voice = { ...v, out: dry };
+      noiseBurst(d, { at: 0, mode: "band", freq: 1400, q: 0.6, attack: 0.001, decay: 0.03, level: 1, width: 0.6, pink: true });
+      noiseBurst(d, { at: 0, mode: "high", freq: 3000, attack: 0.0005, decay: 0.012, level: 0.5, width: 0.8 });
+      addReverb(dry, { room: clamp01((v.duration - 0.3) / 2.6), damp: 0.45, wet: 4, predelay: 0.02 });
+      // Only the tail: the dry burst goes, and the return is high-passed at 300 Hz (CRAFT.md §5).
+      const hp = [new Svf(sr0), new Svf(sr0)];
+      const skip = Math.round(0.02 * sr0);
+      for (let i = 0; i < v.out.length; i += 1) {
+        const fade = i < skip ? 0 : Math.min(1, (i - skip) / (0.01 * sr0));
+        v.out.addStereo(i, hp[0]!.highpass(dry.left[i]!, 300) * fade, hp[1]!.highpass(dry.right[i]!, 300) * fade);
+      }
+      return 0;
+    },
+  },
+  {
+    id: "room_tone",
+    family: "texture",
+    title: "Room tone",
+    use: "An ambience bed under the whole edit (documentary, essay, talking head, 3D product): soft air that keeps cuts from dropping into digital silence. At -30…-38 LUFS, 18 dB or more under the voice.",
+    hit: "onset",
+    duration: { default: 10, min: 2, max: 120 },
+    mixDb: -24,
+    render: (v) => {
+      const s = sr(v);
+      const rng = v.rng.fork(0x70);
+      const src = [new PinkNoise(rng), new PinkNoise(rng.fork(1))];
+      const lp = [new Svf(s), new Svf(s)];
+      const hp = [new Svf(s), new Svf(s)];
+      const drift = new Wander(rng.fork(2), s);
+      const top = 2600 * v.bright;
+      for (let i = 0; i < v.out.length; i += 1) {
+        const g = 1 + 0.15 * drift.next(0.3);
+        const fade = Math.min(1, i / (0.4 * s), (v.out.length - i) / (0.4 * s));
+        const ch = src.map((n, c) => hp[c]!.highpass(lp[c]!.lowpass(n.next(), top, 0.6), 150) * g * fade);
+        v.out.addStereo(i, ch[0]!, ch[1]!);
+      }
+      return 0;
+    },
+  },
+  {
+    id: "paper",
+    family: "texture",
+    title: "Paper",
+    use: "Foley for a photo, page or card moving in a collage (video essay, documentary): a dry crinkle and slide. Micro level, between words.",
+    hit: "onset",
+    duration: { default: 0.35, min: 0.15, max: 0.8 },
+    mixDb: -14,
+    render: (v) => {
+      const rng = v.rng.fork(0x9a);
+      noiseBurst(v, { at: 0, mode: "band", freq: 2600, freqEnd: 1800, q: 0.7, attack: 0.012, decay: v.duration * 0.35, level: 0.5, width: 0.3 });
+      const count = Math.round(v.duration * (30 + 30 * v.intensity));
+      for (let k = 0; k < count; k += 1) {
+        noiseBurst(v, { at: v.duration * 0.6 * Math.pow(rng.next(), 1.4), mode: "band", freq: rng.range(2500, 6500), q: 1.5, attack: 0.0002, decay: rng.range(0.001, 0.004), level: rng.range(0.3, 0.9), pan: rng.range(-0.3, 0.3) });
+      }
+      return 0;
+    },
+  },
+  {
+    id: "cloth",
+    family: "texture",
+    title: "Cloth",
+    use: "A soft hand or body move, a product turning in the hand, a card slid aside: a muffled swish of fabric. The quietest micro sound; never a hit.",
+    hit: "peak",
+    duration: { default: 0.3, min: 0.1, max: 0.6 },
+    mixDb: -16,
+    render: (v) => {
+      const peak = v.duration * 0.45;
+      noiseBurst(v, { at: 0, mode: "band", freq: 900, freqEnd: 1600, q: 0.5, attack: peak, decay: v.duration * 0.18, level: 0.8, width: 0.4, pink: true, pan: v.pan * 0.5 });
+      return peak;
     },
   },
   {

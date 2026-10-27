@@ -3,6 +3,7 @@
 export { ChromeLaunchError, ChromeMissingError, LAUNCH_TIMEOUT_MS, chromeArgs, chromeCacheDir, closeChrome, findChrome, installChrome, launchChrome, leaseChrome } from "./chrome.js";
 export { blockPage, motionDir, pageHtml, writeBlockPages, type BlockPage } from "./page.js";
 export {
+  blockEvents,
   designSize,
   encodeArgs,
   fingerprintRender,
@@ -11,6 +12,7 @@ export {
   renderBlock,
   RENDERER_VERSION,
   sampleTimes,
+  type BlockEventsOptions,
   type Fps,
   type MotionCodec,
   type RenderBlockOptions,

@@ -36,6 +36,8 @@ export function build(ctx: BlockContext): void {
   const lineLeft = (i: number): number => (stack ? 0 : (W - (fixed + gap) * k - widths[i]! * k) / 2);
   tl.fromTo(row, { x: lineLeft(0), y: 30, opacity: 0, blur: 10 }, { x: lineLeft(0), y: 0, opacity: 1, blur: 0 }, { at: 0, duration: enter, ease: "out" });
   tl.set(slot, { width: widths[0]! * k }, 0);
+  ctx.cue(0, "whoosh", { weight: 0.3, at: row });
+  for (let i = 1; i < n; i += 1) ctx.cue(change(i), "swap", { weight: 0.45, at: slot });
   for (let i = 1; i < n; i += 1) {
     tl.to(row, { x: lineLeft(i) }, { at: change(i), duration: move, ease: "in-out" });
     tl.to(slot, { width: widths[i]! * k }, { at: change(i), duration: move, ease: "in-out" });

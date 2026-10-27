@@ -115,9 +115,12 @@ too quiet and nobody has looked at the file.
    `add_vignette_tool` (cinematic: amount 0.3-0.5) and
    `add_shape_mask_tool` (feathered box or ellipse windows, iris and box
    reveals with `keyframes` on `grow`).
-10. **Sound, last.** When the picture is locked: `auto_sound_design_tool`
-    (`intensity`, `beats`, `climax_seconds`), then `add_sfx_tool` for what it
-    cannot know (typing, a click, a shutter, the landing). Both play real
+10. **Sound, last.** When the picture is locked: `spot_sound_tool` shows the
+    cue sheet (every cut, move, block click, card land, emphasis word and 3D
+    landing, and the genre it reads as); `auto_sound_design_tool`
+    (`genre` when the guess is wrong, `intensity`, `beats`, `climax_seconds`)
+    designs from it, then `master_audio_tool`; `add_sfx_tool` for what the
+    sheet cannot see (an in-shot action). Both play real
     CC0 recordings from Zenvi's kit by default (`kit: "recorded"`; no
     Freesound search needed, never the same sample twice in a row); keep
     `kit: "synth"` for tonal risers and sub drops you shape with pitch.

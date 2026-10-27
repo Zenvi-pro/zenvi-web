@@ -154,6 +154,7 @@ export function build(ctx: BlockContext): void {
   Object.assign(core.style, { left: `${x}px`, top: `${y}px` });
   tl.fromTo(core, { scale: 0.5, opacity: 0 }, { scale: 0.32, opacity: 1 }, { at: 0, duration: at, ease: "in" });
   tl.to(core, { scale: 4.5, opacity: 1 }, { at, duration: 0.06, ease: "out" });
+  ctx.cue(at, "burst", { weight: 0.9, at: { x, y } });
   tl.to(core, { scale: 6, opacity: 0 }, { at: at + 0.06, duration: 0.5, ease: "out" });
 
   if (p.rings || shape === "rings") {
@@ -206,6 +207,7 @@ export function build(ctx: BlockContext): void {
     const label = ctx.el("div", "pbx-label", ctx.root, String(p.label));
     Object.assign(label.style, { left: `${x}px`, top: `${y}px` });
     tl.fromTo(label, { xPercent: -50, yPercent: -50, scale: 0.3, opacity: 0 }, { xPercent: -50, yPercent: -50, scale: 1, opacity: 1 }, { at: 0, duration: 0.3, ease: "back-out" });
+    ctx.cue(0, "pop", { weight: 0.35, at: { x, y } });
     // The ignition kicks the label: a press, then a settle.
     tl.to(label, { scale: 0.92 }, { at, duration: 0.06, ease: "out" });
     tl.to(label, { scale: 1 }, { at: at + 0.06, duration: 0.3, ease: "back-out" });

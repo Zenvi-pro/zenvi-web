@@ -72,6 +72,13 @@ export function build(ctx: BlockContext): void {
     shape.setAttribute("stroke-linejoin", "round");
   }
 
+  // The first shape pops in; each morph swings over and lands on the next.
+  ctx.cue(0, "pop", { weight: 0.5, at: { x: cx, y: cy } });
+  for (const s of starts) {
+    ctx.cue(s, "whoosh", { weight: 0.35, at: { x: cx, y: cy } });
+    ctx.cue(s + m, "land", { weight: 0.45, at: { x: cx, y: cy } });
+  }
+
   // A ripple of each new shape as it lands.
   starts.forEach((s, k) => {
     const wrap = ctx.el("div", "smx-echo", stage);

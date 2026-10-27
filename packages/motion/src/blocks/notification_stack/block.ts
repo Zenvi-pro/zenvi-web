@@ -83,6 +83,7 @@ export function build(ctx: BlockContext): void {
     const h = heights[i]!;
     // In: dropping from above into the top slot, focusing as it lands.
     tl.fromTo(card, { y: -h * 0.6, scale: 0.94, opacity: 0, blur: 10 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: arrive[i]!, duration: 0.6, ease: "out" });
+    ctx.cue(arrive[i]!, "pop", { weight: hot && i === n - 1 ? 0.6 : 0.45, at: card });
     // Each later arrival pushes it one slot down and one step back.
     for (let j = i + 1; j < n; j += 1) {
       let y = 0;

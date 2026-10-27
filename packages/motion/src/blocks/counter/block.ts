@@ -53,6 +53,13 @@ export function build(ctx: BlockContext): void {
   if (centred) tl.set(box, { xPercent: -50 }, 0);
 
   tl.track(track);
+  // A tick per value change (the last digit's), over each count, and a land as it settles.
+  for (const s of steps) {
+    const changes = Math.abs(s.to - s.from) * 10 ** decimals;
+    if (changes < 1) continue;
+    ctx.cue(s.at, "tick", { weight: 0.3, at: number, until: s.at + s.duration, rate: Math.min(20, changes / s.duration) });
+    ctx.cue(s.at + s.duration, "land", { weight: 0.5, at: number });
+  }
   tl.fromTo(number, { y: size * 0.18, opacity: 0, blur: 14 }, { y: 0, opacity: 1, blur: 0 }, { at: 0, duration: enter, ease: "out" });
   if (label) tl.fromTo(label, { y: 14, opacity: 0 }, { y: 0, opacity: 1 }, { at: 0.2, duration: 0.5, ease: "out" });
 }
