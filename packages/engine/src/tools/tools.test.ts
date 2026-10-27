@@ -1101,6 +1101,14 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for review_render_tool/ },
   },
+  swap_shot_tool: {
+    happy: {
+      args: { clip_id: IDS.clipB },
+      summary: /^Clip CLIPBROL01 now shows \S+ from 2\.10 s \(was \S+ from 0\.00 s\)\.$/,
+      check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipB)).toMatchObject({ start: 2.1, end: 7.1, position: 10 }),
+    },
+    failure: { args: { clip_id: IDS.clipB, file_id: IDS.music }, status: "refused", summary: /^Error: \S+ is not a video or image to cut to\.$/ },
+  },
   add_motion_template_tool: {
     happy: {
       args: { template: "end_card", text: "Northwind", subtitle: "Brews in four minutes", position_seconds: "1", bpm: "120" },

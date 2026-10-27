@@ -340,7 +340,7 @@ export function createCommands(session: EditorSession, env: CommandEnv): Map<str
     { id: "actionSoundDesign", label: "Sound design: whooshes, hits and risers", group: "Timeline", run: () => void runSoundDesign(session, "normal") },
     { id: "actionSoundDesignSubtle", label: "Sound design: subtle", group: "Timeline", run: () => void runSoundDesign(session, "subtle") },
     { id: "actionSoundDesignHype", label: "Sound design: hype", group: "Timeline", run: () => void runSoundDesign(session, "hype") },
-    { id: "actionMakeItSnappy", label: "Make it snappy: motion transitions, sound design, mastering", group: "Timeline", run: () => void runMakeItSnappy(session) },
+    { id: "actionMakeItSnappy", label: "Make it snappy: matched grade, motion transitions, sound design, mastering", group: "Timeline", run: () => void runMakeItSnappy(session) },
     { id: "actionMotionTransitionsHype", label: "Motion transitions on every cut: hype", group: "Timeline", run: () => void applyMotionStyle(session, "hype") },
     { id: "actionMotionTransitionsCinematic", label: "Motion transitions on every cut: cinematic", group: "Timeline", run: () => void applyMotionStyle(session, "cinematic") },
     {

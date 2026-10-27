@@ -8,7 +8,7 @@ import { addFile } from "../../ops/files.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "../test-support/fake-host.js";
 import { L1, SPOKEN_WORDS, imageInfo, media, snapshotOf, videoInfo } from "../test-support/fixture.js";
-import { KINETIC_KEY, emphasisArg, kineticTag } from "./kinetic-captions.js";
+import { KINETIC_KEY, cueWords, emphasisArg, kineticTag } from "./kinetic-captions.js";
 
 /** A fake host that probes the SVGs it wrote for their real size (the fake recognizer hears SPOKEN_WORDS). */
 function host(options: FakeHostOptions = {}): FakeHost {
@@ -228,5 +228,53 @@ describe("kinetic_captions_tool", () => {
     expect(emphasisArg("Time, big idea")).toEqual(["Time", "big idea"]);
     expect(emphasisArg(" AUTO ")).toBe("auto");
     expect(emphasisArg("none")).toBe("none");
+  });
+
+  it("captions script cues without speech, each word timed by its share of the cue and tagged with the clip on screen", async () => {
+    const { doc, clipId } = talking();
+    const cues = [
+      { text: "Stop chasing", start: 2.5, end: 3.3 },
+      { text: "DEADLINES", start: 3.4, end: 4.2 },
+    ];
+    const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { cues, emphasis: ["deadlines"] });
+    expect(r.ok, r.text).toBe(true);
+    expect(dataOf(r).words_from).toBe("cues");
+    const words = (dataOf(r).groups as { words: { text: string; start: number }[] }[]).flatMap((g) => g.words);
+    expect(words.map((w) => w.text.toLowerCase())).toEqual(["stop", "chasing", "deadlines"]);
+    // "Stop" (5 of 13 characters with spaces) takes the first ~0.31 s of its cue.
+    expect(words[1]!.start).toBeCloseTo(2.5 + (0.8 * 5) / 13, 1);
+    for (const c of captionClips(doc)) expect(kineticTag(c)!.source_clip_ids).toEqual([clipId]);
+    expect(cueWords([{ text: "a b", start: 0, end: 1 }], [], {})).toEqual([
+      { text: "a", start: 0, end: 0.5 },
+      { text: "b", start: 0.5, end: 1 },
+    ]);
+  });
+
+  it("sets the size, height and entrance it is given, inside the safe area", async () => {
+    const run = async (args: Record<string, unknown>) => {
+      const { doc } = talking();
+      const r = await runTool({ doc, host: host() }, "kinetic_captions_tool", { style: "documentary", ...args });
+      expect(r.ok, r.text).toBe(true);
+      return { data: dataOf(r), clips: captionClips(doc) };
+    };
+    const plain = await run({});
+    const big = await run({ text_size: 0.086 });
+    const box = (d: Record<string, unknown>) => (d.groups as { box: number[] }[])[0]!.box;
+    // Twice the documentary size (0.043): about twice as tall.
+    expect(box(big.data)[3]! / box(plain.data)[3]!).toBeGreaterThan(1.6);
+    expect(big.data.text_size).toBe(0.086);
+    // y: 0.4 centres the block there (documentary sits at 0.75 on 9:16 by default).
+    const high = await run({ y: 0.4 });
+    const [, y0, , h0] = box(high.data);
+    expect(y0! + h0! / 2).toBeCloseTo(0.4, 1);
+    // Below the safe area: kept out of the bottom 20 %.
+    const low = await run({ y: 0.97 });
+    const [, y1, , h1] = box(low.data);
+    expect(y1! + h1!).toBeLessThanOrEqual(0.8 + 1e-3);
+    // slam lands from 1.8x: the first scale key of a caption clip is above 1.
+    const slam = await run({ animation: "slam" });
+    expect(slam.data.animation).toBe("slam");
+    const firstScale = (c: Clip) => Number((c.scale_x as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y);
+    expect(Math.max(...slam.clips.map(firstScale))).toBeGreaterThan(Math.max(...plain.clips.map(firstScale)));
   });
 });

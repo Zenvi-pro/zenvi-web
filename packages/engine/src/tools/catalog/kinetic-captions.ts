@@ -21,7 +21,7 @@
 
 import { z } from "zod";
 import { buildKineticCaptions, type AvoidBox, type KineticCaptionPlan } from "../../captions/build.js";
-import { CAPTION_STYLES, CAPTION_STYLE_IDS, type CaptionStyleId } from "../../captions/styles.js";
+import { CAPTION_ANIMATIONS, CAPTION_ANIMATION_IDS, CAPTION_STYLES, CAPTION_STYLE_IDS, type CaptionStyleId } from "../../captions/styles.js";
 import type { CaptionWord } from "../../captions/words.js";
 import { defaultEffectJson } from "../../effects/registry.js";
 import type { Transaction } from "../../history/document.js";
@@ -37,6 +37,7 @@ import { applied, failed, refused } from "../receipt.js";
 import { colorHexAlpha, constantKeyframe, isLocked, projectSize, trackInfo } from "../titles-text.js";
 import { clipTarget, isTalkingFootage, isWordSource, wordsFor, wordsForClip } from "../transcripts.js";
 import { projectFps } from "../frame-time.js";
+import { isFootage } from "./color-unify.js";
 import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
 
 const TOOL = "kinetic_captions_tool";
@@ -64,10 +65,19 @@ interface Scope {
 }
 
 const STYLE_LINES = CAPTION_STYLE_IDS.map((id) => `${id}: ${CAPTION_STYLES[id].summary}.`).join(" ");
+const ANIMATION_LINES = CAPTION_ANIMATION_IDS.map((id) => `${id}: ${CAPTION_ANIMATIONS[id].summary}.`).join(" ");
 const unit = z.number().min(0).max(1);
+/** Connector size the styles are drawn at, share of the frame's short side, when text_size scales them. */
+const baseShare = (style: CaptionStyleId): number => CAPTION_STYLES[style].base.size / 1080;
 
 const input = z.strictObject({
-  timeline_clip_ids: z.array(z.string().min(1)).min(1).max(20).optional().describe("Footage clips whose speech to caption (default: every clip with picture and sound)."),
+  timeline_clip_ids: z.array(z.string().min(1)).min(1).max(20).optional().describe("Footage clips whose speech to caption (default: every clip with picture and sound; with cues, every footage clip under them)."),
+  cues: z
+    .array(z.strictObject({ text: z.string().min(1).max(200), start: z.number().min(0), end: z.number().min(0) }))
+    .min(1)
+    .max(400)
+    .optional()
+    .describe("Script-timed words instead of speech (no voice, or a voice not transcribed): timeline seconds; a cue of several words shares its time between them by length."),
   start_seconds: z.number().min(0).optional().describe("Only words from this timeline time on."),
   end_seconds: z.number().min(0).optional().describe("Only words before this timeline time."),
   style: z.enum(CAPTION_STYLE_IDS).optional().describe(`Look and motion (default creator). ${STYLE_LINES}`),
@@ -82,6 +92,9 @@ const input = z.strictObject({
     .describe("Boxes to keep captions off, 0-1 of the frame (centre x, y and size w, h): the speaker's face first (split puts its words either side of it)."),
   accent: z.string().max(40).optional().describe("Emphasis / marker colour (#rrggbb or a name). Default per style (creator red, karaoke yellow)."),
   ink: z.string().max(40).optional().describe("Colour of the other words (default white)."),
+  text_size: z.number().min(0.015).max(0.2).optional().describe("Connector word size, share of the frame's short side (style default: creator 0.046, karaoke 0.059, stack 0.11); emphasis words keep their ratio to it."),
+  y: unit.optional().describe("Vertical centre of the captions, 0 top - 1 bottom (default: the style's own spots). Kept inside the caption safe area (on 9:16 out of the top 12 % and the bottom 20 %) and off the avoid boxes; split ignores it."),
+  animation: z.enum(CAPTION_ANIMATION_IDS).optional().describe(`How words enter, instead of the style's own. ${ANIMATION_LINES}`),
   behind_subject: z.boolean().optional().describe("Put a cut-out of the speaker above the captions so the words pass behind them. Needs the footage's subject matte."),
   language: z.string().max(16).optional().describe("Speech language when the clip has to be transcribed (auto by default)."),
 });
@@ -180,6 +193,35 @@ async function wordsOf(call: ToolCall, clips: readonly Clip[], args: Input, warn
   return out.sort((a, b) => a.start - b.start);
 }
 
+/**
+ * Words from script cues, timeline seconds: a cue of several words shares
+ * its time between them by length, as a speaker would say them. Each word's
+ * source is the clip on screen when it starts (the topmost of `clips`), else
+ * the nearest of them (none without clips).
+ */
+export function cueWords(cues: readonly { text: string; start: number; end: number }[], clips: readonly Clip[], args: Pick<Input, "start_seconds" | "end_seconds">): CaptionWord[] {
+  const sourceAt = (t: number): string | undefined => {
+    if (clips.length === 0) return undefined;
+    const on = clips.filter((c) => Number(c.position) <= t + 1e-6 && t < Number(c.position) + Number(c.end) - Number(c.start) - 1e-6);
+    if (on.length > 0) return on.reduce((a, b) => (b.layer > a.layer ? b : a)).id;
+    const gap = (c: Clip) => Math.min(Math.abs(Number(c.position) - t), Math.abs(Number(c.position) + Number(c.end) - Number(c.start) - t));
+    return clips.reduce((a, b) => (gap(b) < gap(a) ? b : a)).id;
+  };
+  const out: CaptionWord[] = [];
+  for (const cue of cues) {
+    const parts = cue.text.split(/\s+/).filter(Boolean);
+    const span = Math.max(cue.end - cue.start, 0.05 * parts.length);
+    const weight = parts.reduce((n, w) => n + w.length + 1, 0);
+    let at = cue.start;
+    for (const text of parts) {
+      const length = (span * (text.length + 1)) / weight;
+      if ((args.start_seconds === undefined || at >= args.start_seconds - 1e-6) && (args.end_seconds === undefined || at < args.end_seconds)) out.push({ text, start: at, end: at + length, ...(clips.length > 0 ? { source: sourceAt(at)! } : {}) });
+      at += length;
+    }
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+
 function cutoutOf(tx: Transaction, source: Clip, matte: ProjectFile, layer: number, tag: KineticTag): Clip {
   // The same picture as the footage (its keys, effects and speed: a copy), keyed by the matte last; silent.
   const copy = duplicateClip(tx, source.id, { position: Number(source.position), layer });
@@ -192,9 +234,9 @@ export const kineticCaptionTools: CatalogTool[] = [
     name: TOOL,
     title: "Add kinetic captions",
     description:
-      "Animated word-by-word captions from the speech in footage clips, timed to each word, styled after creator and editorial reels: emphasis words picked automatically (numbers, stressed words) " +
+      "Animated word-by-word captions from the speech in footage clips (or from script cues when there is no transcribed voice), timed to each word, styled after creator and editorial reels: emphasis words picked automatically (numbers, stressed words) " +
       "or given, laid out in the safe area for 9:16 or 16:9 and kept off the boxes you give (the speaker's face). Each word is an outlined SVG title clip with keyframes on Captions tracks: " +
-      "native, editable and the same on every Zenvi surface. Running it again on the same clips (and range) replaces its captions there. One undo step. For plain subtitles use add_captions_tool.",
+      "native, editable and the same on every Zenvi surface. Size (text_size), height (y) and entrance (animation: pop, slam, slide_up, rise, fade) override the style's. Running it again on the same clips (and range) replaces its captions there. One undo step. For plain subtitles use add_captions_tool.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     requires: ["media"],
@@ -205,6 +247,7 @@ export const kineticCaptionTools: CatalogTool[] = [
       const style = args.style ?? "creator";
       if (args.start_seconds !== undefined && args.end_seconds !== undefined && args.end_seconds <= args.start_seconds) return refused(TOOL, "Error: end_seconds must be after start_seconds.");
 
+      if (args.cues?.some((c) => c.end < c.start)) return refused(TOOL, "Error: every cue's end must be at or after its start.");
       let clips: Clip[];
       if (args.timeline_clip_ids) {
         clips = [];
@@ -214,6 +257,11 @@ export const kineticCaptionTools: CatalogTool[] = [
           if (kineticTag(clip)) return refused(TOOL, `Error: clip ${id} is one of the kinetic captions; pass the footage clip (${kineticTag(clip)!.source_clip_ids.join(", ")}).`);
           if (!clips.includes(clip)) clips.push(clip);
         }
+      } else if (args.cues) {
+        const from = Math.min(...args.cues.map((c) => c.start));
+        const to = Math.max(...args.cues.map((c) => c.end));
+        clips = project.clips.filter((c) => isFootage(c) && !kineticTag(c) && Number(c.position) < to && Number(c.position) + Number(c.end) - Number(c.start) > from);
+        if (clips.length === 0) return refused(TOOL, "Error: no footage clip on the timeline under the cues; add the picture first, or pass timeline_clip_ids.");
       } else {
         clips = project.clips.filter((c) => {
           const file = project.files.find((f) => f.id === c.file_id);
@@ -245,8 +293,9 @@ export const kineticCaptionTools: CatalogTool[] = [
       if (locked.length > 0) return refused(TOOL, `Error: earlier captions of these clips are on a locked track (${locked.map((c) => c.id).join(", ")}); unlock it first.`);
 
       const warnings: string[] = [];
-      const words = await wordsOf(call, clips, args, warnings);
+      const words = args.cues ? cueWords(args.cues, clips, args) : await wordsOf(call, clips, args, warnings);
       if (typeof words === "string") return refused(TOOL, words);
+      if (words.length === 0) return refused(TOOL, "Error: no cue starts in the range given.");
       const spec = CAPTION_STYLES[style];
       const lib = await loadFamilies(call, [spec.base.family, spec.emphasis.family]);
       if (typeof lib === "string") return refused(TOOL, lib);
@@ -256,7 +305,19 @@ export const kineticCaptionTools: CatalogTool[] = [
       const fps = fpsFraction.num / fpsFraction.den;
       let built: KineticCaptionPlan;
       try {
-        built = buildKineticCaptions({ frame: { width, height, fps }, words, style, emphasis: emphasisArg(args.emphasis), avoid: (args.avoid ?? []) as AvoidBox[], ...colours, behind: args.behind_subject ?? false, lib });
+        built = buildKineticCaptions({
+          frame: { width, height, fps },
+          words,
+          style,
+          emphasis: emphasisArg(args.emphasis),
+          avoid: (args.avoid ?? []) as AvoidBox[],
+          ...colours,
+          behind: args.behind_subject ?? false,
+          ...(args.text_size !== undefined ? { size: args.text_size / baseShare(style) } : {}),
+          ...(args.y !== undefined ? { y: args.y } : {}),
+          ...(args.animation ? { motion: CAPTION_ANIMATIONS[args.animation].motion } : {}),
+          lib,
+        });
       } catch (error) {
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -309,6 +370,9 @@ export const kineticCaptionTools: CatalogTool[] = [
           warnings,
           data: {
             style,
+            ...(args.animation ? { animation: args.animation } : {}),
+            text_size: round(args.text_size ?? baseShare(style)),
+            words_from: args.cues ? "cues" : "speech",
             start: round(built.start),
             end: round(end),
             words: words.length,

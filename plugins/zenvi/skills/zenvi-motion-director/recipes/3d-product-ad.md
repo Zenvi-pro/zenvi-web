@@ -61,13 +61,29 @@ set_keyframes_tool {"timeline_clip_id": "<product still>", "property": "scale_x"
    the leaders point at nothing.
 5. Close on the name: `kinetic_headline` `style: "pop"`, `palette:
    "light"`, 1.5-2 s, so the piece ends on a word, not on a held render.
-6. Sound: `typing_burst` at 0.4 s (as long as the typing), `mouse_click` on
+6. Transitions, on by default between the scenes (prompt → 3D → callouts →
+   name): `apply_motion_transitions_tool` `{"track": "1", "preset":
+   "zoom_through"}` when they sit back to back on one track, or
+   `apply_motion_transition_tool` `whip` (`direction: "left"`) on each scene
+   cut; one kind for the piece.
+7. Sound: `typing_burst` at 0.4 s (as long as the typing), `mouse_click` on
    send, `pop` on the burst, `whoosh_rise` ending on the landing,
    `impact_thud` on it (never `impact_slam` here), `ui_tap` per chip. Music
    clean electronic, quieter than a hype edit: the mix at RMS −20…−24 dB, so
    a mastered track goes in at `set_clip_volume_tool` `level_db` −8…−10.
    Keep the product moving the whole time (the 3D glide, or a 3-5 % push on
    the still): a held still reads as a slideshow.
+
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 7 above (each scene change and the landing has its sound).
+2. `master_audio_tool` `{"preset": "social", "target_lufs": -16}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file>", "loudness_target_lufs": -16}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
 
 ## Checks
 

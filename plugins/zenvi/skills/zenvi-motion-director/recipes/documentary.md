@@ -33,12 +33,27 @@ a small logo bug, low impacts on topic changes and a quiet music bed.
    Mono"`, `font_scale: 0.5`) placed top right with `set_clip_property_tool`
    (`property: "location_x"` / `"location_y"`, then `property: "alpha"`,
    `value: 0.7`), for the full length.
-6. Grade: `apply_look_tool` `look_id: "elegant_dark_cinema"` or
-   `"cool_haze"`, `all_clips: true`, 0.6, grain `16mm_classic`.
+6. Grade, on matched plates: `unify_grade_tool` `{"look":
+   "elegant_dark_cinema", "look_intensity": 0.6}` (or `"cool_haze"`), then
+   grain only: `apply_look_tool` `all_clips: true`, `look_id:
+   "grain:16mm_classic"`. Transitions, on by default: `apply_motion_transitions_tool`
+   `{"track": "1", "style": "cinematic", "direction": "left"}` on the b-roll
+   track (slides and blur dissolves; hard cuts stay where the voice turns).
 7. Sound: music bed + `duck_under_speech_tool` (`duck_db: -12`);
    `auto_sound_design_tool` `intensity: "subtle"`; `add_sfx_tool`
    `impact_thud` / `sub_drop` on each topic change, `riser_noise` into the
    last line, `reverse_swell` before a reveal.
+
+## Finish (every run, in this order; never skip it)
+
+1. Sound on every cut: step 7 above (`intensity: "subtle"`, ducked under the voice).
+2. `master_audio_tool` `{"preset": "social"}`, after the last audio change (any later
+   audio edit means mastering again).
+3. `render_video`, then `review_render_tool` `{"path": "<the file render_video wrote>"}`.
+4. One fix pass: every `PROBLEM` line with the tool it names (a repeated
+   shot: the `swap_shot_tool` calls the review lists; ends on black: trim
+   what runs past the last picture; true peak or loudness: master again),
+   then render and review once more and report that review's numbers.
 
 ## Checks
 

@@ -64,8 +64,9 @@ describe("make it snappy", () => {
     const real = withMastering(editorToolRunner(session));
     const before = session.doc.undoLabels.length;
     const outcomes = await makeItSnappy(() => session.project, (name, args) => (calls.push(name), real(name, args)));
-    expect(calls.slice(0, 2)).toEqual(["apply_motion_transitions_tool", "auto_sound_design_tool"]);
+    expect(calls.slice(0, 3)).toEqual(["unify_grade_tool", "apply_motion_transitions_tool", "auto_sound_design_tool"]);
     expect(outcomes.map((o) => [o.step, o.status])).toEqual([
+      ["grade", outcomes[0]!.status],
       ["transitions", "done"],
       ["sound", "done"],
       ["master", calls.includes("master_audio_tool") ? "done" : "skipped"],
@@ -82,7 +83,7 @@ describe("make it snappy", () => {
     expect(mainSequence(session.project)).toBeNull();
     const before = session.doc.undoLabels.length;
     const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
-    expect(outcomes.slice(0, 2).map((o) => [o.step, o.status])).toEqual([
+    expect(outcomes.filter((o) => o.step !== "grade").slice(0, 2).map((o) => [o.step, o.status])).toEqual([
       ["gaps", "done"],
       ["transitions", "done"],
     ]);
@@ -93,8 +94,25 @@ describe("make it snappy", () => {
   it("skips the transitions without a cut and still designs the sound", async () => {
     const session = sessionWithCuts(1);
     const outcomes = await makeItSnappy(() => session.project, editorToolRunner(session));
-    expect(outcomes[0]).toMatchObject({ step: "transitions", status: "skipped", undoSteps: 0 });
-    expect(outcomes[1]!.step).toBe("sound");
+    expect(outcomes.slice(0, 2)).toMatchObject([
+      { step: "grade", status: "skipped", undoSteps: 0 },
+      { step: "transitions", status: "skipped", undoSteps: 0 },
+    ]);
+    expect(outcomes[2]!.step).toBe("sound");
+  });
+
+  it("grades the main sequence's shots toward one another first, its own undo step inside Undo all", async () => {
+    const session = sessionWithCuts(3);
+    const calls: [string, Record<string, unknown>][] = [];
+    const real = withMastering(editorToolRunner(session));
+    const run: ToolRunner = async (name, args) => {
+      calls.push([name, args]);
+      return name === "unify_grade_tool" ? { ok: true, status: "applied", summary: "Unified the grade: 2 of 3 clip(s) brought within the band.", data: { counts: { unified: 2 } }, warnings: [], undoSteps: 1 } : real(name, args);
+    };
+    const outcomes = await makeItSnappy(() => session.project, run);
+    expect(calls[0]).toEqual(["unify_grade_tool", { track: String(session.project.layers[0]!.number) }]);
+    expect(outcomes[0]).toMatchObject({ step: "grade", status: "done", brief: "2 shots graded to match", undoSteps: 1 });
+    expect(snappySummary(outcomes).description.split("\n")[0]).toMatch(/^2 shots graded to match · 2 transitions · /);
   });
 
   it("Undo all undoes the chain once, and never after another edit", async () => {
