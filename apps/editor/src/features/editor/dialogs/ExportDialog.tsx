@@ -1,4 +1,4 @@
-import { timelineEnd } from "@zenvi/engine";
+import { defaultExportEnd, timelineEnd } from "@zenvi/engine";
 import { Cloud, Download, FileVideo, Monitor, RectangleHorizontal, RectangleVertical, Square, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useStore } from "zustand";
@@ -88,7 +88,8 @@ export function ExportDialog({ open, onClose }: { open: boolean; onClose: () => 
   const effective: ExportChoice = { ...choice, ...(exportRange ? { range: exportRange } : {}) };
   const options = exportOptionsFor(project, effective);
   const summary = describeChoice(project, effective);
-  const length = exportRange ? exportRange.end - exportRange.start : end;
+  // "All" stops at the last picture, as the exporter does (sound past it is left out).
+  const length = exportRange ? exportRange.end - exportRange.start : defaultExportEnd(project, options.format !== "wav").end;
   const name = session.meta.getState().name;
   const browserOk = support.browser && exportAvailable;
 

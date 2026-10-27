@@ -192,6 +192,7 @@ export function createServices(deps: Dependencies): Services {
       accessTtlSeconds: config.tokens.accessTtlSeconds,
       refreshTtlSeconds: config.tokens.refreshTtlSeconds,
       documentationUrl: DOCUMENTATION_URL,
+      mcpUrlAliases: config.mcpUrlAliases,
     }),
     sessions: new SessionStore(blobs, clock),
     importer,

@@ -3,7 +3,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
-import { isSequenceFormat, timelineEnd, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
+import { defaultExportEnd, isSequenceFormat, type ContainerFormat, type ExportOptions, type Fraction, type Project } from "@zenvi/engine";
 import { ENCODER_PRESETS, FORMATS, formatFromPath, frameCaption, isEncoderPreset, type NodeExportOptions, type RenderResult } from "@zenvi/render-node";
 import { PortableExecutor, type CallOutcome, type Executor } from "../engine/executor.js";
 import { CliError } from "../output.js";
@@ -65,7 +65,7 @@ export function exportOptionsFrom(project: Project, output: string | undefined, 
     quality: quality as ExportOptions["quality"],
   };
   if (start !== undefined || end !== undefined) {
-    options.range = { start: start ?? 0, end: end ?? timelineEnd(project) };
+    options.range = { start: start ?? 0, end: end ?? defaultExportEnd(project, FORMATS[chosen].video).end };
     if (options.range.end <= options.range.start) throw new CliError("--end must be after --start (and inside the timeline).", 2);
   }
   if (flags.videoBitrate) options.videoBitrate = parseBitrate(flags.videoBitrate);

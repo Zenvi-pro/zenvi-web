@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { fakeRenderer } from "../testing/fakes.js";
 import { harness, sampleProject, USER_A } from "../testing/helpers.js";
 import type { RenderTicket } from "./dispatch.js";
-import { resolveRenderOptions } from "./options.js";
+import { renderNotes, resolveRenderOptions } from "./options.js";
 
 const sha = (data: string): string => createHash("sha256").update(data).digest("hex");
 
@@ -236,5 +236,32 @@ describe("render options", () => {
     expect(resolveRenderOptions(project, "mp4", { width: 853 })).toMatchObject({ width: 854, height: 480 });
     expect(resolveRenderOptions(project, "mp3")).toMatchObject({ format: "mp3" });
     expect(resolveRenderOptions(project, "gif")).toMatchObject({ format: "gif", width: 640, height: 360 });
+  });
+
+  it("read a preset's resolution as the short side of vertical and square projects (W25a E2E bug 5)", () => {
+    const vertical = sampleProject({ width: 1080, height: 1920 }) as never;
+    expect(resolveRenderOptions(vertical, "mp4-1080p")).toMatchObject({ width: 1080, height: 1920 });
+    expect(resolveRenderOptions(vertical, "mp4-720p")).toMatchObject({ width: 720, height: 1280 });
+    expect(resolveRenderOptions(vertical, "mp4-2160p")).toMatchObject({ width: 2160, height: 3840 });
+    expect(resolveRenderOptions(sampleProject({ width: 1080, height: 1080 }) as never, "mp4-1080p")).toMatchObject({ width: 1080, height: 1080 });
+    // An explicit height still means the height.
+    expect(resolveRenderOptions(vertical, "mp4", { height: 1080 })).toMatchObject({ width: 608, height: 1080 });
+    expect(() => resolveRenderOptions(sampleProject({ width: 1080, height: 4000 }) as never, "mp4-2160p")).toThrow(
+      /The mp4-2160p preset makes the short side 2160 px, which on this 1080×4000 project is 2160×8000, larger than Zenvi Cloud renders/,
+    );
+  });
+
+  it("note the sound a render without a range leaves out after the last picture (W25a E2E bug 2)", () => {
+    const tail = sampleProject({
+      clips: [
+        { id: "V", layer: 1, position: 0, start: 0, end: 10.27, reader: { has_video: true, media_type: "video" } },
+        { id: "BOOM", layer: 2, position: 8.6, start: 0, end: 2.6, reader: { has_video: false, media_type: "audio" } },
+      ],
+    }) as never;
+    expect(renderNotes(tail, resolveRenderOptions(tail, "mp4"))).toEqual([
+      "The video ends with the last picture at 10.27s: 0.93s of sound after it (to 11.20s) is left out instead of playing over black; pass end_seconds=11.20 to keep it.",
+    ]);
+    expect(renderNotes(tail, resolveRenderOptions(tail, "mp3"))).toEqual([]);
+    expect(renderNotes(tail, resolveRenderOptions(tail, "mp4", { range: { start: 0, end: 11.2 } }))).toEqual([]);
   });
 });

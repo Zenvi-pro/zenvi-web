@@ -189,7 +189,7 @@ export async function executeTool<I extends z.ZodType>(
   const parsed = tool.input.safeParse(args);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    const message = issue ? invalidArgumentsMessage(name, issue, args) : `Error: Invalid arguments for ${name}.`;
+    const message = issue ? invalidArgumentsMessage(name, issue, args, tool.inputSchema, parsed.error.issues) : `Error: Invalid arguments for ${name}.`;
     return resultFor(refused(name, message));
   }
   // A desktop argument this surface does not honour yet is refused, never ignored.

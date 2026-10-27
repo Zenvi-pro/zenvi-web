@@ -21,6 +21,7 @@
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
 import { addFile, removeFile } from "../../ops/files.js";
 import { useFileForClip } from "../../ops/overlays.js";
+import { textSpan } from "../../titles/artboard.js";
 import { TITLE_TEMPLATES } from "../../titles/templates.js";
 import {
   applyFont,
@@ -220,9 +221,10 @@ export class TitleStyle {
   fit(doc: TitleDoc, slots: readonly TextField[]): Record<string, number> {
     const fitted: Record<string, number> = {};
     if (!this.fitText) return fitted;
-    const [width] = artboardSize(doc);
+    // A title fitted to its frame's aspect is fitted to its title-safe span (titles/artboard.ts).
+    const span = textSpan(doc);
     for (const slot of slots) {
-      const ratio = fitField(slot, width);
+      const ratio = fitField(slot, span.width, 0.35, span.left);
       if (ratio < 0.999) fitted[String(slot.index)] = pyRoundTo(ratio, 3);
     }
     return fitted;

@@ -49,6 +49,7 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   update_motion_block_tool: { file_id: "MOTIONFILE" },
   add_3d_scene_tool: { scene: "glass_hero" },
   rerender_3d_scene_tool: { file_id: IDS.broll },
+  review_render_tool: { path: "/out/reel.mp4" },
 };
 
 async function expectNotAvailable(name: string, args: Record<string, unknown>, host: FakeHostOptions): Promise<void> {

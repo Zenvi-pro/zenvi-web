@@ -133,10 +133,18 @@ export interface OAuthServiceOptions {
   accessTtlSeconds: number;
   refreshTtlSeconds: number;
   documentationUrl: string;
+  /** Extra MCP URLs this service is the authorization server for (`Config.mcpUrlAliases`). */
+  mcpUrlAliases: readonly string[];
 }
 
 export function mcpResource(origin: string): string {
   return `${origin}/mcp`;
+}
+
+/** RFC 9728 §3.1: the metadata URL for a resource inserts the well-known segment before its path. */
+export function protectedResourceMetadataUrl(resource: string): string {
+  const url = new URL(resource);
+  return `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`;
 }
 
 function parseScopes(value: string): string[] {
@@ -171,9 +179,9 @@ export class OAuthService {
     };
   }
 
-  protectedResourceMetadata(origin: string): Record<string, unknown> {
+  protectedResourceMetadata(origin: string, resource = mcpResource(origin)): Record<string, unknown> {
     return {
-      resource: mcpResource(origin),
+      resource,
       authorization_servers: [origin],
       scopes_supported: [...RESOURCE_SCOPES],
       bearer_methods_supported: ["header"],
@@ -182,15 +190,22 @@ export class OAuthService {
     };
   }
 
-  /** Accepts the canonical MCP URL (also with a trailing slash or as the bare origin, for older clients). */
+  /**
+   * Accepts the canonical MCP URL (also with a trailing slash or as the bare origin, for older clients) or one of the
+   * MCP URL aliases. Several `resource` values must all name the same one.
+   */
   private resourceFor(origin: string, requested: string[]): string | null {
     const canonical = mcpResource(origin);
     if (requested.length === 0) return canonical;
+    let chosen: string | null = null;
     for (const value of requested) {
       const normalized = value.replace(/\/+$/, "");
-      if (normalized !== canonical && normalized !== origin) return null;
+      const resource = normalized === origin ? canonical : normalized;
+      if (resource !== canonical && !this.options.mcpUrlAliases.includes(resource)) return null;
+      if (chosen !== null && chosen !== resource) return null;
+      chosen = resource;
     }
-    return canonical;
+    return chosen;
   }
 
   async authorize(params: AuthorizeParams, origin: string): Promise<AuthorizeOutcome> {
@@ -221,7 +236,7 @@ export class OAuthService {
     if (!isValidChallenge(params.code_challenge)) return fail("invalid_request", "code_challenge is not a valid S256 challenge.");
     if (params.state !== undefined && params.state.length > MAX_STATE) return fail("invalid_request", "state is too long.");
     const resource = this.resourceFor(origin, params.resource);
-    if (!resource) return fail("invalid_target", `This server only issues tokens for ${mcpResource(origin)}.`);
+    if (!resource) return fail("invalid_target", `This server only issues tokens for ${[mcpResource(origin), ...this.options.mcpUrlAliases].join(" or ")}.`);
 
     const now = this.options.clock.now();
     const id = randomSecret(32);

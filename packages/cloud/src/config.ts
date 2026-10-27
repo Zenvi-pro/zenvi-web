@@ -40,6 +40,11 @@ export interface Config {
   publicBaseUrl: string;
   /** Other origins that route to this service (custom domains). Requests on them use their own issuer/resource. */
   publicBaseUrlAliases: string[];
+  /**
+   * Extra public MCP URLs that a proxy forwards here with the path unchanged (`https://zenvi.pro/plugin`). Each is
+   * served at its path, is its own OAuth resource, and names this service as its authorization server.
+   */
+  mcpUrlAliases: string[];
   /** Web editor base, e.g. https://zenvi.pro/editor (no trailing slash). */
   editorUrl: string;
   supabaseUrl: string;
@@ -98,6 +103,18 @@ function list(value: string | undefined, fallback: string[]): string[] {
     .filter((item) => item !== "");
 }
 
+/** Paths the service already routes; an MCP alias must not shadow them. */
+const RESERVED_SEGMENTS = new Set(["mcp", "v1", "oauth", "editor", "health"]);
+
+function mcpUrlAlias(value: string): string {
+  const url = new URL(value);
+  const segment = url.pathname.replace(/\/+$/, "").slice(1);
+  if (url.protocol !== "https:" || url.search || url.hash || !/^[a-z0-9-]+$/.test(segment) || RESERVED_SEGMENTS.has(segment)) {
+    throw new Error(`invalid MCP_URL_ALIASES entry: ${value} (want https://host/<one path segment>)`);
+  }
+  return `${url.origin}/${segment}`;
+}
+
 function bytes(value: string | undefined, fallback: number): number {
   if (value === undefined || value.trim() === "") return fallback;
   const parsed = Number(value);
@@ -130,6 +147,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   const publicBaseUrl = origin.parse(env.PUBLIC_BASE_URL ?? `http://localhost:${port}`);
   const aliases = list(env.PUBLIC_BASE_URL_ALIASES, []).map((value) => origin.parse(value));
+  const mcpUrlAliases = list(env.MCP_URL_ALIASES, []).map(mcpUrlAlias);
   const editorUrl = origin.parse(env.ZENVI_EDITOR_URL ?? "https://zenvi.pro/editor");
   const supabaseUrl = origin.parse(env.SUPABASE_URL ?? "https://xktarhzbrdnxkaovtdxj.supabase.co");
   const backendUrl = env.ZENVI_BACKEND_URL === "" ? "" : origin.parse(env.ZENVI_BACKEND_URL ?? "https://api.zenvi.pro");
@@ -169,6 +187,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port,
     publicBaseUrl,
     publicBaseUrlAliases: aliases,
+    mcpUrlAliases,
     editorUrl,
     supabaseUrl,
     backendUrl,

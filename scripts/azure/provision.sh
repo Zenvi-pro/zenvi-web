@@ -36,6 +36,7 @@ ANON="${SUPABASE_ANON_KEY:-sb_publishable_2-FCBkJ96Ss35jqL9krVEQ_otR5iGmA}"
 BACKEND="${ZENVI_BACKEND_URL:-https://api.zenvi.pro}"
 CORS="${CORS_ORIGINS:-https://zenvi.pro,https://www.zenvi.pro,https://*.vercel.app,http://localhost:*,http://127.0.0.1:*}"
 ALIASES="${PUBLIC_BASE_URL_ALIASES:-}"
+MCP_ALIASES="${MCP_URL_ALIASES:-https://zenvi.pro/plugin}"
 IMAGE_TAG="${IMAGE_TAG:-}"
 MIN_REPLICAS="${MIN_REPLICAS:-1}"
 MAX_REPLICAS="${MAX_REPLICAS:-1}"
@@ -84,6 +85,7 @@ ENV_VARS=(
   "LOG_LEVEL=info"
 )
 [ -n "$ALIASES" ] && ENV_VARS+=("PUBLIC_BASE_URL_ALIASES=$ALIASES")
+[ -n "$MCP_ALIASES" ] && ENV_VARS+=("MCP_URL_ALIASES=$MCP_ALIASES")
 SECRETS=("$SECRET_NAME=$CONN")
 if [ -n "$SERVICE_SECRET" ]; then
   SECRETS+=("backend-service-secret=$SERVICE_SECRET")

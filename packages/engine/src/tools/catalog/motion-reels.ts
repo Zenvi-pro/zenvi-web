@@ -163,12 +163,13 @@ export async function buildMotionReel(call: ToolCall, input: MotionReelInput): P
     pace: `${style.pace} (${Math.round(grid.bpm)} BPM)`,
     look: style.look,
   };
-  return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${placed.length} scenes on ${Math.round(grid.bpm)} BPM, ${brief.format}.`, {
+  return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${placed.length} scenes on ${Math.round(grid.bpm)} BPM, ${brief.format}. Length ${grid.lengthNote}.`, {
     warnings,
     data: {
       style: style.id,
       duration,
       bpm: grid.bpm,
+      length_note: grid.lengthNote,
       music_file_id: music ? String(music.id) : null,
       music_start: grid.musicStart,
       beats: grid.beats.filter((t) => t <= duration + 1e-6),

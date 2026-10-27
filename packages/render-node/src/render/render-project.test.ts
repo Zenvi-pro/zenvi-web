@@ -44,6 +44,12 @@ function project(seconds: number): Project {
   };
 }
 
+/** `p` plus a sound effect that runs 1.5 s past its last picture (1 s to 3.5 s). */
+function withSoundTail(p: Project): Project {
+  const boom = { id: "C2", file_id: "F2", position: 1, start: 0, end: 2.5, layer: 2000000, reader: { has_video: false, media_type: "audio" } };
+  return { ...p, clips: [...p.clips, boom as unknown as Project["clips"][number]] };
+}
+
 function segment(overrides: Partial<AudioSegment>): AudioSegment {
   return {
     clipId: "C1",
@@ -141,6 +147,22 @@ describe("renderProject", () => {
     expect(rms).toBeLessThan(0.135);
     const leftovers = (await readdir(dir)).filter((n) => n.includes("partial") || n.includes("zenvi-render"));
     expect(leftovers).toEqual([]);
+  });
+
+  it("ends at the last picture when sound runs past it, and warns what it left out (W25a E2E bug 2)", async () => {
+    const out = path.join(dir, "tail.mp4");
+    const result = await renderProject(withSoundTail(project(2)), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "mp4", width: 160, height: 90, fps: { num: 25, den: 1 }, quality: "low" },
+      engine: engine([segment({ clipId: "C2", timelineStart: 1, duration: 2.5 })]),
+    });
+    expect(result.frames).toBe(50);
+    expect(result.warnings).toContain(
+      "The video ends with the last picture at 2.00s: 1.50s of sound after it (to 3.50s) is left out instead of playing over black; render with an end of 3.50s to keep it.",
+    );
+    const probe = await ffprobeJson(out);
+    expect(Math.abs(Number(probe.format.duration) - 2)).toBeLessThan(0.1);
   });
 
   it("places delayed segments and ramps gain along the envelope", async () => {
@@ -366,9 +388,13 @@ describe("audio graph helpers", () => {
     expect(depth).toBeGreaterThan(90);
   });
 
-  it("computes the desktop export frame range", () => {
+  it("computes the export frame range: the last picture by default, the explicit range when given", () => {
     const p = project(2);
-    expect(exportFrameRange(p, { num: 25, den: 1 })).toEqual({ first: 1, last: 50 });
+    expect(exportFrameRange(p, { num: 25, den: 1 })).toMatchObject({ first: 1, last: 50, cut: { audioCut: 0 } });
+    const tail = withSoundTail(project(2));
+    expect(exportFrameRange(tail, { num: 25, den: 1 })).toMatchObject({ first: 1, last: 50, cut: { end: 2, contentEnd: 3.5 } });
+    // Audio formats run to the end of the sound.
+    expect(exportFrameRange(tail, { num: 25, den: 1 }, undefined, false)).toMatchObject({ first: 1, last: 88 });
     // 0.5 s lies inside frame 13 ([0.48, 0.52))
     expect(exportFrameRange(p, { num: 25, den: 1 }, { start: 0.5, end: 1 })).toEqual({ first: 13, last: 25 });
     expect(exportFrameRange(p, { num: 25, den: 1 }, { start: 0.52, end: 1 })).toEqual({ first: 14, last: 25 });

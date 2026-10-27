@@ -9,6 +9,7 @@
  * video reach the open internet.
  */
 
+import { defaultExportEnd } from "@zenvi/engine";
 import { z } from "zod";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
@@ -16,7 +17,7 @@ import { addMediaFile } from "../projects/files.js";
 import { displayName } from "../projects/model.js";
 import { PROFILE_SHORTHANDS, PROJECT_FORMATS, PROJECT_FPS, profileFor, resolveProfile } from "../projects/profiles.js";
 import { snapKlingDuration, t2vDims } from "../generation/service.js";
-import { PRESET_NAMES, RENDER_FORMATS } from "../render/options.js";
+import { isAudioRenderFormat, PRESET_NAMES, PRESETS, type PresetName, RENDER_FORMATS } from "../render/options.js";
 import type { RenderJobView } from "../render/service.js";
 import { defineTool } from "./define.js";
 import { checkProjectId, editProject, resolveProjectId } from "./projects.js";
@@ -388,6 +389,8 @@ const renderStatusShape = z.object({
   url_expires_at: z.string().optional(),
   size_bytes: z.number().optional(),
   error: z.string().optional(),
+  /** What the render leaves out (render_project only), e.g. sound past the last picture. */
+  notes: z.array(z.string()).optional(),
 });
 
 function renderData(job: RenderJobView): z.infer<typeof renderStatusShape> {
@@ -425,12 +428,12 @@ const renderProject = defineTool({
   description:
     "Start rendering the open project to a video (or audio) file in Zenvi Cloud. Returns a render_id right away; renders take roughly as long as the video, so follow up with get_render_status, which returns the download link when it is done. Asking again for the same project state and settings returns the same render.",
   input: z.object({
-    preset: z.enum(PRESET_NAMES as [string, ...string[]]).optional().describe("Output preset (default mp4 at the project's size)."),
+    preset: z.enum(PRESET_NAMES as [string, ...string[]]).optional().describe("Output preset (default mp4 at the project's size). A resolution preset sets the short side: mp4-1080p is 1920×1080 landscape, 1080×1920 vertical, 1080×1080 square."),
     format: z.enum(RENDER_FORMATS).optional().describe("Container format; overrides the preset's."),
     height: z.number().int().min(16).max(4320).optional().describe("Output height in pixels; width follows the project's aspect ratio."),
     quality: z.enum(["low", "medium", "high", "lossless"]).optional(),
     start_seconds: z.number().min(0).optional().describe("Render only from this timeline time."),
-    end_seconds: z.number().positive().optional().describe("Render only up to this timeline time."),
+    end_seconds: z.number().positive().optional().describe("Render only up to this timeline time. Default: the end of the last clip with a picture (sound past it is left out, and the answer says so)."),
     project_id: projectIdArg,
   }),
   output: renderStatusShape,
@@ -448,8 +451,10 @@ const renderProject = defineTool({
         ? { start: input.start_seconds ?? 0, end: input.end_seconds ?? Number.MAX_SAFE_INTEGER }
         : undefined;
     if (range && range.end === Number.MAX_SAFE_INTEGER) {
-      const { meta } = await ctx.services.projects.get(ctx.principal.userId, projectId);
-      range.end = meta.stats.duration;
+      // A start alone runs to where a whole render would end (the last picture, for video).
+      const { project } = await ctx.services.projects.get(ctx.principal.userId, projectId);
+      const format = input.format ?? PRESETS[(input.preset as PresetName | undefined) ?? "mp4"].format;
+      range.end = defaultExportEnd(project, !isAudioRenderFormat(format)).end;
     }
     if (range && range.end <= range.start) throw new ApiError(400, "invalid_request", "end_seconds must be after start_seconds.");
     const job = await ctx.services.renders.start(ctx.principal.userId, projectId, {
@@ -462,7 +467,8 @@ const renderProject = defineTool({
       },
     });
     const view = await ctx.services.renders.getById(ctx.principal.userId, job.renderId);
-    return { text: renderText(view), data: renderData(view) };
+    const notes = job.notes.length > 0 ? ` ${job.notes.join(" ")}` : "";
+    return { text: `${renderText(view)}${notes}`, data: { ...renderData(view), notes: job.notes } };
   },
 });
 
