@@ -163,6 +163,9 @@ describe("add_sfx_tool with the recorded kit", () => {
     const unknown = await runTool({ doc, host }, "add_sfx_tool", { provider: "kit", sound_id: "1", at_seconds: 1 });
     expect(unknown.ok).toBe(false);
     expect(unknown.text).toMatch(/Error: Zenvi's kit has no sound 1/);
+    const titled = await runTool({ doc, host }, "add_sfx_tool", { provider: "kit", sound_id: found.pick, at_seconds: 2, title: "my chime" });
+    expect(titled.ok).toBe(false);
+    expect(titled.text).toMatch(/Error: title goes with openverse and freesound sounds/);
     const elsewhere = await runTool({ doc: edit(), host: fakeHost() }, "add_sfx_tool", { provider: "kit", sound_id: found.pick, at_seconds: 1 });
     expect(elsewhere.ok).toBe(false);
     expect(elsewhere.text).toMatch(/cannot fetch Zenvi's recorded kit/);

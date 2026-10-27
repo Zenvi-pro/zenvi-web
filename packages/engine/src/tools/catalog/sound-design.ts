@@ -430,6 +430,8 @@ export const soundDesignTools: CatalogTool[] = [
         kitSound = /^\d+$/.test(args.sound_id!) ? recordedSample(Number(args.sound_id)) : undefined;
         if (!kitSound) return refused(ADD, `Error: Zenvi's kit has no sound ${args.sound_id} (search_sound_library_tool lists them).`);
         if (args.role) return refused(ADD, "Error: a kit sound's category sets its hit point and level; role goes with openverse and freesound sounds.");
+        const libraryArgs = (["title", "allow_noncommercial"] as const).filter((k) => args[k] !== undefined);
+        if (libraryArgs.length > 0) return refused(ADD, `Error: ${libraryArgs.join(", ")} ${libraryArgs.length === 1 ? "goes" : "go"} with openverse and freesound sounds; a kit sound is CC0 and keeps its name.`);
         if (!recordedKitAvailable(call.host)) return unavailable(ADD, "this surface cannot fetch Zenvi's recorded kit");
       } else if (!procedural) {
         if (!call.host.media.importUrl || !call.host.audio?.decodePcm) return refused(ADD, "Error: library sounds are not available in this Zenvi surface: it cannot download and decode audio.");
