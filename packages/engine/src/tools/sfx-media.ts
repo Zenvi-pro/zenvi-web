@@ -178,6 +178,8 @@ export interface SfxPlacement {
   reason?: string;
   /** Timeline seconds the sound must not play past (the picture's end); its tail is cut there and faded. */
   until?: number;
+  /** More of the clip's mark (auto_sound_design_tool's role, layer and cue). */
+  mark?: Pick<SfxClipMark, "role" | "layer" | "cue">;
 }
 
 export interface PlacedSfx {
@@ -224,6 +226,7 @@ export function placeSfx(tx: Transaction, sound: PreparedSfx, where: SfxPlacemen
     auto: where.auto,
     ...(where.reason ? { reason: where.reason } : {}),
     ...(sound.credit ? { library: `${sound.credit.provider}:${sound.credit.id}` } : {}),
+    ...where.mark,
   };
   return { clip: updateClipValues(tx, clip.id, { zenvi_role: SFX_ROLE, zenvi_sfx: mark }), trimmed, fadeOut };
 }

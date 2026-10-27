@@ -1,5 +1,6 @@
 /** UI pieces several blocks share: a pointer that moves and clicks, and small icons. */
 
+import type { PictureEventKind } from "@zenvi/engine";
 import type { BlockContext } from "../runtime/index.js";
 
 export const ICONS = {
@@ -36,8 +37,12 @@ export interface Pointer {
   el: HTMLElement;
   /** Glide to (x, y) design px, tip first, ending at `at + duration`. */
   moveTo(x: number, y: number, at: number, duration?: number): void;
-  /** Press at `at`: the pointer dips and a ring ripples out from the tip. */
-  click(at: number): void;
+  /**
+   * Press at `at`: the pointer dips and a ring ripples out from the tip. It
+   * reports a `click` there, or `sound` (null when the block reports what the
+   * press does instead, such as the switch it flips).
+   */
+  click(at: number, sound?: PictureEventKind | null): void;
 }
 
 /** A mouse pointer that enters from `from` (design px) at `at`; `size` is its box, px (default 64). */
@@ -58,7 +63,8 @@ export function pointer(ctx: BlockContext, from: { x: number; y: number }, at: n
       ctx.tl.to(el, tip(x, y), { at: start, duration, ease: "in-out" });
       last = { x, y };
     },
-    click(when) {
+    click(when, sound = "click") {
+      if (sound) ctx.cue(when, sound, { weight: 0.35, at: last });
       ctx.tl.to(el, { scale: 0.86 }, { at: when, duration: 0.08, ease: "out" });
       ctx.tl.to(el, { scale: 1 }, { at: when + 0.08, duration: 0.22, ease: "out" });
       const p = last;

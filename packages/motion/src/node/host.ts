@@ -11,12 +11,12 @@ import { existsSync } from "node:fs";
 import { copyFile, link, mkdir, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { projectAssetsDir, type MotionBlockInfo, type MotionBlockParam, type MotionHost, type MotionRuntimeStatus } from "@zenvi/engine";
+import { projectAssetsDir, type MotionBlockInfo, type MotionBlockParam, type MotionHost, type MotionRenderRequest, type MotionRuntimeStatus } from "@zenvi/engine";
 import { fingerprint as fileFingerprint, probe } from "@zenvi/render-node";
 import { BLOCKS, getBlock } from "../catalog.js";
 import { allParams, checkParams, type BlockManifest } from "../params.js";
 import { CHROME_DOWNLOAD_MB, findChrome, installChrome } from "./chrome.js";
-import { renderBlock, type RenderBlockOptions } from "./render.js";
+import { blockEvents, renderBlock, type BlockEventsOptions, type RenderBlockOptions } from "./render.js";
 
 export interface MotionHostOptions {
   /** The open project file, if saved. */
@@ -60,6 +60,18 @@ export async function runtimeStatus(env: NodeJS.ProcessEnv = process.env): Promi
 export function createMotionHost(options: MotionHostOptions): MotionHost {
   const infos = BLOCKS.map(blockInfo);
   let installing: Promise<MotionRuntimeStatus> | undefined;
+  const requestOptions = (request: MotionRenderRequest, signal: AbortSignal | undefined): BlockEventsOptions => ({
+    width: request.width,
+    height: request.height,
+    fps: request.fps,
+    seconds: request.seconds,
+    alpha: request.alpha,
+    motionBlurSamples: request.motionBlurSamples,
+    draft: request.draft,
+    media: Object.fromEntries(Object.entries(request.media).map(([name, p]) => [name, options.resolveMedia(p)])),
+    env: options.env,
+    signal,
+  });
   const linksDir = async (): Promise<string> => {
     const project = options.projectFile();
     const dir = project ? path.join(projectAssetsDir(project), "links", "zenvi-motion") : path.join(tmpdir(), "zenvi-media", "links", "zenvi-motion");
@@ -86,22 +98,9 @@ export function createMotionHost(options: MotionHostOptions): MotionHost {
       if (!manifest) return { ok: false, error: `unknown motion block ${block}` };
       return checkParams(manifest, params);
     },
+    events: (request, signal) => blockEvents(request.block, request.params, requestOptions(request, signal)),
     async render(request, signal) {
-      const media = Object.fromEntries(Object.entries(request.media).map(([name, p]) => [name, options.resolveMedia(p)]));
-      const rendered = await renderBlock(request.block, request.params, {
-        width: request.width,
-        height: request.height,
-        fps: request.fps,
-        seconds: request.seconds,
-        alpha: request.alpha,
-        motionBlurSamples: request.motionBlurSamples,
-        draft: request.draft,
-        media,
-        env: options.env,
-        signal,
-        workers: options.workers,
-        onProgress: options.onProgress,
-      });
+      const rendered = await renderBlock(request.block, request.params, { ...requestOptions(request, signal), workers: options.workers, onProgress: options.onProgress });
       const dest = path.join(await linksDir(), `${request.block}-${rendered.fingerprint.slice(0, 16)}${path.extname(rendered.path)}`);
       // A hard link to the cached render where the filesystem allows (ProRes 4444 is large), else a
       // copy renamed into place, so an interrupted copy is never mistaken for a finished render.
@@ -124,6 +123,7 @@ export function createMotionHost(options: MotionHostOptions): MotionHost {
         fingerprint: rendered.fingerprint,
         cached: rendered.cached,
         renderSeconds: rendered.renderSeconds,
+        events: rendered.events,
       };
     },
   };

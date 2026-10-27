@@ -85,7 +85,10 @@ export function build(ctx: BlockContext): void {
   Object.assign(row.style, { left: `${(W - rowRect.width) / 2}px`, top: `${top}px` });
 
   // Entrance in depth: tilted back, rising, focusing; 0.12 s apart.
-  tl.fromTo(cards, { y: 120, rotateX: 28, scale: 0.92, opacity: 0, blur: 14 }, { y: 0, rotateX: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0.45, duration: 0.9, ease: "out", stagger: 0.12 });
+  const cardsAt = 0.45;
+  const cardStagger = 0.12;
+  tl.fromTo(cards, { y: 120, rotateX: 28, scale: 0.92, opacity: 0, blur: 14 }, { y: 0, rotateX: 0, scale: 1, opacity: 1, blur: 0 }, { at: cardsAt, duration: 0.9, ease: "out", stagger: cardStagger });
+  cards.forEach((card, i) => ctx.cue(cardsAt + i * cardStagger, "pop", { weight: 0.45, at: card }));
 
   const target = Number(p.click);
   if (target >= 0 && target < n) {
@@ -93,10 +96,12 @@ export function build(ctx: BlockContext): void {
     const rect = t.track.getBoundingClientRect();
     const x = rect.left + rect.width * 0.7;
     const y = rect.top + rect.height / 2;
-    const clickAt = Math.min(S - 1.4, 0.45 + n * 0.12 + 1.5);
+    const clickAt = Math.min(S - 1.4, cardsAt + n * cardStagger + 1.5);
     const ptr = pointer(ctx, { x: x + 220, y: y + 260 }, clickAt - 1.1);
     ptr.moveTo(x, y, clickAt - 0.85, 0.75);
-    ptr.click(clickAt);
+    // The switch it flips is the sound.
+    ptr.click(clickAt, null);
+    ctx.cue(clickAt + 0.03, "toggle", { weight: 0.4, at: t.knob });
     tl.to(ptr.el, { x: x + 120, y: y + 140, opacity: 0 }, { at: clickAt + 0.7, duration: 0.5, ease: "in-out" });
     tl.to(t.knob, { x: 40 }, { at: clickAt + 0.03, duration: 0.35, ease: "back-out" });
     tl.to(t.track, { backgroundColor: "#34C759" }, { at: clickAt + 0.03, duration: 0.25, ease: "smooth" });

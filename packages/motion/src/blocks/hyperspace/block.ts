@@ -25,6 +25,12 @@ export function build(ctx: BlockContext): void {
   const jump = S - Math.min(0.62, S * 0.25);
   const breath = jump - Math.min(0.4, (jump - ignite) * 0.35);
   const flashEnd = S - 0.12;
+  // The glint ignites, the streaks rise into a held breath, then the jump.
+  const point = { x: ox, y: oy };
+  ctx.cue(ignite, "glint", { weight: 0.5, at: point });
+  ctx.cue(ignite, "whoosh", { weight: 0.6, at: point, until: breath });
+  ctx.cue(jump, "whoosh", { weight: 1, at: point });
+  if (flash !== "none") ctx.cue(jump + 0.1, "impact", { weight: 0.7, at: point });
 
   const speedAt = (t: number): number => {
     if (t < ignite) return 0;

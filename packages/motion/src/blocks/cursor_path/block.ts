@@ -177,8 +177,13 @@ export function build(ctx: BlockContext): void {
     cursor.style.top = `${(pos.y - tipY).toFixed(2)}px`;
   });
   tl.fromTo(cursor, { opacity: 0 }, { opacity: 1 }, { at: enter - 0.2, duration: 0.3, ease: "linear" });
+  // A long glide (over a third of the frame's width) is heard as a swish.
+  curve.forEach(({ a, b }, i) => {
+    if (Math.hypot(b.x - a.x, b.y - a.y) > W / 3) ctx.cue(moveAt[i]!, "whoosh", { weight: 0.25, at: cursor });
+  });
   if (p.clicks !== false) {
     arrive.forEach((a) => {
+      ctx.cue(a + 0.12, "click", { weight: 0.35, at: cursor });
       tl.to(cursor, { scale: 0.86 }, { at: a + 0.12, duration: 0.08, ease: "out" });
       tl.to(cursor, { scale: 1 }, { at: a + 0.2, duration: 0.25, ease: "out" });
     });

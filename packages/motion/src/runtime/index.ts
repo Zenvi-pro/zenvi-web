@@ -4,7 +4,7 @@ export { cubicBezier, EASES, resolveEase, spring, type Ease, type EaseName, type
 export type { ImageRef, MediaRef, VideoFrames } from "../config.js";
 export { createCamera, frameUrl, particlePosition, particles, strokeDrawable, videoTrack, type Camera, type ParticleOptions } from "./effects.js";
 export { interpolate, type Value } from "./interpolate.js";
-export { createContext, defineBlock, safeArea, type BlockBuild, type BlockConfig, type BlockContext, type Rect } from "./page.js";
+export { createContext, defineBlock, pictureEvents, safeArea, type BlockBuild, type BlockConfig, type BlockContext, type CtxCueOptions, type CuePlace, type Rect } from "./page.js";
 export { hashInts, mulberry32, random01, seedOf } from "./rng.js";
 export {
   caretBlink,
@@ -22,7 +22,7 @@ export {
   type CounterOptions,
   type SplitText,
 } from "./text.js";
-export { composeTransform, Timeline, type Props, type Target, type Targets, type Track, type TweenOptions } from "./timeline.js";
+export { composeTransform, Timeline, type CueOptions, type Props, type Target, type Targets, type Track, type TweenOptions } from "./timeline.js";
 export {
   alignRing,
   blob,

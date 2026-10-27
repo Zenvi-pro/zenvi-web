@@ -54,6 +54,7 @@ export function build(ctx: BlockContext): void {
     fitWidth(bigHost, [bigHost], side ? contentW * 0.38 : contentW, side ? 330 : 280, 80);
     bigHost.style.fontWeight = ctx.display === "sans" ? "300" : "400";
     tl.track(counter(big.num, { from: 0, to: values[hi]!, at: growAt, duration: growFor + 0.5 * k, ease: "out", decimals: fmt.decimals }));
+    cueCount(ctx, big.num, values[hi]!, fmt.decimals, growAt, growFor + 0.5 * k);
     tl.fromTo(bigHost, { y: 40, opacity: 0, blur: 10 }, { y: 0, opacity: 1, blur: 0 }, { at: 0.15, duration: 0.7, ease: "out" });
   }
   if (title) {
@@ -96,6 +97,12 @@ function numberParts(ctx: BlockContext, host: HTMLElement, fmt: Format): { num: 
   return { num };
 }
 
+/** A tick per change of a counter's last digit, from 0 to `to` over `duration` (at most 20 a second). */
+function cueCount(ctx: BlockContext, el: Element, to: number, decimals: number, at: number, duration: number): void {
+  const changes = to * 10 ** decimals;
+  if (changes >= 1 && duration > 0) ctx.cue(at, "tick", { weight: 0.25, at: el, until: at + duration, rate: Math.min(20, changes / duration) });
+}
+
 /** The badge lands above (x, y) (its notch points down at it), kept inside the region. */
 function landBadge(ctx: BlockContext, badge: HTMLElement | null, x: number, y: number, region: Region, at: number): void {
   if (!badge) return;
@@ -105,6 +112,7 @@ function landBadge(ctx: BlockContext, badge: HTMLElement | null, x: number, y: n
   Object.assign(badge.style, { left: `${left}px`, top: `${y - h - 18}px` });
   badge.style.setProperty("--notch", `${x - left}px`);
   ctx.tl.fromTo(badge, { y: 18, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1 }, { at, duration: 0.5, ease: "out" });
+  ctx.cue(at, "pop", { weight: 0.4, at: badge });
 }
 
 function valueSize(values: readonly number[], fmt: Format, room: number): number {
@@ -143,6 +151,7 @@ function bars(ctx: BlockContext, region: Region, values: number[], labels: strin
     Object.assign(val.style, { left: `${x - bw}px`, width: `${bw * 3}px`, top: `${baseY - h - valueRoom + 4}px`, fontSize: `${size}px` });
     const start = at.growAt + i * each;
     tl.fromTo(bar, { scaleY: 0 }, { scaleY: 1 }, { at: start, duration: at.growFor, ease: "out" });
+    ctx.cue(start, "pop", { weight: 0.3, at: { x: x + bw / 2, y: baseY - h / 2 } });
     // The label rides the bar's top while both count up.
     tl.fromTo(val, { y: h, opacity: 0 }, { y: 0, opacity: 1 }, { at: start, duration: at.growFor, ease: "out" });
     tl.track(counter(val, { from: 0, to: v, at: start, duration: at.growFor, ease: "out", ...fmt }));
@@ -158,6 +167,7 @@ function bars(ctx: BlockContext, region: Region, values: number[], labels: strin
   });
   // The climax, after a beat of stillness: the highlight takes the accent, the rest step back.
   tl.fromTo(barEls[hi]!, { backgroundColor: rest }, { backgroundColor: palette.accent }, { at: at.climax, duration: 0.3, ease: "smooth" });
+  ctx.cue(at.climax, "land", { weight: 0.5, at: barEls[hi]! });
   tl.to(barEls.filter((_, i) => i !== hi), { opacity: 0.32 }, { at: at.climax, duration: 0.45, ease: "smooth" });
 }
 
@@ -239,6 +249,7 @@ function line(ctx: BlockContext, region: Region, values: number[], labels: strin
     dot.style.transformOrigin = `${x}px ${ys[i]}px`;
     const when = at.growAt + drawFor * easeInverse(ease, (x - xs[0]!) / Math.max(1, span));
     tl.fromTo(dot, { scale: 0 }, { scale: 1 }, { at: when, duration: 0.3, ease: "out" });
+    ctx.cue(when, "pop", { weight: 0.3, at: { x, y: ys[i]! } });
     return dot;
   });
   labels.slice(0, n).forEach((label, i) => {
@@ -259,6 +270,7 @@ function line(ctx: BlockContext, region: Region, values: number[], labels: strin
   halo.style.fill = palette.accent;
   halo.style.transformOrigin = `${hx}px ${hy}px`;
   tl.fromTo(halo, { scale: 0, opacity: 0 }, { scale: 1, opacity: 0.22 }, { at: at.climax, duration: 0.5, ease: "out" });
+  ctx.cue(at.climax, "land", { weight: 0.5, at: { x: hx, y: hy } });
   tl.fromTo(dots[hi]!, { scale: 1, fill: palette.paper, stroke: rest }, { scale: 1.5, fill: palette.accent, stroke: palette.accent }, { at: at.climax, duration: 0.35, ease: "out" });
   tl.to([stroke, area], { opacity: 0.7 }, { at: at.climax, duration: 0.45, ease: "smooth" });
   const val = ctx.el("div", "cb-val", ctx.root, formatNumber(values[hi]!, fmt));
@@ -308,7 +320,9 @@ function donut(ctx: BlockContext, region: Region, side: boolean, values: number[
       arc.setAttribute("stroke-dasharray", `${len.toFixed(2)} ${C.toFixed(2)}`);
     });
   });
+  values.forEach((_, i) => ctx.cue(at.growAt + starts[i]! * sweepFor, "pop", { weight: 0.25, at: { x: cx, y: cy } }));
   tl.fromTo(arcs[hi]!, { stroke: rest, strokeWidth: sw }, { stroke: palette.accent, strokeWidth: sw * 1.22 }, { at: at.climax, duration: 0.4, ease: "out" });
+  ctx.cue(at.climax, "land", { weight: 0.5, at: { x: cx, y: cy } });
   arcs.forEach((arc, i) => {
     if (i !== hi) tl.fromTo(arc, { opacity: Number(arc.style.opacity) }, { opacity: 0.16 }, { at: at.climax, duration: 0.45, ease: "smooth" });
   });
@@ -324,6 +338,7 @@ function donut(ctx: BlockContext, region: Region, side: boolean, values: number[
   Object.assign(centre.style, { left: `${cx}px`, top: `${cy}px` });
   tl.set(centre, { xPercent: -50, yPercent: -50 }, 0);
   tl.track(counter(parts.num, { from: 0, to: values[hi]!, at: at.growAt, duration: sweepFor, ease: "out", decimals: fmt.decimals }));
+  cueCount(ctx, parts.num, values[hi]!, fmt.decimals, at.growAt, sweepFor);
   tl.fromTo(numHost, { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1 }, { at: at.growAt, duration: 0.6, ease: "out" });
   if (sub) {
     tl.fromTo(sub, { opacity: 0 }, { opacity: 1 }, { at: at.growAt + 0.3, duration: 0.4, ease: "linear" });
@@ -356,5 +371,6 @@ function donut(ctx: BlockContext, region: Region, side: boolean, values: number[
     Object.assign(badge.style, { left: `${ctx.safe.left}px`, top: `${headBottom + 24}px` });
     badge.classList.add("is-flat");
     tl.fromTo(badge, { y: 18, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1 }, { at: at.climax + 0.12, duration: 0.5, ease: "out" });
+    ctx.cue(at.climax + 0.12, "pop", { weight: 0.4, at: badge });
   }
 }

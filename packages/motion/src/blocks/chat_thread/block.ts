@@ -104,6 +104,9 @@ export function build(ctx: BlockContext): void {
         if (t < time.start || t >= time.send) return;
         typewriter(typed, text, opts)(t);
       });
+      if (time.end > time.start) ctx.cue(time.start, "type", { weight: 0.2, at: field, until: time.end, rate: plan.cps });
+      ctx.cue(time.send - 0.06, "click", { weight: 0.35, at: send });
+      ctx.cue(time.send, "pop", { weight: 0.4, at: it.el });
       tl.set(it.el, { opacity: 0 }, 0);
       tl.fromTo(it.el, { y: composerH + 60, scale: 0.94, opacity: 0 }, { y: 0, scale: 1, opacity: 1 }, { at: time.send, duration: 0.55, ease: "out" });
       tl.to(send, { scale: 0.86 }, { at: time.send - 0.06, duration: 0.08, ease: "out" });
@@ -116,6 +119,7 @@ export function build(ctx: BlockContext): void {
     tl.set(it.el, { opacity: 0 }, 0);
     tl.fromTo(it.el, { y: 24, opacity: 0 }, { y: 0, opacity: 1 }, { at: time.start, duration: 0.4, ease: "out" });
     tl.fromTo(dots, { scale: 0.8, opacity: 0 }, { scale: 1, opacity: 1 }, { at: time.start, duration: 0.3, ease: "out" });
+    ctx.cue(time.start, "pop", { weight: 0.3, at: dots });
     tl.to(dots, { opacity: 0, scale: 0.9 }, { at: time.send, duration: 0.15, ease: "exit" });
     const dotEls = Array.from(dots.children) as HTMLElement[];
     tl.track((t) => {
@@ -169,6 +173,7 @@ export function build(ctx: BlockContext): void {
     return sweep;
   });
   if (sweeps.length > 0) {
+    ctx.cue(markAt, "whoosh", { weight: 0.25, at: marks[0]!.el });
     tl.track((t) => {
       let x = pen(Math.min(1, Math.max(0, (t - markAt) / strokeFor))) * totalW;
       sweeps.forEach((sweep, k) => {

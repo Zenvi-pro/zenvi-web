@@ -120,6 +120,10 @@ export function build(ctx: BlockContext): void {
   const morphs = pieces.map((o, k) => prepareMorph(toOutline([circle(dotR, 64).map((q) => ({ x: q.x + slots[k]!.x, y: q.y + slots[k]!.y }))]), o));
   const lockAt = morphAt + MORPH + 3 * 0.06;
   const revealAt = lockAt + 0.45;
+  // The dots fly in as one gesture, tap down on their slots, and the mark locks: the hero beat.
+  ctx.cue(flights[0]!.at, "whoosh", { weight: 0.5 });
+  landed.forEach((t, k) => ctx.cue(t, "land", { weight: 0.35, at: { x: cx + (slots[k]!.x - cx) * BIG, y: cy + (slots[k]!.y - cy) * BIG } }));
+  ctx.cue(lockAt, "reveal", { weight: 0.9, at: { x: cx, y: cy } });
 
   const stage = ctx.el("div", "lbx-stage");
   const canvas = ctx.el("canvas", "lbx-trails", stage);
@@ -179,6 +183,7 @@ export function build(ctx: BlockContext): void {
     // Long names stagger tighter, so the tagline lands by ~3.9 s at any length and holds before the exit (duration.min).
     const each = Math.min(0.035, 0.32 / chars.length);
     tl.fromTo(chars, { yPercent: 115, rotate: 6 }, { yPercent: 0, rotate: 0 }, { at: rise, duration: 0.7, ease: "out", stagger: each });
+    ctx.cue(rise, "whoosh", { weight: 0.35, at: name });
     if (tag) tl.fromTo(tag, { opacity: 0, y: 14 }, { opacity: 1, y: 0 }, { at: rise + 0.25 + chars.length * each, duration: 0.6, ease: "out" });
   }
 

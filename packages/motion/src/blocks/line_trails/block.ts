@@ -50,6 +50,8 @@ export function build(ctx: BlockContext): void {
   // Lines leave at seeded times over the first 0.7 s; each travels its whole figure by 0.5 s before the end.
   const starts = paths.map((_, i) => (count > 1 ? 0.7 * random01(ctx.seed, i, 2) : 0));
   const end = Math.max(0.8, ctx.seconds - 0.5);
+  // One soft swish as the lines set off (a background: nothing louder).
+  ctx.cue(Math.min(...starts), "whoosh", { weight: 0.3, at: { x: cx, y: cy } });
   const ease = EASES["in-out"];
   const width = Number(p.width) * scale;
   const tail = Number(p.tail);

@@ -97,6 +97,9 @@ export async function build(ctx: BlockContext): Promise<void> {
   const resolve = p.resolve !== false;
   const close = Math.max(tone + 0.8, S - 1.85);
   const seed0 = cell * 0.18;
+  ctx.cue(land, "pop", { weight: 0.4, at: { x: cx, y: cy } });
+  ctx.cue(multiply, "whoosh", { weight: 0.4, at: { x: cx, y: cy } });
+  if (resolve) ctx.cue(close + 0.4, "reveal", { weight: 0.6 });
 
   tl.track((t) => {
     const g = canvas.getContext("2d");

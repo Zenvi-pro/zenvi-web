@@ -10,14 +10,16 @@
  * classes/handoff/linked_media.py), H.264 `.mp4` without. Motion blur
  * renders `motionBlurSamples` sub-frames over a 180° shutter and averages
  * them (premultiplied, so edges do not fringe). Renders are cached by
- * fingerprint in `<cache>/motion/`.
+ * fingerprint in `<cache>/motion/`, each with its picture events (what the
+ * sound design hears, `__zenvi.events`) in a `.events.json` beside it.
  */
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, rename, rm, stat } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Browser, CDPSession, Page } from "puppeteer-core";
+import { readPictureEvents, type PictureEvent } from "@zenvi/engine";
 import { cacheDir, resolveBinary, spawnManaged } from "@zenvi/render-node";
 import { getBlock } from "../catalog.js";
 import { allParams, checkParams, type BlockManifest, type Params } from "../params.js";
@@ -77,7 +79,12 @@ export interface RenderedBlock {
   cached: boolean;
   /** Wall-clock seconds the render took (0 when cached). */
   renderSeconds: number;
+  /** What happens on screen that the ear expects to hear, from the block's timeline (seconds from its start). */
+  events: PictureEvent[];
 }
+
+/** What blockEvents needs: a render request without the capture's own settings. */
+export type BlockEventsOptions = Omit<RenderBlockOptions, "output" | "workers" | "onProgress">;
 
 /** A bad block id, params or size: the caller's mistake, in words. */
 export class MotionBlockError extends Error {
@@ -172,14 +179,39 @@ export function motionCacheDir(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(cacheDir(env), "motion");
 }
 
+/** The cached render of `fp` (whether or not it exists yet). */
+function cachedPath(id: string, fp: Fingerprinted, env: NodeJS.ProcessEnv | undefined): string {
+  return path.join(motionCacheDir(env), `${id}-${fp.fingerprint.slice(0, 16)}${fp.alpha ? ".mov" : ".mp4"}`);
+}
+
+const eventsPath = (cached: string): string => `${cached}.events.json`;
+
+/** The events cached beside a render; null when there are none (a render cached before events were recorded). */
+async function readCachedEvents(cached: string): Promise<PictureEvent[] | null> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(eventsPath(cached), "utf8"));
+    return Array.isArray(raw) ? readPictureEvents(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Write the events beside the render, from the scratch folder `work` (in the cache) so a reader never sees half a file. */
+async function writeCachedEvents(cached: string, events: readonly PictureEvent[], work: string): Promise<void> {
+  const partial = path.join(work, "events.json");
+  await writeFile(partial, JSON.stringify(events));
+  await rename(partial, eventsPath(cached));
+}
+
 export async function renderBlock(id: string, raw: Readonly<Record<string, unknown>>, options: RenderBlockOptions): Promise<RenderedBlock> {
   const fp = await fingerprintRender(id, raw, options);
   const codec: MotionCodec = fp.alpha ? "prores4444" : "h264";
   const ext = fp.alpha ? ".mov" : ".mp4";
   const dir = motionCacheDir(options.env);
   await mkdir(dir, { recursive: true });
-  const cached = path.join(dir, `${id}-${fp.fingerprint.slice(0, 16)}${ext}`);
+  const cached = cachedPath(id, fp, options.env);
   const frames = Math.max(1, Math.round((fp.seconds * fp.fps.num) / fp.fps.den));
+  let events: PictureEvent[] = [];
   const result = (file: string, wasCached: boolean, renderSeconds: number): RenderedBlock => ({
     path: file,
     codec,
@@ -193,6 +225,7 @@ export async function renderBlock(id: string, raw: Readonly<Record<string, unkno
     params: fp.params,
     cached: wasCached,
     renderSeconds,
+    events,
   });
   const deliver = async (wasCached: boolean, renderSeconds: number): Promise<RenderedBlock> => {
     if (!options.output) return result(cached, wasCached, renderSeconds);
@@ -200,7 +233,10 @@ export async function renderBlock(id: string, raw: Readonly<Record<string, unkno
     await copyFile(cached, options.output);
     return result(path.resolve(options.output), wasCached, renderSeconds);
   };
-  if (existsSync(cached)) return deliver(true, 0);
+  if (existsSync(cached)) {
+    events = (await readCachedEvents(cached)) ?? (await cacheEvents(fp, cached, options));
+    return deliver(true, 0);
+  }
 
   const started = Date.now();
   // Scratch inside the cache folder so the finished file is renamed into place: a copy across
@@ -208,12 +244,50 @@ export async function renderBlock(id: string, raw: Readonly<Record<string, unkno
   const work = await mkdtemp(path.join(dir, ".render-"));
   try {
     const partial = path.join(work, `render${ext}`);
-    await capture(fp, frames, partial, work, options);
+    events = await capture(fp, frames, partial, work, options);
+    // Events first: a render in the cache always has them beside it.
+    await writeCachedEvents(cached, events, work);
     await rename(partial, cached);
   } finally {
     await rm(work, { recursive: true, force: true });
   }
   return deliver(false, (Date.now() - started) / 1000);
+}
+
+/**
+ * The picture events of a block as renderBlock would make it, without
+ * capturing frames: read from the cache when that render (or an earlier
+ * events-only read) is there, else the page is built once and asked.
+ */
+export async function blockEvents(id: string, raw: Readonly<Record<string, unknown>>, options: BlockEventsOptions): Promise<PictureEvent[]> {
+  const fp = await fingerprintRender(id, raw, options);
+  await mkdir(motionCacheDir(options.env), { recursive: true });
+  const cached = cachedPath(id, fp, options.env);
+  return (await readCachedEvents(cached)) ?? cacheEvents(fp, cached, options);
+}
+
+/** Open the block's page once (no capture), read its events and cache them beside `cached`. */
+async function cacheEvents(fp: Fingerprinted, cached: string, options: BlockEventsOptions): Promise<PictureEvent[]> {
+  const work = await mkdtemp(path.join(path.dirname(cached), ".events-"));
+  try {
+    const events = await withBrowser(options, async (browser) => {
+      const served = await serveBlock(fp, work, options);
+      try {
+        const tab = await openTab(browser, served.url, served.design, false);
+        try {
+          return await readEvents(tab);
+        } finally {
+          await tab.page.close().catch(() => undefined);
+        }
+      } finally {
+        await served.close();
+      }
+    });
+    await writeCachedEvents(cached, events, work);
+    return events;
+  } finally {
+    await rm(work, { recursive: true, force: true });
+  }
 }
 
 /** Sample times (seconds) for each output frame: the frame time, or sub-frames over a 180° shutter. */
@@ -289,17 +363,34 @@ async function openTab(browser: Browser, url: string, design: { width: number; h
   return { page, cdp };
 }
 
-async function capture(fp: Fingerprinted, frames: number, output: string, work: string, options: RenderBlockOptions): Promise<void> {
-  if (options.browser) return captureWith(options.browser, fp, frames, output, work, options);
+/** The page's picture events, checked as the engine reads them (the page is code we run, but keep the contract). */
+async function readEvents(tab: Tab): Promise<PictureEvent[]> {
+  const raw = await tab.page.evaluate(() => (globalThis as unknown as PageGlobals).__zenvi?.events ?? []);
+  return readPictureEvents(raw);
+}
+
+async function withBrowser<T>(options: { browser?: Browser; env?: NodeJS.ProcessEnv }, run: (browser: Browser) => Promise<T>): Promise<T> {
+  if (options.browser) return run(options.browser);
   const lease = await leaseChrome(options.env);
   try {
-    await captureWith(lease.browser, fp, frames, output, work, options);
+    return await run(lease.browser);
   } finally {
     lease.release();
   }
 }
 
-async function captureWith(browser: Browser, fp: Fingerprinted, frames: number, output: string, work: string, options: RenderBlockOptions): Promise<void> {
+function capture(fp: Fingerprinted, frames: number, output: string, work: string, options: RenderBlockOptions): Promise<PictureEvent[]> {
+  return withBrowser(options, (browser) => captureWith(browser, fp, frames, output, work, options));
+}
+
+interface ServedBlock {
+  url: string;
+  design: { width: number; height: number; scale: number };
+  close(): Promise<void>;
+}
+
+/** Prepare the media params and serve the block's page for `fp`. */
+async function serveBlock(fp: Fingerprinted, work: string, options: BlockEventsOptions): Promise<ServedBlock> {
   const draft = options.draft === true;
   const design = designSize(fp.width, fp.height);
   const fpsValue = fp.fps.num / fp.fps.den;
@@ -314,6 +405,14 @@ async function captureWith(browser: Browser, fp: Fingerprinted, frames: number, 
   const config: BlockConfig = { block: fp.manifest.id, params: fp.params, width: design.width, height: design.height, fps: fpsValue, seconds: fp.seconds, alpha: fp.alpha, media, draft };
   const page = await blockPage(fp.manifest.id, options.env);
   const server = await startPageServer({ html: pageHtml(page, config), script: page.script, fontsDir: path.join(motionDir(options.env), "fonts"), mediaDirs });
+  return { url: server.url, design, close: () => server.close() };
+}
+
+async function captureWith(browser: Browser, fp: Fingerprinted, frames: number, output: string, work: string, options: RenderBlockOptions): Promise<PictureEvent[]> {
+  const draft = options.draft === true;
+  const fpsValue = fp.fps.num / fp.fps.den;
+  const served = await serveBlock(fp, work, options);
+  const design = served.design;
   const times = sampleTimes(frames, fpsValue, fp.samples);
   const clip = { x: 0, y: 0, width: design.width, height: design.height, scale: design.scale / Math.max(1, design.scale) };
   const captured = { width: Math.round(design.width * design.scale), height: Math.round(design.height * design.scale) };
@@ -323,7 +422,8 @@ async function captureWith(browser: Browser, fp: Fingerprinted, frames: number, 
   const tabs: Tab[] = [];
   try {
     const workers = Math.max(1, Math.min(options.workers ?? 3, 8, times.length));
-    tabs.push(...(await Promise.all(Array.from({ length: workers }, () => openTab(browser, server.url, design, fp.alpha)))));
+    tabs.push(...(await Promise.all(Array.from({ length: workers }, () => openTab(browser, served.url, design, fp.alpha)))));
+    const events = await readEvents(tabs[0]!);
     const ready = new Map<number, Buffer>();
     let next = 0;
     let written = 0;
@@ -359,12 +459,13 @@ async function captureWith(browser: Browser, fp: Fingerprinted, frames: number, 
     stdin.end();
     const code = await ffmpeg.exited;
     if (code !== 0) throw ffmpeg.failure("encoding the motion block");
+    return events;
   } catch (error) {
     stdin.destroy();
     await ffmpeg.kill();
     throw error;
   } finally {
     await Promise.all(tabs.map((t) => t.page.close().catch(() => undefined)));
-    await server.close();
+    await served.close();
   }
 }

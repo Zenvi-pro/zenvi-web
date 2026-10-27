@@ -4,9 +4,10 @@
  * this checks wiring and determinism, the render smoke test checks pixels).
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { readPictureEvents, type PictureEvent } from "@zenvi/engine";
 import { BLOCKS } from "../catalog.js";
 import { checkParams } from "../params.js";
-import { createContext, type BlockBuild } from "../runtime/index.js";
+import { createContext, pictureEvents, type BlockBuild } from "../runtime/index.js";
 
 /** Blocks that draw only into a canvas, which jsdom does not paint. */
 const CANVAS_ONLY = new Set(["gradient_field", "ripple_logo", "line_trails"]);
@@ -54,8 +55,34 @@ describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s", (id, manifest) => {
         const ctx = createContext(document, { block: id, params: checked.params, width: 1080, height: 1920, fps: 30, seconds, alpha: manifest.alpha, media: {}, draft: false });
         await mod.build(ctx);
         for (const t of [0, seconds / 2, seconds]) ctx.tl.seek(t);
+        for (const e of pictureEvents(ctx)) expect(e.t).toBeLessThan(seconds);
       }
     }
+  });
+
+  it("reports picture events inside its length, sorted, valid and the same on every build", async () => {
+    const mod = (await import(`./${id}/block.ts`)) as { build: BlockBuild };
+    const seconds = manifest.duration.default;
+    const eventsOf = async (): Promise<PictureEvent[]> => {
+      document.body.innerHTML = "";
+      const checked = checkParams(manifest, {});
+      if (!checked.ok) throw new Error(checked.error);
+      const ctx = createContext(document, { block: id, params: checked.params, width: 1080, height: 1920, fps: 30, seconds, alpha: manifest.alpha, media: {}, draft: false });
+      await mod.build(ctx);
+      return pictureEvents(ctx);
+    };
+    const events = await eventsOf();
+    for (const e of events) {
+      expect(e.t).toBeGreaterThanOrEqual(0);
+      expect(e.t).toBeLessThan(seconds);
+      if (e.until !== undefined) expect(e.until).toBeLessThanOrEqual(seconds);
+    }
+    expect(events.map((e) => e.t)).toEqual([...events.map((e) => e.t)].sort((a, b) => a - b));
+    // What the engine reads back is what the block wrote (kinds, ranges, runs).
+    expect(readPictureEvents(JSON.parse(JSON.stringify(events)))).toEqual(events);
+    expect(await eventsOf()).toEqual(events);
+    // Backgrounds may stay silent; everything else has something to hear.
+    if (id !== "gradient_field") expect(events.length).toBeGreaterThan(0);
   });
 });
 
@@ -91,15 +118,56 @@ describe("dock_magnify", () => {
 });
 
 /** Build `id` on 9:16 with `params`, for `seconds`. */
-async function built(id: string, params: Record<string, unknown>, seconds: number): Promise<{ root: HTMLElement; seek: (t: number) => void }> {
+async function built(id: string, params: Record<string, unknown>, seconds: number): Promise<{ root: HTMLElement; seek: (t: number) => void; events: () => PictureEvent[] }> {
   const manifest = BLOCKS.find((b) => b.id === id)!;
   const mod = (await import(`./${id}/block.ts`)) as { build: BlockBuild };
   const checked = checkParams(manifest, params);
   if (!checked.ok) throw new Error(checked.error);
   const ctx = createContext(document, { block: id, params: checked.params, width: 1080, height: 1920, fps: 30, seconds, alpha: manifest.alpha, media: {}, draft: false });
   await mod.build(ctx);
-  return { root: ctx.root, seek: (t) => ctx.tl.seek(t) };
+  return { root: ctx.root, seek: (t) => ctx.tl.seek(t), events: () => pictureEvents(ctx) };
 }
+
+describe("picture events", () => {
+  it("toggle_panel flips one switch per row that starts off, and pops the done pill after them", async () => {
+    const events = (await built("toggle_panel", { rows: ["A", "+B", "C", "D"] }, 5)).events();
+    const toggles = events.filter((e) => e.kind === "toggle");
+    expect(toggles).toHaveLength(3);
+    // The pointer's press is the switch: no separate click.
+    expect(events.filter((e) => e.kind === "click")).toHaveLength(0);
+    expect(events.filter((e) => e.kind === "pop" && e.t > toggles[2]!.t)).toHaveLength(1);
+  });
+  it("counter ticks while it counts and lands as it settles", async () => {
+    const events = (await built("counter", { values: ["0", "58"] }, 3)).events();
+    const tick = events.find((e) => e.kind === "tick")!;
+    expect(tick.until! - tick.t).toBeGreaterThan(0.5);
+    expect(tick.rate).toBeGreaterThan(10);
+    expect(tick.rate).toBeLessThanOrEqual(20);
+    expect(events.find((e) => e.kind === "land")!.t).toBeCloseTo(tick.until!, 3);
+  });
+  it("prompt_bar types the prompt at its typing speed, then sends", async () => {
+    const prompt = "Plan a trip to Lisbon";
+    const events = (await built("prompt_bar", { prompt }, 5)).events();
+    const type = events.find((e) => e.kind === "type")!;
+    expect(type.rate! * (type.until! - type.t)).toBeCloseTo(prompt.length, 0);
+    const clicks = events.filter((e) => e.kind === "click");
+    expect(clicks).toHaveLength(1);
+    expect(clicks[0]!.t).toBeGreaterThan(type.until!);
+  });
+  it("drops events at or past the end, and a block without layout reports the frame's centre", async () => {
+    const manifest = BLOCKS.find((b) => b.id === "counter")!;
+    const checked = checkParams(manifest, {});
+    if (!checked.ok) throw new Error(checked.error);
+    const ctx = createContext(document, { block: "counter", params: checked.params, width: 1080, height: 1920, fps: 30, seconds: 2, alpha: true, media: {}, draft: false });
+    ctx.cue(2, "pop");
+    ctx.cue(1, "click", { weight: 2, at: ctx.root, until: 3, rate: 50 });
+    ctx.cue(0.5, "land", { at: { x: 270, y: 1920 } });
+    expect(pictureEvents(ctx)).toEqual([
+      { t: 0.5, kind: "land", weight: 0.5, x: 0.25, y: 1 },
+      { t: 1, kind: "click", weight: 1, x: 0.5, y: 0.5, until: 2, rate: 30 },
+    ]);
+  });
+});
 
 describe("blocks with the most items they take still land their climax before the exit", () => {
   it("cursor_path reaches its last stop at the default length", async () => {

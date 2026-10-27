@@ -70,6 +70,7 @@ export function build(ctx: BlockContext): void {
     Object.assign(title.style, { left: `${safe.left}px`, top: `${safe.top - 60}px` });
     const text = String(p.title);
     const opts = { at: 0.1, duration: 0.8, seed: ctx.seed, rate: 24 };
+    ctx.cue(opts.at, "swap", { weight: 0.25, at: title, until: opts.at + opts.duration, rate: opts.rate });
     tl.track((t) => {
       title.textContent = scrambledText(text, t, opts);
     });
@@ -105,6 +106,7 @@ export function build(ctx: BlockContext): void {
     const dot = shape("circle", { cx: c.ax, cy: c.ay, r: 6 }, "dot");
     for (const el of [ring, dot]) el.style.transformOrigin = `${c.ax}px ${c.ay}px`;
     tl.fromTo([ring, dot], { scale: 0, opacity: 0 }, { scale: 1, opacity: 1 }, { at, duration: 0.45, ease: "back-out" });
+    ctx.cue(at, "pop", { weight: 0.3, at: { x: c.ax, y: c.ay } });
     tl.track((t) => {
       if (t < at + 0.45) return;
       const k = ((t - at - 0.45) % 1.6) / 1.6;
@@ -131,6 +133,7 @@ export function build(ctx: BlockContext): void {
     const textAt = at + 0.6;
     const o1 = { at: textAt, duration: 0.6, seed: ctx.seed + i * 13, rate: 24 };
     const o2 = { at: textAt + 0.12, duration: 0.6, seed: ctx.seed + i * 29, rate: 24 };
+    ctx.cue(o1.at, "swap", { weight: 0.2, at: label, until: o2.at + o2.duration, rate: o1.rate });
     tl.track((t) => {
       name.textContent = scrambledText(c.name, t, o1);
       value.textContent = scrambledText(c.value, t, o2);

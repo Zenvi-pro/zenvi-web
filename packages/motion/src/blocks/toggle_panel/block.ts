@@ -62,6 +62,7 @@ export function build(ctx: BlockContext): void {
 
   // In: the panel rises and focuses, its rows following (≤ 0.5 s of stagger in all).
   tl.fromTo(panel, { y: H * 0.04, scale: 0.97, opacity: 0, blur: 12 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.7, ease: "out" });
+  ctx.cue(0, "pop", { weight: 0.4, at: { x: left + rect.width / 2, y: top + rect.height / 2 } });
   tl.fromTo(switches.map((s) => s.el), { y: 24, opacity: 0 }, { y: 0, opacity: 1 }, { at: 0.15, duration: 0.6, ease: "out", stagger: Math.min(0.08, 0.45 / Math.max(1, n - 1)) });
 
   // Switches start in their stated state.
@@ -101,7 +102,8 @@ export function build(ctx: BlockContext): void {
     offs.forEach((s, i) => {
       const pt = at(s);
       ptr.moveTo(pt.x, pt.y, clicks[i]! - Math.min(0.55, interval * 0.8), Math.min(0.5, interval * 0.75));
-      ptr.click(clicks[i]!);
+      // The switch it flips is the sound.
+      ptr.click(clicks[i]!, null);
     });
     // Out along the way it was already heading: down the panel.
     const last = at(offs[offs.length - 1]!);
@@ -109,6 +111,7 @@ export function build(ctx: BlockContext): void {
   }
   offs.forEach((s, i) => {
     const c = clicks[i]! + 0.02;
+    ctx.cue(c, "toggle", { weight: 0.35, at: s.knob });
     tl.to(s.knob, { x: TRAVEL }, { at: c, duration: 0.32, ease: "back-out" });
     tl.to(s.fill, { opacity: 1 }, { at: c, duration: 0.22, ease: "smooth" });
     tl.to(s.label, { opacity: 1 }, { at: c, duration: 0.3, ease: "smooth" });
@@ -124,6 +127,7 @@ export function build(ctx: BlockContext): void {
   tl.to(shield, { opacity: 0, scale: 0.6 }, { at: doneAt, duration: 0.2, ease: "exit" });
   tl.to(check, { opacity: 1, scale: 1 }, { at: doneAt + 0.08, duration: 0.4, ease: "back-out" });
   tl.to(pillFill, { scaleX: 1 }, { at: doneAt, duration: 0.45, ease: "in-out" });
+  ctx.cue(doneAt, "pop", { weight: 0.45, at: pill });
   tl.fromTo(pill, { color: palette.muted }, { color: onAccent }, { at: doneAt + 0.1, duration: 0.25, ease: "smooth" });
   tl.to(tile, { scale: 1.08 }, { at: doneAt, duration: 0.18, ease: "out" });
   tl.to(tile, { scale: 1 }, { at: doneAt + 0.18, duration: 0.35, ease: "out" });
