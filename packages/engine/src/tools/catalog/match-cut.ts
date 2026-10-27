@@ -22,7 +22,7 @@ import type { Transaction } from "../../history/document.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { Interpolation, ScaleMode, type Clip, type ProjectFile } from "../../model/types.js";
 import { SOFT_ZOOM, alignMatchCut, type AlignClipInput, type AlignResult, type CoverMode } from "../../ops/match-cut.js";
-import { addClip, deleteClips, setClipKeyframes, setClipProperty } from "../../ops/clips.js";
+import { addClip, deleteClips, retimeClipTo, setClipKeyframes, setClipProperty } from "../../ops/clips.js";
 import { applyFittedMotionTransition, type MotionTransitionResult } from "../../ops/motion-transitions.js";
 import { addTitleClip } from "../../ops/titles.js";
 import { addTrack } from "../../ops/tracks.js";
@@ -293,6 +293,8 @@ interface ShotSource {
   /** Source window, seconds. */
   start: number;
   end: number;
+  /** A file shorter than its shot plays its whole window slowed to fill it, at this speed (< 1). */
+  slow?: number;
   box: SubjectBox;
   later?: { box: SubjectBox; time: number };
   /** Where the box came from. */
@@ -311,7 +313,7 @@ const CENTRED: SubjectBox = { x: 0.3, y: 0.3, w: 0.4, h: 0.4 };
  * moment. Files with an end box are followed instead: each return shows a
  * later moment and the box is interpolated there.
  */
-function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>, followed: ReadonlySet<string>, fps: number): Array<{ start: number; end: number }> {
+function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<string, ProjectFile>, times: Map<string, number>, followed: ReadonlySet<string>, fps: number): Array<{ start: number; end: number; slow?: number }> {
   const cursor = new Map<string, number>();
   return plan.shots.map((shot) => {
     const id = ids[shot.clip]!;
@@ -319,6 +321,10 @@ function sourceWindows(plan: MontagePlan, ids: readonly string[], files: Map<str
     const length = shot.frames / fps;
     if (visualKind(file) === "image") return { start: 0, end: length };
     const [a, b] = usableRange(file);
+    // Shorter than the shot (a held opening on a slow tempo): the whole file, slowed to fill it, rather than black after its last frame.
+    const first = Math.ceil(a * fps - 1e-6) / fps;
+    const last = Math.floor(b * fps + 1e-6) / fps;
+    if (last - first < length - 1e-6 && last > first) return { start: first, end: last, slow: (last - first) / length };
     const room = Math.max(0, b - a - length);
     let start = cursor.get(id) ?? times.get(id) ?? a + room * 0.3;
     if (start + length > b + 1e-6) start = a;
@@ -439,6 +445,11 @@ const montageTool = directTool({
     const variety = varietyProblem(plan.shots.map((shot) => ({ fileId: ids[shot.clip]!, start: shot.start, end: shot.end })));
     if (variety && args.strict_variety) return refused(MONTAGE, `Error: ${variety}`);
     if (variety) warnings.push(variety);
+    const slowed = new Map<string, number>();
+    windows.forEach((w, i) => {
+      if (w.slow) slowed.set(ids[plan.shots[i]!.clip]!, Math.min(slowed.get(ids[plan.shots[i]!.clip]!) ?? 1, w.slow));
+    });
+    for (const [id, speed] of slowed) warnings.push(`${displayName(files.get(id)!)} is shorter than its shot: it plays slowed to ${Math.round(speed * 100)} % to fill it.`);
     // Each file is looked at once, at its first shot: its circle (unless given) and whether its edges are black.
     const looked = new Map<string, FrameSubjects | null>();
     let cannotLook = false;
@@ -517,7 +528,8 @@ const montageTool = directTool({
       const clips = plan.shots.map((shot, i) => {
         const src = sources[i]!;
         const file = files.get(src.fileId)!;
-        const clip = addClip(tx, { fileId: src.fileId, position: shot.start, layer: track.video, start: src.start, end: src.end });
+        const added = addClip(tx, { fileId: src.fileId, position: shot.start, layer: track.video, start: src.start, end: src.end });
+        const clip = src.slow ? retimeClipTo(tx, added.id, { duration: shot.frames / frameRate }) : added;
         // Fill the frame like build_reel: a different aspect is cropped, not letterboxed.
         if (aspectOf(file) !== null) setClipProperty(tx, clip.id, "scale", ScaleMode.CROP);
         if (file.has_audio) setClipProperty(tx, clip.id, "volume", 0);

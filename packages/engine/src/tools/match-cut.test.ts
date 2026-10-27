@@ -348,6 +348,28 @@ describe("match_cut_montage_tool", () => {
     for (let i = 1; i < windows.length; i += 1) expect(windows[i]!.startFrame, `cut ${i}`).toBe(windows[i - 1]!.endFrame + 1);
   });
 
+  it("slows a file shorter than its held shot to fill it instead of showing black after its last frame", async () => {
+    // Bench w47 fullcircle: a 2.04 s clip opened a 2.71 s hold, black for the last 0.67 s.
+    const scratch = new ProjectDocument({ ...createProject({ id: "MATCHCUT02" }), width: W, height: H });
+    scratch.transaction("fixture", (tx) => {
+      addFile(tx, media("/m/short.mp4", videoInfo("/m/short.mp4", 0.6, { width: W, height: H })), { id: "S0" });
+      for (const i of [1, 2, 3]) addFile(tx, media(`/m/f${i}.mp4`, videoInfo(`/m/f${i}.mp4`, 10, { width: W, height: H })), { id: `F${i}` });
+    });
+    const doc = new ProjectDocument({ ...scratch.project, history: { undo: [], redo: [] } });
+    const result = await runTool({ doc, host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["S0", "F1", "F2", "F3"], duration_seconds: 6, bpm: 120, transitions: "none" });
+    expect(result.data?.status, result.data?.summary).toBe("applied");
+    expect(result.data?.warnings?.join(" ")).toMatch(/short is shorter than its shot: it plays slowed to \d+ %/);
+    const shots = (result.data?.data as { shots: { clip_id: string; frames: number }[] }).shots;
+    const opening = doc.project.clips.find((c) => c.id === shots[0]!.clip_id)!;
+    const w = frameWindow(opening, doc.project.fps);
+    expect(w.endFrame - w.startFrame + 1).toBe(shots[0]!.frames);
+    expect(shots[0]!.frames).toBeGreaterThan(18);
+    // Every frame of the shot maps inside the 0.6 s file.
+    expect(clipKeyframe(opening, "time")).toBeDefined();
+    const times = (opening as unknown as { time: { Points: { co: { Y: number } }[] } }).time.Points.map((p) => p.co.Y);
+    expect(Math.max(...times)).toBeLessThanOrEqual(18 + 1);
+  });
+
   it("warns when the files are too few for the pace and refuses with strict_variety, saying how many more", async () => {
     const base = project();
     base.clips = [];
