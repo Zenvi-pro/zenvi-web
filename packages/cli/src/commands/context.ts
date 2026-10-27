@@ -46,7 +46,7 @@ export function engineChoice(flags: GlobalFlags): EngineChoice {
 /** Host options for the Node ToolHost (backend with the signed-in token). */
 export function hostOptions(ctx: CommandContext) {
   return {
-    backend: { baseUrl: ctx.config.backendUrl, token: () => ctx.auth.backendToken(), userAgent: `zenvi-cli/${VERSION}` },
+    backend: { baseUrl: ctx.config.backendUrl, token: () => ctx.auth.backendToken(), unavailable: () => ctx.auth.backendUnavailable(), userAgent: `zenvi-cli/${VERSION}` },
     env: ctx.env,
     // Zenvi desktop's folder on this computer: its recent projects, recovery copies and custom profiles.
     desktopDir: ctx.config.desktopDir,

@@ -109,6 +109,8 @@ export interface SpawnManagedOptions {
   /** stdin/stdout modes. Default: stdin ignored, stdout piped. */
   stdin?: "pipe" | "ignore";
   stdout?: "pipe" | "ignore";
+  /** stderr kept, characters (default 16 KiB): more for a child whose log is its result. */
+  stderrLimit?: number;
 }
 
 export function spawnManaged(binary: string, args: readonly string[], options: SpawnManagedOptions = {}): ManagedChild {
@@ -121,7 +123,7 @@ export function spawnManaged(binary: string, args: readonly string[], options: S
   };
   const child = spawn(binary, args, spawnOptions);
   live.add(child);
-  const stderr = new TailBuffer();
+  const stderr = new TailBuffer(options.stderrLimit);
   child.stderr?.setEncoding("utf8");
   child.stderr?.on("data", (chunk: string) => stderr.push(chunk));
   let spawnErr: Error | undefined;
