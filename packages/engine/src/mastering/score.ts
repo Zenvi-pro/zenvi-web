@@ -454,11 +454,18 @@ export function scoreMix(input: ScoreInput): MixScore {
     const proms: Partial<Record<CueRole, { cue: MixCue; db: number }[]>> = {};
     const at = (t: number): number => Math.round(t / ENVELOPE_HOP);
     for (const c of cues) {
-      const i0 = Math.max(0, Math.trunc((c.t - 0.1) / ENVELOPE_HOP));
-      const i1 = Math.min(on.length, Math.trunc((c.t + 0.1) / ENVELOPE_HOP));
-      if (i1 <= i0) continue;
-      const peakAt = c.kind.startsWith("whoosh") ? argMax(eSfx, i0, Math.min(i1, eSfx.length)) : argMax(on, i0, i1);
-      errs.push({ cue: c, err: (peakAt * ENVELOPE_HOP - c.t) * 1000 });
+      // A tick or typing run puts cues closer than the ±100 ms search: look only up to halfway to the
+      // neighbouring cues (layers on the same moment are one sound), or every tick reads as early or
+      // late by its neighbour's onset.
+      const near = cues.filter((o) => Math.abs(o.t - c.t) > 0.001 && Math.abs(o.t - c.t) < 0.2);
+      const before = Math.min(0.1, ...near.filter((o) => o.t <= c.t).map((o) => (c.t - o.t) / 2));
+      const after = Math.min(0.1, ...near.filter((o) => o.t >= c.t).map((o) => (o.t - c.t) / 2));
+      const i0 = Math.max(0, Math.trunc((c.t - before) / ENVELOPE_HOP));
+      const i1 = Math.min(on.length, Math.trunc((c.t + after) / ENVELOPE_HOP));
+      if (i1 > i0) {
+        const peakAt = c.kind.startsWith("whoosh") ? argMax(eSfx, i0, Math.min(i1, eSfx.length)) : argMax(on, i0, i1);
+        errs.push({ cue: c, err: (peakAt * ENVELOPE_HOP - c.t) * 1000 });
+      }
       const a = Math.max(0, at(c.t - 0.03));
       const b = Math.min(eSfx.length, at(c.t + 0.12) + 1);
       const local = Array.from(eRest.subarray(Math.max(0, at(c.t - 1)), Math.min(eRest.length, at(c.t + 1))));

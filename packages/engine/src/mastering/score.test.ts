@@ -117,6 +117,28 @@ describe("scoreMix", () => {
     expect(scoreMix({ ...base, cues: layered.map(({ group: _, ...c }) => c) }).metrics.V4_min_hero_gap_s!.value).toBe(0);
   });
 
+  it("times each tick of a run against its own onset, not its louder neighbour's (H3)", () => {
+    const sr = 48000;
+    const n = 4 * sr;
+    const sfx = new Float32Array(n);
+    const bed = Float32Array.from({ length: n }, (_, i) => 0.01 * Math.sin(i * 0.05));
+    // A crescendo of 12 ticks 80 ms apart: inside ±100 ms the next tick is always the strongest onset.
+    const ticks = Array.from({ length: 12 }, (_, k) => 1 + k * 0.08);
+    for (const [k, t] of ticks.entries()) {
+      const at = Math.round(t * sr);
+      for (let i = 0; i < 0.02 * sr; i += 1) sfx[at + i]! += (0.1 + 0.05 * k) * Math.exp(-i / (0.004 * sr)) * Math.sin(i * 1.3);
+    }
+    const out = scoreMix({
+      sampleRate: sr,
+      mix: [sumOf([[sfx], [bed]], n)[0]!],
+      stems: { sfx: [sfx], music: [bed] },
+      genre: "saas_ui",
+      fps: 30,
+      cues: ticks.map((t, k) => ({ id: `t${k}`, t, kind: "click", role: "micro", sample: `s${k}` })),
+    });
+    expect(out.metrics.H3_timing_within_1f!.value).toBe(1);
+  });
+
   it("speaks the speech windows it measured and stays compact", () => {
     const out = scoreMix(atTarget());
     expect(out.speech.length).toBe(2);
