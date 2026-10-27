@@ -381,6 +381,7 @@ export function planReel(input: PlanInput): ReelPlan {
         sourceStart = chosen.start;
         sourceEnd = chosen.end;
         speed = Math.max(MIN_SPEED, length / seconds);
+        shown.set(chosen.fileId, [...(shown.get(chosen.fileId) ?? []), [sourceStart, sourceEnd]]);
       }
     }
     const onDownbeat = grid.downbeats.some((d) => Math.abs(d - slot.start) < 0.03);

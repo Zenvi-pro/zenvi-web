@@ -85,6 +85,14 @@ describe("planReel", () => {
     expect(freshFrom({ start: 0, end: 4 }, 1, 3.5, [[0, 1.2], [1.2, 2.2], [2.5, 3.5]])).toBeNull();
   });
 
+  it("counts a short clip played whole (slowed) as shown, so rested clips with unseen moments go first", () => {
+    const plan = planReel({ style: REEL_STYLES.cinematic, media: [clip("tiny", 1.1), ..."abcde".split("").map((id) => clip(id, 8)), clip("pay", 8)], seconds: 30, frameRate: 30 });
+    const tiny = plan.shots.filter((s) => s.fileId === "tiny");
+    // Played whole once it is shown; it does not come back for another part of the same 1.1 s while the others have fresh moments.
+    expect(tiny.length).toBeLessThanOrEqual(2);
+    for (const s of tiny) expect([s.sourceStart, s.sourceEnd]).toEqual([0, 1.1]);
+  });
+
   it("splits a shot on the beat, or slows a clip, instead of leaving a gap when clips are short", () => {
     const plan = planReel({ style: REEL_STYLES.cinematic, media: [clip("tiny", 0.6), clip("short", 0.9)], music: music(), seconds: 12 });
     expectContiguous(plan.shots, plan.duration);
