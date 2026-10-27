@@ -20,15 +20,19 @@ import {
   BLANK,
   backgroundColor,
   editorFontFamily,
+  estimatedTextWidth,
   lineTexts,
+  nodeProperty,
   nodeStyle,
   parseTitleSvg,
+  rectNodes,
   setFieldText,
   textColor,
   titleFields,
   titleSvgText,
   tspanNodes,
 } from "../titles/title-svg.js";
+import { getAttr } from "../titles/xml.js";
 import { buildCaptionText, parseCaptionText, displayText, type Cue } from "./caption-cues.js";
 import type { ToolReceipt } from "./receipt.js";
 import { runTool } from "./registry.js";
@@ -778,7 +782,8 @@ describe("add_title_tool", () => {
     const forced = await call(doc, host(), "add_title_tool", { text: "Low", template: "Standard_1", position_seconds: "12", screen_position: "Bottom" });
     const low = clip(doc, String(data(forced).timeline_clip_id))!;
     expect([low.gravity, data(forced).screen_position, data(forced).lifted_for_vertical_ui]).toEqual([7, "bottom_center", -0.12]);
-    expect((low.location_y as Keyframe).Points.map((p) => p.co.Y)).toEqual([-0.12]);
+    // The title's artboard has the frame's aspect, the lift baked into its viewBox (titles/artboard.ts).
+    expect((low.location_y as Keyframe).Points.map((p) => p.co.Y)).toEqual([0]);
     // A landscape project anchors the same way without a lift.
     const flat = newDoc();
     const plain = await call(flat, host(), "add_title_tool", { text: "Low", template: "Standard_1", screen_position: "bottom" });
@@ -926,5 +931,109 @@ describe("editor tool arguments", () => {
     await expectRefusal(newDoc(), host(), "add_timer_tool", { countdown_from_seconds: "ten" }, /^Error: Invalid arguments for add_timer_tool/);
     const r = await call(newDoc(), host(), "add_timer_tool", { definitely_not_an_arg: "1" });
     expect(r.summary).toMatch(/^Error: Invalid arguments for add_timer_tool: Additional properties are not allowed/);
+  });
+});
+
+describe("add_title_tool on frames of any aspect", () => {
+  function written(h: FakeHost, r: ToolReceipt) {
+    return parseTitleSvg(svgOf(h, String(data(r).path)));
+  }
+  function frameDoc(width: number, height: number): ProjectDocument {
+    const doc = newDoc();
+    doc.setUntracked(["width"], width);
+    doc.setUntracked(["height"], height);
+    return doc;
+  }
+  /** fit_field's weight test: the width estimate depends on it. */
+  const isBold = (field: ReturnType<typeof titleFields>[number]) =>
+    field.nodes.some((n) => ["bold", "700", "800", "900"].includes(String(nodeProperty(n, "font-weight") ?? "normal").toLowerCase()));
+  /** The viewBox, and where a point of the drawing lands on the frame (0-1). */
+  function framing(svg: ReturnType<typeof written>) {
+    const [x, y, w, h] = getAttr(svg.root, "viewBox").split(" ").map(Number) as [number, number, number, number];
+    return { x, y, w, h, at: (px: number, py: number) => ({ x: (px - x) / w, y: (py - y) / h }) };
+  }
+
+  const FRAMES: [string, number, number][] = [
+    ["9:16", 1080, 1920],
+    ["1:1", 1080, 1080],
+    ["4:5", 1080, 1350],
+    ["4:3", 1440, 1080],
+    ["21:9", 2560, 1080],
+  ];
+
+  it.each(FRAMES)("%s: a title card fills the frame, its text inside title-safe", async (_name, fw, fh) => {
+    const h = host();
+    const doc = frameDoc(fw, fh);
+    for (const [template, text] of [
+      ["Standard_1", "DOUBT"],
+      ["Footer_1", "The bet became the future."],
+      ["Header_2", "Chapter one"],
+      ["Gray_Box_4", "Jensen Huang"],
+    ] as const) {
+      const r = await call(doc, h, "add_title_tool", { template, text, background_color: "#d4141c", position_seconds: String(doc.project.clips.length * 6) });
+      expect(r.status, r.summary).toBe("applied");
+      const svg = written(h, r);
+      const width = Number(getAttr(svg.root, "width"));
+      const height = Number(getAttr(svg.root, "height"));
+      // Whole units of exactly the frame's aspect: Best Fit fills the frame on the desktop and in the engine alike.
+      expect(Number.isInteger(width) && Number.isInteger(height), template).toBe(true);
+      expect(width * fh).toBe(height * fw);
+      const box = framing(svg);
+      expect([box.w, box.h]).toEqual([width, height]);
+      // The background covers the whole artboard.
+      const rect = rectNodes(svg)[0]!;
+      const [rx, ry, rw, rh] = ["x", "y", "width", "height"].map((k) => Number(getAttr(rect, k)));
+      const flipped = getAttr(rect, "transform").includes("scale(1,-1)");
+      const top = flipped ? -(ry! + rh!) : ry!;
+      expect(rx!).toBeLessThanOrEqual(box.x);
+      expect(rx! + rw!).toBeGreaterThanOrEqual(box.x + box.w);
+      expect(top).toBeLessThanOrEqual(box.y);
+      expect(top + rh!).toBeGreaterThanOrEqual(box.y + box.h);
+      // Every line inside title-safe: 5 % in from every edge.
+      for (const field of titleFields(svg).filter((f) => f.text.trim())) {
+        const half = estimatedTextWidth(field.text.trim(), field.fontSize!, isBold(field)) / (field.anchor === "middle" ? 2 : 1);
+        const left = field.anchor === "middle" ? field.x! - half : field.anchor === "end" ? field.x! - 2 * half : field.x!;
+        const a = box.at(left, field.y!);
+        const b = box.at(left + (field.anchor === "middle" ? 2 * half : half * (field.anchor === "end" ? 2 : 1)), field.y!);
+        expect(a.x, `${template} ${field.text}`).toBeGreaterThanOrEqual(0.05);
+        expect(b.x, `${template} ${field.text}`).toBeLessThanOrEqual(0.95);
+        expect(a.y, `${template} ${field.text}`).toBeGreaterThanOrEqual(0.05);
+        expect(a.y, `${template} ${field.text}`).toBeLessThanOrEqual(0.95);
+      }
+    }
+  });
+
+  it("keeps a footer low and a header high on 9:16, clear of the platform UI, and 16:9 titles untouched", async () => {
+    const h = host();
+    const doc = frameDoc(1080, 1920);
+    const footer = written(h, await call(doc, h, "add_title_tool", { template: "Footer_1", text: "Low" }));
+    const header = written(h, await call(doc, h, "add_title_tool", { template: "Header_2", text: "High", position_seconds: "6" }));
+    const low = titleFields(footer)[0]!;
+    const high = titleFields(header)[0]!;
+    expect(framing(footer).at(low.x!, low.y!).y).toBeGreaterThan(0.6);
+    // The desktop lifts a bottom title by 12 % of the frame (titles.ts VERTICAL_SAFE_OFFSET).
+    expect(framing(footer).at(low.x!, low.y!).y).toBeLessThan(0.88);
+    expect(framing(header).at(high.x!, high.y!).y).toBeLessThan(0.3);
+    expect(framing(header).at(high.x!, high.y!).y).toBeGreaterThan(0.08);
+    const flat = written(h, await call(newDoc(), h, "add_title_tool", { template: "Standard_1", text: "Wide" }));
+    expect([getAttr(flat.root, "width"), getAttr(flat.root, "height"), getAttr(flat.root, "viewBox")]).toEqual(["1920", "1080", ""]);
+  });
+
+  it("edit_title_tool fits new text to a reshaped title's whole artboard", async () => {
+    const h = host();
+    const doc = frameDoc(1440, 1080);
+    const r = await call(doc, h, "add_title_tool", { template: "Standard_1", text: "Short", background_color: "#101114" });
+    const long = "A longer line than this frame holds";
+    const e = await call(doc, h, "edit_title_tool", { timeline_clip_id: String(data(r).timeline_clip_id), text: long });
+    expect(e.status, e.summary).toBe("applied");
+    const shrunk = Object.values(data(e).text_shrunk_to_fit as Record<string, number>);
+    expect(shrunk.every((ratio) => ratio > 0.35 && ratio < 1)).toBe(true);
+    const svg = written(h, e);
+    const box = framing(svg);
+    const field = titleFields(svg)[0]!;
+    const width = estimatedTextWidth(long, field.fontSize!, isBold(field));
+    // Inside title-safe, not just the artboard.
+    expect(box.at(field.x! - width / 2, 0).x).toBeGreaterThanOrEqual(0.05);
+    expect(box.at(field.x! + width / 2, 0).x).toBeLessThanOrEqual(0.95);
   });
 });

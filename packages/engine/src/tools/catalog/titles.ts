@@ -10,6 +10,10 @@
  * free track above the picture (a new "Titles" track on top when none is
  * free), anchored where the template's text sits (or `screen_position`),
  * lifted clear of the platform UI on vertical video, with optional fades.
+ * On a frame that is not 16:9 the artboard grows to the frame's aspect
+ * around the drawing (titles/artboard.ts), with the anchor and the lift
+ * baked in, so a card with a background fills the frame instead of showing
+ * bars (a Zenvi rule the desktop's add_title does not have yet).
  * One undo step adds the file and the clip.
  *
  * Templates are the 50 bundled SVGs (`ToolHost.assets`); the desktop also
@@ -24,6 +28,7 @@
 import { pyRound } from "../../model/rounding.js";
 import { addFile } from "../../ops/files.js";
 import { placeOverlayClip } from "../../ops/overlays.js";
+import { fitArtboardToFrame, type ArtboardPlacement } from "../../titles/artboard.js";
 import { getTitleTemplate, suggestTitleTemplates } from "../../titles/templates.js";
 import {
   artboardSize,
@@ -47,6 +52,7 @@ import {
   guarded,
   installedFontFamilies,
   isVertical,
+  projectSize,
   planOverlayTrack,
   pyRoundTo,
   snapToFrame,
@@ -78,6 +84,12 @@ const ZONE_POSITION: Readonly<Record<"top" | "center" | "bottom", ScreenPosition
  * least 1.6 times as tall as wide), so the two are not shared.
  */
 const VERTICAL_SAFE_OFFSET: Readonly<Partial<Record<ScreenPosition, number>>> = { bottom_center: -0.12, top_center: 0.06 };
+
+/** Where Best Fit and `posKey`'s gravity put the artboard on the frame. */
+function placementOf(posKey: ScreenPosition, lift: number): ArtboardPlacement {
+  const [v, h = "center"] = posKey === "center" ? ["center"] : posKey.split("_");
+  return { v: v as ArtboardPlacement["v"], h: h as ArtboardPlacement["h"], lift };
+}
 
 function basename(path: string): string {
   return String(path ?? "").split(/[\\/]/).pop() ?? "";
@@ -172,11 +184,13 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
 
   for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index)!);
   const styleInfo = style.apply(doc, families);
-  const fitted = style.fit(doc, slots);
   const zone = textZone(slots, artboardSize(doc)[1]);
   const wanted = input.screen_position ?? "auto";
   const posKey: ScreenPosition = ZONE_POSITION[wanted === "auto" ? zone : wanted] ?? "center";
   const lift = isVertical(project) ? (VERTICAL_SAFE_OFFSET[posKey] ?? 0) : 0;
+  const [frameW, frameH] = projectSize(project);
+  const reshaped = fitArtboardToFrame(doc, { width: frameW, height: frameH }, placementOf(posKey, lift));
+  const fitted = style.fit(doc, slots);
 
   const firstText = slots.map((s) => values.get(s.index) ?? "").find((v) => v.trim()) || name;
   const fileName = uniqueTitleName(text(input.file_name) || firstText, taken);
@@ -188,7 +202,8 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
     const { layer, created } = planOverlayTrack(tx.project, position, end, track);
     const file = addFile(tx, media, { mediaType: "image" });
     const props: Record<string, unknown> = { gravity: GRAVITY[posKey] };
-    if (lift) props.location_y = constantKeyframe(lift);
+    // A title fitted to the frame carries its lift in its viewBox.
+    if (lift && !reshaped) props.location_y = constantKeyframe(lift);
     const alpha = fadeAlpha(tx.project, 0, duration, fadeIn, fadeOut);
     if (alpha) props.alpha = alpha;
     const clip = placeOverlayClip(tx, { fileId: file.id, position, duration, layer, newTrackLabel: "Titles", props });
