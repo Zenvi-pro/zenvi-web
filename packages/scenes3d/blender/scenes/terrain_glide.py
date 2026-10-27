@@ -162,7 +162,6 @@ def sky_world(look, sun_dir, ambient=1.0):
     sun, a soft sun glow; below the horizon the haze colour (the ground
     hides it). Also lights the field (ambient)."""
     world = bpy.context.scene.world
-    world.use_nodes = True
     tree = world.node_tree
     tree.nodes.clear()
     out = tree.nodes.new("ShaderNodeOutputWorld")
