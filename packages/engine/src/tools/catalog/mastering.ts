@@ -267,6 +267,7 @@ export const masteringTools: CatalogTool[] = [
       "dialogue anchors the mix, music sits under it and ducks while someone talks, SFX stay over the bed. " +
       "Writes clip volume and Compressor makeup gain only (the desktop plays the same mix), one undo step, and returns the before/after loudness. " +
       "Presets: social -14 LUFS / -1 dBTP, broadcast -23, podcast -16. Run it LAST, after the edit, music and sound design are in place; running it again changes nothing. " +
+        "iterate=true (with genre) first runs analyze_mix_tool's loop (duck the bed to 10 dB under the voice, fix levels, timing, masking: its top fixes, re-scored, up to 3 rounds) and then masters, all one undo step: the best finishing call. " +
       "If the mix cannot reach the target without exceeding the true-peak ceiling it stops at the ceiling and says so; exporting with loudness normalisation closes the gap. " +
       "dry_run=true measures and plans without changing anything. Refuses timelines with no audible audio.",
     input,
@@ -428,7 +429,11 @@ export const masteringTools: CatalogTool[] = [
         try {
           const { score } = await measureMix(call, call.doc.project, args.genre);
           data.score = { score: score.score, rawScore: score.rawScore, gatesFailed: score.gatesFailed, topFixes: score.topFixes.map((f) => ({ metric: f.metric, fix: f.text, calls: f.calls })) };
-          notes.push(`Sound Score ${score.score}/100${score.gatesFailed.length ? ` (gate failed: ${score.gatesFailed.join(", ")})` : ""}; next: ${score.topFixes[0]?.text ?? "nothing to fix"}.`);
+          const fix = score.topFixes.find((f) => f.metric !== "L1_integrated");
+          notes.push(
+            `Sound Score ${score.score}/100${score.gatesFailed.length ? ` (gate failed: ${score.gatesFailed.join(", ")})` : ""}` +
+              (fix && (score.score ?? 0) < 85 ? `; biggest gap: ${fix.text}. master_audio_tool iterate=true applies the fixes and masters again in one step (an edit after mastering unmasters the mix).` : "."),
+          );
         } catch (error) {
           warnings.push(`The Sound Score could not be measured (${error instanceof Error ? error.message : String(error)}).`);
         }
