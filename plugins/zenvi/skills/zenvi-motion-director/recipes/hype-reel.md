@@ -49,7 +49,8 @@ fixing single shots after it.
    `duration_seconds` 1-2, with `beats`; never across the drop.
 5. Treated hero shot (CLI): `subject_glow_tool` `look: "thermal"` or
    `replace_background_tool` `background: "color"`; else a contrasty LUT on
-   that clip only (`apply_look_tool` `look_id: "noir_era"`).
+   that clip only (`apply_look_tool` `look_id: "chrome"` for a solarized
+   chrome rider, `"solarize"` on a flash frame, or `"noir_era"`).
 6. Look: already done by `build_reel_tool` (`data.grade`). Another look:
    rebuild with `grade` set to a LUT id (`"heroic_cinema"`); only for an
    edit cut by hand run `unify_grade_tool` with `look`, leaving out the

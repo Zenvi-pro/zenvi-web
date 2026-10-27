@@ -18,29 +18,31 @@ const smooth = (x: number) => {
   return t * t * (3 - 2 * t);
 };
 
-/**
- * Sabattier solarisation: each channel rises to white above mid-grey and
- * folds back down in the highlights, so bright areas print as negatives with
- * colour fringes where channels cross (the "solarized flash" of hype reels).
- */
-export function solarizeLut(): string {
-  // Peaks at 0.625 and folds white down to 0.59, not black: saturated colours keep a fringe, not a hole.
-  const fold = (x: number) => Math.sin(0.8 * Math.PI * clamp01(x));
-  return cubeLut("Zenvi solarize", 33, (r, g, b) => [fold(r), fold(g), fold(b)]);
+/** Rises to white at `peak`, then folds straight down to `floor` at white: the tone reversal of a solarised print. */
+function fold(x: number, peak: number, floor: number): number {
+  const t = clamp01(x);
+  return t <= peak ? Math.pow(t / peak, 0.85) : 1 - (1 - floor) * ((t - peak) / (1 - peak));
 }
 
 /**
- * Chrome / silver: monochrome with a hard metallic curve, the top of the
- * range folded back down (a partial solarise reads as polished metal) and a
- * cold blue-steel cast.
+ * Sabattier solarisation: each channel rises to white just under mid-grey
+ * and folds back down above it, so everything brighter than a shadow prints
+ * as a negative with colour fringes where channels cross (the "solarized
+ * flash" of hype reels). The fold sits low so night footage reverses too;
+ * white lands at 0.2, not black, so saturated colours keep a fringe.
+ */
+export function solarizeLut(): string {
+  return cubeLut("Zenvi solarize", 33, (r, g, b) => [fold(r, 0.45, 0.2), fold(g, 0.45, 0.2), fold(b, 0.45, 0.2)]);
+}
+
+/**
+ * Chrome / silver: monochrome with a hard contrast curve folded back down
+ * above the lower mids (a solarised monochrome reads as polished metal) and
+ * a cold blue-steel cast.
  */
 export function chromeLut(): string {
   return cubeLut("Zenvi chrome", 33, (r, g, b) => {
-    const l = luma(r, g, b);
-    // Contrast S, then highlights above 0.72 fold down to a sheen.
-    const s = smooth((l - 0.06) / 0.8);
-    const v = l < 0.72 ? s : mix(s, 1 - (l - 0.72) * 1.9, smooth((l - 0.72) / 0.12));
-    const c = clamp01(v);
+    const c = fold(smooth((luma(r, g, b) - 0.03) / 0.9), 0.42, 0.12);
     return [clamp01(c * 0.94 + 0.01), clamp01(c * 0.98 + 0.015), clamp01(c * 1.04 + 0.03)];
   });
 }

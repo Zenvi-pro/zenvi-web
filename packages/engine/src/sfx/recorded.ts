@@ -85,9 +85,16 @@ export function recordedMaxSeconds(group: RecordedGroup, cueSeconds: number | un
   return SUSTAINED.has(group) && cueSeconds !== undefined ? Math.max(0.1, Math.min(max, cueSeconds)) : max;
 }
 
-/** Sounds that suit a cue `wanted` seconds long: a 2 s whoosh under a 0.3 s cut drowns the next one. At least two, for variety. */
-function fitting(samples: readonly RecordedSample[], wanted: number | undefined): RecordedSample[] {
-  if (wanted === undefined) return [...samples];
+/** Groups whose sound peaks mid-file, so a long one cannot be cut to a short cue (a hit keeps its start, a riser its end). */
+const PEAKING: ReadonlySet<RecordedGroup> = new Set(["whoosh", "swish", "whip"]);
+
+/**
+ * Sounds that suit a cue `wanted` seconds long: a 2 s whoosh under a 0.3 s
+ * cut drowns the next one. Hits, clicks and risers are cut to length, so
+ * every one fits (the whole group rotates). At least two, for variety.
+ */
+function fitting(group: RecordedGroup, samples: readonly RecordedSample[], wanted: number | undefined): RecordedSample[] {
+  if (wanted === undefined || !PEAKING.has(group)) return [...samples];
   const fit = samples.filter((s) => s.duration <= wanted * 1.8 + 0.15);
   if (fit.length >= 2) return fit;
   return [...samples].sort((a, b) => a.duration - b.duration || a.id - b.id).slice(0, Math.min(3, samples.length));
@@ -125,7 +132,7 @@ export function pickRecorded(requests: readonly RecordedRequest[], seed: number,
   return requests.map((request) => {
     const group = recordedGroupOf(request.recipe);
     if (!group) return undefined;
-    const order = shuffled(fitting(recordedSamples(group, kit), request.seconds), groupSeed(seed, group));
+    const order = shuffled(fitting(group, recordedSamples(group, kit), request.seconds), groupSeed(seed, group));
     if (order.length === 0) return undefined;
     let turn = turns.get(group) ?? 0;
     let pick = order[turn % order.length]!;
@@ -145,7 +152,7 @@ export function pickRecorded(requests: readonly RecordedRequest[], seed: number,
 export function pickRecordedOne(request: RecordedRequest, seed: number, placed: number, neighbours: readonly number[], kit: readonly RecordedSample[] = RECORDED_KIT): RecordedSample | undefined {
   const group = recordedGroupOf(request.recipe);
   if (!group) return undefined;
-  const order = shuffled(fitting(recordedSamples(group, kit), request.seconds), groupSeed(seed, group));
+  const order = shuffled(fitting(group, recordedSamples(group, kit), request.seconds), groupSeed(seed, group));
   for (let k = 0; k < order.length; k += 1) {
     const pick = order[(placed + k) % order.length]!;
     if (!neighbours.includes(pick.id)) return pick;

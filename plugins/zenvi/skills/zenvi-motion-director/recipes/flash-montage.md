@@ -57,7 +57,11 @@ match_cut_montage_tool {"file_ids": ["<shell>", "<galaxy>", "<ear>", "<hurricane
    dark one stop jumping at 4 frames a shot; then grain only:
    `apply_look_tool` `all_clips: true`, `look_id: "grain:35mm_gritty"`; then a glow:
    `add_effect_tool` `effect: "Glow"` `scope: "all"` (check the frame: bloom
-   on highlights, not a white wash).
+   on highlights, not a white wash). Dark pieces with one accent colour per
+   shot: `apply_look_tool` per clip with `look_id: "accent #rrggbb"` (or
+   `accent_red`, `accent_cyan`...); a centred object on black:
+   `add_shape_mask_tool` `shape: "ellipse"`, `feather: 0.15`, then
+   `add_vignette_tool` `amount: 0.5`.
 5. End title (1-2 words): `add_title_tool` `text: "THE END"`, `font: "Instrument Serif"` (or `"Anton"` for a harder edit),
    `font_scale: 1.6`, `fade_in_seconds: 0.4`, plus `add_effect_tool` Glow on
    that clip. Or `add_motion_block_tool` `block: "kinetic_headline"` with

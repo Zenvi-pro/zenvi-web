@@ -31,18 +31,23 @@ const clipIds = z
   .min(1)
   .max(500)
   .optional()
-  .describe("Timeline clip ids (describe_project_tool or a receipt). Default: every video and image clip on an unlocked track.");
+  .describe("Timeline clip ids (describe_project_tool or a receipt). Default: every footage and photo clip on an unlocked track (not titles).");
 
 function isVisual(project: Project, clip: Clip): boolean {
   const file = fileById(project, String(clip.file_id));
   return file !== undefined && !isAudioOnlyMedia(file);
 }
 
+/** Footage and photos: not titles, stickers or generated layers (SVGs), which a look would dim along with the picture. */
+function isFootage(project: Project, clip: Clip): boolean {
+  return isVisual(project, clip) && !/\.svg$/i.test(String(fileById(project, String(clip.file_id))?.path ?? ""));
+}
+
 /** The clips a call works on: the ones named (each checked), else every visual clip on an unlocked track. */
 function targets(project: Project, ids: readonly string[] | undefined): Clip[] {
   if (!ids) {
-    const all = project.clips.filter((c) => isVisual(project, c) && !isLocked(project, c.layer));
-    if (all.length === 0) toolError("the timeline has no video or image clips on unlocked tracks");
+    const all = project.clips.filter((c) => isFootage(project, c) && !isLocked(project, c.layer));
+    if (all.length === 0) toolError("the timeline has no footage or photo clips on unlocked tracks");
     return all;
   }
   return [...new Set(ids)].map((id) => {
@@ -142,7 +147,7 @@ export const lookMaskTools: CatalogTool[] = [
     title: "Vignette",
     description:
       "Darken the edges of clips, the cinematic vignette: a Brightness effect masked by a soft oval falloff the shape of the frame. amount sets how dark the corners get, feather how gradual. " +
-      "Default: every video and image clip. Running it again updates the vignette; amount=0 removes it. One undo step.",
+      "Default: every footage and photo clip (not titles). Running it again updates the vignette; amount=0 removes it. One undo step.",
     input: vignetteInput,
     annotations: EDIT,
     run: (call, input: z.infer<typeof vignetteInput>) =>
@@ -171,7 +176,7 @@ export const lookMaskTools: CatalogTool[] = [
     name: "add_shape_mask_tool",
     title: "Shape mask",
     description:
-      "Mask clips to a feathered rectangle or ellipse (the inside shows, or the outside with outside=true): a frame within the frame, a soft spotlight, a split-screen strip, a window for the clip below. " +
+      "Mask clips to a feathered rectangle or ellipse (the inside shows, or the outside with outside=true): a radial mask isolating a centred object on black, a frame within the frame, a soft spotlight, a split-screen strip, a window for the clip below. " +
       "keyframes animate the edge (grow it from nothing for an iris or box reveal, soften it); the feather and size keyframe on the Mask effect, no new image. Running it again replaces the clip's shape mask; remove=true takes it off. One undo step.",
     input: shapeInput,
     annotations: EDIT,

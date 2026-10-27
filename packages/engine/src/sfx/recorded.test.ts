@@ -38,6 +38,9 @@ describe("the recorded kit", () => {
     const short = pickRecorded(Array.from({ length: 10 }, () => ({ recipe: "whoosh_short", seconds: 0.3 })), 1);
     expect(short.every((p) => p!.duration <= 0.3 * 1.8 + 0.15)).toBe(true);
     expect(pickRecorded([{ recipe: "sub_drop" }], 1)).toEqual([undefined]);
+    // Hits are cut to length: a short cue still rotates through every punch.
+    const punches = pickRecorded(Array.from({ length: 16 }, () => ({ recipe: "impact_punch", seconds: 0.3 })), 1);
+    expect(new Set(punches.map((p) => p!.id)).size).toBe(8);
     expect(recordedMaxSeconds("riser", 2)).toBe(2);
     expect(recordedMaxSeconds("whoosh", 0.3)).toBe(RECORDED_GROUP_SPECS.whoosh.maxSeconds);
   });

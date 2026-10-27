@@ -16,11 +16,12 @@ describe("look LUTs", () => {
     for (const cube of [solarizeLut(), chromeLut(), bleachBypassLut(), duotoneLut("#14123b", "#ffc845"), accentLut(0)]) expect(parseCubeLut(cube)).not.toBeNull();
   });
 
-  it("solarize folds: black stays black, the highlights fold down below a bright upper-mid", () => {
+  it("solarize folds: black stays black, everything above the lower mids reverses, white lands dark", () => {
     const cube = solarizeLut();
     expect(at(cube, [0, 0, 0])[0]).toBeLessThan(0.02);
-    expect(at(cube, [1, 1, 1])[0]).toBeLessThan(0.62);
-    expect(at(cube, [0.625, 0.625, 0.625])[0]).toBeGreaterThan(0.99);
+    expect(at(cube, [1, 1, 1])[0]).toBeLessThan(0.25);
+    expect(at(cube, [0.45, 0.45, 0.45])[0]).toBeGreaterThan(0.97);
+    expect(at(cube, [0.75, 0.75, 0.75])[0]).toBeLessThan(at(cube, [0.5, 0.5, 0.5])[0]!);
   });
 
   it("chrome is monochrome with a cold cast and folded highlights", () => {

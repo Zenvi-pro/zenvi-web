@@ -3937,13 +3937,13 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `clip_ids` | string[] |  | Timeline clip ids (describe_project_tool or a receipt). Default: every video and image clip on an unlocked track. |
+| `clip_ids` | string[] |  | Timeline clip ids (describe_project_tool or a receipt). Default: every footage and photo clip on an unlocked track (not titles). |
 | `amount` | number |  | How dark the corners get, 0-1 (default 0.4; 0 removes the vignette). (min 0, max 1) |
 | `feather` | number |  | 0 = the falloff starts late and is quick, 1 = it starts near the centre and is gentle (default 0.5). (min 0, max 1) |
 
 ### add_shape_mask_tool
 
-**Shape mask** (direct tool). Mask clips to a feathered rectangle or ellipse (the inside shows, or the outside with outside=true): a frame within the frame, a soft spotlight, a split-screen strip, a window for the clip below.
+**Shape mask** (direct tool). Mask clips to a feathered rectangle or ellipse (the inside shows, or the outside with outside=true): a radial mask isolating a centred object on black, a frame within the frame, a soft spotlight, a split-screen strip, a window for the clip below.
 
 Surfaces: mcp, cli, editor. edits.
 
@@ -3951,7 +3951,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `clip_ids` | string[] |  | Timeline clip ids (describe_project_tool or a receipt). Default: every video and image clip on an unlocked track. |
+| `clip_ids` | string[] |  | Timeline clip ids (describe_project_tool or a receipt). Default: every footage and photo clip on an unlocked track (not titles). |
 | `shape` | "rectangle" \| "ellipse" |  | rectangle (default) or ellipse. |
 | `x` | number |  | Centre, 0-1 of the frame width (default 0.5). (min -0.5, max 1.5) |
 | `y` | number |  | Centre, 0-1 of the frame height (default 0.5). (min -0.5, max 1.5) |
