@@ -5,7 +5,7 @@
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -42,6 +42,23 @@ describe.skipIf(!blender || !hasFfmpeg)("Blender smoke", () => {
       expect(probe(first.path)).toMatchObject({ pix_fmt: expect.stringMatching(/^yuva444p1[02]le$/), width: 64, height: 112 });
       const again = await renderer.render(request);
       expect(again).toMatchObject({ path: first.path, cached: true, fingerprint: first.fingerprint });
+    } finally {
+      renderer.close();
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("a failed encode leaves no partial movie in the cache", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "zenvi-scenes3d-smoke-"));
+    // Writes its output (the last argument), then fails, like an ffmpeg that dies mid-encode.
+    const ffmpeg = path.join(root, "bad-ffmpeg");
+    await writeFile(ffmpeg, '#!/bin/sh\nfor a; do out="$a"; done\necho half > "$out"\nexit 1\n');
+    await chmod(ffmpeg, 0o755);
+    const renderer = createScene3dRenderer({ blender: blender!, cacheDir: root, tempDir: root, ffmpeg, resolveMedia: (p) => p });
+    try {
+      const parsed = parseScene3dParams("title_3d", { text: "Hi" });
+      if (!parsed.ok) throw new Error(parsed.error);
+      await expect(renderer.render({ scene: "title_3d", params: parsed.params, width: 64, height: 64, fps: { num: 30, den: 1 }, frames: 2, quality: "draft", media: {} })).rejects.toThrow();
+      expect(await readdir(path.join(root, "scenes3d"))).toEqual([]);
     } finally {
       renderer.close();
     }

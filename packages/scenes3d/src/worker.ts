@@ -95,6 +95,11 @@ export class BlenderWorker {
     if (this.idle) clearTimeout(this.idle);
     if (this.child && this.jobs >= (this.options.maxJobs ?? 25)) this.stop(undefined);
     const blender = await this.start();
+    // A cold start takes seconds: a cancel in that time has no listener yet.
+    if (options.signal?.aborted) {
+      this.armIdle();
+      throw new Error("Cancelled.");
+    }
     this.jobs += 1;
     const child = this.child!;
     // Keep Node alive while Blender works for us; an idle worker never does.

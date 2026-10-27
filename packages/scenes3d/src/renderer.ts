@@ -132,6 +132,7 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
       }
       await mkdir(cache, { recursive: true });
       const framesDir = await mkdtemp(path.join(options.tempDir ?? tmpdir(), "zenvi-scenes3d-"));
+      const partial = path.join(cache, `.${fp}.${process.pid}.partial${path.extname(output)}`);
       try {
         const job: BlenderJob = {
           id: randomUUID(),
@@ -154,7 +155,6 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         });
         if (transparent !== (done.backdrop === null)) throw new Error("the scene script and the request disagree about the backdrop");
         request.onProgress?.(0.9, "encoding");
-        const partial = path.join(cache, `.${fp}.${process.pid}.partial${path.extname(output)}`);
         await run(ffmpeg, encodeArgs({ framesDir, fps: request.fps, backdrop: done.backdrop, output: partial, quality: request.quality }), request.signal);
         if (!(await stat(partial)).size) throw new Error("ffmpeg wrote an empty movie");
         const meta: CacheMeta = { codec, width: size.width, height: size.height, fps: { ...request.fps }, frames: request.frames, renderedAt: new Date().toISOString(), blender: done.blender };
@@ -164,6 +164,8 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         options.log?.(`zenvi3d: ${request.scene} ${request.quality} ${size.width}x${size.height}x${request.frames} build ${done.buildSeconds}s render ${done.renderSeconds}s total ${((Date.now() - started) / 1000).toFixed(1)}s`);
         return { path: output, ...meta, fingerprint: fp, cached: false, seconds: (Date.now() - started) / 1000 };
       } finally {
+        // A failed or cancelled encode leaves no half-written movie in the cache (after the rename there is none).
+        await rm(partial, { force: true });
         await rm(framesDir, { recursive: true, force: true });
       }
     },
