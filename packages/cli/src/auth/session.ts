@@ -21,6 +21,23 @@ export interface WhoAmI {
   expired?: boolean;
 }
 
+/** One thing the current sign-in does or does not enable. */
+export interface Feature {
+  name: string;
+  enabled: boolean;
+  /** What to do to get it, when it is off. */
+  fix?: string;
+}
+
+/** Why the Zenvi backend refuses a personal token, in words for a person or an agent. */
+export const PAT_BACKEND_MESSAGE =
+  "AI generation, voice and search run on the Zenvi backend, which does not accept personal tokens (zvn_…). Sign in with `zenvi login` (browser) to use them.";
+
+/** A JWT has three dot-separated base64url parts; a personal token does not. */
+function looksLikeJwt(token: string): boolean {
+  return /^[\w-]+\.[\w-]+\.[\w-]*$/.test(token);
+}
+
 /** Refresh a Supabase session this many seconds before it expires. */
 const REFRESH_MARGIN_S = 60;
 
@@ -92,6 +109,35 @@ export class Auth {
   async backendToken(): Promise<string | undefined> {
     const auth = await this.fresh();
     return auth?.kind === "supabase" ? auth.access_token : undefined;
+  }
+
+  /**
+   * Why the Zenvi backend cannot be called with the stored sign-in, or
+   * undefined. Signed out is not blocked here: the backend answers that
+   * itself (and a few of its routes are open).
+   */
+  async backendUnavailable(): Promise<string | undefined> {
+    const auth = await this.current();
+    if (!auth) return undefined;
+    if (auth.kind === "pat") return PAT_BACKEND_MESSAGE;
+    if (!looksLikeJwt(auth.access_token)) return "The stored Zenvi sign-in is not a session token. Sign in again with `zenvi login`.";
+    return undefined;
+  }
+
+  /** What the current sign-in enables, for `mcp_health` and `zenvi whoami`. */
+  async features(): Promise<Feature[]> {
+    const who = await this.whoami();
+    const signIn = who.expired ? "The sign-in expired: run `zenvi login`." : "Run `zenvi login`.";
+    const signedIn = who.loggedIn;
+    const backendFix = signedIn ? await this.backendUnavailable() : signIn;
+    const off = (fix: string | undefined) => ({ enabled: fix === undefined, ...(fix ? { fix } : {}) });
+    return [
+      { name: "Local editing and rendering", enabled: true },
+      { name: "Zenvi Cloud (push, pull, share links)", ...off(signedIn ? undefined : signIn) },
+      { name: "AI image and video generation", ...off(backendFix) },
+      { name: "AI voice (text to speech)", ...off(backendFix) },
+      { name: "Speech recognition and media search", ...off(backendFix) },
+    ];
   }
 
   async whoami(): Promise<WhoAmI> {

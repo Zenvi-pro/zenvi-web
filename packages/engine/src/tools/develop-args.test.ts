@@ -116,6 +116,13 @@ describe("delete_from_timeline_tool ripple", () => {
     await runTool({ doc, host: fakeHost() }, "delete_from_timeline_tool", { timeline_clip_id: IDS.clipB });
     expect(clip(doc, IDS.clipTail).position).toBe(15);
   });
+
+  it("refuses clip_id (not in the desktop's schema) and names timeline_clip_id", async () => {
+    const doc = fixtureDoc();
+    const text = await summary(doc, fakeHost(), "delete_from_timeline_tool", { clip_id: IDS.clipB });
+    expect(text).toMatch(/^Error: Invalid arguments for delete_from_timeline_tool: .*'clip_id' was unexpected.* pass 'timeline_clip_id' instead of 'clip_id'\.$/);
+    expect(doc.undoLabels).toHaveLength(0);
+  });
 });
 
 describe("import_files_tool", () => {

@@ -60,8 +60,9 @@ export function registerAccountCommands(program: Command, ctx: CommandContext): 
     .description("show who you are signed in as")
     .action(async () => {
       const who = await ctx.auth.whoami();
+      const features = await ctx.auth.features();
       if (ctx.out.json) {
-        ctx.out.data({ status: "applied", ...who });
+        ctx.out.data({ status: "applied", ...who, features });
         return;
       }
       if (!who.loggedIn) {
@@ -70,6 +71,9 @@ export function registerAccountCommands(program: Command, ctx: CommandContext): 
         return;
       }
       ctx.out.line(`${who.email ?? who.userId ?? "Signed in"} ${ctx.out.style(`(${who.kind === "pat" ? "personal token: Zenvi Cloud" : "Zenvi account"})`, "dim")}`);
+      // A personal token cannot use the backend's AI features: say so now, not on the first failed call.
+      const off = features.filter((f) => !f.enabled);
+      if (off.length > 0) ctx.out.line(ctx.out.style(`Off with this sign-in: ${off.map((f) => f.name).join("; ")}. ${off[0]!.fix}`, "dim"));
     });
 
   program

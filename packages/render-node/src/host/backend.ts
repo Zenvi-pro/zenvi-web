@@ -22,6 +22,14 @@ export interface BackendHostOptions {
   baseUrl: string;
   /** Current access token, refreshed by the caller; undefined when signed out. */
   token?: () => Promise<string | undefined>;
+  /**
+   * Why the backend cannot be used with the current sign-in (e.g. a personal
+   * token, which only Zenvi Cloud accepts), or undefined. When set, requests
+   * go out without a token (the backend's open routes, like stock search,
+   * still work) and a 401/403 is reported with this reason instead of the
+   * backend's words; speech uploads are refused before anything is sent.
+   */
+  unavailable?: () => Promise<string | undefined>;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   /** Speech uploads wait this long for the transcription (default 10 minutes). */
@@ -48,10 +56,11 @@ export function createBackendHost(options: BackendHostOptions): BackendHost {
   return {
     baseUrl: base,
     async request<T = unknown>(requestPath: string, init: { method?: string; body?: unknown; signal?: AbortSignal } = {}): Promise<T> {
+      const blocked = await options.unavailable?.();
       const url = `${base}${requestPath.startsWith("/") ? requestPath : `/${requestPath}`}`;
       const headers: Record<string, string> = { Accept: "application/json" };
       if (options.userAgent) headers["User-Agent"] = options.userAgent;
-      const token = await options.token?.();
+      const token = blocked ? undefined : await options.token?.();
       if (token) headers.Authorization = `Bearer ${token}`;
       let body: string | undefined;
       if (init.body !== undefined) {
@@ -77,6 +86,7 @@ export function createBackendHost(options: BackendHostOptions): BackendHost {
         }
       }
       if (!response.ok) {
+        if (blocked && (response.status === 401 || response.status === 403)) throw new BackendError(blocked, response.status, parsed);
         const hint = response.status === 401 || response.status === 403 ? " Sign in with `zenvi login`." : "";
         throw new BackendError(`Zenvi backend ${response.status}: ${detail(parsed, response.statusText).replace(/\.$/, "")}.${hint}`, response.status, parsed);
       }
@@ -94,6 +104,8 @@ export function backendSpeechUpload(options: BackendHostOptions): SpeechUpload {
   const base = options.baseUrl.replace(/\/+$/, "");
   const doFetch = options.fetchImpl ?? fetch;
   return async (piece, fields) => {
+    const blocked = await options.unavailable?.();
+    if (blocked) throw new TranscriptionError("sign_in", blocked);
     const form = new FormData();
     form.append("file", new Blob([piece.bytes], { type: piece.contentType }), piece.fileName);
     if (fields.language) form.append("language", fields.language);
