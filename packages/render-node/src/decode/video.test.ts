@@ -9,6 +9,8 @@ import { encodePng } from "../image/png.js";
 import { createRgba } from "../image/rgba.js";
 import { makeTempDir, removeDir } from "../test-support/fixtures.js";
 import { decodeStill } from "./still.js";
+import type { FramePlan, Project } from "@zenvi/engine";
+import { SourceManager } from "./sources.js";
 import { VideoDecoder, videoDecodeArgs } from "./video.js";
 
 const exec = promisify(execFile);
@@ -186,5 +188,47 @@ describe("decodeStill", () => {
     const img = await decodeStill(path.join(dir, "blue.png"), { width: 20, height: 10 });
     expect([img.width, img.height]).toEqual([20, 10]);
     expect(Array.from(img.data.subarray(0, 4))).toEqual([0x33, 0x66, 0xcc, 255]);
+  });
+});
+
+describe("SourceManager", () => {
+  const plan = (clipId: string | null, k = 0): FramePlan =>
+    ({
+      frame: 1,
+      time: 0,
+      width: 64,
+      height: 48,
+      background: [0, 0, 0, 255],
+      layers: clipId
+        ? [{ clipId, drawWidth: 64, drawHeight: 48, masks: [], effects: [], source: { kind: "video", fileId: "F", path: numbered, frame: k + 1, time: k / 30 } }]
+        : [],
+    }) as unknown as FramePlan;
+
+  it("hands a clip's decoder to the next clip of the same file instead of starting ffmpeg and seeking again", async () => {
+    const project = { files: [{ id: "F", path: numbered, fps: { num: 30, den: 1 }, video_length: 60 }] } as unknown as Project;
+    const sources = new SourceManager(project, { resolveMedia: (p) => p });
+    const before = liveChildCount();
+    const shown: number[] = [];
+    const show = async (clip: string, k: number) => shown.push(frameNumber((await sources.prepare(plan(clip, k))).layers[0]!));
+    try {
+      // A shows source frames 0-9; B (warmed 4 frames before its cut, as a render does) 12-21.
+      for (let k = 0; k < 10; k += 1) {
+        if (k === 6) sources.warm(plan("B", 12), 4);
+        await show("A", k);
+      }
+      for (let k = 12; k < 22; k += 1) await show("B", k);
+      expect(liveChildCount() - before).toBe(1);
+      // Five frames without the file: B's decoder is parked, and C (30-35) takes it over.
+      for (let i = 0; i < 5; i += 1) await sources.prepare(plan(null));
+      for (let k = 30; k < 36; k += 1) await show("C", k);
+      expect(liveChildCount() - before).toBe(1);
+      // A clip behind the stream's position cannot read forward: it gets its own decoder.
+      await show("D", 5);
+      expect(liveChildCount() - before).toBe(2);
+      expect(shown).toEqual([...Array.from({ length: 10 }, (_, i) => i), ...Array.from({ length: 10 }, (_, i) => 12 + i), 30, 31, 32, 33, 34, 35, 5]);
+    } finally {
+      await sources.close();
+    }
+    expect(liveChildCount()).toBe(before);
   });
 });

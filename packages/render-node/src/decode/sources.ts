@@ -48,13 +48,32 @@ type VideoSource = Extract<LayerPlan["source"], { kind: "video" }>;
 
 interface DecoderEntry {
   decoder: Promise<VideoDecoder>;
+  /** The decoder once it is open (adoption needs its stream position now). */
+  ready?: VideoDecoder;
+  /** File, draw size and rotation: clips with the same one can share the decoder, one after another. */
+  fileKey: string;
+  /** Clips drawn with it, or about to be. */
+  clips: Set<string>;
   lastFrame: number;
   /** Started by `warm` and not drawn yet. */
   warming: boolean;
+  /** When it was parked (its clips ended), for the parking limit. */
+  parkedAt?: number;
 }
 
 /** Decoders `warm` may have started and not yet drawn, at most (each holds an ffmpeg child and a few frames). */
 const MAX_WARMING = 4;
+/** Decoders kept after their clip ended, for the next clip of the same file (each holds a paused ffmpeg child). */
+const MAX_PARKED = 6;
+/** Frames a parked decoder waits for a clip to take it over. */
+const PARK_FRAMES = 150;
+
+function closeEntry(entry: DecoderEntry): Promise<void> {
+  return entry.decoder.then(
+    (d) => d.close(),
+    () => undefined,
+  );
+}
 
 /** 0-based source frame index of a video layer: LayerSource.time is (k − 1) / reader fps for libopenshot source frame k. */
 function sourceIndex(source: VideoSource): number {
@@ -62,7 +81,9 @@ function sourceIndex(source: VideoSource): number {
 }
 
 export class SourceManager {
+  /** Per clip (and draw size); a decoder handed from one clip to the next is under both keys. */
   private readonly decoders = new Map<string, DecoderEntry>();
+  private readonly parked: DecoderEntry[] = [];
   private readonly audioReaders = new Map<string, { reader: AudioSampleReader; lastFrame: number }>();
   private readonly stills = new StillCache();
   private readonly resolved = new Map<string, Promise<string>>();
@@ -90,9 +111,13 @@ export class SourceManager {
   }
 
   private decoderKey(layer: LayerPlan, source: VideoSource): string {
+    return `${layer.clipId}\0${this.fileKey(layer, source)}`;
+  }
+
+  private fileKey(layer: LayerPlan, source: VideoSource): string {
     const width = Math.max(1, Math.round(layer.drawWidth));
     const height = Math.max(1, Math.round(layer.drawHeight));
-    return `${layer.clipId}\0${width}x${height}\0${source.applyRotation !== false ? 1 : 0}`;
+    return `${source.fileId}\0${source.path}\0${width}x${height}\0${source.applyRotation !== false ? 1 : 0}`;
   }
 
   private async openDecoder(layer: LayerPlan, source: VideoSource): Promise<VideoDecoder> {
@@ -114,39 +139,86 @@ export class SourceManager {
     return new VideoDecoder(info, { width, height }, { quality: this.options.quality, signal: this.options.signal });
   }
 
+  private newEntry(layer: LayerPlan, source: VideoSource, lastFrame: number, warming: boolean): DecoderEntry {
+    const entry: DecoderEntry = { decoder: this.openDecoder(layer, source), fileKey: this.fileKey(layer, source), clips: new Set([layer.clipId]), lastFrame, warming };
+    entry.decoder.then(
+      (d) => (entry.ready = d),
+      () => undefined,
+    );
+    return entry;
+  }
+
+  /**
+   * A decoder of the same file and size that can read forward to this
+   * clip's first frame instead of starting ffmpeg and seeking: a parked one
+   * (its clip ended), or, when warming, one whose clips are not in the frame
+   * the new clip starts in (they will have ended by then). Montages cut
+   * one source in order, so a shot usually starts a few frames after an
+   * earlier shot of the same file stopped. The pictures are the ones the
+   * decoder would give a single clip reading forward.
+   */
+  private adopt(layer: LayerPlan, source: VideoSource, inPlan?: ReadonlySet<string>): DecoderEntry | undefined {
+    const fileKey = this.fileKey(layer, source);
+    const target = sourceIndex(source);
+    const parked = this.parked.findIndex((e) => e.fileKey === fileKey && e.ready!.readsForwardTo(target));
+    let entry: DecoderEntry | undefined;
+    if (parked >= 0) {
+      entry = this.parked.splice(parked, 1)[0]!;
+      entry.parkedAt = undefined;
+    } else if (inPlan) {
+      for (const candidate of new Set(this.decoders.values())) {
+        if (candidate.fileKey !== fileKey || !candidate.ready?.readsForwardTo(target)) continue;
+        if ([...candidate.clips].some((clip) => inPlan.has(clip))) continue;
+        entry = candidate;
+        break;
+      }
+    }
+    if (!entry) return undefined;
+    entry.clips.add(layer.clipId);
+    return entry;
+  }
+
   private async videoFrame(layer: LayerPlan, source: VideoSource): Promise<RgbaImage> {
     const key = this.decoderKey(layer, source);
     let entry = this.decoders.get(key);
     if (!entry) {
-      entry = { decoder: this.openDecoder(layer, source), lastFrame: this.frameCounter, warming: false };
+      entry = this.adopt(layer, source) ?? this.newEntry(layer, source, this.frameCounter, false);
       this.decoders.set(key, entry);
     }
-    entry.lastFrame = this.frameCounter;
+    entry.lastFrame = Math.max(entry.lastFrame, this.frameCounter);
     entry.warming = false;
     return (await entry.decoder).frame(sourceIndex(source));
   }
 
   /**
-   * Start decoding the video layers of a frame that will be prepared in
-   * about `ahead` frames, at the source frame it shows, so a cut to a new
-   * clip does not wait for ffmpeg to start and seek. Clips already open are
-   * left alone (their decoder reads ahead on its own). Pictures are the same
-   * as without warming: the decoder just started earlier.
+   * Get the video layers of a frame that will be prepared in about `ahead`
+   * frames ready to decode, at the source frame each shows, so a cut to a
+   * new clip waits neither for ffmpeg to start nor for its seek: hand it a
+   * decoder of the same file that can read forward to it, else start one
+   * (at most 4 waiting). Clips already open are left alone (their decoder
+   * reads ahead on its own). Pictures are the same as without warming.
    */
   warm(plan: FramePlan, ahead: number): void {
     if (this.closed) return;
+    const inPlan = new Set(plan.layers.map((layer) => layer.clipId));
     for (const layer of plan.layers) {
       const source = layer.source;
       if (source.kind !== "video") continue;
       const key = this.decoderKey(layer, source);
       if (this.decoders.has(key)) continue;
+      const adopted = this.adopt(layer, source, inPlan);
+      if (adopted) {
+        adopted.lastFrame = Math.max(adopted.lastFrame, this.frameCounter + ahead);
+        this.decoders.set(key, adopted);
+        continue;
+      }
       let warming = 0;
       for (const entry of this.decoders.values()) if (entry.warming) warming += 1;
       if (warming >= MAX_WARMING) return;
-      const decoder = this.openDecoder(layer, source);
       // Kept from the idle sweep until it is due; a failure surfaces when the frame is prepared.
-      this.decoders.set(key, { decoder, lastFrame: this.frameCounter + ahead, warming: true });
-      decoder.then(
+      const entry = this.newEntry(layer, source, this.frameCounter + ahead, true);
+      this.decoders.set(key, entry);
+      entry.decoder.then(
         (d) => {
           if (!this.closed) d.prime(sourceIndex(source));
         },
@@ -269,11 +341,17 @@ export class SourceManager {
   /** Stop decoders whose clips have not been drawn recently. */
   private sweep(): void {
     const idle = this.options.idleFrames ?? 3;
+    const ended = new Set<DecoderEntry>();
     for (const [key, entry] of this.decoders) {
       if (this.frameCounter - entry.lastFrame > idle) {
-        void entry.decoder.then((d) => d.close(), () => undefined);
         this.decoders.delete(key);
+        ended.add(entry);
       }
+    }
+    const live = new Set(this.decoders.values());
+    for (const entry of ended) if (!live.has(entry)) this.park(entry);
+    for (let i = this.parked.length - 1; i >= 0; i -= 1) {
+      if (this.frameCounter - this.parked[i]!.parkedAt! > PARK_FRAMES) void closeEntry(this.parked.splice(i, 1)[0]!);
     }
     for (const [key, entry] of this.audioReaders) {
       if (this.frameCounter - entry.lastFrame > idle) {
@@ -283,17 +361,32 @@ export class SourceManager {
     }
   }
 
+  /** Keep an ended clip's decoder (paused, without its backward cache) for the next clip of its file. */
+  private park(entry: DecoderEntry): void {
+    if (!entry.ready) {
+      void closeEntry(entry);
+      return;
+    }
+    entry.ready.dropCache();
+    entry.clips.clear();
+    entry.warming = false;
+    entry.parkedAt = this.frameCounter;
+    this.parked.push(entry);
+    while (this.parked.length > MAX_PARKED) void closeEntry(this.parked.shift()!);
+  }
+
   get activeDecoders(): number {
     return this.decoders.size;
   }
 
   async close(): Promise<void> {
     this.closed = true;
-    const decoders = [...this.decoders.values()];
+    const decoders = new Set([...this.decoders.values(), ...this.parked]);
     const readers = [...this.audioReaders.values()];
     this.decoders.clear();
+    this.parked.length = 0;
     this.audioReaders.clear();
-    await Promise.all([...decoders.map((e) => e.decoder.then((d) => d.close(), () => undefined)), ...readers.map((e) => e.reader.close())]);
+    await Promise.all([...[...decoders].map(closeEntry), ...readers.map((e) => e.reader.close())]);
     this.stills.clear();
   }
 }

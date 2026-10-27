@@ -244,6 +244,21 @@ export class VideoDecoder {
   }
 
   /**
+   * Whether `frame(index)` would read forward on the running stream (no
+   * restart): what lets the next clip of the same file take this decoder
+   * over where the last one stopped.
+   */
+  readsForwardTo(index: number): boolean {
+    const target = this.clamp(index);
+    return this.stream !== undefined && !this.stream.done && target >= this.stream.position && target - this.stream.position <= this.maxSkip;
+  }
+
+  /** Drop the recent frames kept for backward steps (a decoder parked between clips needs none). */
+  dropCache(): void {
+    this.cache.clear();
+  }
+
+  /**
    * Start decoding at source frame `index` before it is asked for, so the
    * ffmpeg start-up and seek overlap other work (a render's next shots).
    * Does nothing once a stream is running.
