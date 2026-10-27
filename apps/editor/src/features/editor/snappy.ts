@@ -31,6 +31,8 @@ export interface SnappyOptions {
 
 const MASTER_TOOL = "master_audio_tool";
 const GRADE_TOOL = "unify_grade_tool";
+/** Frames the grade measures per shot: three still give a median that ignores a flash, and a 70-cut reel grades in the browser in well under a minute. */
+const GRADE_SAMPLES = 3;
 
 /** Sound design as dense as the transitions are loud: hype cuts get a sound on almost every cut, as in the reference reels. */
 const SOUND_FOR_STYLE: Record<MotionTransitionStyle, SfxIntensity> = { hype: "hype", cinematic: "normal" };
@@ -85,7 +87,7 @@ export async function makeItSnappy(project: () => Project, run: ToolRunner, opti
   // Measured before the transitions go on: their blur and zoom frames are not the shot's colour.
   const grade = editorToolState(GRADE_TOOL);
   if (!track) outcomes.push({ step: "grade", label: "Match the grade", status: "skipped", detail: "No sequence of shots to match.", undoSteps: 0 });
-  else if (grade.kind === "ready") await step("grade", "Match the grade", GRADE_TOOL, { track: String(track.layer) });
+  else if (grade.kind === "ready") await step("grade", "Match the grade", GRADE_TOOL, { track: String(track.layer), samples: GRADE_SAMPLES });
   else outcomes.push({ step: "grade", label: "Match the grade", status: "skipped", detail: grade.kind === "missing" ? "Grade not matched: not in this build yet." : `Grade not matched: it runs on the ${grade.where}.`, undoSteps: 0 });
   const style = options.style ?? "hype";
   if (track) await step("transitions", "Motion transitions", "apply_motion_transitions_tool", { track: String(track.layer), style, direction: "auto" });

@@ -146,7 +146,7 @@ test("make it snappy runs as separate undo steps with one summary toast", async 
   await details.click();
   await expect(summary).toContainText("Close frame gaps");
   await expect(summary).toContainText("Motion transitions");
-  await expect(summary).toContainText(/Sound design: Sound-designed the edit \(hype\)/);
+  await expect(summary).toContainText(/Sound design: Sound-designed the edit as .+; hype\)/);
   // 3 steps here (gaps, transitions, sound); 4 once master_audio_tool is in the catalog.
   const steps = Number(/(\d) undo steps/.exec((await summary.textContent()) ?? "")?.[1]);
   expect(steps).toBeGreaterThanOrEqual(3);

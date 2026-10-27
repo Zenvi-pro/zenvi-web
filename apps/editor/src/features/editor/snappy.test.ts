@@ -110,7 +110,7 @@ describe("make it snappy", () => {
       return name === "unify_grade_tool" ? { ok: true, status: "applied", summary: "Unified the grade: 2 of 3 clip(s) brought within the band.", data: { counts: { unified: 2 } }, warnings: [], undoSteps: 1 } : real(name, args);
     };
     const outcomes = await makeItSnappy(() => session.project, run);
-    expect(calls[0]).toEqual(["unify_grade_tool", { track: String(session.project.layers[0]!.number) }]);
+    expect(calls[0]).toEqual(["unify_grade_tool", { track: String(session.project.layers[0]!.number), samples: 3 }]);
     expect(outcomes[0]).toMatchObject({ step: "grade", status: "done", brief: "2 shots graded to match", undoSteps: 1 });
     expect(snappySummary(outcomes).description.split("\n")[0]).toMatch(/^2 shots graded to match · 2 transitions · /);
   });
