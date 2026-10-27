@@ -20,7 +20,6 @@ import { setClipKeyframes } from "../../ops/clips.js";
 import type { Clip, Effect, KeyframePoint, Project } from "../../model/types.js";
 import {
   MAX_LEVEL,
-  MUSIC_MIN_DURATION,
   buildDuckPoints,
   clampWindows,
   clipSourceFrameRange,
@@ -31,9 +30,12 @@ import {
   makePoint,
   mergeWindows,
   speechWindowsFromSource,
-  type AudioRole,
 } from "../audio-mix.js";
+import { STEM_ROLE_OF, mixRoleOf } from "../mix-roles.js";
+import { MIX_GENRES } from "../../mastering/score.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
+import { measureMix } from "./analyze-mix.js";
+import { iterateMaster } from "./master-loop.js";
 import { applied, refused, unchanged, type ToolReceipt } from "../receipt.js";
 import { energyVadWindows } from "../speech.js";
 import { lockedTrackError } from "../tracks.js";
@@ -51,18 +53,15 @@ const MAX_MAKEUP_DB = 12;
 /** Gain stages one clip may carry: +48 dB of makeup, enough to lift a -45 dBFS recording. */
 const MAX_STAGES = 4;
 
-const STEM_OF: Record<AudioRole, StemRole> = { speech: "speech", music: "music", sfx: "sfx", ambient: "ambient", silent: "music", unknown: "music" };
-
 /**
- * The mix group of a clip: the analysis' role, else (not indexed) what its
- * shape says: sound without picture is music from MUSIC_MIN_DURATION
- * seconds up and an effect below it, as the indexer decides; footage with
- * sound could be anything, so it stays with the music (a neutral bed).
+ * The mix group of a clip: the stem analyze_mix_tool scores it in
+ * (../mix-roles.ts: its own or its track's role, a sound-design clip's sfx,
+ * the analysis' role, else what its shape says: sound without picture is
+ * music from MUSIC_MIN_DURATION seconds up and an effect below it; footage
+ * with sound could be anything, so it stays with the music, a neutral bed).
  */
-function stemOf(entry: AudioEntry): StemRole {
-  if (entry.role !== "unknown") return STEM_OF[entry.role];
-  if (hasVideoStream(entry.clip, entry.file)) return "music";
-  return entry.end - entry.start >= MUSIC_MIN_DURATION ? "music" : "sfx";
+function stemOf(project: Project, entry: AudioEntry): StemRole {
+  return STEM_ROLE_OF[mixRoleOf(project, entry)];
 }
 
 const ids = z.union([z.string(), z.array(z.string())]);
@@ -83,6 +82,12 @@ const input = z.strictObject({
   music_clip_ids: ids.optional().describe("Clips to treat as music."),
   sfx_clip_ids: ids.optional().describe("Clips to treat as sound effects."),
   dry_run: z.boolean().default(false).describe("Measure and plan only: report the loudness before and after, change nothing."),
+  genre: z.enum(MIX_GENRES).default("general").describe("The Sound Score's target bands (analyze_mix_tool genre) for score and iterate."),
+  score: z.boolean().default(true).describe("Score the mastered mix with analyze_mix_tool's Sound Score (in data.score)."),
+  iterate: z
+    .boolean()
+    .default(false)
+    .describe("Before mastering, run analyze_mix_tool's loop: apply its top fixes and re-score, up to 3 rounds, until 85+ with no gate failed; a round that lowers the score is dropped. The whole run is one undo step."),
 });
 
 type Input = z.output<typeof input>;
@@ -238,6 +243,11 @@ async function speechWindowsOf(call: ToolCall, staged: readonly Staged[]): Promi
   return mergeWindows(windows);
 }
 
+/** Filed under a stem by set_track_role_tool (its track) or by hand (the clip). */
+function hasOwnRole(project: Project, entry: AudioEntry): boolean {
+  return Boolean((entry.clip as { zenvi_audio_role?: unknown }).zenvi_audio_role || project.layers.find((l) => Number(l.number) === entry.layer)?.zenvi_audio_role);
+}
+
 function role(id: string, lists: Record<StemRole, Set<string>>): StemRole | undefined {
   return STEM_ROLES.find((r) => lists[r].has(id));
 }
@@ -257,6 +267,7 @@ export const masteringTools: CatalogTool[] = [
       "dialogue anchors the mix, music sits under it and ducks while someone talks, SFX stay over the bed. " +
       "Writes clip volume and Compressor makeup gain only (the desktop plays the same mix), one undo step, and returns the before/after loudness. " +
       "Presets: social -14 LUFS / -1 dBTP, broadcast -23, podcast -16. Run it LAST, after the edit, music and sound design are in place; running it again changes nothing. " +
+        "iterate=true (with genre) first runs analyze_mix_tool's loop (duck the bed to 10 dB under the voice, fix levels, timing, masking: its top fixes, re-scored, up to 3 rounds) and then masters, all one undo step: the best finishing call. " +
       "If the mix cannot reach the target without exceeding the true-peak ceiling it stops at the ceiling and says so; exporting with loudness normalisation closes the gap. " +
       "dry_run=true measures and plans without changing anything. Refuses timelines with no audible audio.",
     input,
@@ -266,6 +277,10 @@ export const masteringTools: CatalogTool[] = [
       const host = call.host.audio;
       if (!host?.mixPcm) {
         return unavailable(TOOL, "this host cannot render the timeline mix to measure it.");
+      }
+      if (args.iterate && !args.dry_run) {
+        const { iterate: _iterate, ...rest } = args;
+        return iterateMaster(call, TOOL, rest, args.genre);
       }
       const project = call.doc.project;
       const base = targetOf(args);
@@ -281,13 +296,13 @@ export const masteringTools: CatalogTool[] = [
       };
       const staged: Staged[] = entries.map((entry) => ({
         entry,
-        stem: role(entry.id, lists) ?? stemOf(entry),
+        stem: role(entry.id, lists) ?? stemOf(project, entry),
         locked: Boolean(lockedTrackError(entry.layer, project.layers)),
       }));
       if (staged.every((s) => s.locked)) {
         return refused(TOOL, `Every clip with audio is on a locked track (${staged.slice(0, 5).map((s) => s.entry.id).join(", ")}): unlock the tracks to master them.`);
       }
-      const unclassified = staged.filter((s) => s.entry.role === "unknown" && !role(s.entry.id, lists) && hasVideoStream(s.entry.clip, s.entry.file));
+      const unclassified = staged.filter((s) => s.entry.role === "unknown" && !role(s.entry.id, lists) && hasVideoStream(s.entry.clip, s.entry.file) && !hasOwnRole(project, s.entry));
 
       let stems;
       try {
@@ -359,6 +374,7 @@ export const masteringTools: CatalogTool[] = [
       const gains = gainFor(0);
       if (unmoved(gains)) {
         data.after = before;
+        data.limitedBy = plan.limitedBy;
         shortfallNote();
         const where = plan.limitedBy === "peak" && plan.shortfallLu > 0.5 ? "At the true-peak ceiling" : "Already mastered";
         return unchanged(TOOL, `${where}: ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} (target ${base.targetLufs} LUFS / ${base.ceilingDbtp} dBTP). Nothing changed.`, { data, warnings, notes });
@@ -408,6 +424,19 @@ export const masteringTools: CatalogTool[] = [
       const short = [...results.entries()].filter(([id, r]) => Math.abs(r.appliedDb - (finalGains.get(id) ?? 0)) > 0.25);
       if (short.length > 0) {
         warnings.push(`${short.length} clip(s) could not take their full gain (volume tops out at ${MAX_LEVEL}, makeup at ${MAX_MAKEUP_DB} dB): ${short.slice(0, 5).map(([id]) => id).join(", ")}.`);
+      }
+      if (args.score) {
+        try {
+          const { score } = await measureMix(call, call.doc.project, args.genre);
+          data.score = { score: score.score, rawScore: score.rawScore, gatesFailed: score.gatesFailed, topFixes: score.topFixes.map((f) => ({ metric: f.metric, fix: f.text, calls: f.calls })) };
+          const fix = score.topFixes.find((f) => f.metric !== "L1_integrated");
+          notes.push(
+            `Sound Score ${score.score}/100${score.gatesFailed.length ? ` (gate failed: ${score.gatesFailed.join(", ")})` : ""}` +
+              (fix && (score.score ?? 0) < 85 ? `; biggest gap: ${fix.text}. master_audio_tool iterate=true applies the fixes and masters again in one step (an edit after mastering unmasters the mix).` : "."),
+          );
+        } catch (error) {
+          warnings.push(`The Sound Score could not be measured (${error instanceof Error ? error.message : String(error)}).`);
+        }
       }
       data.after = after;
       data.gainsDb = planNumbers(plan);

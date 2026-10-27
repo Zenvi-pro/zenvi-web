@@ -136,9 +136,12 @@ Named easings every tool understands (cubic-bezier control points):
 - First frame matters: no fade-in from black on social; open on motion or a
   face.
 - End on a deliberate hold (0.5–1.0 s) before the final fade.
-- Audio: dialogue −12 to −6 dBFS peaks (≈ −16 LUFS integrated for social,
-  −23 LUFS broadcast); music under dialogue −18 to −24 dB below; duck 6–10 dB
-  with 0.3 s attack / 0.6 s release.
+- Audio: master to −14 LUFS / −1 dBTP for social (−23 LUFS broadcast); the
+  voice sits 8–12 dB (target 10) over the bed while it speaks, measured, not
+  a fixed duck: `duck_tool` ducks each line by what it needs with a 40 ms
+  attack, 200 ms hold, 400 ms release and 50 ms look-ahead (zenvi-motion
+  sound/CRAFT.md; `duck_under_speech_tool` keeps the desktop's fixed −12 dB,
+  150 / 400 ms). `analyze_mix_tool` checks all of it.
 - Sound design (`auto_sound_design_tool`, `add_sfx_tool`): in the reference
   reels a cut lands on an audio transient 50–100 % of the time but on the
   music's beat only 20–40 % — the effect makes the cut. A whoosh peaks on the
