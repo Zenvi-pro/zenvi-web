@@ -92,6 +92,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   storage: "project storage",
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",
+  library: "the public sound libraries (Openverse)",
 };
 
 /**

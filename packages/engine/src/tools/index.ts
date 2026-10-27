@@ -59,3 +59,4 @@ export {
 } from "./availability.js";
 export { RECEIPT_OUTPUT_SCHEMA } from "./output-schema.js";
 export { pickPexelsHdLink } from "./backend.js";
+export { SOUND_LIBRARY_ORIGINS, fetchLibraryHost, type LibraryFetch } from "./sfx-library.js";

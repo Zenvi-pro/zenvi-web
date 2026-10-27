@@ -75,6 +75,8 @@ export interface FakeHostOptions {
   omit?: OptionalMethod[];
   /** Extra backend routes (path prefix → handler); they win over the defaults. */
   routes?: Record<string, (body: unknown, path: string) => unknown>;
+  /** Sound-library answers (URL prefix → handler, or an Error to throw); they win over `OPENVERSE_FIXTURES`. */
+  library?: Record<string, (url: string) => unknown>;
   /** Files `storage.readText` can read. */
   texts?: Record<string, string>;
   /** Bundled assets `assets.readText` can read (default: a minimal Bar_1 title template). */
@@ -284,6 +286,43 @@ function defaultRoutes(): Record<string, (body: unknown, path: string) => unknow
     "/api/v1/freesound/search": () => ({
       sounds: [{ id: 202, name: "Rain", previews: { hq_mp3: "https://freesound.org/202-hq.mp3" } }],
     }),
+  };
+}
+
+/** Openverse records the fake library serves: a CC0 whoosh, a CC BY hit, a non-commercial riser. */
+export const OPENVERSE_FIXTURES = [
+  openverseRecord("0e8a6e2a-0ac8-4615-9e0d-ebde30523783", "Deep Whoosh #1", "cc0", "1.0", 1200, ["whoosh", "air"]),
+  openverseRecord("1b2c3d4e-0000-4000-8000-000000000002", "Glass impact hit", "by", "4.0", 800, ["impact", "glass"]),
+  openverseRecord("2c3d4e5f-0000-4000-8000-000000000003", "Tension riser", "by-nc", "4.0", 4000, ["riser"]),
+];
+
+/** An Openverse audio record shaped like api.openverse.org's. */
+export function openverseRecord(id: string, title: string, license: string, version: string, durationMs: number, tags: string[] = []): Record<string, unknown> {
+  const path = license === "cc0" ? "publicdomain/zero" : `licenses/${license}`;
+  return {
+    id,
+    title,
+    creator: "maker",
+    license,
+    license_version: version,
+    license_url: `https://creativecommons.org/${path}/${version}/`,
+    url: `https://cdn.freesound.test/previews/${id.slice(0, 4)}-hq.mp3`,
+    foreign_landing_url: `https://freesound.test/s/${id.slice(0, 4)}/`,
+    duration: durationMs,
+    filesize: 50_000,
+    source: "freesound",
+    tags: tags.map((name) => ({ name })),
+  };
+}
+
+function defaultLibrary(): Record<string, (url: string) => unknown> {
+  return {
+    "https://api.openverse.org/v1/audio/?": () => ({ result_count: OPENVERSE_FIXTURES.length, results: OPENVERSE_FIXTURES }),
+    "https://api.openverse.org/v1/audio/": (url) => {
+      const record = OPENVERSE_FIXTURES.find((r) => url.endsWith(`/${String(r.id)}/`));
+      if (!record) throw new Error("no such sound in the library (404).");
+      return record;
+    },
   };
 }
 
@@ -630,6 +669,20 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         delete profiles[name];
       };
     }
+  }
+  if (!without.has("library")) {
+    const library = { ...defaultLibrary(), ...(options.library ?? {}) };
+    host.library = {
+      getJson: async (url) => {
+        calls.push(`library ${url}`);
+        // Longest matching prefix wins, so a search route never answers a lookup.
+        const prefix = Object.keys(library)
+          .filter((k) => url.startsWith(k))
+          .sort((a, b) => b.length - a.length)[0];
+        if (!prefix) throw new Error(`no fake library route for ${url}`);
+        return structuredClone(library[prefix]!(url));
+      },
+    };
   }
   if (!without.has("audio")) {
     host.audio = {
