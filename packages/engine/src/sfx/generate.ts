@@ -22,7 +22,9 @@ const PROTECTED = [
   "coca cola", "pepsi", "mcdonalds", "intel inside", "nokia", "samsung", "law and order", "inception", "transformers", "james bond", "007", "jurassic park", "terminator",
   "hans zimmer", "john williams", "daft punk", "skrillex", "beyonce", "taylor swift", "drake",
 ];
-const STYLE_OF = /\b(in the style of|sounds? like (?:the )?[A-Z]|as heard in|from the (?:movie|film|game|show))\b/;
+const STYLE_OF = /\b(?:in the style of|as heard in|from the (?:movie|film|game|show))\b/i;
+/** "sounds like" and a capitalised name ("sounds like Tron"): an imitation. "sounds like a door" is a description. */
+const SOUNDS_LIKE_NAME = /\bsounds? like (?:the )?[A-Z]/;
 
 export interface SfxGenerationArgs {
   prompt: string;
@@ -41,7 +43,7 @@ export function sfxGenerationRefusal(args: SfxGenerationArgs): string | undefine
   const lower = ` ${prompt.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
   const named = PROTECTED.find((name) => lower.includes(` ${name} `));
   if (named) return `Error: the prompt names '${named}': a generated sound must not imitate a brand, artist, film or game. Describe the sound itself (its material, motion, pitch, length).`;
-  if (STYLE_OF.test(prompt)) return "Error: describe the sound itself, not what it should sound like from somewhere else (no 'in the style of', 'as heard in').";
+  if (STYLE_OF.test(prompt) || SOUNDS_LIKE_NAME.test(prompt)) return "Error: describe the sound itself, not what it should sound like from somewhere else (no 'in the style of', 'as heard in').";
   return undefined;
 }
 
