@@ -1224,7 +1224,7 @@ const SPECS: Record<string, Spec> = {
   },
 
   // --- Zenvi 3D (scenes3d.test.ts covers placement, media, cube_cut, re-rendering) ----------
-  list_3d_scenes_tool: { happy: { summary: /^7 3D scene\(s\); this surface cannot render them/ }, failure: null },
+  list_3d_scenes_tool: { happy: { summary: /^12 3D scene\(s\); this surface cannot render them/ }, failure: null },
   add_3d_scene_tool: {
     happy: {
       setup: (_doc, host) => {

@@ -24,7 +24,7 @@ rl.on("line", (line) => {
 });
 `;
 
-async function fakeWorker(env: NodeJS.ProcessEnv = {}): Promise<{ worker: BlenderWorker; spawned: () => number }> {
+async function fakeWorker(env: NodeJS.ProcessEnv = {}, onSpawn?: () => void): Promise<{ worker: BlenderWorker; spawned: () => number }> {
   const dir = await mkdtemp(path.join(tmpdir(), "zenvi-scenes3d-worker-"));
   const script = path.join(dir, "fake-blender.cjs");
   await writeFile(script, FAKE);
@@ -35,13 +35,14 @@ async function fakeWorker(env: NodeJS.ProcessEnv = {}): Promise<{ worker: Blende
     idleMs: 60_000,
     spawnProcess: () => {
       count += 1;
+      onSpawn?.();
       return spawn(process.execPath, [script], { stdio: ["pipe", "pipe", "pipe"], env: { ...process.env, ...env } });
     },
   });
   return { worker, spawned: () => count };
 }
 
-const job = (scene: string, frames = 3): BlenderJob => ({ id: `${scene}-${Math.random()}`, scene: scene as BlenderJob["scene"], params: {} as BlenderJob["params"], width: 8, height: 8, fps: 30, frames, quality: "draft", output_dir: "/tmp/x", media: {}, font: null });
+const job = (scene: string, frames = 3): BlenderJob => ({ id: `${scene}-${Math.random()}`, scene: scene as BlenderJob["scene"], params: {} as BlenderJob["params"], width: 8, height: 8, fps: 30, frames, quality: "draft", output_dir: "/tmp/x", media: {}, files: {}, font: null });
 
 describe("parseWorkerLine", () => {
   it("reads the worker's events and ignores Blender's own output", () => {
@@ -89,6 +90,14 @@ describe("BlenderWorker", () => {
     await expect(hung).rejects.toThrow("Cancelled.");
     await expect(worker.run(job("title_3d"))).resolves.toBeTruthy();
     expect(spawned()).toBe(2);
+    worker.close();
+  });
+
+  it("honours a cancel that arrives while Blender is starting", async () => {
+    const controller = new AbortController();
+    const { worker } = await fakeWorker({}, () => controller.abort());
+    await expect(worker.run(job("hang"), { signal: controller.signal })).rejects.toThrow("Cancelled.");
+    await expect(worker.run(job("title_3d"))).resolves.toBeTruthy();
     worker.close();
   });
 

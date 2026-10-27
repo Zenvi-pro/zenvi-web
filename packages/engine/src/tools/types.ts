@@ -740,6 +740,8 @@ export interface Scene3dRenderRequest {
   quality: Scene3dQuality;
   /** By slot: `screen`, `card0`…, `face0`…, `from` / `to`. */
   media: Record<string, Scene3dMediaInput>;
+  /** Files on this computer the scene reads, by slot (`svg`, `model`; scene3dFiles): absolute or project-relative paths the host resolves. */
+  files?: Record<string, string>;
   signal?: AbortSignal;
   onProgress?: (fraction: number, message: string) => void;
 }

@@ -79,6 +79,8 @@ def setup(job):
     vs.look = "AgX - Punchy"
     vs.exposure = 0.0
     scene.world = bpy.data.worlds.new("World")
+    if scene.world.node_tree is None:  # Blender before 5.0: a new world has no nodes until asked
+        scene.world.use_nodes = True
     return scene
 
 

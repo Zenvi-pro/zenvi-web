@@ -2,7 +2,9 @@
  * Render every Zenvi 3D scene for people to look at: each scene in 9:16 and
  * 16:9 on a dark and a light backdrop, a contact sheet and a timings table.
  * The footage on screens, cards and cubes is generated here with ffmpeg
- * (gradients, test patterns, fractals), so everything is original.
+ * (gradients, test patterns, fractals), the demo models by
+ * scripts/make-models.py from Blender primitives and the logo is an SVG
+ * written here, so everything is original.
  *
  *   npx tsx packages/scenes3d/scripts/showcase.ts --out ~/zenvi-motion/fleet/artifacts/w3-blender
  *   options: --quality draft|final (default final) --scenes title_3d,cube_cut --aspects 9:16,16:9 --backgrounds dark,light
@@ -13,7 +15,7 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
-import { SCENE3D_IDS, SCENE3D_INFO, parseScene3dParams, type Scene3dId, type Scene3dMediaInput, type Scene3dQuality } from "@zenvi/engine";
+import { SCENE3D_IDS, SCENE3D_INFO, parseScene3dParams, scene3dFiles, type Scene3dId, type Scene3dMediaInput, type Scene3dQuality } from "@zenvi/engine";
 import { resolveTitleFont } from "@zenvi/render-node";
 import { createScene3dRenderer, findBlender } from "../src/index.js";
 
@@ -65,6 +67,17 @@ for (const [i, color] of STILLS.entries()) {
   media.set(`icon${i}`, { fileId: `icon${i}`, path: file, kind: "image", width: 512, height: 512, fps: 0, frames: 0, start: 0 });
 }
 
+// A two-colour mark (ring with a dot, a chevron) for logo_extrude.
+const logo = path.join(mediaDir, "mark.svg");
+await writeFile(
+  logo,
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120"><path fill="#FF5A36" fill-rule="evenodd" d="M60 10 a50 50 0 1 0 0.01 0 Z M60 30 a30 30 0 1 1 -0.01 0 Z"/><path fill="#2F6BFF" d="M120 10 L190 10 L150 60 L190 110 L120 110 L160 60 Z"/><circle cx="60" cy="60" r="14" fill="#FFD166"/></svg>\n`,
+);
+const models = path.join(mediaDir, "models");
+if (!existsSync(path.join(models, "engine.glb"))) {
+  execFileSync(blender, ["-b", "--factory-startup", "-P", path.join(import.meta.dirname, "make-models.py"), "--", models], { stdio: "ignore" });
+}
+
 /** Per scene: showcase params and media slots. */
 function setup(scene: Scene3dId, background: string, vertical: boolean): { params: Record<string, unknown>; slots: Record<string, string> } {
   switch (scene) {
@@ -82,6 +95,22 @@ function setup(scene: Scene3dId, background: string, vertical: boolean): { param
       return { params: { shape: vertical ? "blob" : "rings", material: "glass", background }, slots: {} };
     case "particle_burst":
       return { params: { kind: background === "dark" ? "sparks" : "confetti", background, origin_y: 0.55 }, slots: {} };
+    case "logo_extrude":
+      return vertical ? { params: { svg: logo, style: background === "dark" ? "chrome" : "original", background }, slots: {} } : { params: { text: "Zenvi", animation: "assemble", style: background === "dark" ? "chrome" : "clay", background }, slots: {} };
+    case "model_showcase":
+      return background === "dark"
+        ? { params: { model: path.join(models, "engine.glb"), look: vertical ? "xray" : "solid", stage: "dark", move: "orbit", background }, slots: {} }
+        : vertical
+          ? { params: { product: "player", stage: "table", land: true, move: "push", background }, slots: {} }
+          : { params: { model: path.join(models, "engine.glb"), stage: "studio", move: "turntable", background }, slots: {} };
+    case "numerals_3d":
+      return background === "dark" ? { params: { values: [0, 51, 79, 70], suffix: "kt", background }, slots: {} } : { params: { values: [12.5, 98.6], decimals: 1, suffix: "%", style: "plastic", background }, slots: {} };
+    case "terrain_glide":
+      return { params: { surface: vertical ? "grass" : background === "dark" ? "snow" : "sand", time: background === "dark" ? (vertical ? "golden" : "dusk") : "day", background }, slots: {} };
+    case "card_stack":
+      return vertical
+        ? { params: { file_ids: ["icon0", "fractal", "icon2", "wide", "icon4", "tall"], background }, slots: { card0: "icon0", card1: "fractal", card2: "icon2", card3: "wide", card4: "icon4", card5: "tall" } }
+        : { params: { kind: "paper", animation: "fan", count: 5, background }, slots: {} };
   }
 }
 
@@ -99,7 +128,7 @@ for (const scene of values.scenes!.split(",") as Scene3dId[]) {
       const seconds = SCENE3D_INFO[scene].defaultSeconds;
       const requestMedia = Object.fromEntries(Object.entries(slots).map(([slot, name]) => [slot, { ...media.get(name)!, start: scene === "cube_cut" && slot === "from" ? 2 : 0 }]));
       const started = Date.now();
-      const r = await renderer.render({ scene, params: parsed.params, width, height, fps: { num: 30, den: 1 }, frames: Math.round(seconds * 30), quality, media: requestMedia });
+      const r = await renderer.render({ scene, params: parsed.params, width, height, fps: { num: 30, den: 1 }, frames: Math.round(seconds * 30), quality, media: requestMedia, files: scene3dFiles(scene, parsed.params) });
       const took = (Date.now() - started) / 1000;
       const name = `${scene}_${vertical ? "9x16" : aspect.replace(":", "x")}_${background}${quality === "draft" ? "_draft" : ""}.mp4`;
       await copyFile(r.path, path.join(out, name));

@@ -11,18 +11,8 @@ ENTRANCE = 0.8
 
 def material(params):
     style = params.get("style", "chrome")
-    color = params.get("color") or params.get("accent") or core.PALETTE["accent"]
-    if style == "glass":
-        return materials.glass(tint="#F4F8FF")
-    if style == "plastic":
-        return materials.plastic(color)
-    if style == "iridescent":
-        return materials.iridescent()
-    if style == "clay":
-        return materials.clay(params.get("color") or "#ECE7DF")
-    if style == "gradient":
-        return materials.gradient([color, params.get("secondary") or core.PALETTE["secondary"]], axis="X")
-    return materials.chrome(bands="Y")
+    color = params.get("color") or (None if style == "clay" else params.get("accent"))
+    return materials.finish(style, color, params.get("secondary"))
 
 
 def build(job):

@@ -3654,7 +3654,7 @@ Availability: editor — (needs Zenvi Motion block rendering (headless Chrome: t
 
 ### list_3d_scenes_tool
 
-**List 3D scenes** (direct tool). The Zenvi 3D scenes add_3d_scene_tool renders with Blender (3D titles, device mockups, floating cards, icon cube, cube cut transition, glass hero objects, particle bursts): what each shows, its default length and its params as JSON Schema, and whether this Zenvi surface can render them.
+**List 3D scenes** (direct tool). The Zenvi 3D scenes add_3d_scene_tool renders with Blender (3D titles and logos, device mockups, the user's 3D models, rolling 3D counters, floating cards, card stacks, icon cube, cube cut transition, glass hero objects, particle bursts, grass/sand/snow terrain glides): what each shows, its default length and its params as JSON Schema, and whether this Zenvi surface can render them.
 
 Surfaces: mcp, cli, editor. read-only.
 
@@ -3662,11 +3662,11 @@ Availability: editor yes; cli yes; cloud — (hidden: belongs to a local app); d
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `scene` | "title_3d" \| "device_mockup" \| "floating_cards" \| "icon_cube" \| "cube_cut" \| "glass_hero" \| "particle_burst" |  | Only this scene. |
+| `scene` | "title_3d" \| "device_mockup" \| "floating_cards" \| "icon_cube" \| "cube_cut" \| "glass_hero" \| "particle_burst" \| "logo_extrude" \| "model_showcase" \| "numerals_3d" \| "terrain_glide" \| "card_stack" |  | Only this scene. |
 
 ### add_3d_scene_tool
 
-**Add a 3D scene** (direct tool). Render a Zenvi 3D scene with Blender and place it on the timeline in one undo step: an extruded chrome/glass title tumbling in, a phone/tablet/laptop playing a bin video while the camera glides, cards floating in depth with depth of field, an icon cube that spins and explodes, a 3D cube turn between two clips (cube_cut, placed over their cut), a glass/chrome hero object, a confetti/sparks/shards burst.
+**Add a 3D scene** (direct tool). Render a Zenvi 3D scene with Blender and place it on the timeline in one undo step: an extruded chrome/glass title tumbling in, a phone/tablet/laptop playing a bin video while the camera glides, cards floating in depth with depth of field, an icon cube that spins and explodes, a 3D cube turn between two clips (cube_cut, placed over their cut), a glass/chrome hero object, a confetti/sparks/shards burst, the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model or a generic music player / speaker on a turntable, landing on a table, or in x-ray (model_showcase), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack).
 
 Surfaces: mcp, cli, editor. edits. Needs: scenes3d, media.
 
@@ -3674,10 +3674,10 @@ Availability: editor — (needs Zenvi 3D (Blender on this computer) and local fi
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `scene` | "title_3d" \| "device_mockup" \| "floating_cards" \| "icon_cube" \| "cube_cut" \| "glass_hero" \| "particle_burst" | yes | Which scene. title_3d: An extruded chrome / glass / plastic / pearl title that tumbles in letter by letter (or rises, or spins) and glides while a light sweeps across it. device_mockup: A generic phone, tablet or laptop playing a bin video on its screen while the camera orbits or pushes in, or the device spins in and lands. floating_cards: Photos and videos as cards floating in depth with depth of field; they rise in one by one and drift while the camera glides. icon_cube: A cube of glossy tiles (icons or colours on its faces) spins, then bursts into its cubelets. cube_cut: A transition: clip A on a 3D cube turns to clip B; first and last frames match the clips, so it sits seamlessly on the cut. glass_hero: An abstract hero object (morphing blob, torus, linked rings, sphere cluster) in glass, chrome or pearl, turning in coloured gradient light. particle_burst: Confetti, glowing sparks or glass shards bursting from a point, falling and tumbling. |
-| `params` | object |  | The scene's params (list_3d_scenes_tool lists each scene's). title_3d needs text; cube_cut needs from_clip_id and to_clip_id; media are bin file ids (file_id, file_ids). |
+| `scene` | "title_3d" \| "device_mockup" \| "floating_cards" \| "icon_cube" \| "cube_cut" \| "glass_hero" \| "particle_burst" \| "logo_extrude" \| "model_showcase" \| "numerals_3d" \| "terrain_glide" \| "card_stack" | yes | Which scene. title_3d: An extruded chrome / glass / plastic / pearl title that tumbles in letter by letter (or rises, or spins) and glides while a light sweeps across it. device_mockup: A generic phone, tablet or laptop playing a bin video on its screen while the camera orbits or pushes in, or the device spins in and lands. floating_cards: Photos and videos as cards floating in depth with depth of field; they rise in one by one and drift while the camera glides. icon_cube: A cube of glossy tiles (icons or colours on its faces) spins, then bursts into its cubelets. cube_cut: A transition: clip A on a 3D cube turns to clip B; first and last frames match the clips, so it sits seamlessly on the cut. glass_hero: An abstract hero object (morphing blob, torus, linked rings, sphere cluster) in glass, chrome or pearl, turning in coloured gradient light. particle_burst: Confetti, glowing sparks or glass shards bursting from a point, falling and tumbling. logo_extrude: The user's SVG logo (or a word) extruded and bevelled in chrome, glass, matte, clay or its own colours; it tumbles in or its pieces fly together, and settles facing the camera. model_showcase: The user's .glb/.gltf/.obj/.fbx/.stl/.ply model (or a generic music player / smart speaker), centred and framed, on a turntable or with the camera orbiting or pushing in; studio, low-key or table-top staging; optional x-ray or wireframe look. numerals_3d: A huge extruded figure whose digits roll like an odometer, with motion blur, through a list of values, with a prefix and unit suffix: for spec and stats beats. terrain_glide: A backdrop: the camera glides low over a procedural grass, sand or snow field toward a low sun, with haze and sky (full frame). card_stack: Cards or sheets of paper (optionally printed with bin photos) tumble down onto a loose stack with soft real shadows, or land and fan out like a hand of cards. |
+| `params` | object |  | The scene's params (list_3d_scenes_tool lists each scene's). title_3d needs text; cube_cut needs from_clip_id and to_clip_id; model_showcase takes model (a file path; without it a generic product); media are bin file ids (file_id, file_ids). |
 | `position_seconds` | number |  | Timeline start, seconds (default 0; cube_cut: centred on the cut). (min 0) |
-| `duration_seconds` | number |  | Length (default per scene: title 3 s, cube_cut 0.8 s, burst 2 s, others 4 s). (min 0.2, max 15) |
+| `duration_seconds` | number |  | Length (default per scene, list_3d_scenes_tool defaultSeconds: titles, logos, counters 3 s; cube_cut 0.8 s; burst 2 s; others 3-4 s). (min 0.2, max 15) |
 | `quality` | "draft" \| "final" |  | draft: half size, few samples, a few seconds, to check the look; final: full size (default). Draft first, then rerender_3d_scene_tool quality=final. |
 | `track` | number \| string |  | Track number (default: the lowest free track above the video). |
 

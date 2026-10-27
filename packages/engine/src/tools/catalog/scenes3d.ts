@@ -20,7 +20,7 @@ import type { Clip, Project, ProjectFile } from "../../model/types.js";
 import { addFile, updateFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
 import { placeOverlayClip, repointFile } from "../../ops/overlays.js";
-import { SCENE3D_IDS, SCENE3D_INFO, SCENE3D_PARAMS, parseScene3dParams, type Scene3dId, type Scene3dParams } from "../../scenes3d/catalog.js";
+import { SCENE3D_IDS, SCENE3D_INFO, SCENE3D_PARAMS, parseScene3dParams, scene3dFiles, type Scene3dId, type Scene3dParams } from "../../scenes3d/catalog.js";
 import { ZENVI_LINK_KEY, blenderLink, readBlenderLink, type Scene3dQuality, type Scene3dRender } from "../../scenes3d/link.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused, unchanged } from "../receipt.js";
@@ -43,9 +43,9 @@ const addInput = z.strictObject({
   params: z
     .record(z.string(), z.unknown())
     .optional()
-    .describe("The scene's params (list_3d_scenes_tool lists each scene's). title_3d needs text; cube_cut needs from_clip_id and to_clip_id; media are bin file ids (file_id, file_ids)."),
+    .describe("The scene's params (list_3d_scenes_tool lists each scene's). title_3d needs text; cube_cut needs from_clip_id and to_clip_id; model_showcase takes model (a file path; without it a generic product); media are bin file ids (file_id, file_ids)."),
   position_seconds: z.number().min(0).optional().describe("Timeline start, seconds (default 0; cube_cut: centred on the cut)."),
-  duration_seconds: z.number().min(0.2).max(15).optional().describe("Length (default per scene: title 3 s, cube_cut 0.8 s, burst 2 s, others 4 s)."),
+  duration_seconds: z.number().min(0.2).max(15).optional().describe("Length (default per scene, list_3d_scenes_tool defaultSeconds: titles, logos, counters 3 s; cube_cut 0.8 s; burst 2 s; others 3-4 s)."),
   quality: quality.optional(),
   track: z.union([z.number(), z.string()]).optional().describe("Track number (default: the lowest free track above the video)."),
 });
@@ -104,8 +104,8 @@ function planMedia(project: Project, scene: Scene3dId, params: Scene3dParams, du
     const error = add("screen", p.file_id, Number(p.media_start_seconds) || 0);
     if (error) return error;
   }
-  if ((scene === "floating_cards" || scene === "icon_cube") && Array.isArray(p.file_ids)) {
-    const slot = scene === "floating_cards" ? "card" : "face";
+  if ((scene === "floating_cards" || scene === "icon_cube" || scene === "card_stack") && Array.isArray(p.file_ids)) {
+    const slot = scene === "icon_cube" ? "face" : "card";
     for (const [i, id] of (p.file_ids as string[]).entries()) {
       const error = add(`${slot}${i}`, id);
       if (error) return error;
@@ -148,7 +148,7 @@ async function render(call: ToolCall, tool: string, scene: Scene3dId, params: Sc
   const [width, height] = projectSize(project);
   let result: Scene3dRender;
   try {
-    result = await call.host.scenes3d!.render({ scene, params, width, height, fps: fpsOf(project), frames, quality: q, media: plan.media, signal: call.signal });
+    result = await call.host.scenes3d!.render({ scene, params, width, height, fps: fpsOf(project), frames, quality: q, media: plan.media, files: scene3dFiles(scene, params), signal: call.signal });
   } catch (error) {
     return `Error: the ${scene} render failed: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -174,8 +174,16 @@ function needsHost(call: ToolCall, tool: string): ReturnType<typeof unavailable>
 }
 
 function clipTitle(scene: Scene3dId, params: Scene3dParams): string {
-  const text = (params as Record<string, unknown>).text;
-  return typeof text === "string" ? `3D ${text}` : SCENE3D_INFO[scene].title;
+  const p = params as Record<string, unknown>;
+  if (typeof p.text === "string") return `3D ${p.text}`;
+  const file = typeof p.svg === "string" ? p.svg : typeof p.model === "string" ? p.model : undefined;
+  if (file) return `3D ${file.split(/[\\/]/).pop()}`;
+  if (Array.isArray(p.values) && p.values.length > 0) {
+    // As the counter shows it (numerals_3d.py formats every value with the same decimals).
+    const last = Number(p.values[p.values.length - 1]).toFixed(Number(p.decimals) || 0);
+    return `3D ${typeof p.prefix === "string" ? p.prefix : ""}${last}${typeof p.suffix === "string" ? p.suffix : ""}`;
+  }
+  return SCENE3D_INFO[scene].title;
 }
 
 export const scenes3dTools: CatalogTool[] = [
@@ -183,7 +191,7 @@ export const scenes3dTools: CatalogTool[] = [
     name: LIST,
     title: "List 3D scenes",
     description:
-      "The Zenvi 3D scenes add_3d_scene_tool renders with Blender (3D titles, device mockups, floating cards, icon cube, cube cut transition, glass hero objects, particle bursts): " +
+      "The Zenvi 3D scenes add_3d_scene_tool renders with Blender (3D titles and logos, device mockups, the user's 3D models, rolling 3D counters, floating cards, card stacks, icon cube, cube cut transition, glass hero objects, particle bursts, grass/sand/snow terrain glides): " +
       "what each shows, its default length and its params as JSON Schema, and whether this Zenvi surface can render them.",
     input: z.strictObject({ scene: z.enum(SCENE3D_IDS).optional().describe("Only this scene.") }),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
@@ -199,7 +207,8 @@ export const scenes3dTools: CatalogTool[] = [
     title: "Add a 3D scene",
     description:
       "Render a Zenvi 3D scene with Blender and place it on the timeline in one undo step: an extruded chrome/glass title tumbling in, a phone/tablet/laptop playing a bin video while the camera glides, " +
-      "cards floating in depth with depth of field, an icon cube that spins and explodes, a 3D cube turn between two clips (cube_cut, placed over their cut), a glass/chrome hero object, a confetti/sparks/shards burst. " +
+      "cards floating in depth with depth of field, an icon cube that spins and explodes, a 3D cube turn between two clips (cube_cut, placed over their cut), a glass/chrome hero object, a confetti/sparks/shards burst, " +
+      "the user's SVG logo extruded (logo_extrude), the user's .glb/.obj/.fbx model or a generic music player / speaker on a turntable, landing on a table, or in x-ray (model_showcase), a huge rolling 3D counter (numerals_3d), a low glide over grass/sand/snow (terrain_glide, a full-frame backdrop), cards tumbling onto a stack (card_stack). " +
       "Transparent scenes render with alpha (ProRes 4444) and go on the lowest free track above the video; with background dark/light/#rrggbb they are opaque full-frame. " +
       "Use quality=draft (seconds) to check the look with preview_frame, then rerender_3d_scene_tool quality=final. list_3d_scenes_tool lists every param.",
     input: addInput,

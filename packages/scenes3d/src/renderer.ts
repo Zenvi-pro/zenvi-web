@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Scene3dCodec, Scene3dHost, Scene3dRender, Scene3dRenderRequest } from "@zenvi/engine";
+import { SCENE3D_FONT_SCENES, type Scene3dCodec, type Scene3dHost, type Scene3dRender, type Scene3dRenderRequest, type Scene3dId } from "@zenvi/engine";
 import { encodeArgs, renderSize, type BlenderJob, type JobMedia } from "./job.js";
 import { fileStamp, fingerprint, scriptsHash } from "./fingerprint.js";
 import { scriptsDir as defaultScriptsDir } from "./paths.js";
@@ -73,8 +73,8 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
   const cache = path.join(options.cacheDir, "scenes3d");
   const ffmpeg = options.ffmpeg ?? "ffmpeg";
 
-  const font = async (params: Record<string, unknown>, scene: string): Promise<string | null> => {
-    if (scene !== "title_3d") return null;
+  const font = async (params: Record<string, unknown>, scene: Scene3dId): Promise<string | null> => {
+    if (!SCENE3D_FONT_SCENES.includes(scene)) return null;
     const given = typeof params.font === "string" ? params.font.trim() : undefined;
     if (given && isPathLike(given)) {
       if (!existsSync(given)) throw new Error(`font file ${given} does not exist`);
@@ -98,6 +98,14 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         media[slot] = { file, kind: m.kind, width: m.width, height: m.height, fps: m.fps, frames: m.frames, start: m.start };
         stamps[slot] = { stamp: await fileStamp(file), start: m.start, kind: m.kind };
       }
+      const files: Record<string, string> = {};
+      const fileStamps: Record<string, unknown> = {};
+      for (const [slot, given] of Object.entries(request.files ?? {})) {
+        const file = options.resolveMedia(given);
+        if (!existsSync(file)) throw new Error(`the ${slot} file ${given} does not exist${file !== given ? ` (${file})` : ""}`);
+        files[slot] = file;
+        fileStamps[slot] = await fileStamp(file);
+      }
       const params = request.params as Record<string, unknown>;
       const fontFile = await font(params, request.scene);
       const transparent = params.background === "transparent";
@@ -111,6 +119,7 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         frames: request.frames,
         quality: request.quality,
         media: stamps,
+        files: Object.keys(fileStamps).length > 0 ? fileStamps : undefined,
         font: fontFile ? await fileStamp(fontFile) : null,
         scripts: await scriptsHash(scripts),
       });
@@ -123,6 +132,7 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
       }
       await mkdir(cache, { recursive: true });
       const framesDir = await mkdtemp(path.join(options.tempDir ?? tmpdir(), "zenvi-scenes3d-"));
+      const partial = path.join(cache, `.${fp}.${process.pid}.partial${path.extname(output)}`);
       try {
         const job: BlenderJob = {
           id: randomUUID(),
@@ -135,6 +145,7 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
           quality: request.quality,
           output_dir: framesDir,
           media,
+          files,
           font: fontFile,
         };
         request.onProgress?.(0, "starting Blender");
@@ -144,7 +155,6 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         });
         if (transparent !== (done.backdrop === null)) throw new Error("the scene script and the request disagree about the backdrop");
         request.onProgress?.(0.9, "encoding");
-        const partial = path.join(cache, `.${fp}.${process.pid}.partial${path.extname(output)}`);
         await run(ffmpeg, encodeArgs({ framesDir, fps: request.fps, backdrop: done.backdrop, output: partial, quality: request.quality }), request.signal);
         if (!(await stat(partial)).size) throw new Error("ffmpeg wrote an empty movie");
         const meta: CacheMeta = { codec, width: size.width, height: size.height, fps: { ...request.fps }, frames: request.frames, renderedAt: new Date().toISOString(), blender: done.blender };
@@ -154,6 +164,8 @@ export function createScene3dRenderer(options: Scene3dRendererOptions): Scene3dR
         options.log?.(`zenvi3d: ${request.scene} ${request.quality} ${size.width}x${size.height}x${request.frames} build ${done.buildSeconds}s render ${done.renderSeconds}s total ${((Date.now() - started) / 1000).toFixed(1)}s`);
         return { path: output, ...meta, fingerprint: fp, cached: false, seconds: (Date.now() - started) / 1000 };
       } finally {
+        // A failed or cancelled encode leaves no half-written movie in the cache (after the rename there is none).
+        await rm(partial, { force: true });
         await rm(framesDir, { recursive: true, force: true });
       }
     },

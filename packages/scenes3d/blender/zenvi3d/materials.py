@@ -1,9 +1,10 @@
 """Materials: chrome, glass, plastic, matte, clay, iridescent, gradient
-emission, and media (image or video) surfaces."""
+emission, media (image or video) surfaces, and `finish`, the hero material
+by style name."""
 
 import bpy
 
-from .core import rgb
+from .core import PALETTE, rgb
 
 
 def _principled(name):
@@ -320,3 +321,23 @@ def card(item, aspect, name="Card", gloss=0.35, lift=0.25):
 def solid_screen(color_top, color_bottom, name="ScreenSolid"):
     """A placeholder display (no footage): a soft vertical gradient glow."""
     return gradient([color_bottom, color_top], axis="Y", name=name)
+
+
+def finish(style, color=None, secondary=None):
+    """The material of a solid hero (title, logo, numerals) by style name:
+    chrome (default), glass, plastic, matte, iridescent, clay, gradient.
+    Without a colour: the accent (clay: warm white)."""
+    if style == "clay":
+        return clay(color or "#ECE7DF")
+    color = color or PALETTE["accent"]
+    if style == "glass":
+        return glass(tint="#F4F8FF")
+    if style == "plastic":
+        return plastic(color)
+    if style == "matte":
+        return matte(color, roughness=0.55)
+    if style == "iridescent":
+        return iridescent()
+    if style == "gradient":
+        return gradient([color, secondary or PALETTE["secondary"]], axis="X")
+    return chrome(bands="Y")
