@@ -481,7 +481,8 @@ export function scoreMix(input: ScoreInput): MixScore {
       const worst = [...errs].sort((a, b) => Math.abs(b.err) - Math.abs(a.err)).filter((e) => Math.abs(e.err) > frameMs).slice(0, 5);
       put("H3_timing_within_1f", within, 0.9, 1, "placement", {
         text: `move the late/early cues by -err: ${worst.map((e) => `${e.cue.id} ${e.err >= 0 ? "+" : ""}${Math.round(e.err)} ms`).join(", ")}`,
-        calls: worst.filter((e) => e.cue.position !== undefined).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
+        // A layer of a designed hit is never moved alone: that would pull it off its other layers and its hit point.
+        calls: worst.filter((e) => e.cue.position !== undefined && e.cue.group === undefined).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
       }, { medianAbsMs: r1(median(errs.map((e) => Math.abs(e.err)))), worst: worst.map((e) => ({ cue: e.cue.id, errMs: Math.round(e.err) })) });
     }
     for (const role of ["hero", "sweetener", "micro"] as const) {

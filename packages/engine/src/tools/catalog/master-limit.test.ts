@@ -5,7 +5,7 @@ import { curvePoints } from "../audio-mix.js";
 import { runTool } from "../registry.js";
 import type { ToolReceipt } from "../receipt.js";
 import { MIX_RATE, mixProject, type MixProject } from "../test-support/mix-host.js";
-import { planPeakRides, MAX_RIDE_DB } from "./master-limit.js";
+import { MAX_BED_RIDE_DB, MAX_RIDE_DB, planPeakRides } from "./master-limit.js";
 
 async function loudness(p: MixProject) {
   const pcm = await p.host.audio!.mixPcm!(p.doc.project, {});
@@ -28,20 +28,35 @@ async function master(p: MixProject, args: Record<string, unknown>): Promise<Too
 }
 
 describe("planPeakRides", () => {
-  it("turns down only the frames that would pass the ceiling, holds a frame either side, eases in and out, and caps the depth", () => {
-    const sr = 48000;
-    const fps = 30;
-    const x = new Float32Array(sr * 2).fill(0.1);
-    x[Math.round(sr * 1.01)] = 0.9;
-    const rides = planPeakRides([{ channels: [x], gainDb: 0 }], sr, fps, -1, 6)!;
-    const peakFrame = 30;
-    expect(rides[peakFrame]).toBeGreaterThan(0);
-    expect(rides[peakFrame]).toBeLessThanOrEqual(MAX_RIDE_DB);
-    expect(rides[peakFrame - 1]).toBe(rides[peakFrame]);
-    expect(rides[peakFrame + 1]).toBe(rides[peakFrame]);
-    expect(rides[peakFrame + 2]).toBeCloseTo(rides[peakFrame]! - 2, 6);
-    expect(rides[5]).toBe(0);
-    expect(planPeakRides([{ channels: [x], gainDb: -20 }], sr, fps, -1, 1)).toBeNull();
+  const sr = 48000;
+  const fps = 30;
+  const peakFrame = 30;
+  /** A steady bed and a click at 1.01 s. */
+  function parts(click: number): { bed: Float32Array; hit: Float32Array } {
+    const bed = new Float32Array(sr * 2).fill(0.3);
+    const hit = new Float32Array(sr * 2);
+    hit[Math.round(sr * 1.01)] = click;
+    return { bed, hit };
+  }
+
+  it("takes the bed down under a hit first, held a frame either side and eased in and out", () => {
+    const { bed, hit } = parts(0.55);
+    const rides = planPeakRides([{ channels: [bed], gainDb: 0, bed: true }, { channels: [hit], gainDb: 0, bed: false }], sr, fps, -1, 1)!;
+    expect(rides.all.every((d) => d === 0)).toBe(true);
+    expect(rides.bed[peakFrame]).toBeGreaterThan(0);
+    expect(rides.bed[peakFrame]).toBeLessThanOrEqual(MAX_BED_RIDE_DB);
+    expect(rides.bed[peakFrame - 1]).toBe(rides.bed[peakFrame]);
+    expect(rides.bed[peakFrame + 1]).toBe(rides.bed[peakFrame]);
+    expect(rides.bed[peakFrame + 2]).toBeCloseTo(Math.max(0, rides.bed[peakFrame]! - 2), 6);
+    expect(rides.bed[5]).toBe(0);
+  });
+
+  it("rides everything, capped, where the hit itself passes the ceiling, and nothing when no frame does", () => {
+    const { bed, hit } = parts(0.95);
+    const rides = planPeakRides([{ channels: [bed], gainDb: 0, bed: true }, { channels: [hit], gainDb: 0, bed: false }], sr, fps, -1, 6)!;
+    expect(rides.all[peakFrame]).toBeGreaterThan(0);
+    expect(rides.all[peakFrame]).toBeLessThanOrEqual(MAX_RIDE_DB);
+    expect(planPeakRides([{ channels: [hit], gainDb: -20, bed: false }], sr, fps, -1, 1)).toBeNull();
   });
 });
 

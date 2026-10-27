@@ -88,7 +88,7 @@ const input = z.strictObject({
   limit: z
     .boolean()
     .default(true)
-    .describe("When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes on every clip that plays there, at most 4 dB: a look-ahead limiter the desktop plays too), so the mix gets there."),
+    .describe("When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes: the music and ambience under a hit up to 10 dB, else every clip playing there up to 4 dB; a look-ahead limiter the desktop plays too), so the mix gets there."),
   iterate: z
     .boolean()
     .default(false)
@@ -152,6 +152,10 @@ function curvePeak(clip: Clip): number {
 
 const dbToFactor = (db: number): number => 10 ** (db / 20);
 
+function ridesText(r: ReturnType<typeof ridesSummary>): string {
+  return `; peaks ridden down in ${r.frames} frame(s): ${[r.bedMaxDb > 0 ? `the bed under hits up to ${r.bedMaxDb} dB` : "", r.allMaxDb > 0 ? `everything up to ${r.allMaxDb} dB` : ""].filter(Boolean).join(", ")}`;
+}
+
 /** Shortfall at the ceiling worth riding the peaks for, LU; also the least a ridden plan must gain to be kept. */
 const RIDE_ABOVE_LU = 0.5;
 
@@ -202,7 +206,7 @@ interface Edits {
   /** dB per clip id. */
   gains: ReadonlyMap<string, number>;
   /** Peak rides on these clips (master-limit.ts), written before the gains. */
-  rides?: { db: Rides; clipIds: readonly string[] };
+  rides?: { db: Rides; clips: readonly { id: string; bed: boolean }[] };
   /** Beds ducked under these speech windows (timeline s) by `duckDb`. */
   duck?: { db: number; windows: readonly SpeechWindow[]; beds: readonly string[] };
 }
@@ -211,7 +215,7 @@ interface Edits {
 export function applyEdits(tx: Transaction, edits: Edits): Map<string, ClipGainResult> {
   const results = new Map<string, ClipGainResult>();
   const { duck } = edits;
-  if (edits.rides) applyPeakRides(tx, edits.rides.db, edits.rides.clipIds);
+  if (edits.rides) applyPeakRides(tx, edits.rides.db, edits.rides.clips);
   if (duck && duck.db < 0) {
     for (const id of duck.beds) {
       const clip = tx.project.clips.find((c) => String(c.id) === id)!;
@@ -279,7 +283,7 @@ export const masteringTools: CatalogTool[] = [
       "Writes clip volume and Compressor makeup gain only (the desktop plays the same mix), one undo step, and returns the before/after loudness. " +
       "Presets: social -14 LUFS / -1 dBTP, broadcast -23, podcast -16. Run it LAST, after the edit, music and sound design are in place; running it again changes nothing. " +
         "iterate=true (with genre) first runs analyze_mix_tool's loop (duck the bed to 10 dB under the voice, fix levels, timing, masking: its top fixes, re-scored, up to 3 rounds) and then masters, all one undo step: the best finishing call. " +
-      "If the true-peak ceiling stops the mix short of the target, the frames that peak are ridden down (at most 4 dB on every clip playing there; limit=false: stop at the ceiling and say so). " +
+      "If the true-peak ceiling stops the mix short of the target, the frames that peak are ridden down (the bed under a hit up to 10 dB, else every clip playing there up to 4 dB; limit=false: stop at the ceiling and say so). " +
       "dry_run=true measures and plans without changing anything. Refuses timelines with no audible audio.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
@@ -350,10 +354,10 @@ export const masteringTools: CatalogTool[] = [
       // Short of the target at the ceiling: ride the peaks down (master-limit.ts), then plan again on a copy that has the rides.
       let rides: Rides | null = null;
       // The voice too: a talking head's own crest is what stops it short, and a few dB off a plosive for three frames is what any dialogue limiter does.
-      const ridden = staged.filter((st) => !st.locked).map((st) => st.entry.id);
+      const ridden = staged.filter((st) => !st.locked).map((st) => ({ id: st.entry.id, bed: st.stem === "music" || st.stem === "ambient" }));
       if (args.limit && plan.limitedBy === "peak" && plan.shortfallLu > RIDE_ABOVE_LU && ridden.length > 0) {
         const { present, sampleRate } = planned;
-        rides = planPeakRides(present.map((st) => ({ channels: st.channels, gainDb: plan!.roleGainDb[st.role] ?? 0 })), sampleRate, fpsFloatOf(project), base.ceilingDbtp, plan.shortfallLu);
+        rides = planPeakRides(present.map((st) => ({ channels: st.channels, gainDb: plan!.roleGainDb[st.role] ?? 0, bed: st.role === "music" || st.role === "ambient" })), sampleRate, fpsFloatOf(project), base.ceilingDbtp, plan.shortfallLu);
         if (rides) {
           const scratch = new ProjectDocument(structuredClone(project));
           scratch.transaction("ride (check)", (tx) => applyPeakRides(tx, rides!, ridden));
@@ -418,7 +422,7 @@ export const masteringTools: CatalogTool[] = [
       }
 
       // Verify on a scratch copy of the project, so the final gain accounts for what the clips really sound like with the edit.
-      const edit = (g: Map<string, number>): Edits => ({ gains: g, ...(rides ? { rides: { db: rides, clipIds: ridden } } : {}), duck: beds.length > 0 ? { db: plan.duckDb, windows: padded, beds } : undefined });
+      const edit = (g: Map<string, number>): Edits => ({ gains: g, ...(rides ? { rides: { db: rides, clips: ridden } } : {}), duck: beds.length > 0 ? { db: plan.duckDb, windows: padded, beds } : undefined });
       let correction = 0;
       let verified: LoudnessReport | undefined;
       try {
@@ -487,7 +491,7 @@ export const masteringTools: CatalogTool[] = [
         TOOL,
         `Mastered (${args.preset}): ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} -> ${fmtLufs(after.integratedLufs)}, ${fmtPeak(after.truePeakDbtp)}` +
           (plan.duckDb < 0 ? `; beds ducked ${plan.duckDb.toFixed(1)} dB under speech` : "") +
-          (rides ? `; peaks ridden down in ${ridesSummary(rides, project).frames} frame(s), at most ${ridesSummary(rides, project).maxDb} dB` : "") +
+          (rides ? ridesText(ridesSummary(rides, project)) : "") +
           ".",
         { data, warnings, notes },
       );

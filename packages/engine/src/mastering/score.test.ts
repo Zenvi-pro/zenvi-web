@@ -107,6 +107,8 @@ describe("scoreMix", () => {
     const first = h3.calls!.find((c) => c.args.clip_id === "c0")!;
     expect(first.tool).toBe("move_clip_tool");
     expect(first.args.position_seconds as number).toBeCloseTo(0.5 - 0.08, 1);
+    const layered = scoreMix({ ...atTarget({ late: 0.08 }), cues: input().cues!.map((c) => ({ ...c, position: c.t, group: c.id })) });
+    expect(layered.metrics.H3_timing_within_1f!.calls ?? []).toEqual([]);
   });
 
   it("counts the layers of one hit as one hero for the hero gap (V4)", () => {

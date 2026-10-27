@@ -3242,7 +3242,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffmpeg is available and 
 | `dry_run` | boolean |  | Measure and plan only: report the loudness before and after, change nothing. (default false) |
 | `genre` | "hype" \| "flash_montage" \| "saas_ui" \| "talking_head" \| "match_cut" \| "3d_product" \| "video_essay" \| "editorial" \| "multiplicity" \| "general" |  | The Sound Score's target bands (analyze_mix_tool genre) for score and iterate. (default "general") |
 | `score` | boolean |  | Score the mastered mix with analyze_mix_tool's Sound Score (in data.score). (default true) |
-| `limit` | boolean |  | When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes on every clip that plays there, at most 4 dB: a look-ahead limiter the desktop plays too), so the mix gets there. (default true) |
+| `limit` | boolean |  | When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes: the music and ambience under a hit up to 10 dB, else every clip playing there up to 4 dB; a look-ahead limiter the desktop plays too), so the mix gets there. (default true) |
 | `iterate` | boolean |  | Before mastering, run analyze_mix_tool's loop: apply its top fixes and re-score, up to 3 rounds, until 85+ with no gate failed; a round that lowers the score is dropped. The whole run is one undo step. (default false) |
 
 ### analyze_mix_tool
