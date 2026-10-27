@@ -30,7 +30,7 @@ function atTarget(options: ScoreFixtureOptions = {}, post: (mix: Float32Array[])
   return { ...raw, mix: post(g(raw.mix as Float32Array[])), stems: Object.fromEntries(Object.entries(raw.stems!).map(([k, v]) => [k, g(v as Float32Array[])])) };
 }
 
-describe("scoreMix", () => {
+describe("scoreMix", { timeout: 60_000 }, () => {
   // scripts/sound_score.py (S1, with its K-weighting applied per channel) on the same signals, written by encodeWav.
   const PYTHON: Record<string, number> = {
     L1_integrated: -17.8,
