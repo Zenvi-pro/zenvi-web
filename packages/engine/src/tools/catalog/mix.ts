@@ -303,6 +303,9 @@ const duckInput = z.strictObject({
 });
 type DuckArgs = z.output<typeof duckInput>;
 
+/** A duck the voice-over-bed target cannot be met by (dB, past the 30 dB cap). */
+const UNREACHABLE = 60;
+
 const duck = directTool({
   name: "duck_tool",
   title: "Duck",
@@ -349,11 +352,17 @@ const duck = directTool({
     }
     let voicePcm: { channels: Float32Array[]; sampleRate: number } | undefined;
     let bedPcm: { channels: Float32Array[]; sampleRate: number } | undefined;
+    let otherPcm: { channels: Float32Array[]; sampleRate: number } | undefined;
+    // The rest of the bed (SFX, beds not ducked here): METRICS.md B1 measures the voice over everything else.
+    const others = entries.filter((e) => !triggerIds.has(e.id) && !bedList.some((b) => b.id === e.id) && e.mixRole !== "voice");
     if (canRender && !heroes) {
       try {
         voicePcm = await call.host.audio!.mixPcm!(project, { clipIds: triggers.map((t) => t.id), signal: call.signal });
         if (windows.length === 0) windows = speechWindowsOf(voicePcm.channels, voicePcm.sampleRate);
-        if (wantVbr !== undefined) bedPcm = await call.host.audio!.mixPcm!(project, { clipIds: bedList.map((b) => b.id), signal: call.signal });
+        if (wantVbr !== undefined) {
+          bedPcm = await call.host.audio!.mixPcm!(project, { clipIds: bedList.map((b) => b.id), signal: call.signal });
+          if (others.length > 0) otherPcm = await call.host.audio!.mixPcm!(project, { clipIds: others.map((o) => o.id), signal: call.signal });
+        }
       } catch (error) {
         return `Error: could not render the mix to measure it: ${error instanceof Error ? error.message : String(error)}`;
       }
@@ -363,22 +372,40 @@ const duck = directTool({
     const total = entries.reduce((m, e) => Math.max(m, e.end), 0);
     const held = duckedWindows({ position: 0, start: 0, end: total }, windows, env);
     // Depth per window: fixed, or what the measured voice-over-bed needs.
-    const depths: { window: Window; db: number; vbr?: number }[] = held.map((w) => ({ window: w, db: args.depth_db ?? (heroes ? -6 : -10) }));
+    const depths: { window: Window; db: number; vbr?: number; masked?: boolean }[] = held.map((w) => ({ window: w, db: args.depth_db ?? (heroes ? -6 : -10) }));
     if (wantVbr !== undefined && voicePcm && bedPcm) {
       const vM = loudnessSeries(voicePcm.channels, voicePcm.sampleRate);
       const bM = loudnessSeries(bedPcm.channels, bedPcm.sampleRate).momentary;
+      const oM = otherPcm ? loudnessSeries(otherPcm.channels, otherPcm.sampleRate).momentary : undefined;
       const vI = measureLoudness(voicePcm.channels, voicePcm.sampleRate).integrated;
+      const pow = (db: number): number => 10 ** (db / 10);
+      /** dB the ducked beds must drop at hop i for the voice to sit `want` dB over the whole bed (UNREACHABLE: the rest alone is too loud). */
+      const needAt = (i: number, want: number): number => {
+        const room = pow(vM.momentary[i]! - want) - pow(oM?.[i] ?? -120);
+        if (room <= 0) return UNREACHABLE;
+        return Math.max(0, (bM[i] ?? -120) - 10 * Math.log10(room));
+      };
       for (const d of depths) {
-        const diffs: number[] = [];
+        const hops: number[] = [];
         for (let i = 0; i < vM.momentary.length; i += 1) {
           const t = i * vM.hop + 0.2;
-          if (t < d.window[0] || t > d.window[1] || vM.momentary[i]! < vI - 8) continue;
-          diffs.push(vM.momentary[i]! - (bM[i] ?? -120));
+          if (t >= d.window[0] && t <= d.window[1] && vM.momentary[i]! >= vI - 8) hops.push(i);
         }
-        const vbr = diffs.length ? median(diffs) : Infinity;
-        d.vbr = vbr;
-        // METRICS.md B1 wants the median on target and the 10th percentile no more than 6 dB under it.
-        const need = diffs.length ? Math.max(wantVbr - vbr, wantVbr - 6 - percentile(diffs, 10)) : 0;
+        if (hops.length === 0) {
+          d.db = 0;
+          continue;
+        }
+        d.vbr = median(hops.map((i) => vM.momentary[i]! - 10 * Math.log10(pow(bM[i] ?? -120) + pow(oM?.[i] ?? -120))));
+        // METRICS.md B1 wants the median on target and the 10th percentile no more than 6 dB under it. Where the other
+        // sounds alone cover the voice the duck cannot reach the target over everything; there it still puts the voice
+        // `want` dB over the ducked beds themselves (and the line is reported).
+        const per = (want: number): number[] =>
+          hops.map((i) => {
+            const n = needAt(i, want);
+            return n < UNREACHABLE ? n : Math.max(0, (bM[i] ?? -120) - (vM.momentary[i]! - want));
+          });
+        d.masked = hops.filter((i) => needAt(i, wantVbr) >= UNREACHABLE).length > hops.length * 0.2;
+        const need = Math.max(median(per(wantVbr)), percentile(per(wantVbr - 6), 90));
         d.db = -Math.min(30, Math.max(0, need));
       }
     }
@@ -408,11 +435,15 @@ const duck = directTool({
       (wantVbr !== undefined ? ` to ${wantVbr} dB voice over bed (${active.map((d) => `${d.window[0].toFixed(1)}-${d.window[1].toFixed(1)} s ${d.db.toFixed(1)} dB`).slice(0, 4).join(", ")})` : ` by ${active[0]!.db.toFixed(1)} dB`) +
       `; attack ${Math.round(env.attack * 1000)} ms, hold ${Math.round(env.padAfter * 1000)} ms, release ${Math.round(env.release * 1000)} ms.`;
     const data = { under: heroes ? "heroes" : args.under, target_vbr_db: wantVbr, windows: report, clips: plans.map((p) => ({ id: p.entry.id, role: p.entry.mixRole, points: p.points.length })) };
-    if (args.dry_run) return unchanged(tool, `${summary} dry_run: nothing written.`, { data });
+    const masked = depths.filter((d) => d.masked);
+    const warnings = masked.length
+      ? [`In ${masked.length} line(s) (${masked.slice(0, 3).map((d) => `${d.window[0].toFixed(1)}-${d.window[1].toFixed(1)} s`).join(", ")}) the other sounds (SFX) alone cover the voice in places: ducking the bed cannot fix those moments; move or lower those cues.`]
+      : [];
+    if (args.dry_run) return unchanged(tool, `${summary} dry_run: nothing written.`, { data, warnings });
     call.commit((tx) => {
       for (const p of plans) writeVolume(tx, p.entry.id, p.points);
     }, "Duck");
-    return applied(tool, summary, { data });
+    return applied(tool, summary, { data, warnings });
   },
 });
 

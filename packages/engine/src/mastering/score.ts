@@ -362,6 +362,12 @@ export function scoreMix(input: ScoreInput): MixScore {
             : [{ tool: "eq_tool", args: { role: "sfx", bands: [{ type: "peak", freq: 2500, gain_db: -4, q: 1 }] } }],
         });
       }
+      const b1 = metrics.B1_vbr_median!;
+      if (b1.fix && metrics.F2_sfx_masks_voice_share?.status === "high") {
+        b1.fix += "; SFX cover the voice too (F2): a deeper duck cannot fix that, lower or move those cues";
+        const f = fixes.find((x) => x.metric === "B1_vbr_median");
+        if (f) f.text = b1.fix;
+      }
       const music = stems.music ?? bed;
       const mb = bandPowerDb(monoOf(music), sr, 1000, 4000);
       const mv = inSpeech(mb.map((v, i) => v - vb[i]!));
