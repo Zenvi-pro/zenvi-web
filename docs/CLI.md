@@ -144,6 +144,7 @@ zenvi tools [--all] [--json] [--schema]     # the catalog (same as the MCP serve
 zenvi call <tool> key=value … [--args '{…}']
 zenvi call get_timeline_state_tool
 zenvi call set_keyframes_tool --args '{"timeline_clip_id":"K3J9X0Q2LM","property":"alpha","points":[{"seconds":0,"value":0},{"seconds":1,"value":1}]}'
+zenvi call review_render_tool path=reel.mp4 --images review/   # save returned images (frames, contact sheets)
 ```
 
 Arguments arrive as strings and are coerced by each tool's schema, exactly
@@ -306,7 +307,10 @@ zenvi call premiere_export preset=h264-high output=/Users/me/out/cut.mp4
   works for Zenvi Cloud and for the AI tools that use the Zenvi backend.
 - `zenvi login --device` (SSH, servers): shows a short code to approve at
   zenvi.pro from any device and stores a Zenvi personal token
-  (`zvn_pat_…`). It works for Zenvi Cloud only.
+  (`zvn_pat_…`). It works for Zenvi Cloud only: AI image/video/voice,
+  speech recognition and media search say so and ask for `zenvi login`
+  (the token is never sent to the backend). `zenvi whoami` lists what the sign-in turns
+  off; the MCP tool `mcp_health` reports the same.
 - `zenvi push` hashes each media file (SHA-256 of the whole file), uploads
   only the files Zenvi Cloud does not have yet, uploads the project with its
   history, and opens the web editor. Local folder names are not uploaded:
