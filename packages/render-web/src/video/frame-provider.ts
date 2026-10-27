@@ -81,6 +81,9 @@ export class FrameProvider {
   async frame(request: FrameRequest): Promise<FrameImage | null> {
     if (this.disposed) throw new Error("FrameProvider is disposed");
     const slot = await this.slot(request.ref);
+    // Disposed while the media was opening: a cursor made now would outlive
+    // dispose's cleanup (an export cancelled with warm requests in flight).
+    if (this.disposed) throw new Error("FrameProvider is disposed");
     const media = slot.lease.media;
     const video = media.video;
     if (!video || !slot.sink) return null;
