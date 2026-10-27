@@ -83,7 +83,8 @@ const IDLE_CLOSE_MS = 120_000;
 export class ChromeLaunchError extends Error {
   constructor(tries: number, timeoutMs: number, cause: unknown) {
     const why = cause instanceof Error ? cause.message.split("\n")[0] : String(cause);
-    super(`Headless Chrome did not start after ${tries} tries of ${Math.round(timeoutMs / 1000)} s (${why}). The computer looks busy or the Chrome install is damaged: close heavy programs and try again, or run \`zenvi motion setup\` again, or set ZENVI_CHROME to a Chrome executable.`);
+    const each = timeoutMs < 1000 ? `${timeoutMs} ms` : `${Math.round(timeoutMs / 1000)} s`;
+    super(`Headless Chrome did not start after ${tries} tries of ${each} (${why}). The computer looks busy or the Chrome install is damaged: close heavy programs and try again, or run \`zenvi motion setup\` again, or set ZENVI_CHROME to a Chrome executable.`);
     this.name = "ChromeLaunchError";
   }
 }
@@ -116,6 +117,8 @@ export async function launchChrome(env: NodeJS.ProcessEnv = process.env, deps: L
 
 interface Warm {
   browser: Promise<PuppeteerBrowser>;
+  /** The browser once launched: an exit handler cannot wait for the promise. */
+  launched?: PuppeteerBrowser;
   leases: number;
   idle?: NodeJS.Timeout;
 }
@@ -144,7 +147,7 @@ export async function leaseChrome(env: NodeJS.ProcessEnv = process.env, deps: La
     exitHook = true;
     // Chrome must not outlive a process that never called closeChrome.
     process.once("exit", () => {
-      void warm?.browser.then((b) => b.process()?.kill()).catch(() => undefined);
+      warm?.launched?.process()?.kill();
     });
   }
   for (;;) {
@@ -167,7 +170,7 @@ export async function leaseChrome(env: NodeJS.ProcessEnv = process.env, deps: La
           if (released) return;
           released = true;
           entry.leases -= 1;
-          if (entry.leases === 0 && warm === entry) entry.idle = setTimeout(() => void closeChrome(), IDLE_CLOSE_MS);
+          if (entry.leases === 0 && warm === entry) entry.idle = setTimeout(() => void closeChrome(), IDLE_CLOSE_MS).unref();
         },
       };
     }
@@ -181,7 +184,12 @@ export async function leaseChrome(env: NodeJS.ProcessEnv = process.env, deps: La
 function startWarm(env: NodeJS.ProcessEnv, deps: LaunchDeps): Warm {
   const entry: Warm = { browser: launchChrome(env, deps), leases: 0 };
   // A failed launch is not kept: the next render tries again.
-  entry.browser.catch(() => dropWarm(entry));
+  entry.browser.then(
+    (browser) => {
+      entry.launched = browser;
+    },
+    () => dropWarm(entry),
+  );
   warm = entry;
   return entry;
 }

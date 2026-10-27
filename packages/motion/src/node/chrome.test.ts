@@ -53,6 +53,12 @@ describe("launchChrome", () => {
     expect(calls.mock.calls[0]![0]).toMatchObject({ timeout: 150_000 });
   });
 
+  it("names a timeout under a second in ms, not as 0 s", async () => {
+    const { launch } = launcher(new Error("Timed out"), new Error("Timed out"));
+    const error = await launchChrome({ ...env, ZENVI_CHROME_TIMEOUT_MS: "1" }, { launch }).catch((e: unknown) => e);
+    expect((error as Error).message).toContain("after 2 tries of 1 ms (");
+  });
+
   it("does not try to launch a Chrome that is not there", async () => {
     const { launch, calls } = launcher();
     await expect(launchChrome({ ZENVI_CHROME: "/nonexistent/chrome" } as NodeJS.ProcessEnv, { launch })).rejects.toBeInstanceOf(ChromeMissingError);
