@@ -117,12 +117,17 @@ from a `File`/OPFS blob or a signed URL. Each `LayerPlan` is drawn with Canvas2D
 masks are first drawn into a scratch canvas and run through the engine's RGBA
 kernels. Preview renders at the preview widget size; export renders at full
 size and encodes with Mediabunny (`CanvasSource` + `AudioBufferSource`, H.264/AAC
-MP4 when the browser can encode it, VP9/Opus WebM otherwise). Audio preview
-schedules decoded `AudioBuffer`s with Web Audio and applies the gain curve.
+MP4 when the browser can encode it, VP9/Opus WebM otherwise); an export decodes
+the next frame while it draws this one, and starts each new clip's decoding a few
+frames before its cut. Audio preview schedules decoded `AudioBuffer`s with Web
+Audio and applies the gain curve.
 
 **Node (`render-node`).** ffmpeg decodes each active clip to raw RGBA at the size
-it is drawn, the engine's CPU compositor composites the frame, and ffmpeg encodes
-the result (libx264/aac by default). Audio is mixed by an ffmpeg filter graph
+it is drawn, the engine's CPU compositor composites the frame (on up to 8 worker
+threads), and ffmpeg encodes the result (libx264/aac by default). A render plans a
+few frames ahead to start the next cuts' decoders early, and a clip takes over the
+decoder of the previous clip of its file when it can read forward to its first
+frame (montages cut a source in order), so cuts rarely relaunch ffmpeg or seek. Audio is mixed by an ffmpeg filter graph
 generated from the `AudioPlan`. SVG titles are rasterized with resvg (WASM) so the
 bundle stays pure JS + WASM. The cloud render worker uses the same code.
 
