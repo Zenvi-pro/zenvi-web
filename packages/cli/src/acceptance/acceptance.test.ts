@@ -2,7 +2,8 @@ import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeTempDir, removeDir } from "@zenvi/render-node/test-support";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { hostHas } from "./media.js";
 import { buildReport, reportMarkdown } from "./report.js";
 import { buildReplayReport, extractCalls, groupFailures, normaliseMessage, pairIds, replayTranscript, rewriteArgs, type ReplayCall } from "./replay.js";
 import { runScenario } from "./run.js";
@@ -36,6 +37,19 @@ describe("scenario data", () => {
     expect(unmet(3.5, { min: 4 })).toBe("3.5 is not >= 4");
     expect(unmet("Timeline clips (3).", { matches: "clips \\(3\\)" })).toBe("");
     expect(unmet(undefined, { exists: true })).toBe("missing");
+  });
+});
+
+describe("host programs", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("reports ffmpeg missing when the resolved binary does not exist", async () => {
+    const dir = await makeTempDir("zenvi-acceptance-host-");
+    dirs.push(dir);
+    vi.stubEnv("ZENVI_FFMPEG", path.join(dir, "no-ffmpeg"));
+    expect(hostHas("ffmpeg")).toBe(false);
   });
 });
 
