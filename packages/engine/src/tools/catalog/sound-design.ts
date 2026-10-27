@@ -641,7 +641,7 @@ export const soundDesignTools: CatalogTool[] = [
         placed.rows.length === 0
           ? `Removed the ${previous.length} effects of the last run: every hit point stays dry at ${intensity} intensity in the ${palette.id} palette.`
           : `Sound-designed the edit as ${palette.title} (${palette.id}${sheet.guessed ? ", read from the edit" : ""}; ${intensity}${args.density === "every_cut" ? ", every cut" : ""}${kit ? `, ${kit === projectKit ? `sound kit '${kit.name}'` : `${sources} sounds`}` : ""}): ` +
-            `${sounded.size} of ${sheet.points.length} hit points have a sound (${wanted} wanted one), ${placed.rows.length} layers — ${heroes} layered heroes, ${byRole("sweetener")} sweeteners, ${byRole("micro")} micro sounds${byRole("bed") > 0 ? ", an ambience bed" : ""}` +
+            `${sounded.size} of ${sheet.points.length} hit points have a sound (${wanted} wanted one), ${placed.rows.length} layers — ${plural(heroes, "layered hero", "layered heroes")}, ${plural(byRole("sweetener"), "sweetener", "sweeteners")}, ${plural(byRole("micro"), "micro sound", "micro sounds")}${byRole("bed") > 0 ? ", an ambience bed" : ""}` +
             (recorded > 0 ? `; ${recorded} recorded (CC0 kit)` : "") +
             (design.climax !== null ? `; ${design.riser ? "a riser into the climax and the drop on it" : "the drop on the climax"} at ${design.climax.toFixed(2)} s` : "") +
             (placed.dipPoints > 0 ? `; ${design.dips.length} ${design.dips.length === 1 ? "dip" : "dips"} of the music (${design.dips.some((d) => d.reason.startsWith("suck")) ? "suck-out" : "pre-hit ducks"})` : "") +
@@ -746,6 +746,8 @@ function hasTiles(project: Project): boolean {
   for (let t = 0.05; t < end; t += 0.1) if (small.filter((c) => c.position <= t && c.position + (c.end - c.start) > t).length >= 4) tiled += 1;
   return end > 0 && tiled * 0.1 >= end / 3;
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 function pointRow(p: HitPoint): Record<string, unknown> {
   return {
