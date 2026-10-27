@@ -28,7 +28,8 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    same track at the noun times, 0.8-1.5 s each.
 3. Rail captions (connectors): `add_captions_tool` `clipId` = the narration
    clip (or `cues`, one word each, without a voice), `maxWords: 1`, `style:
-   "minimal"`, `font: "Arial Black"`, `text_size: 0.065`, `position:
+   "minimal"`, `font: "Arial Black"`, `text_size: 0.065` (above TASTE's 0.045-0.055 rail size on purpose: at 0.05
+   the bench frames read too small in Arial Black on 9:16), `position:
    "center"`. Leave the emphasis words out of the rail (`edit_captions_tool`)
    so they only appear big.
 4. Emphasis words, each **once**, for as long as it is spoken (0.4-0.9 s):

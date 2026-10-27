@@ -38,7 +38,17 @@ other (dark round → dark round, warm → warm); end on the most iconic one
 ```json
 match_cut_montage_tool {
   "file_ids": ["<pose A>", "<pose B>", "<cup>", "<lamp>", "<sun>", "<moon>", "<eye>", "<vinyl>", "<clock>"],
-  "subjects": [{"file_id": "<pose A>", "box": {"x": 0.38, "y": 0.22, "w": 0.24, "h": 0.6}, "time": 2.0}],
+  "subjects": [
+    {"file_id": "<pose A>", "box": {"x": 0.38, "y": 0.22, "w": 0.24, "h": 0.6}, "time": 2.0},
+    {"file_id": "<pose B>", "box": {"x": 0.36, "y": 0.2, "w": 0.26, "h": 0.62}, "time": 1.5},
+    {"file_id": "<cup>", "box": {"x": 0.3, "y": 0.36, "w": 0.4, "h": 0.3}},
+    {"file_id": "<lamp>", "box": {"x": 0.32, "y": 0.3, "w": 0.36, "h": 0.36}},
+    {"file_id": "<sun>", "box": {"x": 0.4, "y": 0.42, "w": 0.2, "h": 0.12}},
+    {"file_id": "<moon>", "box": {"x": 0.42, "y": 0.43, "w": 0.16, "h": 0.09}},
+    {"file_id": "<eye>", "box": {"x": 0.44, "y": 0.46, "w": 0.12, "h": 0.07}},
+    {"file_id": "<vinyl>", "box": {"x": 0.15, "y": 0.33, "w": 0.7, "h": 0.39}},
+    {"file_id": "<clock>", "box": {"x": 0.25, "y": 0.36, "w": 0.5, "h": 0.28}}
+  ],
   "music_file_id": "<track>",
   "duration_seconds": 15,
   "min_frames": 3, "max_frames": 8,
