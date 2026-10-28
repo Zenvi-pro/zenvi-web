@@ -78,7 +78,7 @@ export async function measureMix(project: Project, options: MeasureMixOptions): 
     const minSilence = options.minSilence ?? 0.4;
     const { stderr } = await runBinary(
       resolveBinary("ffmpeg"),
-      ["-hide_banner", "-nostats", "-nostdin", "-i", wav, "-af", `ebur128=peak=true:framelog=quiet,silencedetect=noise=${silenceDb}dB:d=${minSilence}`, "-f", "null", "-"],
+      ["-hide_banner", "-nostats", "-nostdin", "-i", wav, "-af", `ebur128=peak=true:framelog=verbose,silencedetect=noise=${silenceDb}dB:d=${minSilence}`, "-f", "null", "-"],
       { signal: options.signal, timeoutMs: 120_000, what: "Measuring the mix failed" },
     );
     const pcm = await decodePcm(wav, { sampleRate: PCM_RATE, maxSeconds: MAX_SECONDS, signal: options.signal });
