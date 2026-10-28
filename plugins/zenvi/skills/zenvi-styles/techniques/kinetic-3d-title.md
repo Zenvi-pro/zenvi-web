@@ -44,4 +44,4 @@ A whoosh into the landing, a boom/impact on the settle (-10 to -12 dB), maybe a 
 - Final quality before checking the draft (minutes of render for a typo).
 
 ## Verified
-VERIFIED:kinetic-3d-title
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-3d-title.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-3d-title.mp4` and its contact sheet. Checked on the sheet: chrome NIGHTSHIFT tumbles in letter by letter over the night street, settles and glides with the light sweep; final quality render, transparent over footage. Watch judge (absolute, isolated 3-5 s test): **6.4/10** overall, typography 7; its main note: "The extruded bevels look flat and matte rather than chrome because they lack street and headlight reflections.".

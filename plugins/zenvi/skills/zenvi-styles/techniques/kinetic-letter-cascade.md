@@ -44,4 +44,4 @@ for a playful piece (kids, UI), never both.
 - Left-aligned stack style on a centred composition: check `y`/alignment against the shot.
 
 ## Verified
-VERIFIED:kinetic-letter-cascade
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-letter-cascade.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-letter-cascade.mp4` and its contact sheet. Checked on the sheet: ten letters land within 0.5 s and hold; the judge found the native letter pop plain (no secondary bounce). Watch judge (absolute, isolated 3-5 s test): **3.8/10** overall, typography 4; its main note: "The text 'NIGHTSHIFT' pops in linearly without organic bounce, overshoot, or proper kinetic easing.".

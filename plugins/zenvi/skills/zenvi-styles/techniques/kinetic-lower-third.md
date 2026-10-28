@@ -40,4 +40,4 @@ A very soft swish (-18 dB) or nothing under speech.
 - Fictional names only in tests; in a real edit, the user's spelling of the name.
 
 ## Verified
-VERIFIED:kinetic-lower-third
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-lower-third.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-lower-third.mp4` and its contact sheet. Checked on the sheet: accent rule, name and role rise in on the left title-safe edge and exit the way they came; name about 4 % of frame height. Watch judge (absolute, isolated 3-5 s test): **4.6/10** overall, typography 6; its main note: "Completely silent video with zero audio or sound design.".

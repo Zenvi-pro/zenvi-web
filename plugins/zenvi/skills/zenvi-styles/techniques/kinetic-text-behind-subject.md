@@ -42,4 +42,4 @@ A soft thud or the music's downbeat when the word appears; nothing else.
 - Matte edges on hair against a busy background: choose a clean background shot.
 
 ## Verified
-VERIFIED:kinetic-text-behind-subject
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-text-behind-subject.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-text-behind-subject.mp4` and its contact sheet. Checked on the sheet: FOCUS sits behind the head (matte cut-out over the lower letters) and stays readable while he turns; the edges chatter a little on hair. Watch judge (absolute, isolated 3-5 s test): **2.9/10** overall, typography 4; its main note: "The text 'FOCUS' appears instantly and remains totally rigid, disconnected from the handheld camera movement.".

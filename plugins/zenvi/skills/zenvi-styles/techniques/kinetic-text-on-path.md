@@ -45,4 +45,4 @@ A whoosh as the ring builds; per-letter ticks only on a slow build.
 - A ring that should rotate left static for a long hold: hold ≤ 2 s.
 
 ## Verified
-VERIFIED:kinetic-text-on-path
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-text-on-path.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-text-on-path.mp4` and its contact sheet. Checked on the sheet: 13 letters set on a 300-degree arc around the stage lights, each turned to the tangent, still bouncing in one by one; static ring (no spin). Watch judge (absolute, isolated 3-5 s test): **2.4/10** overall, typography 4; its main note: "The video is completely silent, making the kinetic type test feel flat and unfinished.".

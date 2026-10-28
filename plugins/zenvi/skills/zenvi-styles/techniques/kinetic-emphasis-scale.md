@@ -44,4 +44,4 @@ One punch or pop on the hero word (-10 to -12 LUFS momentary, 3-6 dB lower under
 - Hero word in a third colour; it is the accent or the ink, nothing else.
 
 ## Verified
-VERIFIED:kinetic-emphasis-scale
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-emphasis-scale.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-emphasis-scale.mp4` and its contact sheet. Checked on the sheet: OBSESSED about 6x the connectors in the condensed face and accent over dimmed footage. kinetic_headline's *word* was tried first and only changed the face (about 1.1x), so this file uses add_kinetic_title_tool creator. Watch judge (absolute, isolated 3-5 s test): **4.3/10** overall, typography 6; its main note: "The hero word 'OBSESSED' cuts in statically with zero animation or easing.".

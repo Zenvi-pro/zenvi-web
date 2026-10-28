@@ -45,4 +45,4 @@ out. Under VO keep the hit 3-6 dB lower and off 1-4 kHz.
 - Holding the card over 2.5 s: energy drains.
 
 ## Verified
-VERIFIED:kinetic-keyword-slam
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-keyword-slam.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-keyword-slam.mp4` and its contact sheet. Checked on the sheet: the red DOUBT card lands on the cut at 1.6 s and cuts away at 2.7 s, word about 30 % of frame height, thud + kick on the landing. Watch judge (absolute, isolated 3-5 s test): **6.4/10** overall, typography 7; its main note: "The text 'DOUBT' hits statically without any physical punch or visual impact to match the heavy bass slam SFX.".

@@ -42,4 +42,4 @@ Pencil/paper foley under the writing at -16 to -20 dB, stopping with the last st
 - Selling the fallback as a real write-on in a close-up hero shot: use it at reading size only.
 
 ## Verified
-VERIFIED:kinetic-write-on
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-write-on.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-write-on.mp4` and its contact sheet. Checked on the sheet: lines wipe on left to right in the serif with the italic accent; paper foley under it. It reads as a wipe up close, not as strokes. Watch judge (absolute, isolated 3-5 s test): **6.8/10** overall, typography 8; its main note: "The text abruptly stops moving and stays completely frozen for over two seconds until the end.".

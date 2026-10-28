@@ -44,4 +44,4 @@ A pop or keyboard key on each swap; the tile's landing gets the one slightly big
 - Swapping a letter that carries the word's shape (first letter): swap an O, A or a vowel in the middle.
 
 ## Verified
-VERIFIED:kinetic-letter-swap
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-letter-swap.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-letter-swap.mp4` and its contact sheet. Checked on the sheet: BLOOM on the editorial sheet with the lily tile as the O, tag above, corner labels; the first try without grid_background rendered dark ink on black (fixed). Watch judge (absolute, isolated 3-5 s test): **6.2/10** overall, typography 7; its main note: "The text drop and tile placement land abruptly and stay completely static for the remainder of the clip.".

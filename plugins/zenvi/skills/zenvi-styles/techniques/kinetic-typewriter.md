@@ -43,4 +43,4 @@ there under a bed); stop the sound when the last letter lands.
 - Fading the typed text in as well as typing it.
 
 ## Verified
-VERIFIED:kinetic-typewriter
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-typewriter.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-typewriter.mp4` and its contact sheet. Checked on the sheet: the line types in about 1.3 s with no fade, then holds; keyboard foley only under the typing. Watch judge (absolute, isolated 3-5 s test): **4.6/10** overall, typography 6; its main note: "The clip abruptly cuts off mid-motion while hands are still closing the drive bays, leaving the viewer hanging.".

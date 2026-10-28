@@ -44,4 +44,4 @@ A UI tick when the label appears (-18 dB); no whoosh with the motion.
 - Too many labels: 1-3 per shot.
 
 ## Verified
-VERIFIED:kinetic-tracked-label
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-tracked-label.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-tracked-label.mp4` and its contact sheet. Checked on the sheet: the label rides the approaching car from three hand-read points; fine for this slow move, would swim on a fast one. Watch judge (absolute, isolated 3-5 s test): **4.0/10** overall, typography 5; its main note: "Complete lack of audio makes the motion graphic test feel lifeless.".

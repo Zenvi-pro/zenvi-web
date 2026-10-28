@@ -20,9 +20,10 @@ pill or colour; snap in, no drift. The podcast-clip default: readable with the s
 
 ## Build it in Zenvi
 ```json
-kinetic_captions_tool {"style": "karaoke", "emphasis": "nobody,first", "accent": "#ffd400"}
+kinetic_captions_tool {"style": "karaoke", "emphasis": "nobody,first", "accent": "#ffd400", "placement": "style"}
 ```
-From speech (transcribed) or `cues` as in kinetic-vo-captions. `text_size` default 0.059 of the short side; `y` moves the
+From speech (transcribed) or `cues` as in kinetic-vo-captions. `text_size` default 0.059 of the short side; `placement: "style"` skips the automatic subject matte (karaoke sits centred
+anyway; `auto` mattes the footage first, minutes on a busy machine). `y` moves the
 line (kept out of the top 12 % and bottom 20 % on 9:16).
 
 ## Timing & taste rules
@@ -38,4 +39,4 @@ None on the captions; the voice and a ducked bed carry it (-15 LUFS voice, bed -
 - Chunks of 6+ words (two lines): it becomes subtitles.
 
 ## Verified
-VERIFIED:kinetic-karaoke
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-karaoke.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-karaoke.mp4` and its contact sheet. Checked on the sheet: 9:16 crop, three chunks, the spoken word lit in the yellow pill word by word on the say-generated VO; centred below the face. Watch judge (absolute, isolated 3-5 s test): **3.7/10** overall, typography 4; its main note: "The yellow highlight pill snaps instantly between words with hard cuts, feeling robotic and jarring.".

@@ -46,4 +46,4 @@ Soft data chatter under the decode (typing/glitch at -18 to -24 dB), a tick when
 - Leaving the decode block colour clashing with the grade: set `accent` to the edit's accent.
 
 ## Verified
-VERIFIED:kinetic-scramble-decode
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-scramble-decode.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-scramble-decode.mp4` and its contact sheet. Checked on the sheet: two mono lines decode left to right with the green front block; a '/' inside 'MB/s' broke the line on the first try (fixed: MBPS). Watch judge (absolute, isolated 3-5 s test): **6.9/10** overall, typography 8; its main note: "The animation cuts out instantly the frame the final digit resolves, truncating the viewer's ability to read the completed spec.".

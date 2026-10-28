@@ -42,4 +42,4 @@ Ticks under the roll (-22 dB) or a short tonal riser ending on the landing, then
 - Label as large as the number: the contrast is the design.
 
 ## Verified
-VERIFIED:kinetic-counter
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-counter.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-counter.mp4` and its contact sheet. Checked on the sheet: odometer rolls 0 to 7450 in about 1.5 s and holds; leading space in the suffix is dropped. Watch judge (absolute, isolated 3-5 s test): **7.3/10** overall, typography 8; its main note: "The video ends abruptly immediately upon reaching the final number without letting the viewer absorb the spec.".

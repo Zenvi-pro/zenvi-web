@@ -45,4 +45,4 @@ repeats so no two pops are the same sample within 3 s.
 - Mixing pop with letter-level motion in the same scene.
 
 ## Verified
-VERIFIED:kinetic-word-pop
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-word-pop.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-word-pop.mp4` and its contact sheet. Checked on the sheet: words pop in order with the stagger, connectors small and white, DEADLINE / IDEA about 6x in red condensed caps, kept beside the head (avoid box); the subject walks into the hero word once (static avoid box on a moving speaker). Watch judge (absolute, isolated 3-5 s test): **4.1/10** overall, typography 6; its main note: "The video is completely silent with zero audio track, voiceover, or SFX.".

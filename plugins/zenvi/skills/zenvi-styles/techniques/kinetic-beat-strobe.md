@@ -3,7 +3,7 @@ id: kinetic-beat-strobe
 kind: technique
 summary: "When type should hit like the drums: one word per beat or half beat, card colours flipping, lockup at the end."
 categories: [kinetic-type-motion-design, gaming-montage, sports-hype-edit, video-essay-explainer, tech-review, documentary-true-story, fitness-lifestyle]
-tools: [detect_beats_tool, add_kinetic_title_tool, add_sfx_tool, auto_sound_design_tool]
+tools: [detect_beats_tool, add_kinetic_title_tool, trim_clip_tool, add_sfx_tool, auto_sound_design_tool]
 pace: frantic
 mood: [hype, aggressive, rhythmic]
 aspect: ["9:16", "16:9", "1:1"]
@@ -20,15 +20,17 @@ accent) with the ink inverted, ending on a held lockup. Also the slower staccato
 B-roll, a thump each).
 
 ## Build it in Zenvi
-Beat times from `detect_beats_tool` (or a grid: 128 bpm = 0.469 s per beat, half beat 0.234 s). One title per word:
+Beat times from `detect_beats_tool` (or a grid: 150 bpm = 0.4 s per beat). One title per word:
 ```json
 add_kinetic_title_tool {"text": "FAST", "style": "stack", "animation": "slam", "emphasis": "none", "text_size": 0.3,
-  "ink": "#ffffff", "background": "#000000", "y": 0.5, "position_seconds": 0.2, "duration_seconds": 0.234}
-add_kinetic_title_tool {"text": "LOUD", … "ink": "#000000", "background": "#ffffff", "position_seconds": 0.434, …}
-add_kinetic_title_tool {"text": "BOLD", … "ink": "#ffffff", "background": "#e5202e", "position_seconds": 0.668, …}
+  "ink": "#ffffff", "background": "#000000", "y": 0.5, "position_seconds": 0.2, "duration_seconds": 0.4}
+add_kinetic_title_tool {"text": "LOUD", … "ink": "#000000", "background": "#ffffff", "position_seconds": 0.6, …}
+add_kinetic_title_tool {"text": "BOLD", … "ink": "#ffffff", "background": "#e5202e", "position_seconds": 1.0, …}
 … last word "NOW" with "duration_seconds": 1.6
 add_sfx_tool {"recipe": "hit_transient", "at_seconds": <each word>, "gain_db": -14, "seed": <i>}   and impact_slam on the last
 ```
+A title lasts at least 0.4 s (`duration_seconds` min): for 3-11 frame holds place them at 0.4 s and cut each one's clips
+back with `trim_clip_tool` (`edge: "end"`, `at_seconds`) — do not overlap them, a later title can land on a lower track.
 No sequencer for mirrored/cropped full-bleed layout variants yet (`needs: type-strobe-sequencer`,
 `typographic-layout-variants`): vary `text_size`, `y` and the ground by hand, 3-4 layouts at most.
 
@@ -48,4 +50,4 @@ lockup. Never a whoosh per word.
 - No lockup: 7 of 20 reference reels end abruptly and score lower.
 
 ## Verified
-VERIFIED:kinetic-beat-strobe
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-beat-strobe.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-beat-strobe.mp4` and its contact sheet. Checked on the sheet: seven words, one per 0.4 s beat of the generated 150 bpm bed, grounds flipping black/white/red, NOW holds; the 0.234 s version failed (title minimum 0.4 s). Watch judge (absolute, isolated 3-5 s test): **4.1/10** overall, typography 4; its main note: "The sequence ends abruptly on a single static word without resolving into a cohesive final lockup.".

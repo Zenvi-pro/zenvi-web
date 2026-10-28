@@ -23,15 +23,18 @@ ASR on sung vocals is unreliable and there is no forced aligner (`needs: lyric-f
 one cue per sung phrase (listen, or read onsets from `detect_beats_tool` / the waveform) and pass them as cues:
 ```json
 kinetic_captions_tool {"cues": [{"text": "we were lights", "start": 0.4, "end": 1.6}, {"text": "in the dark", "start": 1.9, "end": 2.9},
-  {"text": "WE WERE LOUD", "start": 3.2, "end": 4.6}], "style": "documentary", "animation": "fade", "emphasis": "none"}
+  {"text": "WE WERE LOUD", "start": 3.2, "end": 4.6}], "style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.075, "placement": "style"}
 ```
-A phrase per cue; words inside it are spread by length. `style: "editorial"` for a serif block, `"stack"` for a shout.
+A phrase per cue; words inside it are spread by length. Pass `placement: "style"`: with the default `auto` the CLI
+first mattes the footage to keep words off the subject (on 2026-10-28, under heavy load, 20+ minutes for 7 s of concert
+footage) — lyric layout is decided by hand anyway. `style: "editorial"` for a serif block, `"stack"` for a shout.
 
 ## Timing & taste rules
 - Text onset within 2 frames of the sung onset; hand-timed cues are checked by ear on a render.
 - One face, one size (≤ 1.2x variance); only the shout line may be bigger/caps.
 - Reset the canvas in the vocal rests (on the breath), not mid-line.
-- Keep the lyric off the focal subject (bottom band, above the horizon, or beside the singer).
+- Keep the lyric off the focal subject (bottom band, above the horizon, or beside the singer), on a calm dark area:
+  thin serif or small Inter over flashing stage lights is unreadable (judged 2.9-3.0 in the test).
 
 ## Sound for it
 None: the song is the mix (cue-per-cut under ~10 %). Do not run auto_sound_design at its default density.
@@ -42,4 +45,4 @@ None: the song is the mix (cue-per-cut under ~10 %). Do not run auto_sound_desig
 - Copying a real song's lyrics into a public edit.
 
 ## Verified
-VERIFIED:kinetic-lyric-sync
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-lyric-sync.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-lyric-sync.mp4` and its contact sheet. Checked on the sheet: three hand-timed cues on a sung line from the macOS 'Good News' voice, each phrase fading in on its onset, the shout line in caps. Small documentary Inter (first try) and the thin serif at 0.075 (second) both struggled over the busy concert lights: lyrics need a calm part of the shot or a dark band, which the showcase uses. Watch judge (absolute, isolated 3-5 s test): **2.9/10** overall, typography 4; its main note: "The thin white serif typeface gets lost in the crowd silhouettes and dark background clutter.".

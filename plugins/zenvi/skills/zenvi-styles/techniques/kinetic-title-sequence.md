@@ -47,4 +47,4 @@ theme. CRAFT: hero hit -10 LUFS momentary.
 - Title card on black without sound: it reads as a gap.
 
 ## Verified
-VERIFIED:kinetic-title-sequence
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-title-sequence.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-title-sequence.mp4` and its contact sheet. Checked on the sheet: two small credits fade over the night shots, then NIGHTSHIFT rises on black with the swell and boom. Watch judge (absolute, isolated 3-5 s test): **6.8/10** overall, typography 7; its main note: "Credit text fades in abruptly without organic motion or tracking relative to the dynamic camera movement.".

@@ -47,4 +47,4 @@ Transient ticks on every other copy (-16 dB), one punch on the collapse; the mus
 - Leaving the echoes up: the point is the collapse.
 
 ## Verified
-VERIFIED:kinetic-echo-stack
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-echo-stack.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-echo-stack.mp4` and its contact sheet. Checked on the sheet: seven copies appear 2 frames apart and the outer pairs leave first, collapsing to the centre line by 1.8 s; creator style with every word emphasised stacked the words vertically, so the verified version uses documentary (one Inter line). Watch judge (absolute, isolated 3-5 s test): **4.7/10** overall, typography 6; its main note: "The text collapse feels stiff because all outer lines snap together linearly without motion blur or organic easing.".

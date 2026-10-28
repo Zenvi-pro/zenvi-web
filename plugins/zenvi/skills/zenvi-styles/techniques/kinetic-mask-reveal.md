@@ -42,4 +42,4 @@ One soft swish at the first word (-14 dB) or nothing under music; a hit only if 
 - Three-line headlines shrink to fit and lose scale contrast.
 
 ## Verified
-VERIFIED:kinetic-mask-reveal
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-mask-reveal.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-mask-reveal.mp4` and its contact sheet. Checked on the sheet: words rise out of the line mask, serif italic accent on 'earns', block exits on its own. Watch judge (absolute, isolated 3-5 s test): **4.1/10** overall, typography 6; its main note: "The video is completely silent, missing audio cues to accent the text animation.".

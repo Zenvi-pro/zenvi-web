@@ -44,7 +44,9 @@ whoosh only on cuts. No sound on connector words.
 ## Common mistakes
 - Every word emphasised (auto + a long list): pick 1 per clause.
 - Captions centred on the chest covering the hands.
+- White connectors at the default 0.046 over a bright window or wall vanish (seen in the 16:9 test): raise `text_size`
+  to 0.06-0.07 on 16:9, or give `avoid` boxes over the bright area.
 - Lag from estimated cues on a voice with long pauses: cue phrase by phrase, not the whole script as one cue.
 
 ## Verified
-VERIFIED:kinetic-vo-captions
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-vo-captions.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-vo-captions.mp4` and its contact sheet. Checked on the sheet: three say-generated VO phrases as cues, DEADLINE / IDEA / TIME land huge in red on their words, placed in the room beside the head; the small white connectors almost vanish against the bright window (noted in Common mistakes). Watch judge (absolute, isolated 3-5 s test): **5.2/10** overall, typography 6; its main note: "The text pop on 'DEADLINE' is purely visual and lacks audio impact, making the emphasis fall flat.".

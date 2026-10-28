@@ -40,4 +40,4 @@ Nothing, or room tone and the music dipped 3-6 dB: silence is the point. A soft 
 - Shrinking a long quote to fit: cut it to ≤ 12 words.
 
 ## Verified
-VERIFIED:kinetic-quote-card
+2026-10-28, CLI (`zenvi call`, this branch) on Pexels bench footage / generated media: `scripts/kinetic-quote-card.sh` in the verification artifacts (`~/zenvi-motion/fleet/artifacts/skk-kinetic/`, local only) → `techniques/kinetic-quote-card.mp4` and its contact sheet. Checked on the sheet: quote blurs in on the cream card, italic accent word, mono kicker; legible at 1/4 size. Silent by design (the judge marked the silence down). Watch judge (absolute, isolated 3-5 s test): **4.5/10** overall, typography 8; its main note: "Complete silence leaves the visual reveal feeling sterile and disconnected.".
