@@ -48,9 +48,15 @@ LLM listener tells a good mix from a bad one, so read the numbers.
    gain (each try lands quieter); put it under GAPS.
 7. **Listen** (when you may render). `render_video`, then
    `review_render_tool` with the path: true peak, loudness, dropouts, how it
-   ends. One fix pass for each `PROBLEM`.
+   ends. One fix pass for each `PROBLEM`. Then once
+   `watch_render_tool {"path": ..., "focus": ["sound_design", "mix"]}`: an
+   editor listens with the picture and names the silent cuts, buried voice
+   or missing riser, with times and tools. Fix the `HIGH` issues, master
+   again if you touched audio, render, watch again at most once. Refused
+   (signed out, no credits): skip it and note it under GAPS.
 8. **Report** (short): the genre and palette, the cue count and coverage,
-   the final score and LUFS / dBTP / voice over bed, the 3 biggest fixes in
+   the final score and LUFS / dBTP / voice over bed, the watch score for
+   sound_design and mix (before and after the fix), the 3 biggest fixes in
    dB, then `GAPS:` one line each for what the tools could not do.
 
 `analyze_mix_tool` alone (read-only, `detail: "compact"`) is for a mix you
