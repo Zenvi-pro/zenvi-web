@@ -144,6 +144,9 @@ export class McpState {
     return this.launchedAt !== undefined && Date.now() - this.launchedAt < this.desktopWaitMs;
   }
 
+  /** The brief bump (brief-note.ts) has refused its one call in this server. */
+  briefBumped = false;
+
   /** The portable engine ran a tool (it counts as activity for list_hosts' active host). */
   notePortableCall(): void {
     this.lastPortableCall = Date.now();

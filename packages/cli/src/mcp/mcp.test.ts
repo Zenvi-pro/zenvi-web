@@ -17,8 +17,8 @@ let work: string;
 let desktop: FakeDesktop;
 const open: Array<{ client: Client; server: ZenviMcpServer }> = [];
 
-async function connect(projectFile?: string): Promise<Client> {
-  const ctx = createContext({ env: testEnv(home), cwd: work, registry: testRegistry() });
+async function connect(projectFile?: string, env: NodeJS.ProcessEnv = {}): Promise<Client> {
+  const ctx = createContext({ env: testEnv(home, env), cwd: work, registry: testRegistry() });
   const server = await createZenviMcpServer(ctx, projectFile);
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.server.connect(b);
@@ -56,6 +56,16 @@ afterAll(async () => {
 });
 
 describe("zenvi mcp", () => {
+  it("refuses the first cut without a brief once, then lets the same call through", async () => {
+    const client = await connect(undefined, { ZENVI_MCP_BRIEF: "on" });
+    await call(client, "open_project_file", { path: "bump.zvn" });
+    const first = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
+    expect(first.receipt.status).toBe("refused");
+    expect(first.receipt.summary).toMatch(/^Error: refused once, nothing changed: compile the creative brief/);
+    const again = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
+    expect(again.receipt.summary).not.toMatch(/compile the creative brief before the first cut/);
+  });
+
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {
     const client = await connect();
     const opened = await call(client, "open_project_file", { path: "plan.zvn" });

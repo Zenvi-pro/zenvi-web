@@ -1,6 +1,6 @@
 import { createProject } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
-import { BRIEF_NOTE, briefNote } from "./brief-note.js";
+import { BRIEF_NOTE, briefBump, briefNote } from "./brief-note.js";
 
 describe("the brief note on receipts", () => {
   it("asks for the brief on the calls that start a video, until one is saved or the cut is under way", () => {
@@ -12,5 +12,12 @@ describe("the brief note on receipts", () => {
     const busy = createProject({ id: "BRIEFNOTEY" });
     busy.clips = [{}, {}, {}] as never;
     expect(briefNote("add_clip_to_timeline_tool", busy)).toBeUndefined();
+  });
+
+  it("bumps the first cut without a brief, never a search, the person's import or the frame setting", () => {
+    const project = createProject({ id: "BRIEFBUMPX" });
+    expect(briefBump("match_cut_montage_tool", project)).toBe(true);
+    expect(briefBump("gather_stock_footage_tool", project)).toBe(true);
+    for (const tool of ["search_pexels_videos_tool", "import_files_tool", "set_project_setting_tool", "save_brief_tool", "trim_clip_tool"]) expect(briefBump(tool, project), tool).toBe(false);
   });
 });
