@@ -420,7 +420,7 @@ export const masteringTools: CatalogTool[] = [
         data.limitedBy = plan.limitedBy;
         shortfallNote();
         const where = plan.limitedBy === "peak" && plan.shortfallLu > 0.5 ? "At the true-peak ceiling" : "Already mastered";
-        markMastered(call.doc, args.preset, before.integratedLufs);
+        if (!args.dry_run) markMastered(call.doc, args.preset, before.integratedLufs);
         return unchanged(TOOL, `${where}: ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} (target ${base.targetLufs} LUFS / ${base.ceilingDbtp} dBTP). Nothing changed.`, { data, warnings, notes });
       }
 

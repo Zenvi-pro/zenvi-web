@@ -9,12 +9,14 @@ import { median, monoOf, percentile, rmsEnvelopeDb } from "../../mastering/analy
 import { loudnessSeries, measureLoudness } from "../../mastering/loudness.js";
 import type { MixScore } from "../../mastering/score.js";
 import { parametricEq } from "../../render/audio/parametric-eq.js";
+import type { ChangeEvent } from "../../history/document.js";
 import { runTool } from "../registry.js";
 import type { ToolReceipt } from "../receipt.js";
 import { addClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
 import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
 import { MIX_RATE, decodeWav, mixProject, type MixProject } from "../test-support/mix-host.js";
+import { finishGaps, masterMark } from "../../review/finish.js";
 import { measureMix } from "./analyze-mix.js";
 
 async function run(p: MixProject, tool: string, args: Record<string, unknown>): Promise<ToolReceipt> {
@@ -72,6 +74,7 @@ describe("mix tools", { timeout: 60_000 }, () => {
     expect(Math.abs(at(bedAfter, 4.25) - at(bedBefore, 4.25))).toBeLessThan(1);
     // Running it again adds nothing: the voice already sits there.
     const again = await run(p, "duck_tool", { bed: "music", under: "voice", target_vbr_db: 10 });
+    console.log("AGAIN", again.summary, JSON.stringify((again.data as any)?.rounds));
     expect(again.status).toBe("unchanged");
     expect(p.doc.undoLabels.length).toBe(undo + 1);
     expect(after.rawScore!).toBeGreaterThan(before.rawScore!);
@@ -159,6 +162,7 @@ describe("mix tools", { timeout: 60_000 }, () => {
     const echoes = p.doc.project.clips.find((c) => c.id === p.hits[1])!.effects!.filter((e) => e.class_name === "Echo");
     expect(echoes).toHaveLength(3);
     const again = await run(p, "space_tool", { role: "sfx", space: "room", mix: 0.2 });
+    console.log("AGAIN", again.summary, JSON.stringify((again.data as any)?.rounds));
     expect(again.status).toBe("unchanged");
     const role = await run(p, "set_track_role_tool", { track: "1000000", role: "ambience" });
     expect(role.status).toBe("applied");
@@ -301,6 +305,10 @@ describe("master_audio_tool iterate", { timeout: 120_000 }, () => {
     const p = mixProject({ transcript: true });
     const before = await score(p);
     const undo = p.doc.undoLabels.length;
+    const tracked: ChangeEvent[] = [];
+    p.doc.subscribe((e) => {
+      if (e.source !== "untracked") tracked.push(e);
+    });
     const receipt = await run(p, "master_audio_tool", { iterate: true, genre: "saas_ui" });
     expect(receipt.status).toBe("applied");
     expect(p.doc.undoLabels.length).toBe(undo + 1);
@@ -311,6 +319,10 @@ describe("master_audio_tool iterate", { timeout: 120_000 }, () => {
     expect(after.rawScore!).toBeGreaterThan(before.rawScore!);
     expect(after.metrics.L2_true_peak!.value!).toBeLessThanOrEqual(-1);
     expect(after.gatesFailed).not.toContain("L1_integrated");
+    // The master mark is written untracked: the undo step holds the mix edits, never the mark.
+    expect(tracked.flatMap((e) => e.actions).some((a) => String(a.key[0]) === "settings")).toBe(false);
+    expect(masterMark(p.doc.project)).not.toBeNull();
+    expect(finishGaps(p.doc.project).map((g) => g.kind)).not.toContain("master");
     p.doc.undo();
     expect((await score(p)).rawScore).toBe(before.rawScore);
   });

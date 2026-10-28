@@ -15,7 +15,7 @@
 
 import { ProjectDocument, type Transaction } from "../../history/document.js";
 import type { FixCall, MixGenre, MixScore } from "../../mastering/score.js";
-import { markMastered } from "../../review/finish.js";
+import { MASTER_KEY, markMastered } from "../../review/finish.js";
 import { isAutoSfxClip } from "../../sfx/moments.js";
 import type { Project } from "../../model/types.js";
 import type { ToolCall } from "../define.js";
@@ -169,6 +169,10 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     mastered = remastered;
     final = next;
   }
+  // The master step marked the scratch copy mastered; the mark is not an edit (it goes on call.doc, untracked, below).
+  const { [MASTER_KEY]: _scratchMark, ...scratchSettings } = (scratch.project.settings ?? {}) as Record<string, unknown>;
+  const kept = (call.doc.project.settings as Record<string, unknown> | undefined)?.[MASTER_KEY];
+  if (scratch.project.settings) scratch.setUntracked(["settings"], kept === undefined ? scratchSettings : { ...scratchSettings, [MASTER_KEY]: kept });
   const changed = JSON.stringify(scratch.project) !== JSON.stringify(call.doc.project);
   if (!changed) final = first;
   const data = {

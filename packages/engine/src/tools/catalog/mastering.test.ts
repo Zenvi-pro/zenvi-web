@@ -19,7 +19,7 @@ import { applyClipGain } from "./mastering.js";
 import type { ToolReceipt } from "../receipt.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
 import { L1, L2, L3, audioInfo, media, videoInfo } from "../test-support/fixture.js";
-import { finishGaps, masterMark } from "../../review/finish.js";
+import { finishGaps, MASTER_KEY, masterMark } from "../../review/finish.js";
 
 const RATE = 24000;
 
@@ -203,6 +203,19 @@ describe("master_audio_tool", { timeout: 60_000 }, () => {
     expect(again.undoSteps).toBe(0);
     expect(doc.undoLabels.length).toBe(steps);
     expect(JSON.stringify(doc.project.clips)).toBe(snapshot);
+  });
+
+  it("dry_run on a mix already in band does not mark it mastered", async () => {
+    const { doc, host } = setup();
+    add(doc, "speech.mp4", { ai: SPEECH_AI, video: true, layer: L1 });
+    add(doc, "music.mp3", { ai: indexed, layer: L2 });
+    await master(doc, host);
+    // Mastered with no mark (on the desktop, or before marks existed): a measurement must not add one.
+    const { [MASTER_KEY]: _mark, ...settings } = doc.project.settings as Record<string, unknown>;
+    doc.setUntracked(["settings"], settings);
+    const dry = await master(doc, host, { dry_run: true });
+    expect(dry.summary).toMatch(/Already mastered/);
+    expect(masterMark(doc.project)).toBeNull();
   });
 
   it("dry_run reports the plan and changes nothing", async () => {
