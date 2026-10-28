@@ -90,8 +90,9 @@ too quiet and nobody has looked at the file.
    `subject_glow_tool`, `pop_out_tool`), `speed_ramp_tool` on hero shots.
 8. **Captions and type: type moves.** `kinetic_captions_tool` for speech
    (word by word, emphasis words big; a TTS voice-over keeps its script's word
-   timings, so pass its clip in `timeline_clip_ids`; `cues` only when there is
-   no voice to time to, `text_size`, `animation`); it places each caption in the shot's
+   timings, so pass its clip in `timeline_clip_ids`; `cues` when there is no
+   voice to time to, or the TTS receipt says it has no word timings (then say
+   the captions are hand-timed), `text_size`, `animation`); it places each caption in the shot's
    negative space and, after `generate_subject_matte_tool` on the footage,
    puts emphasis words behind the head. Title cards and word cards:
    `add_kinetic_title_tool` (`animation`: pop, slam, tilt, scramble,

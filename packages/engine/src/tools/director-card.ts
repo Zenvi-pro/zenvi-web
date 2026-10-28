@@ -6,7 +6,10 @@
  * never opened the recipe left grade and sound to chance. It must stay under
  * 400 tokens: 366 on Claude Sonnet 5.5 as written, 926 characters (Bedrock
  * converse usage, 2026-10-28), so the CLI's test bounds it at 1000
- * characters. The recipes keep the craft.
+ * characters. The recipes keep the craft. DIRECTOR_CARD and DIRECTOR_START go
+ * out only from the CLI's `zenvi mcp`, where render_video and
+ * read_director_recipe exist; FINISH_HINT is in engine tool descriptions on
+ * every surface, so it names Zenvi Cloud's render_project too.
  */
 
 /** The finish, for the descriptions of the tools that start a whole video (on every surface: Zenvi Cloud renders with render_project). */
