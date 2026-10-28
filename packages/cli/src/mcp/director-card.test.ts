@@ -12,7 +12,7 @@ import { SERVER_INSTRUCTIONS } from "./server.js";
 describe("director card", () => {
   it("is in the server instructions and stays under its 400-token budget", () => {
     expect(SERVER_INSTRUCTIONS).toContain(DIRECTOR_CARD);
-    // 916 characters measured 365 Sonnet 5.5 tokens (director-card.ts).
+    // 926 characters measured 366 Sonnet 5.5 tokens (director-card.ts).
     expect(DIRECTOR_CARD.length).toBeLessThanOrEqual(1000);
   });
 

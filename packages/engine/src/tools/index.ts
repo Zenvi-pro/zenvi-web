@@ -59,6 +59,6 @@ export {
   type ToolNeeds,
 } from "./availability.js";
 export { RECEIPT_OUTPUT_SCHEMA } from "./output-schema.js";
-export { DIRECTOR_CARD } from "./director-card.js";
+export { DIRECTOR_CARD, DIRECTOR_START } from "./director-card.js";
 export { backendStock, pickPexelsHdLink } from "./backend.js";
 export { SOUND_LIBRARY_ORIGINS, fetchLibraryHost, type LibraryFetch } from "./sfx-library.js";

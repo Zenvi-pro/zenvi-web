@@ -4,7 +4,7 @@
  * miss, for the MCP servers' `instructions` (sent at initialize, so every
  * client sees it whether or not it loads a skill). Bench round 5: agents that
  * never opened the recipe left grade and sound to chance. It must stay under
- * 400 tokens: 365 on Claude Sonnet 5.5 as written, 916 characters (Bedrock
+ * 400 tokens: 366 on Claude Sonnet 5.5 as written, 926 characters (Bedrock
  * converse usage, 2026-10-28), so the CLI's test bounds it at 1000
  * characters. The recipes keep the craft.
  */
@@ -13,11 +13,21 @@
 export const FINISH_HINT =
   "Then finish, in order, skipping what its receipt says it did: unify_grade_tool, apply_motion_transitions_tool, spot_sound_tool and auto_sound_design_tool, master_audio_tool iterate=true, render_video, review_render_tool.";
 
-export const DIRECTOR_CARD: string = [
-  "Whole videos (reel, ad, promo, montage, a reference to recreate): before the first edit read the genre's recipe, zenvi://director/<recipe> or the zenvi-motion-director skill's recipes/. " +
-    "Recipes: match-cut-montage (shapes line up), flash-montage (a new image every few frames), hype-reel (fast, sport, trailer: build_reel_tool hype), documentary (voice-over), kinetic-captions (talking head), " +
-    "saas-ui-promo, 3d-product-ad, editorial-type (type, mask reveals), grid-montage, tutorial, showreel-intro.",
+/** The genre router: which recipe to read. */
+const RECIPES =
+  "Recipes: match-cut-montage (shapes line up), flash-montage (a new image every few frames), hype-reel (fast, sport, trailer: build_reel_tool hype), documentary (voice-over), kinetic-captions (talking head), " +
+  "saas-ui-promo, 3d-product-ad, editorial-type (type, mask reveals), grid-montage, tutorial, showreel-intro.";
+
+/** The finish every recipe ends with, in order. */
+const FINISH =
   "Finish every edit, in order: unify_grade_tool; apply_motion_transitions_tool (no track = every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
-    "master_audio_tool iterate=true, last; render_video; review_render_tool. Receipts name what is still missing: make those calls.",
+  "master_audio_tool iterate=true, last; render_video; review_render_tool. Receipts name what is still missing: make those calls.";
+
+export const DIRECTOR_CARD: string = [
+  `Whole videos (reel, ad, promo, montage, a reference to recreate): before the first edit read the genre's recipe with read_director_recipe {recipe} (or the zenvi-motion-director skill's recipes/). ${RECIPES}`,
+  FINISH,
   "Captions on a TTS voice: kinetic_captions_tool timeline_clip_ids=[the TTS clip] uses its word timings.",
 ].join("\n");
+
+/** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
+export const DIRECTOR_START: string = `A new edit: read the genre's recipe first, read_director_recipe {recipe}. ${RECIPES} ${FINISH}`;

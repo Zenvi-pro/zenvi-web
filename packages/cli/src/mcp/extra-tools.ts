@@ -8,7 +8,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { finishGaps, finishLines, type ToolImage } from "@zenvi/engine";
 import type { JsonSchemaObject } from "@zenvi/engine/tools";
-import { applied, failed, refused, type ToolReceipt } from "@zenvi/engine/tools";
+import { applied, DIRECTOR_START, failed, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import { frameCaption, type RenderResult } from "@zenvi/render-node";
 import { pushProject } from "../cloud/sync.js";
 import { openInDesktop } from "../desktop/open.js";
@@ -19,6 +19,9 @@ import { cloudClient, keepCloudRefs } from "../commands/account.js";
 import { newProject } from "../commands/project.js";
 import { exportOnDesktop, exportOptionsFrom, type RenderFlags } from "../commands/render.js";
 import { parseTime } from "../commands/edit.js";
+import { DIRECTOR_RECIPES } from "../hosts/director.gen.js";
+import { guideText } from "../hosts/guides.js";
+import { SOUND_PALETTES } from "../hosts/sound.gen.js";
 import { VERSION } from "../version.js";
 import type { McpState } from "./state.js";
 
@@ -51,6 +54,11 @@ const bool = (description: string) => ({ type: "boolean" as const, description }
 
 function text(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : undefined;
+}
+
+/** On an empty project, the plan: open_project_file is the one receipt every agent reads before its first edit. */
+function startNotes(state: McpState): { notes?: string[] } {
+  return state.session.doc.project.clips.length === 0 ? { notes: [DIRECTOR_START] } : {};
 }
 
 function projectSummary(state: McpState): Record<string, unknown> {
@@ -92,15 +100,41 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const file = path.resolve(ctx.cwd, isProjectPath(raw) ? raw : `${raw}.zvn`);
         if (existsSync(file)) {
           await state.switchTo(file);
-          return { receipt: applied(tool, `Opened ${file}`, { data: projectSummary(state) }, 0) };
+          return { receipt: applied(tool, `Opened ${file}`, { data: projectSummary(state), ...startNotes(state) }, 0) };
         }
         if (args.create === false || args.create === "false") return { receipt: failed(tool, `${file} does not exist.`) };
         const keepEdits = !state.session.file && (state.session.doc.canUndo || state.session.doc.project.clips.length > 0 || state.session.doc.project.files.length > 0);
         const project = keepEdits ? state.session.doc.toJSON() : newProject(text(args.profile));
         await state.switchTo(file, project);
         return {
-          receipt: applied(tool, keepEdits ? `Saved the unsaved project as ${file}` : `Created ${file}`, { data: { ...projectSummary(state), created: true } }, 0),
+          receipt: applied(tool, keepEdits ? `Saved the unsaved project as ${file}` : `Created ${file}`, { data: { ...projectSummary(state), created: true }, ...startNotes(state) }, 0),
         };
+      },
+    },
+    {
+      name: "read_director_recipe",
+      title: "Read a director recipe",
+      description:
+        "The motion director's recipe for a genre (structure in seconds, shot lengths, sound plan, the exact tool calls and the finish), the same text as the resource zenvi://director/<recipe> and the zenvi-motion-director skill's recipes/. " +
+        "Read it before the first edit of a whole video. recipe=director gives the director's shared rules; sound_palette a sound designer palette (zenvi://sound/<palette>). Read-only.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          recipe: { type: "string", enum: ["director", ...DIRECTOR_RECIPES.map((r) => r.genre)], description: "The genre's recipe, or director for the shared rules." },
+          sound_palette: { type: "string", enum: SOUND_PALETTES.map((p) => p.genre), description: "Instead: a sound designer palette." },
+        },
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+      async run(_state, args) {
+        const tool = "read_director_recipe";
+        const recipe = text(args.recipe);
+        const palette = text(args.sound_palette);
+        if ((recipe === undefined) === (palette === undefined)) return { receipt: refused(tool, "Error: give recipe or sound_palette (one of them)."), engine: null };
+        const uri = palette ? `zenvi://sound/${palette}` : recipe === "director" ? "zenvi://director" : `zenvi://director/${recipe}`;
+        const markdown = guideText(uri);
+        if (!markdown) return { receipt: refused(tool, `Error: no ${palette ? `sound palette ${palette}` : `recipe ${recipe}`}; recipes: director, ${DIRECTOR_RECIPES.map((r) => r.genre).join(", ")}.`), engine: null };
+        return { receipt: applied(tool, markdown, { data: { uri } }, 0), engine: null };
       },
     },
     {
@@ -165,7 +199,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
           receipt: applied(
             tool,
             `Rendered ${result.location} (${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${mb.toFixed(1)} MB)` +
-              (gaps.length > 0 ? `. Not finished: ${gaps.map((g) => g.kind).join(", ")} missing (notes list the next calls)` : ""),
+              (gaps.length > 0 ? `. Not finished: ${gaps.map((g) => g.kind).join(", ")} missing. The edit is not done until these run: make the calls in notes, then render once more (finishing, not polish)` : ""),
             {
               data: { ...result, format: options.format, width: options.width, height: options.height, ...(gaps.length > 0 ? { finish: gaps } : {}) },
               warnings: result.warnings,
