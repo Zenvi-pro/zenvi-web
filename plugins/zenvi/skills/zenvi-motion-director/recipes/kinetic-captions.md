@@ -25,7 +25,10 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    (`file_id` of the narration) and `get_transcript_tool` with
    `includeWords: true` for word times.
 2. Picture: talking-head clip on track 1 for the whole length; inserts on the
-   same track at the noun times, 0.8-1.5 s each. Then the head's matte, once:
+   same track at the noun times, 0.8-1.5 s each. Given pieces of a talking
+   head instead of one take (a re-edit, jump cuts): `sequence_shots_tool`
+   with `voice_file_id` and each piece's line in `says` (its burnt-in
+   caption or transcript) so every piece starts on its own words. Then the head's matte, once:
    `generate_subject_matte_tool` `{"clip_id": "<head clip>"}` (CLI; about 15
    frames a second). With it the captions find the head in every shot and
    put the emphasis words behind it; a refusal (no matting here) only costs

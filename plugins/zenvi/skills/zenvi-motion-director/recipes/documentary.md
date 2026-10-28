@@ -23,7 +23,10 @@ a small logo bug, low impacts on topic changes and a quiet music bed.
    `build_reel_tool` `style: "cinematic"` (`file_ids`, `music_file_id`,
    `duration_seconds`) for a quick first cut, then trim shots to the
    narration; or place each with `add_clip_to_timeline_tool` and
-   `start_seconds`/`end_seconds`.
+   `start_seconds`/`end_seconds`. Interview / speaker shots go where they
+   say their words: `sequence_shots_tool` with `voice_file_id` and each
+   speaker shot's line in `says` (or `speech_at`), the B-roll between them
+   ordered by continuity.
 3. Collage: `add_motion_template_tool` `template: "grid"`, `layout:
    "mosaic"`, `tiles: 3`, `reveal: "slide"`, `file_ids` (3 stills), over the
    matching sentence.
