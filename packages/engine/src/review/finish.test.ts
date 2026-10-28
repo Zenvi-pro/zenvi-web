@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EditHarness } from "../tools/test-support/edit-harness.js";
+import { L1 } from "../tools/test-support/fixture.js";
 import { finishGaps, finishLines, markMastered } from "./finish.js";
 
 const kinds = (ed: EditHarness) => finishGaps(ed.doc.project).map((g) => g.kind);
@@ -50,6 +51,24 @@ describe("finishGaps", () => {
     const file = ed.doc.project.files.find((f) => f.id === block)!;
     ed.doc.setUntracked(["files", { id: block }], { ...file, zenvi_link: { engine: "zenvi-motion" } });
     ed.addClip(block, { position: 0, end: 4, layer: 2 });
-    expect(kinds(ed)).toEqual(["sound", "master"]);
+    // Silent picture: master_audio_tool would refuse it, so no master is owed.
+    expect(kinds(ed)).toEqual(["sound"]);
+  });
+
+  it("counts a libopenshot transition only where it lies on a cut", () => {
+    const { ed } = cut();
+    const fade = ed.addTransition(L1, 0, 1);
+    expect(kinds(ed)).toContain("transitions");
+    ed.doc.transaction("move", (tx) => tx.update(["effects", { id: fade }], { position: 1.5 }));
+    expect(kinds(ed)).not.toContain("transitions");
+  });
+
+  it("reads a master as stale when an audio clip is relinked to other media", () => {
+    const { ed, music } = cut();
+    markMastered(ed.doc, "social", -14);
+    expect(kinds(ed)).not.toContain("master");
+    const reader = ed.clip(music)!.reader;
+    ed.setClip(music, { reader: { ...reader, path: "/media/other-take.mp3" } });
+    expect(kinds(ed)).toContain("master");
   });
 });

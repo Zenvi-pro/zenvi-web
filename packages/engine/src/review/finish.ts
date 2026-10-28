@@ -18,6 +18,7 @@ import type { Clip, Project } from "../model/types.js";
 import { listProjectMotionTransitions } from "../ops/motion-transitions.js";
 import { supportedAudioEffects } from "../render/audio/registry.js";
 import { isSfxClip } from "../sfx/moments.js";
+import { collectTimelineAudio } from "../tools/catalog/audio.js";
 import { isColorGradeEffect } from "../tools/color-agent.js";
 import { reviewTimeline } from "./timeline.js";
 
@@ -78,8 +79,9 @@ function fnv(text: string): string {
 }
 
 /**
- * What the mix is made of: every clip that can sound, where it plays, its
- * gain curves and audio effects, and the tracks' mutes. Picture edits
+ * What the mix is made of: every clip that can sound, the media it reads
+ * (a relinked file keeps its id), where it plays, its gain curves and audio
+ * effects, and the tracks' mutes. Picture edits
  * (grades, transforms, titles) leave it alone.
  */
 export function audioFingerprint(project: Project): string {
@@ -88,6 +90,7 @@ export function audioFingerprint(project: Project): string {
     .map((c) => [
       c.id,
       c.file_id,
+      c.reader?.path,
       c.layer,
       c.position,
       c.start,
@@ -135,7 +138,9 @@ export function finishGaps(project: Project): FinishGap[] {
   }
 
   const cuts = review.cuts.length;
-  if (cuts >= MIN_CUTS && listProjectMotionTransitions(project).length === 0 && review.colorFlashes.length === 0 && (project.effects ?? []).length === 0) {
+  // A libopenshot transition counts where it lies on a cut (an opening fade does not move between shots).
+  const styled = review.cuts.some((c) => c.style === "transition");
+  if (cuts >= MIN_CUTS && listProjectMotionTransitions(project).length === 0 && review.colorFlashes.length === 0 && !styled) {
     gaps.push({
       kind: "transitions",
       message: `Hard cuts only: ${cuts} cuts and no transition (fine for a match cut or editorial type; every other genre moves between shots).`,
@@ -154,7 +159,8 @@ export function finishGaps(project: Project): FinishGap[] {
     });
   }
 
-  if (project.clips.length > 0) {
+  // master_audio_tool refuses a timeline with nothing that sounds: no master is owed to it.
+  if (collectTimelineAudio(project).length > 0) {
     const mark = masterMark(project);
     const fresh = mark !== null && mark.fingerprint === audioFingerprint(project);
     if (!fresh) {
