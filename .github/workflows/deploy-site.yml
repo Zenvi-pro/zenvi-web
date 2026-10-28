@@ -4,9 +4,16 @@ name: Deploy zenvi.pro
 # passes on main, rebuild and deploy zenvi.pro with this commit's editor.
 # The build itself lives in Zenvi-pro/zenvi-pro (`azure-deploy.yml`).
 #
+# zenvi-web is public and zenvi-pro is private, and a public repository cannot
+# call a private repository's reusable workflow, so this job asks zenvi-pro to
+# run its own deploy (workflow_dispatch with `editor_ref`). That needs a token
+# that may start workflows in zenvi-pro: the `ZENVI_PRO_DEPLOY_TOKEN` secret, a
+# fine-grained token scoped to Zenvi-pro/zenvi-pro with "Actions: read and
+# write". Without it the job says so and skips.
+#
 # An older commit can't deploy after a newer one: CI cancels an in-progress
 # run on main when the next push arrives (`cancel-in-progress`), so only the
-# newest push's CI can succeed, and deploys queue one at a time.
+# newest push's CI can succeed, and zenvi-pro's deploy job queues one at a time.
 
 on:
   workflow_run:
@@ -23,8 +30,16 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
-    uses: Zenvi-pro/zenvi-pro/.github/workflows/azure-deploy.yml@main
-    with:
-      editor_ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-    secrets:
-      AZURE_STATIC_WEB_APPS_API_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start the zenvi.pro deploy in Zenvi-pro/zenvi-pro
+        env:
+          GH_TOKEN: ${{ secrets.ZENVI_PRO_DEPLOY_TOKEN }}
+          EDITOR_REF: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::ZENVI_PRO_DEPLOY_TOKEN is not set; zenvi.pro was not deployed. Run 'Deploy to Azure (production)' in Zenvi-pro/zenvi-pro with editor_ref=$EDITOR_REF."
+            exit 0
+          fi
+          gh workflow run azure-deploy.yml --repo Zenvi-pro/zenvi-pro --ref main -f editor_ref="$EDITOR_REF"
+          echo "Asked Zenvi-pro/zenvi-pro to deploy zenvi.pro with editor $EDITOR_REF."
