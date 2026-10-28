@@ -118,12 +118,13 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       title: "Read a director recipe",
       description:
         "The motion director's recipe for a genre (structure in seconds, shot lengths, sound plan, the exact tool calls and the finish), the same text as the resource zenvi://director/<recipe> and the zenvi-motion-director skill's recipes/. " +
-        "Read it before the first edit of a whole video. recipe=director gives the director's shared rules; sound_palette a sound designer palette (zenvi://sound/<palette>). Read-only.",
+        "Read it before the first edit of a whole video. recipe=director gives the director's shared rules; sound_palette a sound designer palette (zenvi://sound/<palette>); styles the brief compiler (brief, step 0 of every edit), the styles index (index) or one style or technique by id (zenvi://styles/<id>). Read-only.",
       inputSchema: {
         type: "object",
         properties: {
           recipe: { type: "string", enum: ["director", ...DIRECTOR_RECIPES.map((r) => r.genre)], description: "The genre's recipe, or director for the shared rules." },
           sound_palette: { type: "string", enum: SOUND_PALETTES.map((p) => p.genre), description: "Instead: a sound designer palette." },
+          styles: { type: "string", description: "Instead: brief (the brief compiler), index (every style and technique, one line each) or a style or technique id from the index." },
         },
         additionalProperties: false,
       },
@@ -132,7 +133,14 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const tool = "read_director_recipe";
         const recipe = text(args.recipe);
         const palette = text(args.sound_palette);
-        if ((recipe === undefined) === (palette === undefined)) return { receipt: refused(tool, "Error: give recipe or sound_palette (one of them)."), engine: null };
+        const styles = text(args.styles);
+        if ([recipe, palette, styles].filter((v) => v !== undefined).length !== 1) return { receipt: refused(tool, "Error: give one of recipe, sound_palette or styles."), engine: null };
+        if (styles !== undefined) {
+          const uri = styles === "index" ? "zenvi://styles" : `zenvi://styles/${styles}`;
+          const markdown = guideText(uri);
+          if (!markdown) return { receipt: refused(tool, `Error: no style or technique ${styles}; styles=index lists them.`), engine: null };
+          return { receipt: applied(tool, markdown, { data: { uri } }, 0), engine: null };
+        }
         const uri = palette ? `zenvi://sound/${palette}` : recipe === "director" ? "zenvi://director" : `zenvi://director/${recipe}`;
         const markdown = guideText(uri);
         if (!markdown) return { receipt: refused(tool, `Error: no ${palette ? `sound palette ${palette}` : `recipe ${recipe}`}; recipes: director, ${DIRECTOR_RECIPES.map((r) => r.genre).join(", ")}.`), engine: null };

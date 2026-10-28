@@ -58,12 +58,17 @@ describe("zenvi mcp", () => {
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {
     const client = await connect();
     const opened = await call(client, "open_project_file", { path: "plan.zvn" });
-    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: read the genre's recipe first, read_director_recipe \{recipe\}\..*Finish every edit, in order: unify_grade_tool/);
+    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: First compile the brief: inspect_media_bin_tool, read_director_recipe \{styles: "brief"\}.*Then read its style's recipe, read_director_recipe \{recipe\}\..*Finish every edit, in order: unify_grade_tool/);
     const recipe = await call(client, "read_director_recipe", { recipe: "match-cut-montage" });
     expect(recipe.receipt.status).toBe("applied");
     expect(recipe.receipt.summary).toMatch(/match_cut_montage_tool/);
     expect((await call(client, "read_director_recipe", { sound_palette: "hype" })).receipt.summary.length).toBeGreaterThan(200);
     expect((await call(client, "read_director_recipe", {})).receipt.status).toBe("refused");
+    expect((await call(client, "read_director_recipe", { styles: "brief" })).receipt.summary).toMatch(/^# The brief compiler/);
+    expect((await call(client, "read_director_recipe", { styles: "index" })).receipt.summary).toContain("| [hype-reel](");
+    expect((await call(client, "read_director_recipe", { styles: "hype-reel" })).receipt.summary).toContain("build_reel_tool");
+    expect((await call(client, "read_director_recipe", { styles: "nope" })).receipt.status).toBe("refused");
+    expect((await call(client, "read_director_recipe", { styles: "brief", recipe: "hype-reel" })).receipt.status).toBe("refused");
   });
 
   it("lists catalog tools plus the local extras, with workflow instructions", async () => {
