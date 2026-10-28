@@ -134,7 +134,7 @@ const TO_YUV = (pixFmt: string) => `scale=out_color_matrix=bt709:out_range=tv,fo
 const COLOR_TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
 /** The options `encoderRates` sees: the frame actually encoded, quality defaulting to the dialog's "high". */
-function rateOptions(job: EncodeJob): ExportOptions {
+function rateOptions(job: Pick<EncodeJob, "options" | "video">): ExportOptions {
   const frame = job.video ?? { width: job.options.width, height: job.options.height, fps: job.options.fps };
   return { ...job.options, width: frame.width, height: frame.height, fps: frame.fps };
 }
@@ -213,7 +213,8 @@ export function isLossyAudio(format: ContainerFormat, audioCodec?: string): bool
   return !/^(pcm_|flac$|alac$)/.test(codec);
 }
 
-function audioCodecArgs(job: EncodeJob): string[] {
+/** The export's audio encoder arguments: codec and bitrate. */
+export function audioCodecArgs(job: Pick<EncodeJob, "format" | "options" | "video">): string[] {
   const rate = encoderRates(rateOptions(job)).audioBitsPerSecond ?? job.options.audioBitrate ?? FALLBACK_AUDIO_BITRATE;
   const bitrate = String(Math.round(rate));
   switch (job.format) {
