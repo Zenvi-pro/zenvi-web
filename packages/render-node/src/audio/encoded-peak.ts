@@ -50,9 +50,9 @@ export interface EncodedPeakFit {
   warning?: string;
 }
 
-/** True peak of a file's first audio stream, dBTP (ffmpeg `ebur128`); null when silent. */
+/** True peak of a file's first audio stream, dBTP (ffmpeg `ebur128`; framelog=verbose: 5.1 has no quiet); null when silent. */
 export async function encodedTruePeak(file: string, signal?: AbortSignal): Promise<number | null> {
-  const { stderr } = await runBinary(resolveBinary("ffmpeg"), ["-hide_banner", "-nostats", "-nostdin", "-i", file, "-map", "0:a:0", "-af", "ebur128=peak=true:framelog=quiet", "-f", "null", "-"], {
+  const { stderr } = await runBinary(resolveBinary("ffmpeg"), ["-hide_banner", "-nostats", "-nostdin", "-i", file, "-map", "0:a:0", "-af", "ebur128=peak=true:framelog=verbose", "-f", "null", "-"], {
     signal,
     what: "Measuring the encoded true peak failed",
   });
