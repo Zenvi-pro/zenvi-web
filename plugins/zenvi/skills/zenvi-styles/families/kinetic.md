@@ -84,3 +84,19 @@ says which type motions carry it, and which never share a scene.
 `text-echo-stack`, `text-on-path`, `svg-path-write-on`, `cutout-title-reveal`, `tracked-point-callout-pin`,
 `lyric-forced-alignment`, `type-strobe-sequencer`, `typographic-layout-variants`, `cylinder-text-wheel`. Each technique
 that needs one says so and gives the fallback it was verified with.
+
+## Four verified combinations (showcases, 2026-10-28)
+
+Built with the CLI on bench footage, rendered, judged once with the watch judge, one fix pass from its notes, judged
+again. Scores are absolute (/10). Each scene keeps to one hero motion + at most one support motion.
+
+| edit | scenes (hero + support) | first → after fix | what the fix was |
+| --- | --- | --- | --- |
+| Talking head 9:16, 12 s | text-behind-subject hook → vo-captions + emphasis-scale (+ lower-third once) → keyword-slam card at 40 % → captions over inserts → mask-reveal end card | 4.3 → 6.5 | picture ended 0.5 s after the last word (no dead air), inserts on the words they show, hook word sized to fit, captions not behind the head while inserts are on |
+| Launch promo 16:9, 12 s, 120 bpm | mask-reveal headline → counter → keyword-slam (black) → 3d-title → word-rotator end card | 5.0 → 6.4 | brighter accent on the serif word, footage dimmed under type, the 3D title on its own dark field instead of repeated b-roll |
+| Editorial 16:9, 15 s, 108 bpm | letter-swap on a specimen sheet → hard cuts → scramble-decode labels over footage → quote-card (pattern break) → type-morph lockup | 6.6 → 7.7 | lockup held 1.4 s, shadows lifted + fine grain on the stock to meet the paper palette |
+| Lyric 16:9, 9 s, 96 bpm | lyric-sync (one face, one size) → shout line + text-on-path ring → letter-cascade lockup on black | 4.6 → 4.5 | ended on the lockup, dimmed footage, one hit on the shout; still limited by the synthetic singing voice and busy concert footage |
+
+Lessons that hold for every edit: end on a held lockup (the judge marks every abrupt end down), give type its own calm or
+dark ground (stock footage under type is the most common complaint), and a sound on the hero type events is worth more
+than any extra motion.
