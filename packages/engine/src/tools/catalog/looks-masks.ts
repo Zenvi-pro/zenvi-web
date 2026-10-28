@@ -43,12 +43,18 @@ function isFootage(project: Project, clip: Clip): boolean {
   return isVisual(project, clip) && !/\.svg$/i.test(String(fileById(project, String(clip.file_id))?.path ?? ""));
 }
 
-/** The clips a call works on: the ones named (each checked), else every visual clip on an unlocked track. */
-function targets(project: Project, ids: readonly string[] | undefined): Clip[] {
+/**
+ * The clips a call works on: the ones named (each checked), else every footage clip on an unlocked track;
+ * with `baseTrack`, only those on the lowest of those tracks (the base video track: not the grid tiles,
+ * motion-block or 3D renders laid over it, which a vignette would darken edge by edge).
+ */
+function targets(project: Project, ids: readonly string[] | undefined, baseTrack = false): Clip[] {
   if (!ids) {
     const all = project.clips.filter((c) => isFootage(project, c) && !isLocked(project, c.layer));
     if (all.length === 0) toolError("the timeline has no footage or photo clips on unlocked tracks");
-    return all;
+    if (!baseTrack) return all;
+    const base = Math.min(...all.map((c) => c.layer));
+    return all.filter((c) => c.layer === base);
   }
   return [...new Set(ids)].map((id) => {
     const clip = project.clips.find((c) => c.id === id);
@@ -84,7 +90,7 @@ function commitLooks(call: ToolCall, label: string, changes: [Clip, Effect[]][])
 }
 
 const vignetteInput = z.strictObject({
-  clip_ids: clipIds,
+  clip_ids: clipIds.describe("Timeline clip ids (describe_project_tool or a receipt). Default: the footage and photo clips of the base video track (the lowest unlocked one with any)."),
   amount: z.number().min(0).max(1).optional().describe("How dark the corners get, 0-1 (default 0.4; 0 removes the vignette)."),
   feather: z.number().min(0).max(1).optional().describe("0 = the falloff starts late and is quick, 1 = it starts near the centre and is gentle (default 0.5)."),
 });
@@ -147,13 +153,13 @@ export const lookMaskTools: CatalogTool[] = [
     title: "Vignette",
     description:
       "Darken the edges of clips, the cinematic vignette: a Brightness effect masked by a soft oval falloff the shape of the frame. amount sets how dark the corners get, feather how gradual. " +
-      "Default: every footage and photo clip (not titles). Running it again updates the vignette; amount=0 removes it. One undo step.",
+      "Default: the footage and photo clips of the base video track (the lowest one with any; not titles, grid tiles or overlays above it). Running it again updates the vignette; amount=0 removes it. One undo step.",
     input: vignetteInput,
     annotations: EDIT,
     run: (call, input: z.infer<typeof vignetteInput>) =>
       guarded("add_vignette_tool", async () => {
         const project = call.doc.project;
-        const clips = targets(project, input.clip_ids);
+        const clips = targets(project, input.clip_ids, true);
         const amount = input.amount ?? 0.4;
         const feather = input.feather ?? 0.5;
         let effect: ((id: string) => Effect) | null = null;

@@ -15,17 +15,18 @@ import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from "node:fs/pr
 import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import { audioCutNote, defaultExportEnd, exportCeilingDb, frameContaining, isSequenceFormat, lastFrameBefore, projectAtFrameRate, type ExportEnd, type ExportResult, type Fraction, type FramePlan, type Project, type RgbaImage } from "@zenvi/engine";
+import { audioCutNote, defaultExportEnd, EXPORT_TRUE_PEAK_DBTP, exportCeilingDb, frameContaining, isSequenceFormat, lastFrameBefore, projectAtFrameRate, type ExportEnd, type ExportResult, type Fraction, type FramePlan, type Project, type RgbaImage } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
 import { SourceManager, type MediaResolver } from "../decode/sources.js";
 import type { ScaleQuality } from "../decode/video.js";
 import { streamStarts } from "../probe/starts.js";
+import { fitEncodedPeak } from "../audio/encoded-peak.js";
 import { appendToOutput, normalizeLoudness, truePeakLimiterFilter } from "../audio/mix.js";
 import { buildAudioGraph } from "./audio-graph.js";
 import { processLimits } from "../limits.js";
 import { CompositePool, compositeThreads } from "./composite-pool.js";
-import { encoderCommand, ffmpegMajor, FORMATS, isLossyAudio, type NodeExportOptions } from "./encoder.js";
+import { audioCodecArgs, encoderCommand, ffmpegMajor, FORMATS, isLossyAudio, type NodeExportOptions } from "./encoder.js";
 import { nodeTextRasterizer } from "../svg/text.js";
 import { defaultRenderEngine, projectNeedsText, type RenderEngine } from "./engine.js";
 
@@ -175,7 +176,7 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
   try {
     const effectsDir = withAudio ? await mkdtemp(path.join(tmpdir(), "zenvi-audio-fx-")) : undefined;
     tempDirs.push(...(effectsDir ? [effectsDir] : []));
-    const audio = withAudio
+    let audio = withAudio
       ? await buildAudioGraph({
           plan: engine.planAudio(project, { start, end }),
           range: { start, end },
@@ -194,10 +195,27 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
       const skipped = await normalizeLoudness(audio, options.loudness, sampleRate, channels, effectsDir!, info.video ? 1 : 0, signal);
       if (skipped) warnings.push(skipped);
     }
-    // Last on the mix, after any normalisation: nothing that reaches the file passes the ceiling.
+    // Last on the mix, after any normalisation: nothing that reaches the file passes the ceiling. A lossy
+    // codec overshoots its input, so there the limit is fitted on trial encodes of the mix (encoded-peak.ts).
     if (audio && options.truePeakLimit !== false) {
-      const ceiling = exportCeilingDb(isLossyAudio(format, options.audioCodec));
-      audio.filter = appendToOutput(audio.filter, truePeakLimiterFilter(sampleRate, ceiling, await ffmpegMajor()));
+      if (isLossyAudio(format, options.audioCodec)) {
+        const video = info.video ? { width, height, fps } : undefined;
+        const fit = await fitEncodedPeak(audio, {
+          sampleRate,
+          channels,
+          seconds: end - start,
+          codecArgs: audioCodecArgs({ format, options, video }),
+          firstInput: info.video ? 1 : 0,
+          ceilingDb: EXPORT_TRUE_PEAK_DBTP,
+          startDb: exportCeilingDb(true),
+          tempDir: effectsDir!,
+          signal,
+        });
+        audio = fit.graph;
+        if (fit.warning) warnings.push(fit.warning);
+      } else {
+        audio.filter = appendToOutput(audio.filter, truePeakLimiterFilter(sampleRate, exportCeilingDb(false), await ffmpegMajor()));
+      }
     }
 
     const command = encoderCommand({

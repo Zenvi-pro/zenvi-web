@@ -35,6 +35,10 @@ describe("add_vignette_tool", () => {
     await ed.receipt("add_vignette_tool", {});
     expect(looksOf(ed, a, "vignette")).toHaveLength(1);
     expect(looksOf(ed, title, "vignette")).toHaveLength(0);
+    // A picture laid over the base track (a grid tile, a motion-block render) keeps its edges (W53 integration note).
+    const overlay = ed.addClip(ed.addFile("video"), { position: 1, end: 3, layer: 3 });
+    expect((await ed.call("add_vignette_tool", {})).status).toBe("unchanged");
+    expect(looksOf(ed, overlay, "vignette")).toHaveLength(0);
     ed.mark();
     expect((await ed.call("add_vignette_tool", {})).status).toBe("unchanged");
     expect((await ed.call("add_shape_mask_tool", { remove: true })).status).toBe("unchanged");

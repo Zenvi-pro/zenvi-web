@@ -236,6 +236,11 @@ describe("renders and frames over MCP", () => {
     expect(image?.mimeType).toBe("image/png");
     expect(Buffer.from(image?.data ?? "", "base64")).toEqual(PNG_1X1);
     expect(await h.blobs.acceptSignedRead(res.structuredContent?.image_url as string)).toEqual(PNG_1X1);
+    // The local MCP server's argument name works too (W53 B7); no time at all is refused.
+    const local = await call(client, "preview_frame", { seconds: 0.5 });
+    expect(local.isError).toBeFalsy();
+    expect(local.structuredContent?.time_seconds).toBe(0.5);
+    expect((await call(client, "preview_frame", {})).isError).toBe(true);
     await client.close();
   });
 });

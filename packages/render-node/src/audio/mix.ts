@@ -33,7 +33,7 @@ export interface MixOptions {
  * sources from `firstInput` (1 when the video arrives on input 0): the
  * inputs before them are placeholders here.
  */
-async function graphArgs(graph: AudioGraph, filter: string, scriptPath: string, firstInput = 0): Promise<string[]> {
+export async function graphArgs(graph: AudioGraph, filter: string, scriptPath: string, firstInput = 0): Promise<string[]> {
   const args = ["-nostats", "-nostdin"];
   for (let i = 0; i < firstInput; i += 1) args.push("-f", "lavfi", "-t", "0.1", "-i", "anullsrc");
   for (const input of graph.inputs) args.push("-ss", input.seek.toFixed(6), "-t", input.duration.toFixed(6), "-i", input.path);

@@ -151,10 +151,18 @@ describe("make it snappy", () => {
 
   it("leads its summary with one line of what changed, from the receipts", async () => {
     const session = sessionWithCuts(3);
-    const outcomes = await makeItSnappy(() => session.project, withMastering(editorToolRunner(session)));
+    const runner = withMastering(editorToolRunner(session));
+    let sound: Record<string, unknown> = {};
+    const outcomes = await makeItSnappy(() => session.project, async (name, a) => {
+      const run = await runner(name, a);
+      if (name === "auto_sound_design_tool") sound = run.data;
+      return run;
+    });
     const summary = snappySummary(outcomes);
     const [headline] = summary.description.split("\n");
-    expect(headline).toMatch(/^2 transitions · \d+ sounds?( · mastered to −\d+ LUFS)?$/);
+    expect(headline).toMatch(/^2 transitions · \d+ sound cues?( · mastered to −\d+ LUFS)?$/);
+    // Hit points with a sound, not the layers they are made of (W53 B9: "117 sounds" on a 40-cut reel).
+    expect(headline).toContain(`· ${sound.sounded as number} sound cue`);
     expect(summary.issues).toEqual([]);
     expect(summary.details).toContain("✓ Motion transitions: Added 2 motion transition(s)");
     expect(summary.details).toMatch(/\d undo steps; Undo all takes them back\.$/);
