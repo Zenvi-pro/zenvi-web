@@ -1,0 +1,45 @@
+---
+id: kinetic-lyric-sync
+kind: technique
+summary: "When a song's words are the text: lyrics appear on vocal onsets, one face, one size, a shout line in caps."
+categories: [music-lyric-video, kinetic-type-motion-design, fashion-beauty-ad, travel-cinematic-montage]
+tools: [kinetic_captions_tool, add_kinetic_title_tool, detect_beats_tool, edit_captions_tool]
+pace: medium
+mood: [emotional, rhythmic, intimate]
+aspect: ["9:16", "16:9", "1:1"]
+pairs_with: [kinetic-text-on-path, kinetic-title-sequence]
+avoid_with: [kinetic-vo-captions, kinetic-karaoke, kinetic-emphasis-scale, kinetic-scramble-decode]
+needs: [lyric-forced-alignment]
+---
+
+# Lyric text timed to vocals
+
+## What it is
+Lyric words or phrases appear at the sung onsets: lowercase subtitle lines with one caps shout line, a serif block with
+4-frame fades, or a monospace stanza that snaps. Emphasis comes from timing and layout, not size.
+
+## Build it in Zenvi
+ASR on sung vocals is unreliable and there is no forced aligner (`needs: lyric-forced-alignment`). Fallback: hand-time
+one cue per sung phrase (listen, or read onsets from `detect_beats_tool` / the waveform) and pass them as cues:
+```json
+kinetic_captions_tool {"cues": [{"text": "we were lights", "start": 0.4, "end": 1.6}, {"text": "in the dark", "start": 1.9, "end": 2.9},
+  {"text": "WE WERE LOUD", "start": 3.2, "end": 4.6}], "style": "documentary", "animation": "fade", "emphasis": "none"}
+```
+A phrase per cue; words inside it are spread by length. `style: "editorial"` for a serif block, `"stack"` for a shout.
+
+## Timing & taste rules
+- Text onset within 2 frames of the sung onset; hand-timed cues are checked by ear on a render.
+- One face, one size (≤ 1.2x variance); only the shout line may be bigger/caps.
+- Reset the canvas in the vocal rests (on the breath), not mid-line.
+- Keep the lyric off the focal subject (bottom band, above the horizon, or beside the singer).
+
+## Sound for it
+None: the song is the mix (cue-per-cut under ~10 %). Do not run auto_sound_design at its default density.
+
+## Common mistakes
+- Captions from ASR on a song (wrong words, drifting timing).
+- Pop/slam entrances on a ballad.
+- Copying a real song's lyrics into a public edit.
+
+## Verified
+VERIFIED:kinetic-lyric-sync
