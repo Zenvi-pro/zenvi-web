@@ -71,10 +71,18 @@ export const watchRenderTools: CatalogTool[] = [
       const project = call.doc.project;
       const review = (project.clips ?? []).length > 0 ? reviewTimeline(project) : null;
       // Read the length first when the host can: a render of another edit gets no timeline notes, and a long one is refused before uploading.
+      // The watch host's own reading comes first: it opens the path as `watch` will (the CLI's start at the project's folder).
+      const watcher = call.host.watch!;
+      const media = call.host.media;
+      const readLength = watcher.length
+        ? (p: string) => watcher.length!(p, call.signal)
+        : media
+          ? async (p: string) => Number((await media.probe(p)).duration)
+          : null;
       let length: number | null = null;
-      if (call.host.media) {
+      if (readLength) {
         try {
-          length = Number((await call.host.media.probe(args.path)).duration) || null;
+          length = (await readLength(args.path)) || null;
         } catch (error) {
           return refused(TOOL, `Error: could not read ${args.path}: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -87,7 +95,7 @@ export const watchRenderTools: CatalogTool[] = [
 
       let critique: WatchCritique;
       try {
-        critique = await call.host.watch!.watch(args.path, {
+        critique = await watcher.watch(args.path, {
           brief: args.brief,
           focus: args.focus,
           timelineNotes: notes || undefined,

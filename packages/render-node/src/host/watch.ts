@@ -252,5 +252,6 @@ export function createNodeWatchHost(options: NodeWatchOptions): WatchHost | unde
   if (!critic) return undefined;
   return {
     watch: (p, request = {}) => critic(options.resolvePath(p), { ...request, signal: request.signal ?? options.signal }),
+    length: async (p, signal) => Number((await ffprobe(options.resolvePath(p), signal ?? options.signal)).format.duration) || 0,
   };
 }

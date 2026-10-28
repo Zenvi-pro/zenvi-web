@@ -125,4 +125,9 @@ describe("watch host (node)", { timeout: 60_000 }, () => {
     expect(createNodeWatchHost({ env: {}, backend, resolvePath: (p) => p })).toBeDefined();
     expect(createNodeWatchHost({ env: { ZENVI_GEMINI_API_KEY: "k" }, resolvePath: (p) => p })).toBeDefined();
   });
+
+  it("reads a render's length from the path it will watch", async () => {
+    const host = createNodeWatchHost({ env: {}, backend: { baseUrl: "https://api.test", token: async () => "t" }, resolvePath: (p) => `${dir}/${p}` })!;
+    expect(await host.length!("tall.mp4")).toBeCloseTo(1.5, 1);
+  });
 });

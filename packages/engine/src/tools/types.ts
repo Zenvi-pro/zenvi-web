@@ -976,6 +976,8 @@ export interface MotionHost {
  */
 export interface WatchHost {
   watch(path: string, request?: WatchRequest): Promise<WatchCritique>;
+  /** Seconds of the file `watch` would open (the same path resolution); absent = the tool asks `media.probe`. */
+  length?(path: string, signal?: AbortSignal): Promise<number>;
 }
 
 export interface ToolHost {

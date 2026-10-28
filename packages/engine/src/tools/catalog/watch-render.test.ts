@@ -109,6 +109,20 @@ describe("watch_render_tool", () => {
     expect((await runTool({ doc: ed.doc, host: ed.host }, "watch_render_tool", { path: "out.mp4" })).data!.status).toBe("error");
   });
 
+  it("reads the length the way the watch host opens the file, not media.probe's way", async () => {
+    const ed = new EditHarness();
+    const asked = watching(ed, 9, async () => critique(120));
+    const probed: string[] = [];
+    const probe = ed.host.media!.probe;
+    ed.host.media!.probe = async (path) => (probed.push(path), probe(path));
+    ed.host.watch!.length = async () => 120;
+    const long = (await runTool({ doc: ed.doc, host: ed.host }, "watch_render_tool", { path: "renders/out.mp4" })).data!;
+    expect(long.status).toBe("refused");
+    expect(long.summary).toContain("at most 90 s");
+    expect(asked).toHaveLength(0);
+    expect(probed).toHaveLength(0);
+  });
+
   it("is unavailable where the host cannot watch, naming where it works", async () => {
     const ed = new EditHarness();
     delete ed.host.watch;
