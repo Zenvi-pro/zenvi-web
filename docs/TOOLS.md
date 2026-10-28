@@ -3424,6 +3424,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `bpm` | number |  | Tempo to use instead of the detected one. Alone: the music is tracked at this tempo (detect_beats_tool's alternatives lists the half/double readings). With offset_seconds: no detection, the grid is exact. (min 40, max 400) |
 | `offset_seconds` | number |  | With bpm: where the first beat falls in the music, seconds. The grid runs from there at that tempo. (min 0, max 3600) |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (they are removed in the same undo step). |
+| `keep_order` | boolean |  | Cut styles: keep file_ids as given when they are the bin's own order (by default such a list is ordered by continuity first, like sequence_shots_tool). |
 | `strict_variety` | boolean |  | Refuse (nothing changes) when the files are too few for the pace and a file comes back within 3 s; the error says how many more to import. Default false: a warning. |
 | `grade` | string |  | One look over every shot: 'auto' (default for hype and highlight) measures each clip, corrects it toward one target and lays one shared LUT (a cool night look when the titles say night or the footage is dark, else teal and orange); a LUT id from list_looks_tool uses that LUT; 'none' (default for the other styles) skips it. Needs a surface that renders frames. |
 
@@ -3488,6 +3489,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `transitions` | "auto" \| "none" \| "punch" \| "flash" \| "whip" |  | Motion transitions on the cuts, once a bar between the flashed downbeats, in the same undo step: auto (default) = punch: crash zoom about the subject and glitch, the last cut flying into the subject; flash (a flash montage): inverted frames, glitches and punches; whip: whips in one direction, landing on a pull-back; none: hard cuts and flashes only. |
 | `strict_variety` | boolean |  | Refuse (nothing changes) when the files are too few for the pace and a file comes back within 3 s; the error says how many more to import. Default false: a warning. |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (in the same undo step). |
+| `keep_order` | boolean |  | Keep file_ids as given when they are the bin's own order (by default such a list is first chained by shape continuity, like sequence_shots_tool). |
 
 ### sequence_shots_tool
 

@@ -53,6 +53,7 @@ import { effectFactory, mergedGradeEffects } from "./color-agent.js";
 import { gradeFootage, gradeReport, measureFootage, resolveReelLook, type ReelGrade } from "./reel-grade.js";
 import type { ImportedMedia } from "../types.js";
 import { FINISH_HINT } from "../director-card.js";
+import { inBinOrder, sequenceFiles } from "./sequence.js";
 
 const TOOL = "build_reel_tool";
 /** How long a white flash fades, seconds (three frames at 30 fps). */
@@ -105,6 +106,7 @@ const input = z.strictObject({
     .describe("Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial)."),
   ...beatOverrideShape,
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (they are removed in the same undo step)."),
+  keep_order: z.boolean().optional().describe("Cut styles: keep file_ids as given when they are the bin's own order (by default such a list is ordered by continuity first, like sequence_shots_tool)."),
   strict_variety: z
     .boolean()
     .optional()
@@ -404,6 +406,15 @@ export const reelTools: CatalogTool[] = [
       if (gradeMode !== "none" && !measured) warnings.push("This surface cannot render frames: the shots keep their own colour (no one-look grade).");
       const look = measured && gradeMode !== "none" ? await resolveReelLook(call, gradeMode, texts, [...measured.profiles.values()]) : null;
       let ordered = media;
+      const orderNotes: string[] = [];
+      // file_ids in the bin's own order are no story either: ordered by continuity first (re-edit bench, 2026-10-28).
+      if (args.file_ids && !args.keep_order && inBinOrder(project, args.file_ids)) {
+        const sequenced = await sequenceFiles(call, args.file_ids, { arc: styleId === "hype" ? "build" : "peak" }, "keep_order");
+        if (sequenced) {
+          ordered = sequenced.ids.map((id) => media.find((m) => m.fileId === id)!);
+          orderNotes.push(sequenced.note);
+        }
+      }
       if (measured && look && !args.file_ids) {
         // Bin order has no story: the clips that already fit the look open the reel and close it.
         const order = orderByFit(media.map((m) => m.fileId), measured.profiles, lookTarget(look.choice.look, [...measured.profiles.values()]));
@@ -561,6 +572,7 @@ export const reelTools: CatalogTool[] = [
       return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${plan.shots.length} shots cut to ${Math.round(plan.bpm)} BPM, ${brief.format}. Length ${plan.lengthNote}.${accentNote}${gradeNote}`, {
         warnings,
         notes: [
+          ...orderNotes,
           ...(style.id === "hype" ? ["Sound design: auto_sound_design_tool with the receipt's sound_design args puts a sound on nearly every cut."] : []),
           "Finish with master_audio_tool (preset social) after the sound is in place: it sets the loudness and balance.",
         ],

@@ -42,6 +42,7 @@ import type { ImportedMedia } from "../types.js";
 import { placeMusicBed } from "./music-bed.js";
 import { aspectOf, displayName, musicFromBeats, usableRange, visualKind, writeCard } from "./reels.js";
 import { FINISH_HINT } from "../director-card.js";
+import { inBinOrder, sequenceFiles } from "./sequence.js";
 
 const ALIGN = "align_match_cut_tool";
 const DETECT = "detect_subject_tool";
@@ -147,6 +148,7 @@ const montageInput = z.strictObject({
     .optional()
     .describe(`Refuse (nothing changes) when the files are too few for the pace and a file comes back within ${REUSE_GAP_SECONDS} s; the error says how many more to import. Default false: a warning.`),
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (in the same undo step)."),
+  keep_order: z.boolean().optional().describe("Keep file_ids as given when they are the bin's own order (by default such a list is first chained by shape continuity, like sequence_shots_tool)."),
 });
 
 type AlignArgs = z.infer<typeof alignInput>;
@@ -360,7 +362,7 @@ const montageTool = directTool({
   run: async (call, args: MontageArgs) => {
     const project = call.doc.project;
     const files = new Map(project.files.map((f) => [String(f.id), f]));
-    const ids = args.file_ids;
+    let ids = args.file_ids;
     const unknown = ids.filter((id) => !files.has(id));
     if (unknown.length > 0) return refused(MONTAGE, `Error: unknown file id(s): ${unknown.join(", ")}.`);
     const notVisual = ids.filter((id) => visualKind(files.get(id)!) === null);
@@ -416,6 +418,16 @@ const montageTool = directTool({
       } else warnings.push("This surface cannot analyse audio: the cuts follow 120 BPM, not the music (pass bpm and offset_seconds).");
     } else if (args.beats || args.offset_seconds !== undefined) {
       warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow bpm (default 120).");
+    }
+
+    // A list in the bin's own order is no chain: shapes are chained first (re-edit bench, 2026-10-28).
+    const notes: string[] = [];
+    if (!args.keep_order && inBinOrder(project, ids)) {
+      const ordered = await sequenceFiles(call, ids, { arc: "flat", continuity: 2 }, "keep_order");
+      if (ordered) {
+        ids = ordered.ids;
+        notes.push(ordered.note);
+      }
     }
 
     const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);
@@ -599,6 +611,7 @@ const montageTool = directTool({
       }.`,
       {
         warnings: [...new Set(warnings)],
+        notes,
         data: {
           duration: round(plan.duration),
           bpm: round(plan.bpm, 2),

@@ -22,7 +22,7 @@ import { shotFeatures } from "../../sequence/features.js";
 import { ENERGY_ARCS, planSequence, type SequenceGoal, type SequenceShotInput } from "../../sequence/plan.js";
 import { findSpoken } from "../../sequence/speech.js";
 import { fpsFloat } from "../../timeline/time.js";
-import { directTool, type CatalogTool } from "../define.js";
+import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused, unchanged, failed } from "../receipt.js";
 import { shotFrames, type ShotWindow } from "../shot-frames.js";
 import { isLocked } from "../titles-text.js";
@@ -140,6 +140,48 @@ function speechOf(s: z.output<typeof shotSchema>): { says?: string; speechVoice?
 
 function indexOf(cands: readonly Candidate[], id: string): number {
   return cands.findIndex((c) => idOf(c) === id || String(c.window.file.id) === id);
+}
+
+/** Fewer files than this have no order worth searching for. */
+const AUTO_MIN_FILES = 4;
+
+/**
+ * Whether `ids` are the bin's own order (every id once, in project.files
+ * order): what a caller passes when nobody chose an order, like the import
+ * receipt's list. The genre tools sequence such a list themselves.
+ */
+export function inBinOrder(project: Project, ids: readonly string[]): boolean {
+  if (ids.length < AUTO_MIN_FILES || new Set(ids).size !== ids.length) return false;
+  const at = new Map(project.files.map((f, i) => [String(f.id), i]));
+  return ids.every((id, k) => k === 0 || (at.get(id) ?? -1) > (at.get(ids[k - 1]!) ?? -1));
+}
+
+/**
+ * Whole bin files in sequence_shots_tool's order (continuity, `goal`'s arc,
+ * the strongest last), with the receipt note that says so; null where the
+ * frames cannot be read (the caller keeps its order).
+ */
+export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal: SequenceGoal, keepFlag: string): Promise<{ ids: string[]; note: string } | null> {
+  const project = call.doc.project;
+  if (!call.host.frames) return null;
+  const fps = fpsFloat(project.fps);
+  const shots: SequenceShotInput[] = [];
+  for (const id of ids) {
+    const file = project.files.find((f) => String(f.id) === id);
+    if (!file) return null;
+    const still = isStill(file);
+    const end = still ? STILL_SECONDS : Number(file.duration) || 0;
+    if (!(end > 0)) return null;
+    const frames = await shotFrames(call, { file, start: 0, end, still }, fps);
+    if (typeof frames === "string") return null;
+    shots.push({ features: shotFeatures(frames), seconds: end, ...(still ? { still: true } : {}) });
+  }
+  const plan = planSequence(shots, goal);
+  const out = plan.order.map((k) => ids[k]!);
+  return {
+    ids: out,
+    note: `file_ids were in bin order: ordered by continuity first (sequence_shots_tool's planner; mean cut match ${plan.meanMatch} vs ${plan.givenMatch} in bin order). Pass ${keepFlag}: true to keep the order given.`,
+  };
 }
 
 export const sequenceTools: CatalogTool[] = [

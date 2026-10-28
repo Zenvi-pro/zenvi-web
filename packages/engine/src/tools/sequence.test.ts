@@ -7,6 +7,7 @@ import type { RgbaImage } from "../render/types.js";
 import { runTool } from "./registry.js";
 import { storeTranscript, type StoredTranscript } from "./transcripts.js";
 import { audioInfo, media, videoInfo } from "./test-support/fixture.js";
+import { fakeHost } from "./test-support/fake-host.js";
 import { pixelFrameHost } from "./test-support/pixel-host.js";
 import type { FrameHost, ToolHost } from "./types.js";
 
@@ -148,5 +149,25 @@ describe("sequence_shots_tool", () => {
     const result = await runTool({ doc, host: { frames: pixelFrameHost(paint) } }, "sequence_shots_tool", { shots: WINDOWS.map((w) => ({ file_id: "TAKE", ...w })), arc: "flat", close: "none", dry_run: true });
     expect(result.data?.status, result.data?.summary).toMatch(/^(applied|unchanged)$/);
     expect((result.data?.data as Data).order.map((r) => r.source_in)).toEqual([0, 0.5, 1, 1.5]);
+  });
+
+  it("has the genre tools order a file list that is just the bin's own order, unless keep_order", async () => {
+    const doc = new ProjectDocument(project(false));
+    doc.transaction("more files", (tx) => {
+      for (const k of [1, 2, 3]) addFile(tx, media(`/m/take${k}.mp4`, videoInfo(`/m/take${k}.mp4`, 2, { width: W, height: H, fps: { num: FPS, den: 1 } })), { id: `TAKE${k}` });
+    });
+    const ids = ["TAKE", "TAKE1", "TAKE2", "TAKE3"];
+    const host: ToolHost = { ...fakeHost(), frames: sampler() };
+    const montage = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 4, flash: false, transitions: "none" });
+    expect(montage.data?.status, montage.data?.summary).toBe("applied");
+    expect(montage.data?.notes?.join(" ")).toMatch(/^file_ids were in bin order: ordered by continuity first .* Pass keep_order: true/);
+    const kept = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 4, flash: false, transitions: "none", replace: true, keep_order: true });
+    expect(kept.data?.notes ?? []).toEqual([]);
+    // A chosen order is left alone.
+    const chosen = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ["TAKE2", "TAKE", "TAKE3", "TAKE1"], duration_seconds: 4, flash: false, transitions: "none", replace: true });
+    expect(chosen.data?.notes ?? []).toEqual([]);
+    const reel = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: ids, duration_seconds: 4, replace: true });
+    expect(reel.data?.status, reel.data?.summary).toBe("applied");
+    expect(reel.data?.notes?.[0]).toMatch(/^file_ids were in bin order: ordered by continuity first/);
   });
 });
