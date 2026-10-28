@@ -43,7 +43,7 @@ const input = z.strictObject({
   what: z.enum(WHATS).describe(
     "What lands on the word: title (add_kinetic_title_tool; text defaults to the word), sfx (add_sfx_tool), clip (add_clip_to_timeline_tool: a cutaway, needs file_id), motion_block (add_motion_block_tool, needs block), cut (split_clip_tool: splits the speaking clip there).",
   ),
-  args: z.record(z.string(), z.unknown()).optional().describe("Arguments of that tool, without its time (position_seconds / at_seconds is set to the word), e.g. {recipe:'whoosh'} for sfx, {file_id, duration_seconds:1.2, track:'V2'} for clip, {style:'creator', duration_seconds:1.5} for title."),
+  args: z.record(z.string(), z.unknown()).optional().describe("Arguments of that tool, without its time (position_seconds / at_seconds is set to the word), e.g. {recipe:'impact_punch'} for sfx, {file_id, duration_seconds:1.2, track:'V2'} for clip, {style:'creator', duration_seconds:1.5} for title."),
   timeline_clip_ids: z.array(z.string().min(1)).min(1).max(20).optional().describe("Clips whose speech to search (default: footage with sound, and clips with a transcript such as TTS voices or aligned lyrics)."),
   language: z.string().max(16).optional().describe("Speech language when a clip has to be transcribed (auto by default)."),
 });
@@ -123,7 +123,9 @@ export const placeOnWordTools: CatalogTool[] = [
         const result = await runTool({ doc: scratch, host: call.host, signal: call.signal }, placer.tool, step);
         const receipt = result.data;
         const ok = receipt?.status === "applied";
-        const landed = ok ? (args.what === "cut" ? target : landedAt(before, scratch.project)) : null;
+        // A sound lands where its hit plays (add_sfx_tool starts the clip early by its lead-in); anything else at its first frame.
+        const hitAt = Number((receipt?.data as { hit_seconds?: unknown } | undefined)?.hit_seconds);
+        const landed = !ok ? null : args.what === "cut" ? target : Number.isFinite(hitAt) ? hitAt : landedAt(before, scratch.project);
         placements.push({
           word: hit.text,
           occurrence: hits.indexOf(hit) + 1,
@@ -141,7 +143,9 @@ export const placeOnWordTools: CatalogTool[] = [
       }
       const placed = placements.filter((p) => p.status === "applied");
       if (placed.length === 0) {
-        return failed(TOOL, `Error: nothing was placed: ${placements[0]?.summary.replace(/^Error:\s*/, "") ?? "the placing tool failed"}`, { data: { placements } });
+        const why = `Error: nothing was placed: ${placements[0]?.summary.replace(/^Error:\s*/, "") ?? "the placing tool failed"}`;
+        // The placing tool refused (bad args, a locked track): so does this call; it failed: so does this one.
+        return placements.every((p) => p.status === "refused") ? refused(TOOL, why, { data: { placements } }) : failed(TOOL, why, { data: { placements } });
       }
       call.commit((tx) => applyProjectState(tx, scratch.project), `Place ${args.what} on "${args.word}"`);
       const missed = placed.filter((p) => p.missFrames !== null && p.missFrames !== 0);

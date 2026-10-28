@@ -3666,7 +3666,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `anchor` | "start" \| "end" |  | Land on the word's first frame (start, default) or right after the phrase's last word (end). |
 | `offset_frames` | integer |  | Frames before (negative) or after the anchor, e.g. -2 so a hit leads the word slightly (default 0). (min -60, max 60) |
 | `what` | "title" \| "sfx" \| "clip" \| "motion_block" \| "cut" | yes | What lands on the word: title (add_kinetic_title_tool; text defaults to the word), sfx (add_sfx_tool), clip (add_clip_to_timeline_tool: a cutaway, needs file_id), motion_block (add_motion_block_tool, needs block), cut (split_clip_tool: splits the speaking clip there). |
-| `args` | object |  | Arguments of that tool, without its time (position_seconds / at_seconds is set to the word), e.g. {recipe:'whoosh'} for sfx, {file_id, duration_seconds:1.2, track:'V2'} for clip, {style:'creator', duration_seconds:1.5} for title. |
+| `args` | object |  | Arguments of that tool, without its time (position_seconds / at_seconds is set to the word), e.g. {recipe:'impact_punch'} for sfx, {file_id, duration_seconds:1.2, track:'V2'} for clip, {style:'creator', duration_seconds:1.5} for title. |
 | `timeline_clip_ids` | string[] |  | Clips whose speech to search (default: footage with sound, and clips with a transcript such as TTS voices or aligned lyrics). |
 | `language` | string |  | Speech language when a clip has to be transcribed (auto by default). |
 

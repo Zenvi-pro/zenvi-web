@@ -82,6 +82,14 @@ describe("place_on_word_tool", () => {
     expect((after.data as { placements: { target: number }[] }).placements[0]!.target).toBe(4.4);
   });
 
+  it("lands a sound's hit on the word, however early its clip starts", async () => {
+    const { ed } = harness(spoken("and then boom it happened", 2, 0.5));
+    const receipt = await ed.call("place_on_word_tool", { word: "boom", what: "sfx", args: { recipe: "whoosh_short" } });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    const [placement] = (receipt.data as { placements: { target: number; landed: number; missFrames: number }[] }).placements;
+    expect(placement).toMatchObject({ target: 3, missFrames: 0 });
+  });
+
   it("refuses a missing occurrence and says which words are close", async () => {
     const { ed } = harness(spoken("cameras and lenses", 1));
     const steps = ed.doc.undoLabels.length;
