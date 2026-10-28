@@ -65,4 +65,23 @@ describe("add_shape_mask_tool", () => {
     await ed.receipt("add_shape_mask_tool", { clip_ids: [a], remove: true });
     expect(looksOf(ed, a, "shape_mask")).toHaveLength(0);
   });
+
+  it("reads keyframe times counted from an overlay's own start as such, and refuses times outside the clip", async () => {
+    // Bench round 5 (masking): a slit on an overlay placed at 2 s keyed 0-1.8 s; all four keys clamped to its first frame and it never opened.
+    const ed = new EditHarness();
+    const slit = ed.addClip(ed.addFile("video"), { position: 2, start: 3, end: 7, layer: 2 });
+    ed.mark();
+    const r = await ed.call("add_shape_mask_tool", { clip_ids: [slit], width: 0.08, height: 0.8, keyframes: [{ seconds: 0, grow: -0.04 }, { seconds: 0.3, grow: 0 }, { seconds: 1.8, grow: 0.5 }, { seconds: 4, grow: -0.04 }] });
+    expect(r.status).toBe("applied");
+    expect(r.summary).toContain("read from the start of clip");
+    expect(ed.stepsSinceMark()).toBe(1);
+    // 3 s into the source at 30 fps is frame 91; the keys spread from there instead of piling on it.
+    expect(points(looksOf(ed, slit, "shape_mask")[0]!, "brightness").map((p) => p[0])).toEqual([91, 100, 145, 211]);
+    // Timeline times inside the clip stay timeline times.
+    await ed.receipt("add_shape_mask_tool", { clip_ids: [slit], keyframes: [{ seconds: 2.5, grow: -0.2 }, { seconds: 3, grow: 0 }] });
+    expect(points(looksOf(ed, slit, "shape_mask")[0]!, "brightness").map((p) => p[0])).toEqual([106, 121]);
+    ed.mark();
+    await ed.refused("add_shape_mask_tool", { clip_ids: [slit], keyframes: [{ seconds: 1, grow: 0 }, { seconds: 9, grow: 0.2 }] }, "outside clip");
+    expect(ed.stepsSinceMark()).toBe(0);
+  });
 });

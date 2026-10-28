@@ -18,7 +18,7 @@ import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { ASSET_KEY, generatedSvg } from "../mattes.js";
 import { applied, unchanged } from "../receipt.js";
 import { constantKeyframe, guarded, isLocked, keyframeOf, projectSize, toolError } from "../titles-text.js";
-import { clipFrameAt } from "./effect-values.js";
+import { clipExtent, clipFrameAt, fpsFloat } from "./effect-values.js";
 import { fileById } from "./common.js";
 
 /** Which look an effect is, on the effect (an unknown key the desktop keeps). */
@@ -90,7 +90,7 @@ const vignetteInput = z.strictObject({
 });
 
 const keyframeInput = z.strictObject({
-  seconds: z.number().min(0).describe("Timeline time, seconds."),
+  seconds: z.number().min(0).describe("Timeline time, seconds (times that fall before the clip starts but fit its length count from the clip's own start)."),
   grow: z.number().min(-1).max(1).optional().describe("Edge moved out (+) or in (-), fraction of the frame's short side (default 0). -0.5 closes most shapes."),
   feather: z.number().min(0).max(1).optional().describe("Edge softness at this point, fraction of the short side (default: the mask's feather)."),
 });
@@ -119,13 +119,34 @@ const shapeInput = z.strictObject({
 
 type ShapeInput = z.infer<typeof shapeInput>;
 
+/**
+ * Keyframe times as timeline seconds on `clip`. Agents often count from the
+ * clip's own start ("0 to 0.6 s") on an overlay placed later; read as
+ * timeline times those all clamp to its first frame and the mask never
+ * moves (bench round 5: a slit reveal that never opened). So when a time
+ * falls outside the clip's span on the timeline and every time fits inside
+ * its length, they count from the clip's start; times that fit neither are
+ * refused, like set_effect_keyframes_tool's.
+ */
+export function maskKeyTimes(project: Project, clip: Clip, seconds: readonly number[]): { seconds: number[]; relative: boolean } {
+  const [start, end, duration] = clipExtent(clip);
+  const slack = 1 / fpsFloat(project);
+  const inside = (t: number, lo: number, hi: number): boolean => t >= lo - slack && t <= hi + slack;
+  if (seconds.every((t) => inside(t, start, end))) return { seconds: [...seconds], relative: false };
+  if (seconds.every((t) => inside(t, 0, duration))) return { seconds: seconds.map((t) => Math.min(start + t, end)), relative: true };
+  const off = seconds.find((t) => !inside(t, start, end))!;
+  toolError(`keyframe time ${round(off)}s is outside clip ${clip.id} (it plays ${round(start)}-${round(end)}s on the timeline, ${round(duration)}s long); give timeline seconds inside it`);
+}
+
 function shapeEffect(project: Project, clip: Clip, id: string, input: ShapeInput, reader: Record<string, unknown>, hash: string): Effect {
   const feather = input.feather ?? 0.04;
   const base = shapeMaskSettings(feather, 0);
   let brightness: Keyframe = constantKeyframe(base.brightness);
   let contrast: Keyframe = constantKeyframe(base.contrast);
   if (input.keyframes && input.keyframes.length > 0) {
-    const points = [...input.keyframes].sort((a, b) => a.seconds - b.seconds).map((k) => ({ frame: clipFrameAt(project, clip, k.seconds), ...shapeMaskSettings(k.feather ?? feather, k.grow ?? 0) }));
+    const keys = [...input.keyframes].sort((a, b) => a.seconds - b.seconds);
+    const times = maskKeyTimes(project, clip, keys.map((k) => k.seconds)).seconds;
+    const points = keys.map((k, i) => ({ frame: clipFrameAt(project, clip, times[i]!), ...shapeMaskSettings(k.feather ?? feather, k.grow ?? 0) }));
     brightness = keyframeOf(points.map((p) => [p.frame, p.brightness] as const));
     contrast = keyframeOf(points.map((p) => [p.frame, p.contrast] as const));
   }
@@ -185,6 +206,8 @@ export const lookMaskTools: CatalogTool[] = [
         const project = call.doc.project;
         const clips = targets(project, input.clip_ids);
         const shape: MaskShape = input.shape ?? "rectangle";
+        // Checked before the mask image is written: a refused time stores nothing.
+        const relative = input.keyframes?.length && !input.remove ? clips.filter((c) => maskKeyTimes(project, c, input.keyframes!.map((k) => k.seconds)).relative).map((c) => c.id) : [];
         let make: ((clip: Clip, id: string) => Effect) | null = null;
         if (!input.remove) {
           if (!call.host.media?.writeGenerated) toolError("this Zenvi surface cannot store the mask image");
@@ -195,11 +218,11 @@ export const lookMaskTools: CatalogTool[] = [
         }
         const next = idFactory(project);
         const { changed } = commitLooks(call, input.remove ? "Remove shape mask" : `Shape mask (${shape})`, clips.map((clip) => [clip, withLook(clip, "shape_mask", make ? make(clip, next()) : null)]));
-        const data = { clip_ids: clips.map((c) => c.id), changed_clip_ids: changed, shape, keyframes: input.keyframes?.length ?? 0 };
+        const data = { clip_ids: clips.map((c) => c.id), changed_clip_ids: changed, shape, keyframes: input.keyframes?.length ?? 0, ...(relative.length ? { keyframes_from_clip_start: relative } : {}) };
         if (changed.length === 0) return unchanged("add_shape_mask_tool", input.remove ? "No clip has a shape mask to remove." : "Every clip already has this mask.", { data });
         return applied(
           "add_shape_mask_tool",
-          input.remove ? `Removed the shape mask from ${changed.length} clip(s).` : `Masked ${changed.length} clip(s) to ${shape === "ellipse" ? "an ellipse" : "a rectangle"}${input.outside ? " (outside kept)" : ""}${input.keyframes?.length ? `, ${input.keyframes.length} keyframes` : ""}.`,
+          input.remove ? `Removed the shape mask from ${changed.length} clip(s).` : `Masked ${changed.length} clip(s) to ${shape === "ellipse" ? "an ellipse" : "a rectangle"}${input.outside ? " (outside kept)" : ""}${input.keyframes?.length ? `, ${input.keyframes.length} keyframes` : ""}${relative.length ? ` (keyframe times read from the start of clip${relative.length === 1 ? "" : "s"} ${relative.join(", ")}: they fell before ${relative.length === 1 ? "it starts" : "they start"} on the timeline)` : ""}.`,
           { data },
         );
       }),
