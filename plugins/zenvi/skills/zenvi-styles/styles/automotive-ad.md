@@ -68,7 +68,8 @@ runtime is the rule; the tables are that rule at four lengths.
   inside the film (T105 on a hit) is a strong arc.
 - One accent colour: the car's paint or its lights is the only saturated
   hue (T025). Surroundings desaturated (saturation 0.6-0.8).
-- `unify_grade_tool` first, then the look at 0.5-0.7; vignette 0.3-0.5. No
+- `unify_grade_tool` first, then the look at 0.5-0.7; vignette 0.2 with
+  feather 0.85 on a scope frame (0.4 reads as a fuzzy oval tunnel on 2.39:1). No
   grain on studio footage. Bloom/halation only on lights (`apply_fx_tool`
   bloom, CLI).
 - Scope frame 2.39:1 (1920x804 or 1920x816) unless the platform is
@@ -131,7 +132,7 @@ contact sheet first). Lengths follow the beat table: tease 2-3.5 s, details
 add_clip_to_timeline_tool {"file_id": "<headlight clip>", "position_seconds": 0, "start_seconds": 1.2, "end_seconds": 5.8, "track": "1"}
 color_grade_clip_tool {"timeline_clip_id": "<tease>", "exposure": -0.3, "shadows": -0.5, "contrast": 0.25, "saturation": 0.6}
 unify_grade_tool {"look": "teal_cinema", "look_intensity": 0.5}
-add_vignette_tool {"amount": 0.4, "feather": 0.5}
+add_vignette_tool {"amount": 0.2, "feather": 0.85}
 fade_clip_tool {"clip_id": "<tease>", "fade_in_seconds": 0.8}
 set_keyframes_tool {"timeline_clip_id": "<hero hold>", "property": "scale_x", "points": [{"timeline_seconds": 22, "value": 1}, {"timeline_seconds": 27, "value": 1.05}]}
 set_keyframes_tool {"timeline_clip_id": "<hero hold>", "property": "scale_y", "points": [{"timeline_seconds": 22, "value": 1}, {"timeline_seconds": 27, "value": 1.05}]}
@@ -194,3 +195,12 @@ film; light-up 5.1 s, black-to-white jump 8.8 s, cockpit burst 23.9-35.2 s);
 latch foley 29.8 s, sub drop on the card 58.4 s); `x7r65a1` (narrative
 spot; music off 56.6 s, brass re-entry 70.3 s); `x7v1ev8` (one-shot CGI
 model morphs every 8-15 s).
+
+## Example (verified 2026-10-28)
+
+30 s at 1920x816 from 17 mixed Pexels car clips and a CC BY build track
+(`~/zenvi-motion/fleet/artifacts/sk2-product-brand/styles/automotive-ad.*`, build script in the PR). Watch judge 3.6/10 absolute;
+pairwise 3.8 against the reference hero film (8.4). Structure, light-up and
+foley read; it loses on mixed car models (the judge's main complaint), a
+0.4 vignette that read as an oval tunnel (now 0.2/0.85 above) and a burst that
+reused two shots. With one car's footage the sequence needs no new tool.

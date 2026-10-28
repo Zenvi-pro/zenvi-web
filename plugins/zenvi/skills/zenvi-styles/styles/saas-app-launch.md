@@ -153,7 +153,10 @@ master_audio_tool {"preset": "social", "genre": "saas_ui", "iterate": true}
 review_edit_tool {}
 ```
 
-Read each block's click and typing times off its frames (`preview_frame`)
+`chart_build` counts its big number *up* to the highlighted value: chart
+a metric that rises (hours saved, deploys a week), not one that falls.
+Over a bright plate, `glass_cards`' white headline needs a darker or
+warmer plate (exposure 0, not +0.3). Read each block's click and typing times off its frames (`preview_frame`)
 before placing the sounds; the times above are this layout's. The music
 clip ends at the lockup hit (trim it there, or `fade_out` 0.3 s).
 Render, `review_render_tool`, one fix pass.
@@ -188,3 +191,12 @@ hard stop 85.5 s); `linear-ai-hero` (silent dark loop; tilted UI planes,
 6-10 s slow dolly, 0 s). Owner reels named in the dossier: giant opening
 word at 1.0 s and glass UI on landscape at 33.5 s (an AI-agent launch),
 strobe text stack at 6.8 s (two creator demo reels), crash zoom at 1.7 s.
+
+## Example (verified 2026-10-28)
+
+20 s, six blocks back to back over one pale landscape plate, `cinematic`
+transitions, `saas_ui` sound and a CC0 groove (`~/zenvi-motion/fleet/artifacts/sk2-product-brand/styles/saas-app-launch.*`).
+Watch judge 7.9/10 absolute ("immaculate modern SaaS motion design ...
+punchy UI sound design"). Its fixes: the chart counter counted up while the
+line fell (rule added above), a white headline low on contrast over misty
+sky, one abrupt chart → rotator cut.

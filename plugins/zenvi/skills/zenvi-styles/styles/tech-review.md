@@ -76,6 +76,8 @@ TTS script.
 
 ## Motion & transitions
 
+- `lower_third` runs at least 2.5 s: a claim shorter than that keeps its
+  card into the next insert, or uses `add_kinetic_title_tool`.
 - Hard cuts (~98 %). One designed transition: a chapter bumper (ring wipe
   or `ripple_logo` / `kinetic_headline` on a brand gradient) per ~60-70 s.
 - No whips, no flashes, no motion-transition chains.
@@ -118,7 +120,7 @@ frame:
 
 ```json
 add_clip_to_timeline_tool {"file_id": "<case clip>", "position_seconds": 3.1, "start_seconds": 1, "end_seconds": 3.4, "track": "1"}
-add_motion_block_tool {"block": "lower_third", "position_seconds": 3.1, "duration_seconds": 2.3, "params": {"name": "8 h battery", "role": "32 h with the case", "style": "bar", "align": "left", "palette": "light", "display_font": "sans", "accent": "#1E40FF"}}
+add_motion_block_tool {"block": "lower_third", "position_seconds": 3.1, "duration_seconds": 2.5, "params": {"name": "8 h battery", "role": "32 h with the case", "style": "bar", "align": "left", "palette": "light", "display_font": "sans", "accent": "#1E40FF"}}
 add_kinetic_title_tool {"text": "$199", "position_seconds": 17, "duration_seconds": 2.5, "style": "stack", "animation": "pop", "text_size": 0.25, "emphasis": "$199"}
 add_motion_block_tool {"block": "type_morph", "position_seconds": 21, "duration_seconds": 2.7, "params": {"words": ["BUY", "SKIP?"], "weight": 800}}
 add_sfx_tool {"recipe": "whoosh_short", "at_seconds": 3.1, "gain_db": -16}
@@ -165,3 +167,11 @@ price pill 16.0 s, rival render cutaway 25.1 s, a 30.5 s static take that
 is the weak point 36.3 s); `xbp64sa` (drone; price shout 19.8 s, leader
 line callout 23.8 s, BUY/SKIP 37.3 s, inserts on adjectives 46.4 s: the
 best-paced of the three).
+
+## Example (verified 2026-10-28)
+
+17.5 s: macOS `say` VO in six sentences (Zenvi TTS was out of credits),
+Pexels earbuds inserts cut on each sentence, five bar cards, a $199 shout,
+a BUY? slam (`~/zenvi-motion/fleet/artifacts/sk2-product-brand/styles/tech-review.*`). Watch judge 4.2/10: weak hook text,
+a vertical phone clip letterboxed in 16:9, synthetic voice. Two cards were
+refused (under 2.5 s: rule added).

@@ -116,14 +116,14 @@ beats receipt):
 
 ```json
 add_clip_to_timeline_tool {"file_id": "<macro product>", "position_seconds": 0, "start_seconds": 1, "end_seconds": 3, "track": "1"}
-add_motion_block_tool {"block": "kinetic_headline", "position_seconds": 2, "duration_seconds": 1.6, "placement": "full_frame",
+add_motion_block_tool {"block": "kinetic_headline", "position_seconds": 2, "duration_seconds": 1.5, "track": 2, "placement": "full_frame",
   "params": {"text": "<Product Name>", "style": "pop", "palette": "dark", "max_size": 160}}
 add_kinetic_title_tool {"text": "CODE", "position_seconds": 3.6, "duration_seconds": 0.5, "style": "stack", "animation": "slam", "text_size": 0.3, "background": "#000000"}
 add_clip_to_timeline_tool {"file_id": "<code on screen>", "position_seconds": 4.1, "start_seconds": 0, "end_seconds": 2, "track": "1"}
 add_kinetic_title_tool {"text": "RENDER", "position_seconds": 6.1, "duration_seconds": 0.5, "style": "stack", "animation": "slam", "text_size": 0.3, "background": "#000000"}
 add_clip_to_timeline_tool {"file_id": "<timeline screen>", "position_seconds": 6.6, "start_seconds": 0, "end_seconds": 2, "track": "1"}
 set_keyframes_tool {"timeline_clip_id": "<timeline screen>", "property": "scale_x", "points": [{"timeline_seconds": 6.6, "value": 1.35}, {"timeline_seconds": 8.0, "value": 1.0, "ease": "ease_out"}]}
-add_motion_block_tool {"block": "hyperspace", "position_seconds": 10, "duration_seconds": 1.2, "params": {"palette": "night", "colors": ["#8B5CF6", "#22D3EE"], "flash": "none"}}
+add_motion_block_tool {"block": "hyperspace", "position_seconds": 10, "duration_seconds": 1.5, "track": 2, "params": {"palette": "night", "colors": ["#8B5CF6", "#22D3EE"], "flash": "none"}}
 add_motion_block_tool {"block": "counter", "position_seconds": 15, "duration_seconds": 2.5, "params": {"values": ["0", "24"], "suffix": " h", "label": "battery life", "palette": "dark", "accent": "#8B5CF6"}}
 apply_motion_transition_tool {"track": "1", "time": 11.2, "preset": "zoom_through"}
 ```
@@ -138,11 +138,14 @@ add_sfx_tool {"recipe": "impact_slam", "at_seconds": 3.6, "gain_db": -8}
 add_sfx_tool {"recipe": "sub_drop", "at_seconds": 6.1, "gain_db": -8}
 add_sfx_tool {"recipe": "whoosh_long", "at_seconds": 11.2, "gain_db": -12}
 add_sfx_tool {"recipe": "hit_transient", "at_seconds": 25.5, "gain_db": -6}
-master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}
+master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}
 review_edit_tool {}
 ```
 
-`spot_sound_tool` first if unsure which slams and moves still lack a cue.
+Blocks have minimum lengths (`kinetic_headline`, `hyperspace` 1.5 s,
+`lower_third` 2.5 s): put a short block on track 2 over the cut instead of
+shortening it. `master_audio_tool` spells the genre `3d_product`
+(`auto_sound_design_tool` says `product_3d`). `spot_sound_tool` first if unsure which slams and moves still lack a cue.
 Render, `review_render_tool` (`loudness_target_lufs: -16`), one fix pass.
 
 ## Finish checklist
@@ -174,3 +177,13 @@ then proof 17.9-25 s, warp tunnels 13.0 and 34.5 s, lockup 68.8 s);
 matte 10.7 s, floor-plane stat 5.4 s, lid close to packshot 35.8 s);
 `iphone-air-product-tpl-us-2025_16x9` (8 s macro opening, designer lower
 third 4.0 s, exploded glass layers 54.2 s, portal push 42.1 s).
+
+## Example (verified 2026-10-28)
+
+20 s: keyboard macro hook, three verb slams each followed by a screen
+proof, counter, lid close, dark lockup, Pexels stock and a CC0 trap beat
+(`~/zenvi-motion/fleet/artifacts/sk2-product-brand/styles/product-launch-film.*`). Watch judge 3.6/10. The run hit three
+refusals that are now rules above (headline and warp under 1.5 s, the
+genre spelling), so the name card and warp tunnel were missing from the
+judged render and the mix was unmastered; the judge also flagged a bright
+desk lid-close shot against the black film. Not re-rendered (budget).

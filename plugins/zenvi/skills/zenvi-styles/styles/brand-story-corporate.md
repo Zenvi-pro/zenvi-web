@@ -137,7 +137,8 @@ master_audio_tool {"preset": "social", "iterate": true}
 review_edit_tool {}
 ```
 
-Spot the in-picture actions by eye (`preview_frame` or each clip's contact
+Keyframe times must sit inside the clip: end a push one frame before
+the clip's last frame, or `set_keyframes_tool` refuses. Spot the in-picture actions by eye (`preview_frame` or each clip's contact
 sheet: a tap, a key, a pour): there is no action spotter yet
 (`action-foley-spotter`), and `spot_sound_tool` sees cuts and titles, not
 hands. Render, `review_render_tool`, one fix pass.
@@ -175,3 +176,12 @@ crane at the demo turn 39.2 s, slow-mo bird to vector diagram match
 `Deq9CiUzzvG` (24 s product spot; wide-to-tracking momentum cut 2.2 s,
 tabletop pour with music drop 12.8 s, logo on the last action 21.4 s with
 a bass hit 21.8 s).
+
+## Example (verified 2026-10-28)
+
+25 s from 14 Pexels classroom clips, a tablet entering at 10.2 s on a
+zoom-through, warm look, foley on paper/taps, CC BY acoustic track
+(`~/zenvi-motion/fleet/artifacts/sk2-product-brand/styles/brand-story-corporate.*`). Watch judge 3.4/10: flat hallway hook with
+no sound, grade and resolution jumps between stock sources. Stock from
+many shoots is this style's weak point; the same people and place
+throughout matter more than any tool.

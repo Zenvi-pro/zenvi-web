@@ -116,13 +116,15 @@ add_3d_scene_tool {"scene": "model_showcase", "quality": "draft", "position_seco
 add_kinetic_title_tool {"text": "Noise, gone in a tap.", "position_seconds": 3.2, "duration_seconds": 3.2, "style": "documentary", "animation": "rise", "text_size": 0.04, "ink": "#111111", "y": 0.82}
 add_motion_block_tool {"block": "particle_burst", "position_seconds": 3, "duration_seconds": 1.5, "params": {"shape": "rings", "origin": [{"x": 0.5, "y": 0.5}]}}
 add_3d_scene_tool {"scene": "glass_hero", "quality": "draft", "position_seconds": 7, "duration_seconds": 4, "params": {"background": "light"}}
-add_3d_scene_tool {"scene": "numerals_3d", "quality": "draft", "position_seconds": 19, "duration_seconds": 4, "params": {"values": ["0", "30"], "suffix": "h", "background": "light"}}
+add_3d_scene_tool {"scene": "numerals_3d", "quality": "draft", "position_seconds": 19, "duration_seconds": 4, "params": {"values": [0, 30], "suffix": "h", "background": "light"}}
 add_motion_block_tool {"block": "logo_reveal_end", "position_seconds": 25.5, "duration_seconds": 4.5, "params": {"brand": "<Brand>", "cta": "", "url": "", "palette": "light"}}
 ```
 
 Look at every draft (`preview_frame` mid-shot), then `rerender_3d_scene_tool`
 `quality: "final"` on each. Read the parameter names from `list_3d_scenes_tool`
-(they differ per scene). Sound:
+(they differ per scene; `numerals_3d` `values` are numbers). Keep
+`title_3d` to 1.5-2 s, and put the landing thump on the frame the product
+touches down (a `land: true` showcase lands in its first ~0.4 s). Sound:
 
 ```json
 auto_sound_design_tool {"genre": "product_3d", "intensity": "normal"}
@@ -132,7 +134,7 @@ add_sfx_tool {"recipe": "impact_thud", "at_seconds": 2.53, "gain_db": -9}
 add_sfx_tool {"recipe": "sparkle", "at_seconds": 8.0, "gain_db": -18}
 add_sfx_tool {"recipe": "mouse_click", "at_seconds": 25.4, "pitch": -4, "gain_db": -8}
 add_sfx_tool {"recipe": "hit_transient", "at_seconds": 25.5, "gain_db": -8}
-master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}
+master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}
 review_edit_tool {}
 ```
 
@@ -172,3 +174,12 @@ bolt 35.8 s, logo 40.5 s); `airpods-5-product-tpl-us-2026_16x9`
 announcement 15.6 s, hard stop 40.7 s); `macbook-pro-product-tpl-us-2026_16x9`
 (light-cone matte 1.7 s, chassis-plane type 5.1 s, lid snap to black
 36.5 s); `C9Mh5ukKt3e` (an 8 s render loop with no foley: the weak example).
+
+## Example (verified 2026-10-28)
+
+18 s of draft Blender scenes (glass title, generic speaker, glass rings,
+battery figure, landing) and a light logo card, CC0 groove
+(`~/zenvi-motion/fleet/artifacts/sk2-product-brand/styles/3d-product-cgi-ad.*`). Watch judge 3.9/10: the landing had no impact on
+its frame and the title held static 2 s (rules added above); the first
+`numerals_3d` call was refused for string values and master for the genre
+spelling, both fixed in the sequence above. Draft quality only.
