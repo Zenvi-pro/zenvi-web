@@ -14,7 +14,8 @@
 import type { Transaction } from "../history/document.js";
 import { createEffect } from "../effects/registry.js";
 import type { Clip, Effect, Keyframe, Project } from "../model/types.js";
-import { findClip } from "../model/query.js";
+import { isAudioOnlyMedia } from "../model/media.js";
+import { findClip, findLayer } from "../model/query.js";
 import { deliveredSource } from "../render/plan/reader.js";
 import { frameWindow, localFrame } from "../timeline/windows.js";
 import {
@@ -63,6 +64,8 @@ export interface MotionTransitionRecord {
   cut: number;
   /** Clip frames owned, inclusive: the rest frame and the moving frames. */
   window: [number, number];
+  /** A clip moving with the cut's own clip on its side (one scene over several tracks): that clip's id. */
+  follows?: string;
   /** Transform curves: as they were before, and as the transition wrote them (null: the key was absent). */
   props: Partial<Record<TransformChannel, { before: Keyframe | null; after: Keyframe }>>;
   /** Effects the transition added to the clip. */
@@ -79,6 +82,10 @@ export interface MotionTransitionInput {
   frames?: number;
   intensity?: number;
   focus?: { x: number; y: number };
+  /** The two clips may sit on different tracks (a scene change: one ends on the frame before the other starts). */
+  acrossTracks?: boolean;
+  /** Clips that end (out) or start (in) on the cut's frame on other tracks and move with its clips: the rest of each scene. */
+  followers?: { out?: readonly string[]; in?: readonly string[] };
 }
 
 export interface TransitionSfxCue {
@@ -111,6 +118,8 @@ export interface MotionTransitionResult {
   sfxCues: TransitionSfxCue[];
   /** The transition this one replaced on the same cut. */
   replaced?: string;
+  /** Followers left still, and why (too short, a locked track, another transition there). */
+  skippedFollowers?: { id: string; reason: string }[];
 }
 
 export interface MotionCut {
@@ -130,7 +139,7 @@ export function motionRecords(clip: Clip): MotionTransitionRecord[] {
 export function listProjectMotionTransitions(project: Project): (MotionTransitionRecord & { outClipId: string; inClipId: string; layer: number })[] {
   const out: (MotionTransitionRecord & { outClipId: string; inClipId: string; layer: number })[] = [];
   for (const clip of project.clips) {
-    for (const r of motionRecords(clip)) if (r.role === "out") out.push({ ...r, outClipId: clip.id, inClipId: r.partner, layer: clip.layer });
+    for (const r of motionRecords(clip)) if (r.role === "out" && !r.follows) out.push({ ...r, outClipId: clip.id, inClipId: r.partner, layer: clip.layer });
   }
   return out.sort((a, b) => a.layer - b.layer || a.cut - b.cut);
 }
@@ -155,18 +164,80 @@ export function trackCuts(project: Project, layer: number): MotionCut[] {
   return cuts;
 }
 
+/** Tag on kinetic caption clips (sfx/moments.ts KINETIC_CAPTIONS_KEY, which imports this module). */
+const KINETIC_CAPTIONS_KEY = "zenvi_kinetic_captions";
+
+/** Clips this short are accents over a cut (flash frames), not scenes. */
+const ACCENT_FRAMES = 4;
+
+/** A cut between scenes: its two clips plus the rest of each scene on other tracks. */
+export interface SceneCut extends MotionCut {
+  followers: { out: string[]; in: string[] };
+}
+
+/** Picture a scene is made of: not sound, not a flash frame, not caption words (their own animation is the show). */
+function scenePicture(project: Project, clip: Clip): boolean {
+  if ((clip as Record<string, unknown>)[KINETIC_CAPTIONS_KEY] !== undefined || clip.reader?.has_video === false) return false;
+  const file = project.files.find((f) => String(f.id) === String(clip.file_id));
+  return file !== undefined && !isAudioOnlyMedia(file);
+}
+
+const isTitle = (clip: Clip): boolean => /\.(svg|html?)$/i.test(String(clip.reader?.path ?? ""));
+
+/**
+ * The scene changes of the whole timeline, across tracks: frames where
+ * picture clips end on the frame before others start. A SaaS promo puts each
+ * scene on its own tracks (a background, a block over it), a montage its
+ * flashes on a track of their own; the cut is the same frame on every track.
+ * The lowest clip of each side carries the transition and the rest of its
+ * scene moves with it; clips that span the cut (a logo bug, a music video's
+ * backdrop), flash frames and caption words stay put. Titles only ever move
+ * with footage: a change of words over the same picture is not a scene change.
+ */
+export function sceneCuts(project: Project): SceneCut[] {
+  const fps = project.fps;
+  const placed = project.clips
+    .filter((c) => scenePicture(project, c))
+    .map((c) => ({ c, w: frameWindow(c, fps) }))
+    .filter((e) => e.w.endFrame - e.w.startFrame + 1 > ACCENT_FRAMES);
+  const starts = new Map<number, typeof placed>();
+  for (const e of placed) starts.set(e.w.startFrame, [...(starts.get(e.w.startFrame) ?? []), e]);
+  const cuts: SceneCut[] = [];
+  const byLayer = (x: { c: Clip }, y: { c: Clip }): number => x.c.layer - y.c.layer;
+  for (const [frame, incoming] of [...starts].sort((x, y) => x[0] - y[0])) {
+    const outgoing = placed.filter((e) => e.w.endFrame === frame - 1);
+    const outs = [...outgoing.filter((e) => !isTitle(e.c))].sort(byLayer);
+    const ins = [...incoming.filter((e) => !isTitle(e.c))].sort(byLayer);
+    if (outs.length === 0 || ins.length === 0) continue;
+    const others = (all: typeof placed, primary: Clip): string[] => [...all].sort(byLayer).filter((e) => e.c.id !== primary.id).map((e) => e.c.id);
+    cuts.push({
+      outClip: outs[0]!.c,
+      inClip: ins[0]!.c,
+      cut: (frame - 1) / rateOf(project),
+      layer: outs[0]!.c.layer,
+      followers: { out: others(outgoing, outs[0]!.c), in: others(incoming, ins[0]!.c) },
+    });
+  }
+  return cuts;
+}
+
 /** The cut between two clips, or why they do not make one. */
-export function cutBetween(project: Project, outClipId: string, inClipId: string): MotionCut {
+export function cutBetween(project: Project, outClipId: string, inClipId: string, acrossTracks = false): MotionCut {
   let a = findClip(project, outClipId);
   let b = findClip(project, inClipId);
   if (!a) throw new OpError("not_found", `No clip with id ${outClipId}.`, { id: outClipId });
   if (!b) throw new OpError("not_found", `No clip with id ${inClipId}.`, { id: inClipId });
   if (a.id === b.id) throw invalid("Give two different clips.");
-  if (a.layer !== b.layer) throw invalid(`Clips ${a.id} and ${b.id} are on different tracks (${a.layer}, ${b.layer}); a motion transition joins two clips cut back to back on one track.`);
+  if (a.layer !== b.layer && !acrossTracks) throw invalid(`Clips ${a.id} and ${b.id} are on different tracks (${a.layer}, ${b.layer}); a motion transition joins two clips cut back to back on one track.`);
   if (frameWindow(b, project.fps).startFrame < frameWindow(a, project.fps).startFrame) [a, b] = [b, a];
   const wa = frameWindow(a, project.fps);
   const wb = frameWindow(b, project.fps);
   const gap = wb.startFrame - (wa.endFrame + 1);
+  if (gap !== 0 && a.layer !== b.layer) {
+    throw invalid(
+      `Clips ${a.id} and ${b.id} are on different tracks (${a.layer}, ${b.layer}) and ${gap > 0 ? `${gap} frame(s) apart` : `overlap by ${-gap} frame(s)`}; across tracks a motion transition joins a clip to one that starts on the frame after it ends.`,
+    );
+  }
   if (gap !== 0) {
     throw new OpError(
       "conflict",
@@ -288,7 +359,14 @@ function curveMax(kf: Keyframe | undefined): number {
   return ys.length ? Math.max(...ys) : 1;
 }
 
-function writeSide(side: SidePlan, record: Omit<MotionTransitionRecord, "role" | "partner" | "window" | "props" | "effects">, partner: string, project: Project, nextId: () => string): { clip: Clip; receipt: MotionClipReceipt } {
+function writeSide(
+  side: SidePlan,
+  record: Omit<MotionTransitionRecord, "role" | "partner" | "window" | "props" | "effects" | "follows">,
+  partner: string,
+  project: Project,
+  nextId: () => string,
+  follows?: string,
+): { clip: Clip; receipt: MotionClipReceipt } {
   const width = Math.round(Number(project.width)) || 1920;
   const height = Math.round(Number(project.height)) || 1080;
   const next: Record<string, unknown> = { ...side.clip };
@@ -346,7 +424,7 @@ function writeSide(side: SidePlan, record: Omit<MotionTransitionRecord, "role" |
   next.effects = [...(side.clip.effects ?? []), ...effects];
   const lo = Math.min(side.rest, side.frames[0]!);
   const hi = Math.max(side.rest, side.frames[side.frames.length - 1]!);
-  const full: MotionTransitionRecord = { ...record, role: side.role, partner, window: [lo, hi], props, effects: effects.map((e) => String(e.id)) };
+  const full: MotionTransitionRecord = { ...record, role: side.role, partner, window: [lo, hi], props, effects: effects.map((e) => String(e.id)), ...(follows ? { follows } : {}) };
   next[MOTION_TRANSITIONS_KEY] = [...motionRecords(side.clip), full];
   return { clip: next as Clip, receipt: { id: side.clip.id, role: side.role, frames: [lo, hi], properties: written, effectIds: full.effects } };
 }
@@ -369,7 +447,7 @@ function existingOnCut(outClip: Clip, inClip: Clip): string | undefined {
 export function planMotionTransitionEdit(project: Project, input: MotionTransitionInput, newId?: string): { clips: Clip[]; result: MotionTransitionResult } {
   const info = getMotionTransition(input.preset);
   if (!info) throw new OpError("not_found", `Unknown motion transition '${input.preset}'.`);
-  const cut = cutBetween(project, input.outClipId, input.inClipId);
+  const cut = cutBetween(project, input.outClipId, input.inClipId, input.acrossTracks);
   requireUnlocked(project, cut.layer, "Track");
   const replaced = existingOnCut(cut.outClip, cut.inClip);
   const outClip = replaced ? withoutRecord(cut.outClip, replaced) : cut.outClip;
@@ -411,11 +489,52 @@ export function planMotionTransitionEdit(project: Project, input: MotionTransiti
   const otherB = clash(inClip, firstB, inSide.rest);
   if (otherB) throw new OpError("conflict", `Clip ${inClip.id} is too short for two motion transitions: this one would overlap ${otherB.preset} (${otherB.id}). Use fewer frames or remove that one first.`);
 
+  // The rest of each scene: the same moving frames on its own clip frames, or left still when it cannot take them.
+  const followerSides: SidePlan[] = [];
+  const skippedFollowers: { id: string; reason: string }[] = [];
+  for (const [role, given] of [["out", input.followers?.out ?? []], ["in", input.followers?.in ?? []]] as const) {
+    for (const fid of new Set(given)) {
+      if (fid === outClip.id || fid === inClip.id) continue;
+      const found = findClip(project, fid);
+      if (!found) throw new OpError("not_found", `No clip with id ${fid}.`, { id: fid });
+      const clip = replaced ? withoutRecord(found, replaced) : found;
+      const w = frameWindow(clip, fps);
+      if (role === "out" ? w.endFrame !== wa.endFrame : w.startFrame !== wb.startFrame) {
+        throw invalid(`Clip ${fid} does not ${role === "out" ? "end" : "start"} on the cut's frame; only the clips of a scene that ${role === "out" ? "end" : "start"} with it move with it.`);
+      }
+      if (findLayer(project, clip.layer)?.lock) {
+        skippedFollowers.push({ id: fid, reason: "its track is locked" });
+        continue;
+      }
+      const first = w.localStartFrame;
+      const last = localFrame(w, w.endFrame);
+      const n = role === "out" ? nOut : nIn;
+      if (last - first + 1 < n + 1) {
+        skippedFollowers.push({ id: fid, reason: `too short (${last - first + 1} frames) for ${plan.frames} frames of ${input.preset}` });
+        continue;
+      }
+      const side: SidePlan =
+        role === "out"
+          ? { clip, role, rest: last - n, frames: Array.from({ length: n }, (_, i) => last - n + 1 + i), values: plan.out.frames }
+          : { clip, role, rest: first + n, frames: Array.from({ length: n }, (_, i) => first + i), values: plan.in.frames };
+      const other = clash(clip, Math.min(side.rest, side.frames[0]!), Math.max(side.rest, side.frames[n - 1]!));
+      if (other) {
+        skippedFollowers.push({ id: fid, reason: `${other.preset} (${other.id}) already moves it there` });
+        continue;
+      }
+      followerSides.push(side);
+    }
+  }
+  const moving = new Set([outClip.id, inClip.id, ...followerSides.map((f) => f.clip.id)]);
+  // Clips that moved with the replaced transition and are not in this one go back to rest.
+  const released = replaced ? project.clips.filter((c) => !moving.has(c.id) && motionRecords(c).some((r) => r.id === replaced)).map((c) => withoutRecord(c, replaced)) : [];
+
   const nextId = ids(project);
   const id = newId ?? replaced ?? `MT${nextId()}`;
   const base = { id, preset: plan.preset, direction: plan.direction, intensity: plan.intensity, frames: plan.frames, cut: Math.round(cut.cut * 1e6) / 1e6, ...(input.preset === "zoom_through" ? { focus: { x: input.focus?.x ?? 0.5, y: input.focus?.y ?? 0.5 } } : {}) };
   const a = writeSide(outSide, base, inClip.id, project, nextId);
   const b = writeSide(inSide, base, outClip.id, project, nextId);
+  const followers = followerSides.map((f) => writeSide(f, base, f.role === "out" ? inClip.id : outClip.id, project, nextId, f.role === "out" ? outClip.id : inClip.id));
   const round = (t: number): number => Math.round(t * 1000) / 1000;
   const result: MotionTransitionResult = {
     id,
@@ -425,11 +544,12 @@ export function planMotionTransitionEdit(project: Project, input: MotionTransiti
     frames: plan.frames,
     layer: cut.layer,
     cut: round(cut.cut),
-    clips: [a.receipt, b.receipt],
+    clips: [a.receipt, b.receipt, ...followers.map((f) => f.receipt)],
     sfxCues: plan.sfx.map((s) => ({ time: round(Math.max(0, cut.cut + s.offset / rate)), kind: s.kind, duration: round(s.frames / rate) })),
   };
   if (replaced) result.replaced = replaced;
-  return { clips: [a.clip, b.clip], result };
+  if (skippedFollowers.length > 0) result.skippedFollowers = skippedFollowers;
+  return { clips: [a.clip, b.clip, ...followers.map((f) => f.clip), ...released], result };
 }
 
 /** Apply (or replace) a motion transition on one cut. */

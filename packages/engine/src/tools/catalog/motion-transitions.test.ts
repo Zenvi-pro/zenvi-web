@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectDocument } from "../../history/document.js";
 import { addClip } from "../../ops/clips.js";
+import { listProjectMotionTransitions, motionRecords } from "../../ops/motion-transitions.js";
 import { makeDoc } from "../../ops/testkit.js";
 import { runTool } from "../registry.js";
 import { fakeHost } from "../test-support/fake-host.js";
@@ -127,6 +128,63 @@ describe("motion transition tools", () => {
     const one = await call(doc, "apply_motion_transition_tool", { preset: "flash_invert", track: "2", time: 2 });
     expect(summaryOf(one)).toMatch(/^Error: no cuts on .*: no clips play back to back there\. Cuts are on track 1 \(3 cuts\): pass track="1"\.$/);
     expect(doc.undoLabels).toHaveLength(0);
+  });
+
+  it("transitions scene changes across tracks: each scene's stack moves as one, what spans the cut stays put", async () => {
+    // A SaaS promo's layout (bench round 5): scene 1 = background + headline on tracks 1-2, scene 2 = glass cards on track 3,
+    // scene 3 back on tracks 1-2; a logo bug over everything and a 2-frame flash over the second cut.
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      const clip = (id: string, layer: number, position: number, length: number, fileId = "VIDEO00001") => addClip(tx, { fileId, position, layer, start: 0, end: length, id });
+      clip("BG1", 1, 0, 2);
+      clip("HEAD1", 2, 0, 2);
+      clip("CARDS", 3, 2, 2);
+      clip("BG3", 1, 4, 2);
+      clip("HEAD3", 2, 4, 2);
+      clip("LOGO", 5, 0, 6, "IMAGE00001");
+      clip("FLASH", 4, 4, 2 / 30, "IMAGE00001");
+    });
+    doc.clearHistory();
+    const before = JSON.stringify(doc.project.clips);
+    const onTrack = await call(doc, "apply_motion_transitions_tool", { track: "1", preset: "whip" });
+    expect(summaryOf(onTrack)).toMatch(/2 scene changes cross tracks: omit track/);
+    const result = await call(doc, "apply_motion_transitions_tool", { style: "hype", direction: "left" });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toHaveLength(1);
+    const data = dataOf(result) as { track: string; transitions: { cut: number; clips: { clip_id: string; role: string }[] }[] };
+    expect(data.track).toBe("all");
+    expect(data.transitions.map((t) => [t.cut, t.clips.map((c) => `${c.clip_id}:${c.role}`)])).toEqual([
+      [2, ["BG1:out", "CARDS:in", "HEAD1:out"]],
+      [4, ["CARDS:out", "BG3:in", "HEAD3:in"]],
+    ]);
+    const clip = (id: string) => doc.project.clips.find((c) => c.id === id)!;
+    expect(motionRecords(clip("HEAD1"))[0]).toMatchObject({ role: "out", follows: "BG1", partner: "CARDS" });
+    expect(clip("HEAD1").location_x).toEqual(clip("BG1").location_x);
+    expect(motionRecords(clip("LOGO"))).toEqual([]);
+    expect(motionRecords(clip("FLASH"))).toEqual([]);
+    // One record per transition for lists and sound design; followers come off with it.
+    expect(listProjectMotionTransitions(doc.project)).toHaveLength(2);
+    const removed = await call(doc, "remove_motion_transition_tool", { clip_id: "CARDS" });
+    expect(removed.ok, removed.text).toBe(true);
+    expect(JSON.stringify(doc.project.clips)).toBe(before);
+  });
+
+  it("replacing a scene transition releases the clips that no longer move with it", async () => {
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      addClip(tx, { fileId: "VIDEO00001", position: 0, layer: 1, start: 0, end: 2, id: "A" });
+      addClip(tx, { fileId: "VIDEO00001", position: 0, layer: 2, start: 0, end: 2, id: "A2" });
+      addClip(tx, { fileId: "VIDEO00001", position: 2, layer: 3, start: 0, end: 2, id: "B" });
+    });
+    doc.clearHistory();
+    const plain = JSON.stringify(doc.project.clips.find((c) => c.id === "A2"));
+    expect((await call(doc, "apply_motion_transitions_tool", { preset: "whip" })).ok).toBe(true);
+    expect(motionRecords(doc.project.clips.find((c) => c.id === "A2")!)).toHaveLength(1);
+    // By clip ids across tracks: just the two clips this time.
+    const again = await call(doc, "apply_motion_transition_tool", { preset: "glitch", clip1_id: "A", clip2_id: "B" });
+    expect(again.ok, again.text).toBe(true);
+    expect(JSON.stringify(doc.project.clips.find((c) => c.id === "A2"))).toBe(plain);
+    expect(listProjectMotionTransitions(doc.project).map((r) => r.preset)).toEqual(["glitch"]);
   });
 
   it("removes one transition by id and refuses unknown ids", async () => {

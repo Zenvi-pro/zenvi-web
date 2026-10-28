@@ -322,9 +322,9 @@ function exportReceipt(call: ToolCall, plan: ExportPlan, result: ExportResult, w
   }
   receipt.warnings = warnings;
   // The finish the director owes every edit (review/finish.ts): what is missing, with the calls that close it.
+  // In notes and data only: the summary is the desktop's export_video text.
   const gaps = plan.export_type === "audio_only" ? [] : finishGaps(call.doc.project);
   if (gaps.length > 0) {
-    receipt.summary += ` Not finished: ${gaps.map((g) => g.kind).join(", ")} missing (notes list the next calls).`;
     receipt.notes = [...receipt.notes, ...finishLines(gaps)];
     if (receipt.data && typeof receipt.data === "object") (receipt.data as Record<string, unknown>).finish = gaps;
   }
