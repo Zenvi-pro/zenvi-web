@@ -286,7 +286,7 @@ export const WATCH_FIX_TOOLS: Record<WatchDimension | "other", readonly string[]
 
 /** Words in a fix that name the tool better than its dimension does (a pacing issue fixed with a whoosh). */
 const FIX_WORDS: readonly [RegExp, string][] = [
-  [/\b(whoosh|swoosh|hit|impact|click|riser|boom|sfx|sound effect|foley)\b/i, "add_sfx_tool"],
+  [/\b(whoosh|swoosh|hit|impact|click|riser|boom|sfx|sound effect|foley)(e?s)?\b/i, "add_sfx_tool"],
   [/\b(duck|ducking)\b/i, "duck_tool"],
   [/\b(louder|quieter|loudness|lufs|clipping|true peak|master)\b/i, "master_audio_tool"],
   [/\b(trim|shorten|tighten|cut .{0,20}earlier|hold .{0,12}less)\b/i, "trim_clip_tool"],

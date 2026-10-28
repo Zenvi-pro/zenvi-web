@@ -65,6 +65,7 @@ describe("watch critique", () => {
     expect(fixToolsFor({ dimension: "pacing", problem: "", fix: "Add a whoosh on the cut at 2 s" })).toEqual(["add_sfx_tool", "trim_clip_tool", "detect_beats_tool"]);
     expect(fixToolsFor({ dimension: "mix", problem: "", fix: "Duck the music 8 dB under the voice" })).toEqual(["duck_tool", "master_audio_tool", "set_clip_volume_tool"]);
     expect(fixToolsFor({ dimension: "other", problem: "", fix: "Something vague" })).toEqual(["review_edit_tool"]);
+    expect(fixToolsFor({ dimension: "sound_design", problem: "", fix: "Add sub-bass hits on the downbeats" })[0]).toBe("add_sfx_tool");
     const named = new Set(Object.values(WATCH_FIX_TOOLS).flat());
     for (const words of ["whoosh", "duck", "louder", "trim", "speed ramp", "whip", "match cut", "grade", "captions", "title", "end card", "swap the shot"]) {
       for (const tool of fixToolsFor({ dimension: "other", problem: "", fix: words })) named.add(tool);
