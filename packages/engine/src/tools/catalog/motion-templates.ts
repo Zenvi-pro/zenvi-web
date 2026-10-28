@@ -44,6 +44,7 @@ import { directTool, unavailable, type CatalogTool, type ToolCall } from "../def
 import { applied, failed, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
 import { TRACK_STEP, clipsInWindow, colorHexAlpha, isLocked, planOverlayTrack, projectSize, snapToFrame, trackInfo } from "../titles-text.js";
+import { FINISH_HINT } from "../director-card.js";
 
 const TOOL = "add_motion_template_tool";
 const TRACK_LABEL = "Motion";
@@ -313,7 +314,7 @@ export const motionTemplateTools: CatalogTool[] = [
       "Place one motion-design template on the timeline, timed to the beat: UI cards that slide in with depth, a search field that types, a scrolling word list with a selection box, " +
       "labelled crop boxes over a shot, a product callout with leader lines, kinetic type with image tiles, a tutorial step card, a grid background or an end card. " +
       "Drawings are SVG titles and the media plays inside them, all animated with clip keyframes, so the result renders the same on every Zenvi surface and stays editable. " +
-      "One undo step; the layers go on the lowest free tracks above the video. For a whole motion-led video use build_reel_tool with a motion style (ui_promo, editorial_motion, product_callout, tutorial).",
+      `One undo step; the layers go on the lowest free tracks above the video. For a whole motion-led video use build_reel_tool with a motion style (ui_promo, editorial_motion, product_callout, tutorial). ${FINISH_HINT}`,
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     requires: ["media"],

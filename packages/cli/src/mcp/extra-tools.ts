@@ -107,7 +107,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       name: "render_video",
       title: "Render the timeline",
       description:
-        "Render the project to a file: mp4 (default), webm, mov, mkv, gif, mp3, wav or png (frames). Returns the file path, size and duration. Run review_edit_tool first to watch the cut (pacing, beats, holds, black frames, loudness) and preview_frame for single frames.",
+        "Render the project to a file: mp4 (default), webm, mov, mkv, gif, mp3, wav or png (frames). Returns the file path, size and duration. Render after the finish (unify_grade_tool, transitions, sound design, master_audio_tool last): the receipt lists what is still missing, with the calls; then review_render_tool on the file. review_edit_tool watches the cut before it.",
       inputSchema: {
         type: "object",
         properties: {

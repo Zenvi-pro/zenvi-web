@@ -183,6 +183,10 @@ describe("export_video_tool in the cloud", () => {
     // The same request again is the same render (connectors retry slow calls).
     const again = await call(client, "export_video_tool", { preset: "YouTube", quality: "low", start: 1, end: 3, width: 1280, height: 720, file_name: "teaser" });
     expect((again.structuredContent?.data as { data: Record<string, unknown> }).data.render_id).toBe(receipt.render_id);
+    // A title and no sound: both renders say what the finish still owes, with the calls.
+    expect((receipt.finish as { kind: string }[]).map((g) => g.kind)).toEqual(["sound", "master"]);
+    const whole = await call(client, "render_project", {});
+    expect(textOf(whole)).toMatch(/Not finished: sound, master missing\. No sound design: .* Next: spot_sound_tool \{\}, then auto_sound_design_tool \{\}\./);
 
     const folder = await call(client, "export_video_tool", { folder: "renders" });
     expect(textOf(folder)).toBe("Error: this Zenvi surface has no folders (Zenvi Cloud answers with a download link); call it again without folder (file_name names the file)");

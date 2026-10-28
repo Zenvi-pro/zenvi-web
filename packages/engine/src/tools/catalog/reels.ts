@@ -52,6 +52,7 @@ import { ColorValueError } from "../color-agent.js";
 import { effectFactory, mergedGradeEffects } from "./color-agent.js";
 import { gradeFootage, gradeReport, measureFootage, resolveReelLook, type ReelGrade } from "./reel-grade.js";
 import type { ImportedMedia } from "../types.js";
+import { FINISH_HINT } from "../director-card.js";
 
 const TOOL = "build_reel_tool";
 /** How long a white flash fades, seconds (three frames at 30 fps). */
@@ -279,7 +280,7 @@ export const reelTools: CatalogTool[] = [
       "camera moves, flashes, a look, an opening hook title, shot labels, an end card and the music faded out. " +
       "hype and highlight add the accents: whips in one direction on the downbeats, a slow-motion wind-up ramping into the drop, a glitch on the drop, negative/glitch hits in the climax, a pull-back into the last shot, condensed display titles that slam in (the receipt lists them and their sfx_cues). One undo step. " +
       "Put the videos/images and one music track in the media bin first (stock, AI, uploads, URLs); give them in story order. " +
-      "Its sound is the music at full level, so once any sound design is added call master_audio_tool last to set the final loudness.",
+      `Its sound is the music at full level, so once any sound design is added call master_audio_tool last to set the final loudness. ${FINISH_HINT}`,
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["media"],

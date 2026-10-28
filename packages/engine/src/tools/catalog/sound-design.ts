@@ -543,7 +543,7 @@ export const soundDesignTools: CatalogTool[] = [
       "Sound-design the whole edit in one step from its cue sheet (spot_sound_tool) in the genre's palette: layered hits (transient + body + sub with a phone harmonic + a tail in one shared space) on heroes, " +
       "whooshes peaking on cuts and moves (pre-rolled, panned with the motion), clicks, toggles, typing and counter ticks on motion block events, micro sounds on glints and lands, a riser into the climax " +
       "that stops a beat early with the bed sucked out under it, an ambience bed where the genre wants one, density held to the genre's band (cuts under speech and inside flash runs left dry), " +
-      "no recipe twice in a row, levels by role (hero, sweetener, micro). Running it again replaces its previous effects and bed dips (hand-placed ones stay). Run master_audio_tool after it. One undo step.",
+      "no recipe twice in a row, levels by role (hero, sweetener, micro). Running it again replaces its previous effects and bed dips (hand-placed ones stay). Run master_audio_tool iterate=true after it, then render_video and review_render_tool. One undo step.",
     input: autoInput,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["media"],
