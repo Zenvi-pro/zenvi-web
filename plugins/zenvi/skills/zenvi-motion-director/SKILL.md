@@ -36,6 +36,11 @@ is the rules every genre shares. Do not plan before you have read it.
 Mixed asks: take the structure from the genre of the *first five seconds*
 and borrow single techniques from the others.
 
+**Given a bin of finished shots to re-edit** (a reference's own shots, an
+editor's selects): the order is the edit. Before any genre tool, call
+`sequence_shots_tool` on every shot (see "Re-editing shots you were given"
+below); never cut them in bin or file-name order.
+
 Every recipe ends with **Finish**: sound on every cut, `master_audio_tool`,
 `render_video`, `review_render_tool`, one fix pass. A run that stops before
 it is not done, however good the picture: unmastered edits arrive 9-17 dB

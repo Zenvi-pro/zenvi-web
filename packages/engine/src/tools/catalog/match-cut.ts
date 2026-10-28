@@ -111,7 +111,7 @@ const detectInput = z.strictObject({
 });
 
 const montageInput = z.strictObject({
-  file_ids: z.array(z.string().min(1)).min(1).max(60).describe("Media-bin videos and images in chain order: the first opens (held), the last closes (held), the others cycle in between."),
+  file_ids: z.array(z.string().min(1)).min(1).max(60).describe("Media-bin videos and images in chain order: the first opens (held), the last closes (held), the others cycle in between. Bin order is not a chain: get one from sequence_shots_tool (dry_run: true, continuity: 2, its data.file_ids)."),
   subjects: z
     .array(
       z.strictObject({
