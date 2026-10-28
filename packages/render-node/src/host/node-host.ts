@@ -8,13 +8,14 @@
 import { mkdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
+import { isTranscriptionError, type AssetHost, type ExportOptions, type ToolHost } from "@zenvi/engine";
 import { backendStock } from "@zenvi/engine/tools";
 import { fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
 import { renderMixPcm } from "../audio/mix.js";
 import { measureMix } from "../audio/measure-mix.js";
 import { transcribeMediaFile } from "../audio/speech.js";
+import { localSpeechReady, transcribeLocally } from "../speech/local.js";
 import { engineAssetsDir } from "../resources.js";
 import { encoderNames } from "../ffmpeg/capabilities.js";
 import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
@@ -66,6 +67,12 @@ export interface NodeHostOptions {
   scenes3d?: boolean;
   /** Zenvi FX (ffmpeg footage effects; default true). */
   fx?: boolean;
+  /**
+   * Where speech is transcribed: "auto" (on device once `zenvi speech setup`
+   * ran, else the Zenvi backend when signed in), "local", "cloud" or "off".
+   * Default `ZENVI_SPEECH`, else auto.
+   */
+  speech?: SpeechMode;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -75,6 +82,13 @@ export interface NodeHost extends ToolHost {
   resolveMedia(projectPath: string): string;
   /** The open project file, if any. */
   projectFile(): string | undefined;
+}
+
+export type SpeechMode = "auto" | "local" | "cloud" | "off";
+
+export function speechMode(env: NodeJS.ProcessEnv = process.env): SpeechMode {
+  const asked = env.ZENVI_SPEECH?.trim().toLowerCase();
+  return asked === "local" || asked === "cloud" || asked === "off" ? asked : "auto";
 }
 
 const MAX_TEXT_BYTES = 16 * 1024 * 1024;
@@ -274,9 +288,26 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   if (options.backend) {
     host.backend = createBackendHost(options.backend);
     host.stock = backendStock(host.backend);
-    // Speech recognition through the Zenvi backend, as the person `zenvi login` signed in.
-    const upload = backendSpeechUpload(options.backend);
-    host.audio!.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });
+  }
+  const mode = options.speech ?? speechMode(options.env);
+  // On device once set up (free, offline); else through the Zenvi backend, as the person `zenvi login` signed in.
+  const local = (mode === "auto" || mode === "local") && localSpeechReady({ env: options.env });
+  const upload = options.backend && (mode === "auto" || mode === "cloud") ? backendSpeechUpload(options.backend) : undefined;
+  if (local || upload) {
+    host.audio!.transcribe = async (p, o) => {
+      const file = resolveMedia(p);
+      const signal = o?.signal ?? options.signal;
+      if (!local) return transcribeMediaFile(file, { ...o, signal, upload: upload! });
+      try {
+        return await transcribeLocally(file, { ...o, signal, env: options.env, log: options.log });
+      } catch (error) {
+        // A runtime that will not start falls back to the server; anything else (no audio, a failed run) is the answer.
+        if (!upload || !isTranscriptionError(error) || error.code !== "unavailable") throw error;
+        options.log?.(`${error.message}; transcribing through the Zenvi backend instead`);
+        return transcribeMediaFile(file, { ...o, signal, upload });
+      }
+    };
+    if (local) host.audio!.transcribesOnDevice = true;
   }
   return host;
 }

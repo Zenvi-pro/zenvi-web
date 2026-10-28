@@ -44,6 +44,8 @@ import { TTS_SCRIPT_SOURCE } from "./tts-words.js";
 export const ASR_KEY = "asr";
 /** `transcriptionSource` of words from the Zenvi backend's speech recognition. */
 export const SERVER_SOURCE = "server";
+/** `transcriptionSource` of words heard on this machine (zenvi-core speech/cache.py's default). */
+export const LOCAL_SOURCE = "local";
 /** `transcriptionSource` of words estimated from the media index's transcript cues. */
 export const INDEX_SOURCE = "index_cues";
 
@@ -340,7 +342,7 @@ export async function wordsFor(call: ToolCall, target: WordTarget, request: Word
         requestLanguage: requested || "auto",
         // After the index's words (generation 1), so indices from either never pass for the other.
         generation: stored ? stored.generation + 1 : target.indexed ? 2 : 1,
-        transcriptionSource: SERVER_SOURCE,
+        transcriptionSource: result.onDevice ? LOCAL_SOURCE : SERVER_SOURCE,
         createdAt: Math.round(Date.now() / 1000),
         ...(sha ? { sha256: sha } : {}),
         words: result.words,

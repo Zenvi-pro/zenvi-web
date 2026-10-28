@@ -548,6 +548,12 @@ export interface AudioHost {
    */
   transcribe?(path: string, options?: TranscribeOptions): Promise<Transcription>;
   /**
+   * `transcribe` runs on this machine (Whisper, `zenvi speech setup`): free
+   * and offline, so tools may transcribe to improve timings nobody asked to
+   * pay for (a TTS voice's words, given lyrics).
+   */
+  transcribesOnDevice?: boolean;
+  /**
    * Generate a sound effect from a text prompt (sfx/generate.ts checks the
    * request first) into a local audio file, cached by request: the same
    * request is never paid for twice. Present only where a provider whose
