@@ -14,7 +14,7 @@
 
 /** The finish, for the descriptions of the tools that start a whole video (on every surface: Zenvi Cloud renders with render_project). */
 export const FINISH_HINT =
-  "Then finish, in order, skipping what its receipt says it did: unify_grade_tool, apply_motion_transitions_tool, spot_sound_tool and auto_sound_design_tool, master_audio_tool iterate=true, render (render_video; Zenvi Cloud: render_project), review_render_tool.";
+  "Then finish, in order, skipping what its receipt says it did: unify_grade_tool, apply_motion_transitions_tool, spot_sound_tool and auto_sound_design_tool, master_audio_tool iterate=true, render (render_video; Zenvi Cloud: render_project), review_render_tool, watch_render_tool once (fix its HIGH issues, render, watch again at most once).";
 
 /** The genre router: which recipe to read. */
 const RECIPES =
@@ -24,7 +24,7 @@ const RECIPES =
 /** The finish every recipe ends with, in order. */
 const FINISH =
   "Finish every edit, in order: unify_grade_tool; apply_motion_transitions_tool (no track = every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
-  "master_audio_tool iterate=true, last; render_video; review_render_tool. Receipts name what is still missing: make those calls.";
+  "master_audio_tool iterate=true, last; render_video; review_render_tool; watch_render_tool once, fix its HIGH issues. Receipts name what is still missing: make those calls.";
 
 export const DIRECTOR_CARD: string = [
   `Whole videos (reel, ad, promo, montage, a reference to recreate): before the first edit read the genre's recipe with read_director_recipe {recipe} (or the zenvi-motion-director skill's recipes/). ${RECIPES}`,
