@@ -34,6 +34,7 @@ const DIRECT_TOOLS = [
   "align_match_cut_tool",
   "detect_subject_tool",
   "match_cut_montage_tool",
+  "sequence_shots_tool",
   "unify_grade_tool",
   "review_edit_tool",
   "review_render_tool",

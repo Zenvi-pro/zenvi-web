@@ -1117,6 +1117,19 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { clip_id: IDS.clipA }, summary: /^(No circle found|Found \d+ circle\(s\)) in /, check: ({ receipt }) => expect(receipt.undoSteps).toBe(0) },
     failure: { args: { file_id: IDS.music }, status: "refused", summary: /^Error: .* has no picture to look at\.$/ },
   },
+  sequence_shots_tool: {
+    happy: {
+      args: { shots: [{ clip_id: IDS.clipB }, { clip_id: IDS.clipA }], arc: "flat", continuity: "1" },
+      summary: /^Sequenced 2 shot\(s\): .*; mean cut match [\d.]+ \(given order [\d.]+\), arc flat\.$/,
+      check: ({ receipt, doc }) => {
+        expect(receipt.undoSteps).toBe(1);
+        // The two clips now play back to back from the first one's place, the broll first.
+        const [a, b] = [IDS.clipB, IDS.clipA].map((id) => doc.project.clips.find((c) => c.id === id)!);
+        expect([a!.position, b!.position]).toEqual([0, 5]);
+      },
+    },
+    failure: { args: { file_ids: ["NOPE000000", IDS.broll] }, status: "refused", summary: /^Error: unknown file_id NOPE000000\.$/ },
+  },
   match_cut_montage_tool: {
     happy: {
       args: {

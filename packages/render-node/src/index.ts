@@ -10,6 +10,7 @@ export * from "./image/rgba.js";
 export * from "./resources.js";
 export * from "./decode/video.js";
 export * from "./decode/still.js";
+export * from "./decode/sample-frames.js";
 export * from "./decode/sources.js";
 export * from "./probe/exif.js";
 export * from "./probe/starts.js";
