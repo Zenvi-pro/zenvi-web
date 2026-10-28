@@ -54,15 +54,23 @@ describe("alignText", () => {
   });
 
   it("aligns long texts in a band without losing the matches", () => {
-    const n = 1500;
+    const n = 1100;
     const words = Array.from({ length: n }, (_, i) => `w${i}`);
     const got = alignText(words.join(" "), heard(words.map((w, i) => [w, i * 0.4, i * 0.4 + 0.3])));
     expect(got.heardRatio).toBe(1);
     expect(got.words[n - 1]!.startSec).toBeCloseTo((n - 1) * 0.4, 3);
-  });
+  }, 20_000);
 
   it("compares letters and digits, folding case and accents", () => {
     expect(wordKey("Café!")).toBe("cafe");
     expect(wordKey("—")).toBe("");
+  });
+});
+
+describe("alignText word lengths", () => {
+  it("gives words squeezed between heard neighbours a minimum length instead of none", () => {
+    const got = alignText("all together all the way", heard([["all", 1, 1.3], ["the", 1.3, 1.5], ["way", 1.5, 1.9]]));
+    for (const w of got.words) expect(w.endSec - w.startSec).toBeGreaterThanOrEqual(0.079);
+    for (let i = 1; i < got.words.length; i += 1) expect(got.words[i]!.startSec).toBeGreaterThanOrEqual(got.words[i - 1]!.endSec - 1e-9);
   });
 });

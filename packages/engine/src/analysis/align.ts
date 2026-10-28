@@ -49,6 +49,8 @@ const MATCH_RATIO = 0.6;
 const MAX_CELLS = 1_000_000;
 /** Seconds a text word with no heard time takes, per weight unit, when there is nothing to spread it over. */
 const SECONDS_PER_LETTER = 0.07;
+/** Shortest a word may be: a word squeezed to nothing between two heard ones would drop out of captions and cuts. */
+const MIN_WORD_SECONDS = 0.08;
 
 /** difflib's ratio, after its cheap upper bounds (lengths, shared letters) rule most pairs out. */
 function similarity(a: string, b: string, cache: Map<string, number>): number {
@@ -226,6 +228,13 @@ export function alignText(text: string, heard: readonly TimedText[], range: { st
     }
     for (const [i, span] of spread(run, from, to).entries()) times[k + i] = span;
     k = end;
+  }
+
+  // Words squeezed into no time take the minimum, pushing the words after them (never back into a matched word's start).
+  for (let i = 0; i < times.length; i += 1) {
+    const span = times[i]!;
+    if (i > 0 && span[0] < times[i - 1]![1]) span[0] = times[i - 1]![1];
+    if (span[1] - span[0] < MIN_WORD_SECONDS) span[1] = span[0] + MIN_WORD_SECONDS;
   }
 
   const matched = new Set(pairs.map(([t]) => t));
