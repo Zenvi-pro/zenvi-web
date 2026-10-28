@@ -33,6 +33,8 @@ title: `title_clip_id` instead of `text`.
 - One word, caps, heaviest face; the accent or white.
 - Works on a locked or slow shot; fast handheld makes matte edges chatter.
 - 1.5-3 s; it is a moment, not a caption.
+- Push the word 1.0 → 1.08 over its hold (`set_keyframes_tool` scale_x/scale_y on the text clip, track above the
+  footage) so it lives in the shot; static behind-text was judged a sticker (2.9 → kept the push in the script).
 
 ## Sound for it
 A soft thud or the music's downbeat when the word appears; nothing else.

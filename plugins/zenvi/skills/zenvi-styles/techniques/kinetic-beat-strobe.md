@@ -39,6 +39,9 @@ No sequencer for mirrored/cropped full-bleed layout variants yet (`needs: type-s
 
 ## Timing & taste rules
 - 7-12 frames per word for reading words; 3-6 frames only for repeats of a word already read.
+- Mix holds of 1 / 2 / 4 beats across the run (not one word per beat throughout): set-up on 2s, accelerate to 1s,
+  the climax on half beats for repeats, then a 4-8 beat lockup on a ground the run has not used yet (the climax breaks
+  the system).
 - Changes on percussive hits (kick/snare/vocal) — 64 % of the best type cuts land on onsets, not the bare grid.
 - 2-3 grounds total (ink, paper, one accent) with one inversion rule.
 - End with a lockup held ≥ 1.5 s, or a hard stop with the music.

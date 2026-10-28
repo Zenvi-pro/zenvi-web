@@ -34,6 +34,8 @@ face, not the size, when the line fits the width: use it for a 1.2-2x accent, no
 - One emphasis word per line, at most one per 2 s of speech.
 - Hero word lands on the stressed syllable (±2 frames), connectors before it.
 - Keep the hero word inside title safe and off the face; at 6x it is often wider than the negative space: shorten it.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 One punch or pop on the hero word (-10 to -12 LUFS momentary, 3-6 dB lower under voice); nothing on connectors.

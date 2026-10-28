@@ -3,13 +3,54 @@
 Read this after the style is chosen and before placing any type. The style file says *what* the edit says; this file
 says which type motions carry it, and which never share a scene.
 
-## The two rules
+## The rules
 
 1. **Never more than two type motions per scene** (a scene = one shot or one card, or 2-4 s of edit). One is the hero
    motion (the thing the eye follows), the other is support (a caption, a label, a lower third). A third motion makes
    the viewer read the animation instead of the words.
-2. **One type system per edit**: one display face + one text face (+ mono for labels when there is data), ink, paper and
+2. **But always two layers of motion per shot** (from the kinetic-cut method): the type's entrance *plus* a continuous
+   secondary move — a slow push or drift on the footage or background, breathing, particles, a scan — and one small
+   event in the second half of the shot, so the frame never freezes after the words land. This is not a third type
+   motion; it lives in the picture. Build it with `set_keyframes_tool` on the footage/background clip (scale 1.0 → 1.04-1.08
+   over the shot), a moving backdrop block (`gradient_field`, `line_trails`), or the shot's own camera move — not on the
+   title clips, whose scale/alpha curves are their entrance (setting them replaces it). "Static after it lands" was the
+   watch judge's most common note on the isolated technique tests (word-pop, emphasis-scale, mask-reveal, quote-card,
+   text-behind-subject, karaoke, lyric-sync).
+3. **One type system per edit**: one display face + one text face (+ mono for labels when there is data), ink, paper and
    one accent. The motions change scene to scene; the faces and colours do not.
+4. **Nothing repeats by default** (kinetic-cut storyboard columns, see `../METHOD-motif.md`):
+   - shot/hold lengths mixed from **1 / 2 / 4 / 8 beats** with a curve — set-up, accelerate, breathe, climax, freeze —
+     never the same count for every shot;
+   - **≥ 3 different text entrances** in an edit with 6+ type moments (e.g. slam, typed, mask wipe, letters, morph);
+   - a composition is used **at most twice**; at least one shot where the type bleeds off the frame and one with a large
+     empty field;
+   - **at least one full-bright, inverted or accent-filled frame**, and **the climax breaks the system** — another ground
+     colour, scale or rhythm — or the heaviest hit looks like every other shot;
+   - the **reskin test**: if a shot would still work with another subject's copy, it is a template — make it from the
+     subject (letter-swap tile, tracked label, the product's own number) instead.
+
+## kinetic-cut (the style) vs these techniques
+
+`styles/kinetic-cut.md` (the `kinetic_cut` style, ported from Tweenkit's MIT kinetic-cut skill), its `techniques/kcut-*.md`
+and `METHOD-motif.md` are a whole-edit method: a beat-synced quick-cut motion piece where every shot is drawn from the
+subject's own motifs (8-12 subject-specific elements, one through-line motif), with hit-driven camera punch, shake,
+chromatic aberration, flash and bloom on the beat grid. The `kinetic-*` files here are single type moves that work in
+any style, over footage or on cards.
+
+| the brief is… | use |
+| --- | --- |
+| a 10-30 s beat-cut motion piece with little or no footage (school/brand intro, launch sting, data highlight), every shot designed | the **kinetic_cut** style + `METHOD-motif.md` storyboard; take its type entrances from this family (below) |
+| type over footage: captions, talking heads, titles in a documentary, a lower third, a quote, a spec label | **kinetic-*** techniques inside whatever style the edit has |
+| a footage montage that needs a type hook or lockup | the montage style + one or two **kinetic-*** moments (keyword-slam, beat-strobe, 3d-title, letter-cascade) |
+| a lyric or VO piece | **kinetic-lyric-sync** / **kinetic-vo-captions**; kinetic-cut only for a drop or an intro sting |
+
+Inside a kinetic_cut edit the text entrances come from here: slam → `kinetic-keyword-slam`, typed → `kinetic-typewriter`,
+mask/wipe → `kinetic-mask-reveal`, letters → `kinetic-letter-cascade`, flip/rotate → `kinetic-word-rotator`, decode →
+`kinetic-scramble-decode`, morph → `kinetic-type-morph`, strobe → `kinetic-beat-strobe`, number → `kinetic-counter`, word
+made of the subject → `kinetic-letter-swap`. Ids do not overlap: `kinetic-*` is this family, `kcut-*` is the style's own
+shot techniques (hit FX, motif drawings, particles that assemble). A `kcut-*` file that needs one of these type moves
+names the `kinetic-*` id in `pairs_with` instead of redefining it; if both ever describe the same move, the `kinetic-*`
+file keeps the type rules and the `kcut-*` file keeps the hit/FX timing.
 
 ## Pick by pace
 
@@ -57,6 +98,8 @@ says which type motions carry it, and which never share a scene.
 - **Body**: one hero motion family for the body (captions *or* headlines), the support motions where the content needs
   them (a name, a number).
 - **Pattern break at 40-55 %**: change one rule once — a serif italic word, a black slam card, a quote card, a scale-out.
+- **Climax at 60-85 %**: the system breaks — the densest cutting (down to 1 beat or 0.25 s), a new ground or an
+  inverted frame, the biggest scale — then the lockup.
 - **Lockup**: one end card held ≥ 1.5 s (letter-cascade wordmark, word-rotator landing, 3d-title, mask-reveal) with a
   stinger or a clean music stop. Not three CTAs.
 
@@ -65,7 +108,8 @@ says which type motions carry it, and which never share a scene.
 - Hero:connector 3-6x over footage (captions), 2-3x in type-only and VO type; hero:label 9-30x in spec layouts.
 - Hold ≥ 0.4 s per short word before it changes; typing ≤ 40 % of a hold.
 - Overshoot ≤ 115 %; exits are cuts or the next element replacing the type.
-- Type changes on percussive onsets or spoken onsets (±2 frames), not on the bare beat grid.
+- Type changes on percussive onsets or spoken onsets (±2 frames), not on the bare beat grid; holds are 1, 2, 4 or 8
+  beats (a word ≥ 1 beat, a held lockup 4-8).
 - Safe areas: 9:16 keeps type out of the top 12 % and bottom 20 %; nothing over the face.
 
 ## Sound per type event (CRAFT.md levels)

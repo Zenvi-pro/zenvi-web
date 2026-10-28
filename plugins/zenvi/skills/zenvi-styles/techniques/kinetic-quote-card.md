@@ -31,6 +31,8 @@ Native fallback: `add_kinetic_title_tool {"style": "editorial", "animation": "ri
 - Ratio of quote to kicker 6-10x; the kicker in mono caps at 1.5-3 %.
 - One emphasis word in italic accent, quotes as real curly quotes.
 - Calm entrance (blur or rise), exit by cut.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 Nothing, or room tone and the music dipped 3-6 dB: silence is the point. A soft paper swish at most.

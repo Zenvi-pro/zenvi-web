@@ -33,6 +33,8 @@ On 9:16 `style: "auto"` flips and stacks prefix/word. A big column of words with
 - The last word is the payoff ("you", the product name) — usually the accent.
 - Words of similar length keep the line from jumping (the block re-centres, but less jump reads better).
 - `size` ≥ 110 px at 1080: the default fit is small on short lines.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 A soft tick per change (-16 to -20 dB), a slightly bigger tap or chime on the last word.

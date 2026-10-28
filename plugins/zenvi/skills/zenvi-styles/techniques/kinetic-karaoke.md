@@ -30,6 +30,8 @@ line (kept out of the top 12 % and bottom 20 % on 9:16).
 - Highlight lands on each word's onset; chunk changes on phrase ends, never mid-phrase.
 - One accent colour (yellow, green or the brand's) and white; no second highlight colour.
 - Lower-middle of the frame, under the chin line; never over the mouth.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 None on the captions; the voice and a ducked bed carry it (-15 LUFS voice, bed -10 LU under).

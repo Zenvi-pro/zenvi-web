@@ -33,6 +33,8 @@ Leading spaces in `suffix` are dropped (" MB/s" renders "7450MB/s").
 - Count 0.8-1.5 s, ease-out (fast start, slow last digits), then hold ≥ 1.5 s on the value.
 - Land the final value on the spoken number (±2 frames) or the downbeat.
 - One number per scene; round it the way it is said ("7,450", not "7450.00").
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 Ticks under the roll (-22 dB) or a short tonal riser ending on the landing, then one punch on the final value.

@@ -33,6 +33,8 @@ A hand face (`font_family: "caveat-brush"` in motion templates) helps sell the f
 - 0.3-0.5 s per short word; the whole phrase ≤ 3 s in a reel.
 - One phrase; cream/paper ground and ink, one accent at most.
 - Hold the written phrase ≥ 1.5 s.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 Pencil/paper foley under the writing at -16 to -20 dB, stopping with the last stroke.

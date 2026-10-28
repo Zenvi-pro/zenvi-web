@@ -33,6 +33,8 @@ add_sfx_tool {"recipe": "swish_airy", "at_seconds": 0.45, "gain_db": -14}
 - Two lines at most; `/` breaks the line.
 - Hold ≥ 1.5 s, exit with the block's own exit or a cut on the next beat.
 - Over footage: calm, dark or soft part of the shot; never over a busy centre.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 One soft swish at the first word (-14 dB) or nothing under music; a hit only if the headline is the reveal.

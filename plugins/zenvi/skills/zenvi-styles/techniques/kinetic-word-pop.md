@@ -34,6 +34,8 @@ subject matte when the clip has one.
 - Overshoot stays ≤ 115 % (the pop preset's); bouncier reads as kids' TV.
 - Hold the finished line ≥ 0.4 s per short word after the last word lands; exit by cut, not fade.
 - One pop line per scene; the next line replaces it on a cut or a beat.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 A pop or soft tap on the emphasis word only (CRAFT: card pop -16 to -20 dB); connectors stay dry. Vary `seed` between

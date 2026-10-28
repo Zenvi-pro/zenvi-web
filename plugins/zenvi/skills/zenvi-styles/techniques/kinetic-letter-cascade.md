@@ -33,6 +33,8 @@ is built). Headline-sized with a mask: `add_motion_block_tool {"block": "kinetic
 - Overshoot 105-115 %, never more; the best pieces settle, the average bounce.
 - Hold the finished word ≥ 1.5 s when it is the lockup; then a cut or a stinger, no fade.
 - One word (≤ 12 letters); a sentence cascading letter by letter is unreadable.
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 A rising whoosh that peaks as the last letter lands plus one hit on the landing; or per-letter micro ticks at -24 dB

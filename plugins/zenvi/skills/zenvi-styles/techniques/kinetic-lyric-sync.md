@@ -35,6 +35,8 @@ footage) — lyric layout is decided by hand anyway. `style: "editorial"` for a 
 - Reset the canvas in the vocal rests (on the breath), not mid-line.
 - Keep the lyric off the focal subject (bottom band, above the horizon, or beside the singer), on a calm dark area:
   thin serif or small Inter over flashing stage lights is unreadable (judged 2.9-3.0 in the test).
+- Second layer of motion (families/kinetic.md rule 2): while the type holds, the picture keeps moving — push the
+  footage or backdrop 1.0 → 1.06 over the shot with `set_keyframes_tool` on that clip (not on the title clips).
 
 ## Sound for it
 None: the song is the mix (cue-per-cut under ~10 %). Do not run auto_sound_design at its default density.
