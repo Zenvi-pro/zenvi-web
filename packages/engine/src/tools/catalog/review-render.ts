@@ -283,7 +283,9 @@ export const reviewRenderTools: CatalogTool[] = [
         (images.length > 0 ? "\nContact sheet attached: shots in order, the last tile is the end; problems are framed red." : "") +
         // Meters and frames cannot hear a silent whip or feel a sagging middle; a watch can.
         (call.host.watch
-          ? `\n${count("problem") === 0 ? "Next" : "Once the PROBLEM lines are fixed"}: watch_render_tool ${JSON.stringify({ path: args.path })} once, so an editor watches it with sound and names what to fix.`
+          ? count("problem") === 0
+            ? `\nNext: watch_render_tool ${JSON.stringify({ path: args.path })} once, so an editor watches it with sound and names what to fix.`
+            : "\nOnce the PROBLEM lines are fixed and rendered again with no PROBLEM left: watch_render_tool {path: the new render} once, so an editor watches it with sound and names what to fix."
           : "");
       const data = {
         path: args.path,
