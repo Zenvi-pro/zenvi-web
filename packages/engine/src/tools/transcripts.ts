@@ -320,8 +320,9 @@ export async function wordsFor(call: ToolCall, target: WordTarget, request: Word
   const stored = storedTranscript(file);
   const sha = mediaSha256(file);
   const sameMedia = stored !== null && (!stored.sha256 || !sha || stored.sha256 === sha);
-  const reusable = stored !== null && sameMedia && languageMatches(stored, requested);
   const transcribe = request.transcribe ? call.host.audio?.transcribe : undefined;
+  // A TTS script has no detected language; with no speech recognition to ask, it is the voice's words in any.
+  const reusable = stored !== null && sameMedia && (languageMatches(stored, requested) || (stored.transcriptionSource === TTS_SCRIPT_SOURCE && !transcribe));
   const warnings: string[] = [];
   if (request.force && !transcribe) warnings.push("force ignored: speech recognition is not available on this Zenvi surface");
   const force = Boolean(request.force && transcribe);

@@ -39,6 +39,10 @@ describe("generate_tts_and_add_to_timeline_tool word timings", () => {
     const captions = await ed.call("kinetic_captions_tool", {});
     expect(captions.status, captions.summary).toBe("applied");
     expect(captions.warnings.join(" ")).toContain("TTS script laid over the voice's pauses");
+    // A language given with no speech recognition here still takes the script's words.
+    ed.doc.undo();
+    const english = await ed.call("kinetic_captions_tool", { language: "en" });
+    expect(english.status, english.summary).toBe("applied");
     const transcript = await ed.call("get_transcript_tool", { clipId, includeWords: true });
     expect(transcript.status, transcript.summary).toBe("applied");
     expect(JSON.stringify(transcript.data)).toContain("Welcome");
