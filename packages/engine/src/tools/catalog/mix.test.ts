@@ -74,7 +74,6 @@ describe("mix tools", { timeout: 60_000 }, () => {
     expect(Math.abs(at(bedAfter, 4.25) - at(bedBefore, 4.25))).toBeLessThan(1);
     // Running it again adds nothing: the voice already sits there.
     const again = await run(p, "duck_tool", { bed: "music", under: "voice", target_vbr_db: 10 });
-    console.log("AGAIN", again.summary, JSON.stringify((again.data as any)?.rounds));
     expect(again.status).toBe("unchanged");
     expect(p.doc.undoLabels.length).toBe(undo + 1);
     expect(after.rawScore!).toBeGreaterThan(before.rawScore!);
@@ -162,7 +161,6 @@ describe("mix tools", { timeout: 60_000 }, () => {
     const echoes = p.doc.project.clips.find((c) => c.id === p.hits[1])!.effects!.filter((e) => e.class_name === "Echo");
     expect(echoes).toHaveLength(3);
     const again = await run(p, "space_tool", { role: "sfx", space: "room", mix: 0.2 });
-    console.log("AGAIN", again.summary, JSON.stringify((again.data as any)?.rounds));
     expect(again.status).toBe("unchanged");
     const role = await run(p, "set_track_role_tool", { track: "1000000", role: "ambience" });
     expect(role.status).toBe("applied");
