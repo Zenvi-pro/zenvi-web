@@ -31,12 +31,13 @@ import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFloat, pyG, pySlice } from "../pyfmt.js";
 import { applied } from "../receipt.js";
 import { energyVadWindows } from "../speech.js";
-import { ASR_KEY } from "../transcripts.js";
+import { ASR_KEY, type StoredTranscript } from "../transcripts.js";
 import { scriptWordTimes, ttsTranscript } from "../tts-words.js";
 import { formatTrackLabelForLlm, lockedTrackError, newTracksNote, resolvePlacementTrack } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { applyPlacement, planPlacement, provisionalFile, placementText, type PlacementArgs } from "./clips.js";
 import { playheadSeconds, record, text } from "./common.js";
+import { alignedTranscript, lyricsPrompt } from "./align-lyrics.js";
 
 /** Kling O1 Pro durations: 5 s unless 10 s is clearly asked for (>= 8). */
 export function snapKlingDuration(duration: unknown): number {
@@ -352,10 +353,25 @@ export const generationTools: CatalogTool[] = [
       } catch (error) {
         call.host.log?.(`generate_tts_and_add_to_timeline_tool: no speech runs (${error instanceof Error ? error.message : String(error)}); words spread over the voice's length`);
       }
-      const words = scriptWordTimes(narration, voiced, seconds);
+      let words = scriptWordTimes(narration, voiced, seconds);
+      // Speech recognition on this machine costs nothing: the script then takes the times its words are heard at.
+      let aligned: StoredTranscript | undefined;
+      if (call.host.audio?.transcribesOnDevice && call.host.audio.transcribe) {
+        try {
+          const heard = await call.host.audio.transcribe(path, { language: "", prompt: lyricsPrompt(narration), signal: call.signal });
+          const got = alignedTranscript(narration, heard, "");
+          if (got.alignment.heardRatio >= 0.5) {
+            aligned = got.record;
+            words = got.record.words;
+          }
+        } catch (error) {
+          if (call.signal?.aborted) throw error;
+          call.host.log?.(`generate_tts_and_add_to_timeline_tool: no word timings heard (${error instanceof Error ? error.message : String(error)}); words spread over the voice's pauses`);
+        }
+      }
       const clip = call.commit((tx) => {
         const file = addFile(tx, media, { dedupe: false, mediaType: "audio" });
-        if (words.length > 0) tx.update(["files", { id: file.id }], { ai_metadata: { ...record(file.ai_metadata), [ASR_KEY]: ttsTranscript(words) } });
+        if (words.length > 0) tx.update(["files", { id: file.id }], { ai_metadata: { ...record(file.ai_metadata), [ASR_KEY]: aligned ?? ttsTranscript(words) } });
         let target = picked;
         if (target === null) {
           // Every track above the main one is busy (or there is only one): a Narration track right above it.
@@ -371,7 +387,9 @@ export const generationTools: CatalogTool[] = [
         ` timeline_clip_id=${clip.id}.` +
         (words.length === 0
           ? " No word timings could be read from the voice: caption it with kinetic_captions_tool cues and say the captions are hand-timed."
-          : voiced.length > 0
+          : aligned
+            ? ` Its ${words.length} words are timed to where they are heard in the voice: kinetic_captions_tool timeline_clip_ids=["${clip.id}"] captions it word by word.`
+            : voiced.length > 0
             ? ` Its ${words.length} words are timed to the voice's pauses: kinetic_captions_tool timeline_clip_ids=["${clip.id}"] captions it word by word.`
             : ` Its ${words.length} words are spread over the voice's length (its pauses could not be measured): kinetic_captions_tool timeline_clip_ids=["${clip.id}"] captions it word by word; say the timing is approximate.`)
       );

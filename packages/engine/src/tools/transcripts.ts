@@ -46,6 +46,8 @@ export const ASR_KEY = "asr";
 export const SERVER_SOURCE = "server";
 /** `transcriptionSource` of words heard on this machine (zenvi-core speech/cache.py's default). */
 export const LOCAL_SOURCE = "local";
+/** `transcriptionSource` of given words (lyrics, a TTS script) timed by forced alignment to heard ones (analysis/align.ts). */
+export const ALIGNED_SOURCE = "aligned_text";
 /** `transcriptionSource` of words estimated from the media index's transcript cues. */
 export const INDEX_SOURCE = "index_cues";
 

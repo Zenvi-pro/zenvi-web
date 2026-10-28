@@ -71,4 +71,23 @@ describe("generate_tts_and_add_to_timeline_tool word timings", () => {
     const sources = new Set(ed.doc.project.clips.flatMap((c) => (c.zenvi_kinetic_captions as { source_clip_ids?: string[] } | undefined)?.source_clip_ids ?? []));
     expect([...sources]).toEqual([voice]);
   });
+
+  it("times the script by the words heard in the voice when speech recognition runs on this machine", async () => {
+    const ed = new EditHarness();
+    const heard = ["welcome", "to", "the", "show", "stay", "for", "the", "twist"].map((text, i) => ({ text, startSec: 0.2 + i * 0.3 + (i >= 4 ? 0.6 : 0), endSec: 0.45 + i * 0.3 + (i >= 4 ? 0.6 : 0) }));
+    const asked: string[] = [];
+    ed.host.audio!.transcribesOnDevice = true;
+    ed.host.audio!.transcribe = async (path, options) => {
+      asked.push(`${path} ${options?.prompt ?? ""}`);
+      return { language: "en", model: "whisper-base", words: heard, segments: [], durationSeconds: 3.5, onDevice: true };
+    };
+    const summary = (await ed.call("generate_tts_and_add_to_timeline_tool", { text: "Welcome to the show. Stay for the twist!", position_seconds: "0" })).summary;
+    expect(summary).toContain("Its 8 words are timed to where they are heard in the voice");
+    expect(asked[0]).toMatch(/zenvi_tts_.*Welcome to the show\. Stay for the twist!$/);
+    const clipId = /timeline_clip_id=(\w+)\./.exec(summary)![1]!;
+    const asr = (ed.doc.project.files.find((f) => f.id === ed.clip(clipId)!.file_id)!.ai_metadata as { asr: { transcriptionSource: string; words: { text: string; startSec: number }[] } }).asr;
+    expect(asr.transcriptionSource).toBe("aligned_text");
+    expect(asr.words.map((w) => w.text)).toEqual(["Welcome", "to", "the", "show.", "Stay", "for", "the", "twist!"]);
+    expect(asr.words[4]!.startSec).toBe(2);
+  });
 });
