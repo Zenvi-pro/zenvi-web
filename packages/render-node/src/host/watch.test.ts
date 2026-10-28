@@ -56,6 +56,15 @@ describe("watch host (node)", { timeout: 60_000 }, () => {
     expect(probe.streams.some((s) => s.codec_type === "audio")).toBe(true);
   });
 
+  it("keeps a frame rate under 30, and refuses a proxy still over the size it may be", async () => {
+    const film = await makeVideo(dir, "film.mp4", { width: 320, height: 240, fps: "24", duration: 1 });
+    const out = `${dir}/proxy-film.mp4`;
+    await (await import("node:fs/promises")).writeFile(out, (await makeWatchProxy(film)).bytes);
+    const video = (await ffprobeJson(out)).streams.find((s) => s.codec_type === "video")!;
+    expect(video.r_frame_rate).toBe("24/1");
+    await expect(makeWatchProxy(film, undefined, 1000)).rejects.toSatisfy((e) => isWatchError(e) && e.code === "too_large");
+  });
+
   it("refuses a render over 90 s and a file with no picture", async () => {
     const long = await makeVideo(dir, "long.mp4", { width: 32, height: 32, fps: "1", duration: 92 });
     await expect(makeWatchProxy(long)).rejects.toSatisfy((e) => isWatchError(e) && e.code === "too_long");

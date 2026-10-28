@@ -41,15 +41,22 @@ export interface WatchProxy {
   hasAudio: boolean;
 }
 
-/** The render as it is sent: long edge at most 640 px, at most 30 fps, H.264 + AAC 96 k. */
-export async function makeWatchProxy(file: string, signal?: AbortSignal): Promise<WatchProxy> {
+/** Frames per second from ffprobe's "num/den", 0 when unknown. */
+function frameRate(text: string | undefined): number {
+  const [num, den = 1] = String(text ?? "").split("/").map(Number);
+  return num && den ? num / den : 0;
+}
+
+/** The render as it is sent: long edge at most 640 px, at most 30 fps, H.264 + AAC 96 k, at most `maxBytes` (the backend's 25 MB). */
+export async function makeWatchProxy(file: string, signal?: AbortSignal, maxBytes = WATCH_MAX_BYTES): Promise<WatchProxy> {
   let probe;
   try {
     probe = await ffprobe(file, signal);
   } catch (error) {
     throw new WatchError("rejected", `could not read ${path.basename(file)}: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (!probe.streams.some((s) => s.codec_type === "video")) throw new WatchError("rejected", `${path.basename(file)} has no picture`);
+  const video = probe.streams.find((s) => s.codec_type === "video");
+  if (!video) throw new WatchError("rejected", `${path.basename(file)} has no picture`);
   const duration = Number(probe.format.duration) || 0;
   if (duration > WATCH_MAX_SECONDS + 0.5) {
     throw new WatchError("too_long", `${path.basename(file)} is ${duration.toFixed(1)} s; watching takes at most ${WATCH_MAX_SECONDS} s`);
@@ -59,6 +66,8 @@ export async function makeWatchProxy(file: string, signal?: AbortSignal): Promis
   try {
     const out = path.join(dir, "proxy.mp4");
     const edge = WATCH_PROXY_EDGE;
+    // An fps filter only above 30 (not -fpsmax, which ffmpeg before 4.4 lacks).
+    const fps = (frameRate(video.avg_frame_rate) || frameRate(video.r_frame_rate)) > 30.01 ? ",fps=30" : "";
     for (const crf of [30, 38]) {
       await runBinary(
         resolveBinary("ffmpeg"),
@@ -66,8 +75,7 @@ export async function makeWatchProxy(file: string, signal?: AbortSignal): Promis
           "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
           "-i", file,
           "-map", "0:v:0", ...(hasAudio ? ["-map", "0:a:0"] : []),
-          "-vf", `scale=w='min(${edge},iw)':h='min(${edge},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2`,
-          "-fpsmax", "30",
+          "-vf", `scale=w='min(${edge},iw)':h='min(${edge},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2${fps}`,
           "-c:v", "libx264", "-preset", "veryfast", "-crf", String(crf), "-pix_fmt", "yuv420p",
           ...(hasAudio ? ["-c:a", "aac", "-b:a", "96k", "-ac", "2"] : []),
           "-movflags", "+faststart",
@@ -75,11 +83,11 @@ export async function makeWatchProxy(file: string, signal?: AbortSignal): Promis
         ],
         { signal, what: `Making the watch proxy of ${path.basename(file)} failed` },
       );
-      if ((await stat(out)).size <= WATCH_MAX_BYTES) {
+      if ((await stat(out)).size <= maxBytes) {
         return { bytes: new Uint8Array(await readFile(out)), duration, hasAudio };
       }
     }
-    throw new WatchError("too_large", `the proxy of ${path.basename(file)} is still over 25 MB; render a shorter part`);
+    throw new WatchError("too_large", `the proxy of ${path.basename(file)} is still over ${Math.round(maxBytes / 1024 / 1024)} MB; render a shorter part`);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -156,8 +164,8 @@ export function geminiCritic(options: { apiKey: string; model?: string; fetchImp
   const model = options.model || DEFAULT_WATCH_MODEL;
   const doFetch = options.fetchImpl ?? fetch;
   return async (file, request) => {
-    const proxy = await makeWatchProxy(file, request.signal);
-    if (proxy.bytes.byteLength > GEMINI_INLINE_MAX_BYTES) throw new WatchError("too_large", "the proxy is too large to send inline to Gemini; render a shorter part");
+    // Over the inline limit the proxy is made again at the smaller quality before giving up.
+    const proxy = await makeWatchProxy(file, request.signal, GEMINI_INLINE_MAX_BYTES);
     const body = {
       systemInstruction: { parts: [{ text: WATCH_SYSTEM_PROMPT }] },
       contents: [
