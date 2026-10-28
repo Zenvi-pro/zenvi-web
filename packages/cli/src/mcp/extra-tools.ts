@@ -6,7 +6,7 @@
 
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { finishGaps, finishLines, type ToolImage } from "@zenvi/engine";
+import { finishGaps, finishLines, readBrief, type ToolImage } from "@zenvi/engine";
 import type { JsonSchemaObject } from "@zenvi/engine/tools";
 import { applied, DIRECTOR_START, failed, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import { frameCaption, type RenderResult } from "@zenvi/render-node";
@@ -57,6 +57,10 @@ const bool = (description: string) => ({ type: "boolean" as const, description }
 function text(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : undefined;
 }
+
+/** What a recipe read before any brief starts with. */
+const BRIEF_FIRST =
+  "This project has no brief yet. Step 0, before the first edit: compile the brief with the brief compiler below (inspect_media_bin_tool, one style, up to four techniques, the critique) and save it with save_brief_tool; then build it with the recipe after it.";
 
 /** On an empty project, the plan: open_project_file is the one receipt every agent reads before its first edit. */
 function startNotes(state: McpState): { notes?: string[] } {
@@ -129,7 +133,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         additionalProperties: false,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-      async run(_state, args) {
+      async run(state, args) {
         const tool = "read_director_recipe";
         const recipe = text(args.recipe);
         const palette = text(args.sound_palette);
@@ -144,6 +148,11 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const uri = palette ? `zenvi://sound/${palette}` : recipe === "director" ? "zenvi://director" : `zenvi://director/${recipe}`;
         const markdown = guideText(uri);
         if (!markdown) return { receipt: refused(tool, `Error: no ${palette ? `sound palette ${palette}` : `recipe ${recipe}`}; recipes: director, ${DIRECTOR_RECIPES.map((r) => r.genre).join(", ")}.`), engine: null };
+        // Bench sk0, first pass: agents went from the card straight to the recipe and never compiled
+        // the brief. A genre recipe read before any brief is saved carries the brief compiler first.
+        if (recipe !== undefined && recipe !== "director" && !readBrief(state.session.doc.project)) {
+          return { receipt: applied(tool, `${BRIEF_FIRST}\n\n${guideText("zenvi://styles/brief")}\n\n--- Recipe (${uri}) ---\n\n${markdown}`, { data: { uri, brief: "zenvi://styles/brief" } }, 0), engine: null };
+        }
         return { receipt: applied(tool, markdown, { data: { uri } }, 0), engine: null };
       },
     },

@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { createProject } from "@zenvi/engine";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
@@ -62,6 +63,14 @@ describe("zenvi mcp", () => {
     const recipe = await call(client, "read_director_recipe", { recipe: "match-cut-montage" });
     expect(recipe.receipt.status).toBe("applied");
     expect(recipe.receipt.summary).toMatch(/match_cut_montage_tool/);
+    // No brief saved yet: the recipe comes after the brief compiler; once one is saved, alone.
+    expect(recipe.receipt.summary).toMatch(/^This project has no brief yet\. Step 0/);
+    expect(recipe.receipt.summary).toContain("# The brief compiler");
+    const briefed = createProject({ id: "BRIEFEDXXX" });
+    briefed.settings = { zenvi_brief: { goal: "g", platform: "Reels", aspect: "16:9", length_seconds: 10, style: "match-cut-montage", hook: "h", beats: [{ start: 0, end: 10, name: "all" }] } };
+    await writeFile(path.join(work, "briefed.zvn"), JSON.stringify(briefed));
+    expect((await call(client, "open_project_file", { path: "briefed.zvn" })).receipt.status).toBe("applied");
+    expect((await call(client, "read_director_recipe", { recipe: "match-cut-montage" })).receipt.summary).toMatch(/^# Match-cut montage/);
     expect((await call(client, "read_director_recipe", { sound_palette: "hype" })).receipt.summary.length).toBeGreaterThan(200);
     expect((await call(client, "read_director_recipe", {})).receipt.status).toBe("refused");
     expect((await call(client, "read_director_recipe", { styles: "brief" })).receipt.summary).toMatch(/^# The brief compiler/);
