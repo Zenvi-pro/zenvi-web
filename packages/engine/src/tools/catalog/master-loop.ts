@@ -18,6 +18,10 @@ import type { FixCall, MixGenre, MixScore } from "../../mastering/score.js";
 import { isAutoSfxClip } from "../../sfx/moments.js";
 import type { Project } from "../../model/types.js";
 import type { ToolCall } from "../define.js";
+// A cycle (the registry lists mastering's tools), safe because runTool is only
+// called inside iterateMaster. Not a dynamic import: that makes esbuild
+// initialise the engine lazily and broke every cloud render (W53 B1).
+import { runTool } from "../registry.js";
 import { applied, unchanged, type ToolReceipt } from "../receipt.js";
 import { measureMix } from "./analyze-mix.js";
 import { spottedHits } from "./sound-design.js";
@@ -84,7 +88,6 @@ interface Round {
 }
 
 export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Record<string, unknown>, genre: MixGenre): Promise<ToolReceipt> {
-  const { runTool } = await import("../registry.js");
   const scratch = new ProjectDocument(structuredClone(call.doc.project));
   const run = async (doc: ProjectDocument, name: string, args: Record<string, unknown>) => (await runTool({ doc, host: call.host, signal: call.signal }, name, args)).data;
   /** Files a reverted step wrote (add_sfx_tool renders, pan renders) that no longer back any project file: deleted, like a failed tool's. */

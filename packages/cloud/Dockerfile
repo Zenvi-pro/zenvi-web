@@ -87,6 +87,8 @@ COPY --from=build /opt/chrome /opt/chrome
 RUN ! ldd "$(readlink -f "$ZENVI_CHROME")" | grep "not found"
 COPY --from=build /opt/ort/node_modules ./node_modules
 COPY --from=build /repo/packages/cloud/dist ./dist
+# A bundle that cannot render (module init order, missing resources) fails the build, not the first user's render.
+RUN node dist/render-job.mjs --self-test /tmp/self-test.mp4 && rm /tmp/self-test.mp4
 COPY --from=editor /repo/apps/editor/dist/editor ./editor
 USER node
 EXPOSE 8080
