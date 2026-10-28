@@ -31,14 +31,17 @@ export interface TimelineWords {
 }
 
 /**
- * Clips whose speech a call without clip ids searches: footage with picture
- * and sound, and any clip whose file already has a transcript (TTS voices,
- * aligned lyrics).
+ * Clips whose speech a call without clip ids searches: the clips whose words
+ * are known already (a transcript: TTS voices, aligned lyrics, transcribed
+ * footage; or index cues), else footage with picture and sound. Footage
+ * nobody has heard is not transcribed (and paid for) while known words exist.
  */
 export function speakingClips(project: Project): Clip[] {
+  const known = project.clips.filter((c) => storedTranscript(fileOfClip(project, c)) !== null || (clipTarget(project, c)?.cues.length ?? 0) > 0);
+  if (known.length > 0) return known;
   return project.clips.filter((c) => {
     const file = fileOfClip(project, c);
-    return file !== undefined && (isTalkingFootage(file) || storedTranscript(file) !== null || (clipTarget(project, c)?.cues.length ?? 0) > 0);
+    return file !== undefined && isTalkingFootage(file);
   });
 }
 

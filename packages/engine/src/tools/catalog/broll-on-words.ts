@@ -22,8 +22,8 @@ import { applied, refused, type ToolReceipt } from "../receipt.js";
 // A cycle (the registry lists this tool), safe because runTool is only called while a tool runs.
 import { runTool } from "../registry.js";
 import { constantKeyframe, isLocked, uiTrackNumber } from "../titles-text.js";
-import { findPhrase, timelineWords, type TimelineWord } from "../timeline-words.js";
-import { clipTarget, fileOfClip, isTalkingFootage, storedTranscript } from "../transcripts.js";
+import { findPhrase, speakingClips, timelineWords, type TimelineWord } from "../timeline-words.js";
+import { fileOfClip, isTalkingFootage } from "../transcripts.js";
 import { applyProjectState } from "./master-loop.js";
 
 const TOOL = "insert_broll_on_words_tool";
@@ -92,13 +92,14 @@ export const brollOnWordsTools: CatalogTool[] = [
         if (unknown) return refused(TOOL, `Error: unknown timeline clip ${unknown}.`);
         aroll = project.clips.filter((c) => args.timeline_clip_ids!.includes(c.id));
       } else {
-        const talking = project.clips.filter((c) => {
-          const file = fileOfClip(project, c);
-          return file !== undefined && isTalkingFootage(file);
-        });
         // Footage whose speech is known (a transcript, index cues) is the speaker; other footage with sound may be B-roll.
-        const heardClips = talking.filter((c) => storedTranscript(fileOfClip(project, c)) !== null || (clipTarget(project, c)?.cues.length ?? 0) > 0);
-        aroll = heardClips.length > 0 ? heardClips : talking;
+        const talking = (clips: Clip[]): Clip[] =>
+          clips.filter((c) => {
+            const file = fileOfClip(project, c);
+            return file !== undefined && isTalkingFootage(file);
+          });
+        aroll = talking(speakingClips(project));
+        if (aroll.length === 0) aroll = talking(project.clips);
       }
       if (aroll.length === 0) return refused(TOOL, "Error: no clip on the timeline has picture and sound; pass timeline_clip_ids (the speaker's clips).");
       const speakerFiles = new Set(aroll.map((c) => String(c.file_id ?? "")));
