@@ -51,8 +51,11 @@ describe("finishGaps", () => {
     const file = ed.doc.project.files.find((f) => f.id === block)!;
     ed.doc.setUntracked(["files", { id: block }], { ...file, zenvi_link: { engine: "zenvi-motion" } });
     ed.addClip(block, { position: 0, end: 4, layer: 2 });
-    // Silent picture: master_audio_tool would refuse it, so no master is owed.
-    expect(kinds(ed)).toEqual(["sound"]);
+    // Silent picture: master_audio_tool would refuse it, so no master is owed; one still shot has no hit point to design.
+    expect(kinds(ed)).toEqual([]);
+    // A second shot makes a cut, which wants a sound.
+    ed.addClip(camera, { position: 4, start: 5, end: 7 });
+    expect(kinds(ed)).toContain("sound");
   });
 
   it("counts a libopenshot transition only where it lies on a cut", () => {

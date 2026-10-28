@@ -18,6 +18,7 @@ import type { Clip, Project } from "../model/types.js";
 import { listProjectMotionTransitions } from "../ops/motion-transitions.js";
 import { supportedAudioEffects } from "../render/audio/registry.js";
 import { isSfxClip } from "../sfx/moments.js";
+import { spotHitPoints } from "../sfx/spot.js";
 import { collectTimelineAudio } from "../tools/catalog/audio.js";
 import { isColorGradeEffect } from "../tools/color-agent.js";
 import { reviewTimeline } from "./timeline.js";
@@ -148,7 +149,8 @@ export function finishGaps(project: Project): FinishGap[] {
     });
   }
 
-  if (!project.clips.some(isSfxClip)) {
+  // auto_sound_design_tool refuses an edit with no hit point (one still shot): no design is owed to it.
+  if (!project.clips.some(isSfxClip) && spotHitPoints(project).length > 0) {
     gaps.push({
       kind: "sound",
       message: "No sound design: no effect on any cut, so the cuts do not land (the references put a whoosh, hit or click on nearly every one).",
