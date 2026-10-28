@@ -62,9 +62,9 @@ describe("review_edit_tool over MCP", () => {
       const first = await call(client, "render_video", out);
       expect(first.receipt.status).toBe("applied");
       expect(first.receipt.notes.join(" ")).toMatch(/not been reviewed/);
-      // A cut with no sound design and no master: the receipt says what the finish owes, with the calls.
-      expect(first.receipt.summary).toMatch(/Not finished: .*sound, master missing/);
-      expect(first.receipt.notes.join(" ")).toContain('master_audio_tool {"preset":"social","iterate":true}');
+      // A silent cut with hard cuts and no sound design: the receipt says what the finish owes, with the calls (no master: nothing sounds).
+      expect(first.receipt.summary).toMatch(/Not finished: transitions, sound missing/);
+      expect(first.receipt.notes.join(" ")).toContain("spot_sound_tool {}, then auto_sound_design_tool {}");
 
       await call(client, "review_edit_tool", { audio: false, image: false });
       const reviewed = await call(client, "render_video", out);
