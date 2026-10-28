@@ -1,3 +1,15 @@
+---
+id: documentary
+kind: style
+summary: A voice-over essay or true story over B-roll - small captions, dark desaturated grade, quiet bed
+categories: [documentary-true-story, video-essay-explainer, science-curiosity, news-short-vertical-explainer]
+tools: [generate_tts_and_add_to_timeline_tool, kinetic_captions_tool, build_reel_tool, unify_grade_tool, auto_sound_design_tool]
+pace: medium
+mood: [serious, curious, moody]
+aspect: ["16:9", "9:16"]
+pairs_with: []
+avoid_with: []
+---
 # Documentary / video essay
 
 A voice tells a story over a B-roll montage: small centred one-word captions,

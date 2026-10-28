@@ -15,29 +15,33 @@ LLM listener tells a good mix from a bad one, so read the numbers.
 
 1. **Open.** `open_project_file`. Do not call `describe_project_tool` (20 K
    tokens); the cue sheet is the overview you need.
-2. **Spot.** `spot_sound_tool` (no args). It lists every hit point (cuts,
+2. **Read the brief.** `get_brief_tool`: its music (tempo, energy curve,
+   the drop), sound and checklist lines are the design intent, its style the
+   genre, its beats where the hits and the stillness go. No brief: design
+   from the cue sheet alone.
+3. **Spot.** `spot_sound_tool` (no args). It lists every hit point (cuts,
    transitions, titles, flash runs, block clicks and toggles, 3D lands, the
    climax), who speaks where, and the genre it reads as. Check the genre
    against what you see in the brief; pass `genre` from then on if it is
    wrong. **Read the palette now:** `<this skill's base directory>/palettes/<file>.md`
    (table below): it has the design call, the levels and the moves.
-3. **Design.** `auto_sound_design_tool` with the palette's arguments. One
+4. **Design.** `auto_sound_design_tool` with the palette's arguments. One
    call places every cue layered, timed, levelled over the bed, varied, in
    one space. Running it again replaces its own cues (hand-placed ones stay):
    re-run it with other arguments instead of patching dozens of cues.
-4. **What the sheet cannot see.** At most 5 `add_sfx_tool` calls, only for
+5. **What the sheet cannot see.** At most 5 `add_sfx_tool` calls, only for
    in-shot actions the brief or the shot names make obvious (a door, a pour,
    a camera shutter, a punch, a car pass) and the palette's signature move if
    the design left it out. `search_sound_library_tool` (`category`, `query`,
    `near_seconds`) to pick a recording; then `add_sfx_tool` `provider: "kit"`,
    `sound_id`, `at_seconds`. Never on a word of the voice.
-5. **Mix and master: one call.** `master_audio_tool`
+6. **Mix and master: one call.** `master_audio_tool`
    `{"preset": "social", "genre": <score genre>, "iterate": true}`. It scores
    the mix (`analyze_mix_tool`'s Sound Score), applies its top fixes (ducks
    the bed to 10 dB under the voice, levels, timing, masking) for up to 3
    rounds, then masters to -14 LUFS / -1 dBTP, riding the peaks down when
    they stop it short. One undo step.
-6. **Read the receipt, fix at most twice.** Done when the score is 85+, no
+7. **Read the receipt, fix at most twice.** Done when the score is 85+, no
    gate failed and the loudness is -15..-13 LUFS. Otherwise apply the top 1-3
    fixes the receipt names as tool calls (exactly those arguments), then
    `master_audio_tool` again with the same arguments. Any audio edit after
@@ -46,10 +50,10 @@ LLM listener tells a good mix from a bad one, so read the numbers.
    the ceiling" is as loud as the mix gets without crushing it (master has
    already ridden its peaks): do not chase it with compressors, limiters or
    gain (each try lands quieter); put it under GAPS.
-7. **Listen** (when you may render). `render_video`, then
+8. **Listen** (when you may render). `render_video`, then
    `review_render_tool` with the path: true peak, loudness, dropouts, how it
    ends. One fix pass for each `PROBLEM`.
-8. **Report** (short): the genre and palette, the cue count and coverage,
+9. **Report** (short): the genre and palette, the cue count and coverage,
    the final score and LUFS / dBTP / voice over bed, the 3 biggest fixes in
    dB, then `GAPS:` one line each for what the tools could not do.
 

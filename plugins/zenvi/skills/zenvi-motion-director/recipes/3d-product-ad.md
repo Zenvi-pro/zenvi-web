@@ -1,3 +1,15 @@
+---
+id: 3d-product-ad
+kind: style
+summary: One product that spins in and lands - a device, a bottle, an app icon; clean studio, few cuts, one landing
+categories: [3d-product-cgi-ad, product-launch-film, tech-review]
+tools: [add_3d_scene_tool, add_motion_block_tool, auto_sound_design_tool, master_audio_tool]
+pace: medium
+mood: [clean, premium, calm]
+aspect: ["16:9", "9:16", "1:1"]
+pairs_with: []
+avoid_with: []
+---
 # 3D product ad
 
 A prompt types the wish, icons burst, a "Generating…" state, then the

@@ -1,3 +1,15 @@
+---
+id: kinetic-captions
+kind: style
+summary: A person talking to camera where the captions are the show - word by word, emphasis words huge, behind the head
+categories: [talking-head-captions, podcast-clip-vertical, ugc-ad-testimonial]
+tools: [kinetic_captions_tool, generate_subject_matte_tool, text_behind_subject_tool, add_kinetic_title_tool]
+pace: fast
+mood: [direct, energetic]
+aspect: ["9:16"]
+pairs_with: []
+avoid_with: []
+---
 # Kinetic-caption talking head
 
 A person talks; the captions are the show: one word at a time in sync with

@@ -1,3 +1,15 @@
+---
+id: flash-montage
+kind: style
+summary: One idea told by a new image every 3-6 frames ("the evolution of") - shapes matched, flashes, glow, loud
+categories: [flash-cut-match-cut-edit, gaming-montage, music-lyric-video]
+tools: [gather_stock_footage_tool, match_cut_montage_tool, apply_look_tool, auto_sound_design_tool]
+pace: frantic
+mood: [intense, hypnotic]
+aspect: ["9:16", "16:9"]
+pairs_with: []
+avoid_with: []
+---
 # Flash montage
 
 A new image every 3-6 frames on one idea ("the evolution of time"), shapes
