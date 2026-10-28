@@ -187,6 +187,22 @@ describe("motion transition tools", () => {
     expect(listProjectMotionTransitions(doc.project).map((r) => r.preset)).toEqual(["glitch"]);
   });
 
+  it("refuses a cross-track transition onto a clip on a locked track, adding no undo step", async () => {
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      addClip(tx, { fileId: "VIDEO00001", position: 0, layer: 1, start: 0, end: 2, id: "A" });
+      addClip(tx, { fileId: "VIDEO00001", position: 2, layer: 3, start: 0, end: 2, id: "B" });
+    });
+    doc.transaction("lock", (tx) => tx.update(["layers", { number: 3 }], { lock: true }));
+    doc.clearHistory();
+    const before = JSON.stringify(doc.project.clips);
+    const result = await call(doc, "apply_motion_transition_tool", { preset: "whip", clip1_id: "A", clip2_id: "B" });
+    expect(result.ok).toBe(false);
+    expect(result.text).toMatch(/locked/);
+    expect(JSON.stringify(doc.project.clips)).toBe(before);
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+
   it("removes one transition by id and refuses unknown ids", async () => {
     const doc = editDoc();
     const before = JSON.stringify(doc.project.clips);

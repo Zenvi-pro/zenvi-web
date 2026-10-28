@@ -449,6 +449,7 @@ export function planMotionTransitionEdit(project: Project, input: MotionTransiti
   if (!info) throw new OpError("not_found", `Unknown motion transition '${input.preset}'.`);
   const cut = cutBetween(project, input.outClipId, input.inClipId, input.acrossTracks);
   requireUnlocked(project, cut.layer, "Track");
+  if (cut.inClip.layer !== cut.layer) requireUnlocked(project, cut.inClip.layer, "Track");
   const replaced = existingOnCut(cut.outClip, cut.inClip);
   const outClip = replaced ? withoutRecord(cut.outClip, replaced) : cut.outClip;
   const inClip = replaced ? withoutRecord(cut.inClip, replaced) : cut.inClip;
@@ -528,6 +529,7 @@ export function planMotionTransitionEdit(project: Project, input: MotionTransiti
   const moving = new Set([outClip.id, inClip.id, ...followerSides.map((f) => f.clip.id)]);
   // Clips that moved with the replaced transition and are not in this one go back to rest.
   const released = replaced ? project.clips.filter((c) => !moving.has(c.id) && motionRecords(c).some((r) => r.id === replaced)).map((c) => withoutRecord(c, replaced)) : [];
+  for (const clip of released) requireUnlocked(project, clip.layer, "Track");
 
   const nextId = ids(project);
   const id = newId ?? replaced ?? `MT${nextId()}`;
