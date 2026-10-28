@@ -222,16 +222,16 @@ describe("export loudness normalisation", () => {
   }, 60_000);
 
   it("builds the second pass from the first pass's readings", () => {
-    const pass2 = loudnormPass2({ inputI: -27.6, inputTp: -20, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
+    const pass2 = loudnormPass2({ inputI: -27.6, inputTp: -20, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100, 2);
     expect(pass2).toContain("I=-14:TP=-2");
     expect(pass2).toContain("measured_I=-27.6:measured_TP=-20:measured_LRA=3.2:measured_thresh=-38:offset=0.3:linear=true");
     expect(pass2).toContain("aresample=44100");
-    expect(pass2).toContain("alimiter=limit=0.79433:level=disabled");
+    expect(pass2).toContain("aresample=44100,aformat=channel_layouts=stereo,alimiter=limit=0.79433:level=disabled");
     // +13.6 dB to reach -14 would take a -12 dBTP peak to +1.6: past -2, so a gain and a limiter.
-    const hot = loudnormPass2({ inputI: -27.6, inputTp: -12, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
+    const hot = loudnormPass2({ inputI: -27.6, inputTp: -12, inputLra: 3.2, inputThresh: -38, targetOffset: 0.3 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100, 2);
     expect(hot).toBe("volume=13.6dB,alimiter=limit=0.79433:level=disabled");
     // Asked for far more than the limiter may take: the gain stops at 6 dB of peak reduction.
-    const crushed = loudnormPass2({ inputI: -45, inputTp: -22, inputLra: 3.2, inputThresh: -50, targetOffset: 0 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100);
+    const crushed = loudnormPass2({ inputI: -45, inputTp: -22, inputLra: 3.2, inputThresh: -50, targetOffset: 0 }, { targetLufs: -14, truePeakDbtp: -1 }, 44100, 2);
     expect(crushed).toBe("volume=26dB,alimiter=limit=0.79433:level=disabled");
   });
 });

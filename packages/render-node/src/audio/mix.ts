@@ -11,7 +11,7 @@ import { CODEC_HEADROOM_DB, LIMITER_LOOKAHEAD_SECONDS, LIMITER_RELEASE_SECONDS, 
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { AbortedError, spawnManaged } from "../ffmpeg/process.js";
 import { streamStarts } from "../probe/starts.js";
-import { buildAudioGraph, num, type AudioGraph } from "../render/audio-graph.js";
+import { buildAudioGraph, layoutName, num, type AudioGraph } from "../render/audio-graph.js";
 import { SCRIPT_THRESHOLD, ffmpegMajor } from "../render/encoder.js";
 import { defaultRenderEngine, type RenderEngine } from "../render/engine.js";
 
@@ -171,7 +171,7 @@ export async function measureLoudnorm(graph: AudioGraph, target: LoudnessTarget,
  * mastering chain does: linear `loudnorm` would stop short of the target and
  * its dynamic mode squeezes the whole programme.
  */
-export function loudnormPass2(measured: LoudnormMeasurement, target: LoudnessTarget, sampleRate: number): string {
+export function loudnormPass2(measured: LoudnormMeasurement, target: LoudnessTarget, sampleRate: number, channels: number): string {
   const ceilingDb = target.truePeakDbtp - CODEC_HEADROOM_DB;
   const ceiling = num(10 ** (ceilingDb / 20), 5);
   const gain = target.targetLufs - measured.inputI;
@@ -179,6 +179,9 @@ export function loudnormPass2(measured: LoudnormMeasurement, target: LoudnessTar
     return [
       `${loudnormBase(target)}:measured_I=${num(measured.inputI, 3)}:measured_TP=${num(measured.inputTp, 3)}:measured_LRA=${num(measured.inputLra, 3)}:measured_thresh=${num(measured.inputThresh, 3)}:offset=${num(measured.targetOffset, 3)}:linear=true`,
       `aresample=${sampleRate}`,
+      // ffmpeg 5.1 (the cloud image's Debian) loses the layout across loudnorm: the limiter after it then fails
+      // the whole export with "Cannot select channel layout".
+      `aformat=channel_layouts=${layoutName(channels)}`,
       `alimiter=limit=${ceiling}:level=disabled`,
     ].join(",");
   }
@@ -207,9 +210,9 @@ export function truePeakLimiterFilter(sampleRate: number, ceilingDb: number, ffm
 }
 
 /** Normalize `graph`'s output to `target` (mutates the graph's filter). Returns a warning when it left the mix alone. */
-export async function normalizeLoudness(graph: AudioGraph, target: LoudnessTarget, sampleRate: number, tempDir: string, firstInput: number, signal?: AbortSignal): Promise<string | undefined> {
+export async function normalizeLoudness(graph: AudioGraph, target: LoudnessTarget, sampleRate: number, channels: number, tempDir: string, firstInput: number, signal?: AbortSignal): Promise<string | undefined> {
   const measured = await measureLoudnorm(graph, target, tempDir, firstInput, signal);
   if (!measured) return "Loudness normalisation skipped: the mix is silent.";
-  graph.filter = appendToOutput(graph.filter, loudnormPass2(measured, target, sampleRate));
+  graph.filter = appendToOutput(graph.filter, loudnormPass2(measured, target, sampleRate, channels));
   return undefined;
 }

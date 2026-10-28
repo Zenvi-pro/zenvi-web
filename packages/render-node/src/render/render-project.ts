@@ -191,7 +191,7 @@ export async function renderProject(source: Project, opts: RenderProjectOptions)
       : undefined;
     if (audio) warnings.push(...audio.warnings);
     if (audio && options.loudness) {
-      const skipped = await normalizeLoudness(audio, options.loudness, sampleRate, effectsDir!, info.video ? 1 : 0, signal);
+      const skipped = await normalizeLoudness(audio, options.loudness, sampleRate, channels, effectsDir!, info.video ? 1 : 0, signal);
       if (skipped) warnings.push(skipped);
     }
     // Last on the mix, after any normalisation: nothing that reaches the file passes the ceiling.
