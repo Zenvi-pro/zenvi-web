@@ -46,6 +46,7 @@ import { APP_LABEL, type FamilyDecision, type FamilyDecisions } from "../hosts/p
 import { findProject } from "../project/select.js";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { VERSION } from "../version.js";
+import { briefNote } from "./brief-note.js";
 import { extraTools, type ExtraTool } from "./extra-tools.js";
 import { HANDOFF_TOOL_NAMES, hostTools } from "./host-tools.js";
 import { McpState, type McpStateOptions } from "./state.js";
@@ -181,6 +182,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text);
       if (!receipt) return { content: [{ type: "text", text: result.text }], ...(result.ok ? {} : { isError: true }) };
       if (name === "review_edit_tool" && result.ok) state.noteReview();
+      const brief = isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
+      if (brief) receipt.notes = [...receipt.notes, brief];
       if (!state.session.file && receipt.undoSteps > 0) {
         receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }
