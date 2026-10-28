@@ -3,7 +3,7 @@ id: product-launch-film
 kind: style
 summary: "For a hardware or device launch film: product named in 3 s, spec slams on black, proof shots, one lockup."
 categories: [product-launch-film]
-tools: [set_project_setting_tool, gather_stock_footage_tool, search_freesound_music_tool, import_stock_media_tool, detect_beats_tool, add_clip_to_timeline_tool, add_kinetic_title_tool, add_motion_block_tool, add_3d_scene_tool, set_keyframes_tool, apply_motion_transition_tool, color_grade_clip_tool, unify_grade_tool, apply_fx_tool, add_sfx_tool, spot_sound_tool, master_audio_tool, review_edit_tool, review_render_tool]
+tools: [set_project_setting_tool, gather_stock_footage_tool, search_freesound_music_tool, import_stock_media_tool, detect_beats_tool, add_clip_to_timeline_tool, add_kinetic_title_tool, add_title_tool, add_motion_block_tool, add_3d_scene_tool, set_keyframes_tool, apply_motion_transition_tool, color_grade_clip_tool, unify_grade_tool, apply_fx_tool, add_sfx_tool, spot_sound_tool, master_audio_tool, review_edit_tool, review_render_tool]
 pace: fast
 mood: [bold, premium, precise, dark]
 aspect: ["16:9", "9:16"]

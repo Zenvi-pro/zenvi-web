@@ -1,7 +1,7 @@
 ---
 id: 3d-product-cgi-ad
 kind: style
-summary: "For a CGI product spot (earbuds, device, bottle): one feature per 3-5 s, each with its own picture, clean white or black."
+summary: "For a CGI product spot (earbuds, device, bottle): one feature per 3-5 s, each with its own picture, on white or black."
 categories: [3d-product-cgi-ad]
 tools: [set_project_setting_tool, add_3d_scene_tool, rerender_3d_scene_tool, generate_image_and_add_to_timeline_tool, add_motion_block_tool, add_kinetic_title_tool, add_title_tool, set_keyframes_tool, apply_motion_transition_tool, apply_fx_tool, subject_glow_tool, search_freesound_music_tool, import_stock_media_tool, detect_beats_tool, add_sfx_tool, auto_sound_design_tool, master_audio_tool, review_edit_tool, review_render_tool]
 pace: medium

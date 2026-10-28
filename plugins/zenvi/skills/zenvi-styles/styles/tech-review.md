@@ -3,7 +3,7 @@ id: tech-review
 kind: style
 summary: "For a gadget review or hands-on: verdict in 3 s, presenter plus claim-synced inserts, one card style, buy-or-skip."
 categories: [tech-review]
-tools: [set_project_setting_tool, transcribe_media_tool, get_transcript_tool, generate_tts_and_add_to_timeline_tool, gather_stock_footage_tool, search_clip_scenes_tool, add_clip_to_timeline_tool, split_clip_tool, set_clip_properties_tool, add_motion_block_tool, add_kinetic_title_tool, kinetic_captions_tool, unify_grade_tool, add_sfx_tool, duck_tool, master_audio_tool, review_edit_tool, review_render_tool]
+tools: [set_project_setting_tool, transcribe_media_tool, get_transcript_tool, generate_tts_and_add_to_timeline_tool, gather_stock_footage_tool, search_freesound_music_tool, search_clip_scenes_tool, add_clip_to_timeline_tool, split_clip_tool, set_clip_properties_tool, add_motion_block_tool, add_kinetic_title_tool, kinetic_captions_tool, unify_grade_tool, add_sfx_tool, duck_tool, master_audio_tool, review_edit_tool, review_render_tool]
 pace: medium
 mood: [informative, honest, crisp, friendly]
 aspect: ["16:9", "9:16"]
