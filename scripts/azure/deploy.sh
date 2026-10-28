@@ -36,7 +36,9 @@ git -C "$ROOT" archive HEAD package.json package-lock.json tsconfig.base.json \
   packages/engine packages/render-node packages/scenes3d packages/motion packages/cloud packages/render-web apps/editor "${MANIFESTS[@]}" | tar -x -C "$CTX"
 
 step "Building $REGISTRY.azurecr.io/zenvi-cloud:$TAG in ACR"
-az acr build -r "$REGISTRY" -t "zenvi-cloud:$TAG" -f packages/cloud/Dockerfile "$CTX"
+# From inside the staged tree: az resolves -f against the current directory first, so a run from another checkout
+# would build with that checkout's Dockerfile.
+(cd "$CTX" && az acr build -r "$REGISTRY" -t "zenvi-cloud:$TAG" -f packages/cloud/Dockerfile .)
 
 if az containerapp show -g "$RG" -n "$APP" -o none 2>/dev/null; then
   ACR_SERVER="$(az acr show -n "$REGISTRY" --query loginServer -o tsv)"
