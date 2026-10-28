@@ -46,7 +46,7 @@ import { APP_LABEL, type FamilyDecision, type FamilyDecisions } from "../hosts/p
 import { findProject } from "../project/select.js";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { VERSION } from "../version.js";
-import { BRIEF_BUMP, briefBump, briefNote } from "./brief-note.js";
+import { BRIEF_GATE, briefGate, briefNote } from "./brief-note.js";
 import { extraTools, type ExtraTool } from "./extra-tools.js";
 import { HANDOFF_TOOL_NAMES, hostTools } from "./host-tools.js";
 import { McpState, type McpStateOptions } from "./state.js";
@@ -177,9 +177,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
         if (receipt) return toCallResult(receipt, outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...(outcome.ok ? {} : { isError: true }) };
       }
-      if (ctx.env.ZENVI_MCP_BRIEF !== "off" && !state.briefBumped && briefBump(name, state.session.doc.project)) {
-        state.briefBumped = true;
-        return toCallResult(refused(name, BRIEF_BUMP), undefined, { engine: "portable" });
+      if (ctx.env.ZENVI_MCP_BRIEF !== "off" && briefGate(name, state.session.doc.project)) {
+        return toCallResult(refused(name, BRIEF_GATE), undefined, { engine: "portable" });
       }
       state.notePortableCall();
       const { result } = await state.session.run(name, args, extra.signal);

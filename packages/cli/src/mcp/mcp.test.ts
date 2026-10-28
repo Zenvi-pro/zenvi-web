@@ -56,14 +56,17 @@ afterAll(async () => {
 });
 
 describe("zenvi mcp", () => {
-  it("refuses the first cut without a brief once, then lets the same call through", async () => {
+  it("refuses cuts before a brief is saved, then lets them through", async () => {
     const client = await connect(undefined, { ZENVI_MCP_BRIEF: "on" });
-    await call(client, "open_project_file", { path: "bump.zvn" });
+    await call(client, "open_project_file", { path: "gate.zvn" });
     const first = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
     expect(first.receipt.status).toBe("refused");
-    expect(first.receipt.summary).toMatch(/^Error: refused once, nothing changed: compile the creative brief/);
-    const again = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
-    expect(again.receipt.summary).not.toMatch(/compile the creative brief before the first cut/);
+    expect(first.receipt.summary).toMatch(/^Error: no brief saved, nothing changed\. Step 0/);
+    const briefed = createProject({ id: "GATEDXXXXX" });
+    briefed.settings = { zenvi_brief: { goal: "g", platform: "Reels", aspect: "16:9", length_seconds: 10, style: "hype-reel", hook: "h", beats: [{ start: 0, end: 10, name: "all" }] } };
+    await writeFile(path.join(work, "gated.zvn"), JSON.stringify(briefed));
+    await call(client, "open_project_file", { path: "gated.zvn" });
+    expect((await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" })).receipt.summary).not.toMatch(/no brief saved/);
   });
 
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {

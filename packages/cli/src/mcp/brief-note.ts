@@ -6,10 +6,11 @@
  * the timeline is nearly empty, so a single quick edit hears it at most once
  * or twice.
  *
- * Notes alone were not enough (the next bench pilot read three of them and
- * cut anyway), so the first call that lays down material without a brief is
- * refused once per server: a speed bump, not a wall. The same call made again
- * goes through. ZENVI_MCP_BRIEF=off turns the bump off.
+ * Notes alone were not enough (bench pilots read three of them and cut
+ * anyway), and neither was refusing the first cut once (the pilot repeated
+ * the call), so until a brief is saved the calls that lay down material are
+ * refused while the timeline is nearly empty. A quick edit needs only a
+ * short brief. ZENVI_MCP_BRIEF=off turns the gate off.
  */
 
 import { readBrief, type Project } from "@zenvi/engine";
@@ -46,13 +47,13 @@ export function briefNote(tool: string, project: Project): string | undefined {
   return BRIEF_NOTE;
 }
 
-/** Calls the bump stops: they lay material on the timeline or fetch it for a plan (searches, the person's own imports and the frame setting stay free). */
-const BUMPED = new Set([...STARTS_A_VIDEO].filter((t) => !["set_project_setting_tool", "search_pexels_videos_tool", "search_freesound_music_tool", "import_files_tool"].includes(t)));
+/** Calls the gate stops: they lay material on the timeline or fetch it for a plan (searches, the person's own imports and the frame setting stay free). */
+const GATED = new Set([...STARTS_A_VIDEO].filter((t) => !["set_project_setting_tool", "search_pexels_videos_tool", "search_freesound_music_tool", "import_files_tool"].includes(t)));
 
-export const BRIEF_BUMP =
-  'Error: refused once, nothing changed: compile the creative brief before the first cut (read_director_recipe {styles: "brief"}: the hook, beats with timings, shot plan and critique), save it with save_brief_tool, then make this call again. A request with no time for a brief can repeat this call as it is: it goes through.';
+export const BRIEF_GATE =
+  'Error: no brief saved, nothing changed. Step 0 of a video is the creative brief: read_director_recipe {styles: "brief"}, then save_brief_tool (goal, platform, aspect, length_seconds, style, hook, beats; for a quick edit one beat is enough), then make this call again.';
 
-/** Whether `tool` on `project` is the first unbriefed cut, which the bump refuses. */
-export function briefBump(tool: string, project: Project): boolean {
-  return BUMPED.has(tool) && project.clips.length < EARLY_CLIPS && !readBrief(project);
+/** Whether `tool` on `project` lays down material before any brief, which the gate refuses. */
+export function briefGate(tool: string, project: Project): boolean {
+  return GATED.has(tool) && project.clips.length < EARLY_CLIPS && !readBrief(project);
 }
