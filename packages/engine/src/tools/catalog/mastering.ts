@@ -33,6 +33,7 @@ import {
 } from "../audio-mix.js";
 import { STEM_ROLE_OF, mixRoleOf } from "../mix-roles.js";
 import { MIX_GENRES } from "../../mastering/score.js";
+import { markMastered } from "../../review/finish.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { measureMix } from "./analyze-mix.js";
 import { iterateMaster, PEAK_MARGIN_DB } from "./master-loop.js";
@@ -419,6 +420,7 @@ export const masteringTools: CatalogTool[] = [
         data.limitedBy = plan.limitedBy;
         shortfallNote();
         const where = plan.limitedBy === "peak" && plan.shortfallLu > 0.5 ? "At the true-peak ceiling" : "Already mastered";
+        markMastered(call.doc, args.preset, before.integratedLufs);
         return unchanged(TOOL, `${where}: ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} (target ${base.targetLufs} LUFS / ${base.ceilingDbtp} dBTP). Nothing changed.`, { data, warnings, notes });
       }
 
@@ -487,6 +489,7 @@ export const masteringTools: CatalogTool[] = [
           warnings.push(`The Sound Score could not be measured (${error instanceof Error ? error.message : String(error)}).`);
         }
       }
+      markMastered(call.doc, args.preset, after.integratedLufs);
       data.after = after;
       data.gainsDb = planNumbers(plan);
       data.duckDb = Math.round(plan.duckDb * 100) / 100;

@@ -19,6 +19,7 @@ import { applyClipGain } from "./mastering.js";
 import type { ToolReceipt } from "../receipt.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
 import { L1, L2, L3, audioInfo, media, videoInfo } from "../test-support/fixture.js";
+import { finishGaps, masterMark } from "../../review/finish.js";
 
 const RATE = 24000;
 
@@ -153,8 +154,12 @@ describe("master_audio_tool", { timeout: 60_000 }, () => {
     expect(music.integrated - sfx.integrated).toBeGreaterThan(1.5);
     expect(music.integrated - sfx.integrated).toBeLessThan(4.5);
 
+    // The finish check reads the mix as mastered until an undo (or any audio edit) changes it.
+    const kinds = () => finishGaps(doc.project).map((g) => g.kind);
+    expect(kinds()).not.toContain("master");
     doc.undo();
     expect((await loudnessOf(doc)).integrated).toBeCloseTo(before.integrated, 1);
+    expect(kinds()).toContain("master");
   });
 
   it("anchors on dialogue, ducks the music under it and lands on the target", async () => {
@@ -207,6 +212,7 @@ describe("master_audio_tool", { timeout: 60_000 }, () => {
     const steps = doc.undoLabels.length;
     const receipt = await master(doc, host, { dry_run: true, preset: "broadcast" });
     expect(receipt.status).toBe("unchanged");
+    expect(masterMark(doc.project)).toBeNull();
     expect(JSON.stringify(doc.project.clips)).toBe(snapshot);
     expect(doc.undoLabels.length).toBe(steps);
     expect(data(receipt).after.integratedLufs).toBeCloseTo(-23, 0);

@@ -6,7 +6,7 @@
 
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { ToolImage } from "@zenvi/engine";
+import { finishGaps, finishLines, type ToolImage } from "@zenvi/engine";
 import type { JsonSchemaObject } from "@zenvi/engine/tools";
 import { applied, failed, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import { frameCaption, type RenderResult } from "@zenvi/render-node";
@@ -153,16 +153,23 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         }
         const result = (await session.host.exporter!.export(session.doc.project, options, (f) => call.progress?.(f, 1, `Rendering ${Math.round(f * 100)}%`))) as RenderResult;
         const mb = (result.bytes ?? 0) / 1e6;
+        const audioOnly = options.format === "mp3" || options.format === "wav";
+        // What the director's finish still owes (grade, transitions, sound design, master), with the next calls: agents act on receipts.
+        const gaps = audioOnly ? [] : finishGaps(session.doc.project);
+        const notes = [
+          ...(state.unreviewedCut() && !audioOnly ? ["This cut has not been reviewed since the last edit: review_edit_tool shows pacing, beat sync, holds and black frames in one image. Fix what it flags and render again."] : []),
+          ...finishLines(gaps),
+          ...(gaps.length > 0 ? ["Then render again and call review_render_tool on the file."] : []),
+        ];
         return {
           receipt: applied(
             tool,
-            `Rendered ${result.location} (${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${mb.toFixed(1)} MB)`,
+            `Rendered ${result.location} (${options.format}, ${options.width}x${options.height}, ${result.durationSeconds.toFixed(2)} s, ${mb.toFixed(1)} MB)` +
+              (gaps.length > 0 ? `. Not finished: ${gaps.map((g) => g.kind).join(", ")} missing (notes list the next calls)` : ""),
             {
-              data: { ...result, format: options.format, width: options.width, height: options.height },
+              data: { ...result, format: options.format, width: options.width, height: options.height, ...(gaps.length > 0 ? { finish: gaps } : {}) },
               warnings: result.warnings,
-              ...(state.unreviewedCut() && options.format !== "mp3" && options.format !== "wav"
-                ? { notes: ["This cut has not been reviewed since the last edit: review_edit_tool shows pacing, beat sync, holds and black frames in one image. Fix what it flags and render again."] }
-                : {}),
+              ...(notes.length > 0 ? { notes } : {}),
             },
             0,
           ),

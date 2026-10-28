@@ -93,6 +93,10 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
     const receipt = (await runTool({ doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
     expect(receipt.summary).toContain('- 4.00s FILEAAAAAA.mp4 → FILEXTRA00.mp4 from 1.20s (unused clip): swap_shot_tool {"clip_id":"CLIPA00002","file_id":"FILEXTRA00","start_seconds":1.2}');
     expect((receipt.data as Row).swaps).toHaveLength(1);
+    // The open project has no sound design and no master yet: the review says so, with the calls.
+    expect(receipt.summary).toContain("Not finished (the open project)");
+    expect(receipt.summary).toContain('- FINISH: No sound design');
+    expect(((receipt.data as Row).finish as { kind: string }[]).map((g) => g.kind)).toContain("master");
     // A render of another edit (the harness's 19 s timeline): no swaps, rather than wrong ones.
     const other = (await runTool({ doc: ed.doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
     expect((other.data as Row).swaps).toBeNull();
