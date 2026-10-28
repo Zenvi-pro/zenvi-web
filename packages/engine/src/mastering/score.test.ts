@@ -121,6 +121,25 @@ describe("scoreMix", { timeout: 60_000 }, () => {
     expect(single.metrics.H3_timing_within_1f!.calls!.some((c) => c.args.clip_id === "c0")).toBe(true);
   });
 
+  it("does not move a cue by another sound's onset (H3)", () => {
+    const base = atTarget();
+    const cues = input().cues!.map((c) => ({ ...c, position: c.t, group: c.id, auto: true }));
+    const sr = base.sampleRate;
+    // A louder click 60 ms after c0, which is on time: the strongest onset of c0's window is not c0's.
+    const echo = (stem: Float32Array[]) => stem.map((ch) => {
+      const out = ch.slice();
+      const from = Math.round(0.5 * sr);
+      const to = Math.round(0.56 * sr);
+      for (let i = 0; i < Math.round(0.03 * sr); i += 1) out[to + i]! += 1.5 * ch[from + i]!;
+      return out;
+    });
+    const busy = scoreMix({ ...base, mix: echo(base.mix as Float32Array[]), stems: { ...base.stems, sfx: echo(base.stems!.sfx as Float32Array[]) }, cues });
+    expect(busy.metrics.H3_timing_within_1f!.calls ?? []).toEqual([]);
+    // A cue with nothing at its moment, 120 ms after a neighbour: the window's strongest point is the edge the neighbour drew.
+    const lone = scoreMix({ ...base, cues: [...cues, { id: "quiet", t: 0.62, kind: "impact", role: "hero", position: 0.62, group: "quiet", auto: true }] });
+    expect((lone.metrics.H3_timing_within_1f!.calls ?? []).some((c) => c.args.clip_id === "quiet")).toBe(false);
+  });
+
   it("counts the layers of one hit as one hero for the hero gap (V4)", () => {
     const base = atTarget();
     const layered = [...base.cues!, { id: "tail0", t: base.cues![0]!.t, kind: "tail", role: "hero" as const, group: "cue0" }];

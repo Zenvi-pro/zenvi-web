@@ -85,7 +85,7 @@ const listingKey = (families: FamilyDecisions, handoff: FamilyDecision): string 
 export async function createZenviMcpServer(ctx: CommandContext, projectFile?: string, options: McpStateOptions = {}): Promise<ZenviMcpServer> {
   const state = await McpState.create(ctx, projectFile, options);
   const extras: ExtraTool[] = [...extraTools(ctx), ...hostTools(ctx)];
-  const extraByName = new Map<string, ExtraTool>(extras.map((t) => [t.name, t]));
+  const extraByName = new Map<string, ExtraTool>(extras.flatMap((t) => [t.name, ...(t.aliases ?? [])].map((name) => [name, t] as const)));
   const server = new McpServer(
     { name: "zenvi", title: "Zenvi video editor", version: VERSION },
     { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS },

@@ -45,6 +45,8 @@ export interface ExtraTool {
   annotations: { readOnlyHint: boolean; destructiveHint: boolean; openWorldHint: boolean; idempotentHint?: boolean };
   /** The tool checks argument names itself (forwarded desktop tools use the desktop's own schema). */
   checksOwnArguments?: boolean;
+  /** Older names it still answers to, not listed. */
+  aliases?: readonly string[];
   run(state: McpState, args: Record<string, unknown>, call: ExtraCallContext): Promise<ExtraToolResult>;
 }
 
@@ -154,6 +156,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
           fps: str("Frame rate, e.g. 30 or 30000/1001 (default: the project's)."),
           start: num("Render from this timeline time (seconds)."),
           end: num("Render up to this timeline time (seconds)."),
+          overwrite: bool("Accepted for agents that ask: a render always replaces the file at its output path."),
           loudness: str("Normalise the mix on export: social (-14 LUFS, -1 dBTP), broadcast (-23), podcast (-16) or a LUFS number; two-pass loudnorm with a true-peak limiter. Use it when master_audio_tool says the peaks held the mix under its target. Default off."),
         },
         additionalProperties: false,
@@ -219,11 +222,11 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         type: "object",
         properties: {
           seconds: num("Timeline time in seconds."),
+          time_seconds: num("Same as seconds (Zenvi Cloud's name)."),
           width: num("Image width in pixels (default 768, max 1920)."),
           grid: bool("Draw a 0-1 coordinate grid and a frame caption (default false)."),
           format: { type: "string", enum: ["jpeg", "png"], description: "Default jpeg." },
         },
-        required: ["seconds"],
         additionalProperties: false,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
@@ -231,7 +234,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const tool = "preview_frame";
         let seconds: number;
         try {
-          seconds = parseTime(String(args.seconds ?? "")) ?? NaN;
+          seconds = parseTime(String(args.seconds ?? args.time_seconds ?? "")) ?? NaN;
         } catch {
           seconds = NaN;
         }
@@ -283,13 +286,24 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       },
     },
     {
-      name: "mcp_health",
-      title: "What the current sign-in enables",
+      // The engine's mcp_health_tool (Zenvi up, motion runtime) and what the sign-in enables, in one tool:
+      // the merge of #53 and #58 had listed both. `mcp_health` stays callable.
+      name: "mcp_health_tool",
+      aliases: ["mcp_health"],
+      title: "Is Zenvi up, and what the current sign-in enables",
       description:
-        "Report who Zenvi is signed in as and which features that sign-in enables: local editing and rendering, Zenvi Cloud, AI image/video generation, AI voice (text to speech), speech recognition and media search; for each one that is off, how to turn it on. Call it before generating images, video or voice, or when one of those fails with a sign-in error. Read-only.",
-      inputSchema: { type: "object", properties: {}, additionalProperties: false },
+        "Check that Zenvi answers and can render Zenvi Motion blocks, and report who Zenvi is signed in as and which features that sign-in enables: local editing and rendering, Zenvi Cloud, AI image/video generation, AI voice (text to speech), speech recognition and media search; for each one that is off, how to turn it on. Call it before generating images, video or voice, or when one of those fails with a sign-in error. Read-only.",
+      inputSchema: { type: "object", properties: { main_thread_timeout_seconds: num("Desktop app only: how long to wait for its editor to answer (default 5).") }, additionalProperties: false },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-      async run() {
+      async run(state, args, call) {
+        const tool = "mcp_health_tool";
+        const desktop = await state.desktopExecutor();
+        const engine = desktop
+          ? await desktop.call(tool, args).then((outcome) => ({ ok: outcome.ok, summary: outcome.receipt?.summary ?? outcome.text, data: outcome.receipt?.data, warnings: outcome.receipt?.warnings ?? [] }))
+          : await state.session.run(tool, args, call.signal).then(({ result }) => {
+              const receipt = result.data as ToolReceipt | undefined;
+              return { ok: result.ok, summary: receipt?.summary ?? result.text, data: receipt?.data, warnings: receipt?.warnings ?? [] };
+            });
         const who = await ctx.auth.whoami();
         const features = await ctx.auth.features();
         const account = !who.loggedIn
@@ -298,7 +312,9 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
             : "Not signed in."
           : `Signed in as ${who.email ?? who.userId ?? "an unnamed account"} (${who.kind === "pat" ? "personal token: Zenvi Cloud only" : "Zenvi account"}).`;
         const lines = features.map((f) => `- ${f.name}: ${f.enabled ? "on" : `off. ${f.fix}`}`);
-        return { receipt: applied("mcp_health", [account, ...lines].join("\n"), { data: { signedIn: who.loggedIn, kind: who.kind ?? null, features } }, 0), engine: null };
+        const summary = [engine.summary, account, ...lines].join("\n");
+        const data = { ...(engine.data && typeof engine.data === "object" ? engine.data : {}), signedIn: who.loggedIn, kind: who.kind ?? null, features };
+        return { receipt: engine.ok ? applied(tool, summary, { data, warnings: engine.warnings }, 0) : failed(tool, summary), engine: null };
       },
     },
     {

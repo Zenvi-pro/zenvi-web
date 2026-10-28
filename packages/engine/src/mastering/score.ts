@@ -31,6 +31,10 @@ const DENSITY: Record<MixGenre, [number, number]> = {
 };
 const COVERAGE_MIN: Partial<Record<MixGenre, number>> = { talking_head: 0.6, video_essay: 0.6 };
 /** METRICS.md B5: cue prominence over the local bed, dB. */
+/** H3: an onset within a frame of a cue at this fraction of its search window's strongest is the cue's own sound. */
+const OWN_ONSET = 0.5;
+/** H3, whooshes: a swell within a frame of the cue this close to the window's loudest is its own, dB. */
+const OWN_SWELL_DB = 3;
 export const ROLE_PROMINENCE: Record<CueRole, [number, number]> = { hero: [6, 12], sweetener: [0, 6], micro: [-6, 3] };
 
 export type MetricGroup = "loudness" | "voice" | "placement" | "balance" | "translation" | "variety";
@@ -459,7 +463,7 @@ export function scoreMix(input: ScoreInput): MixScore {
     const on = onsetStrength(sm, sr);
     const eSfx = rmsEnvelopeDb(sm, sr);
     const eRest = rmsEnvelopeDb(monoOf(differenceOf(mix, sfx)), sr);
-    const errs: { cue: MixCue; err: number }[] = [];
+    const errs: { cue: MixCue; err: number; movable: boolean }[] = [];
     const proms: Partial<Record<CueRole, { cue: MixCue; db: number }[]>> = {};
     const at = (t: number): number => Math.round(t / ENVELOPE_HOP);
     for (const c of cues) {
@@ -472,8 +476,16 @@ export function scoreMix(input: ScoreInput): MixScore {
       const i0 = Math.max(0, Math.trunc((c.t - before) / ENVELOPE_HOP));
       const i1 = Math.min(on.length, Math.trunc((c.t + after) / ENVELOPE_HOP));
       if (i1 > i0) {
-        const peakAt = c.kind.startsWith("whoosh") ? argMax(eSfx, i0, Math.min(i1, eSfx.length)) : argMax(on, i0, i1);
-        errs.push({ cue: c, err: (peakAt * ENVELOPE_HOP - c.t) * 1000 });
+        const whoosh = c.kind.startsWith("whoosh");
+        const peakAt = whoosh ? argMax(eSfx, i0, Math.min(i1, eSfx.length)) : argMax(on, i0, i1);
+        // The strongest point is another sound, not this cue late or early, when it sits on an edge the
+        // neighbours drew (the slope of their onset or tail) or when the cue's own moment already sounds: an
+        // onset (a whoosh's swell) within a frame of t nearly as strong (the next key of a typing run).
+        const j0 = Math.max(i0, Math.trunc((c.t - 1 / fps) / ENVELOPE_HOP));
+        const j1 = Math.min(i1, Math.trunc((c.t + 1 / fps) / ENVELOPE_HOP) + 1);
+        const own = j1 > j0 && (whoosh ? eSfx[argMax(eSfx, j0, Math.min(j1, eSfx.length))]! >= eSfx[peakAt]! - OWN_SWELL_DB : on[argMax(on, j0, j1)]! >= OWN_ONSET * on[peakAt]!);
+        const edge = (peakAt === i0 && before < 0.1) || (peakAt === Math.min(i1, whoosh ? eSfx.length : i1) - 1 && after < 0.1);
+        errs.push({ cue: c, err: (peakAt * ENVELOPE_HOP - c.t) * 1000, movable: !own && !edge });
       }
       const a = Math.max(0, at(c.t - 0.03));
       const b = Math.min(eSfx.length, at(c.t + 0.12) + 1);
@@ -494,8 +506,10 @@ export function scoreMix(input: ScoreInput): MixScore {
       put("H3_timing_within_1f", within, 0.9, 1, "placement", {
         text: `move the late/early cues by -err: ${worst.map((e) => `${e.cue.id} ${e.err >= 0 ? "+" : ""}${Math.round(e.err)} ms`).join(", ")}`,
         // One layer of a multi-layer hit is never moved alone: that would pull it off its other layers and its hit
-        // point. A single-layer cue (an auto-designed tick, a whoosh) is moved like any other.
-        calls: worst.filter((e) => e.cue.auto && e.cue.position !== undefined && !layered(e.cue)).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
+        // point. A single-layer cue (an auto-designed tick, a whoosh) is moved like any other, unless its error
+        // was another sound's: moving it then follows a neighbour off the hit point (the Sound Bench's 3D
+        // product ad went S1 100 -> 75 and its hype reel 85 -> 79 that way, pops and thuds walked off their frames).
+        calls: worst.filter((e) => e.cue.auto && e.cue.position !== undefined && !layered(e.cue) && e.movable).map((e) => ({ tool: "move_clip_tool", args: { clip_id: e.cue.id, position_seconds: r2(Math.max(0, e.cue.position! - e.err / 1000)) } })),
       }, { medianAbsMs: r1(median(errs.map((e) => Math.abs(e.err)))), worst: worst.map((e) => ({ cue: e.cue.id, errMs: Math.round(e.err) })) });
     }
     for (const role of ["hero", "sweetener", "micro"] as const) {

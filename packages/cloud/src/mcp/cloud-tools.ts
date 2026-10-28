@@ -501,7 +501,8 @@ const previewFrame = defineTool({
   description:
     "Render one frame of the open project at a timeline time and return it as an image (plus a link to it), so you can check framing, titles and effects. Use it to verify edits visually before rendering the whole video.",
   input: z.object({
-    time_seconds: z.number().min(0).describe("Timeline time of the frame, in seconds."),
+    time_seconds: z.number().min(0).optional().describe("Timeline time of the frame, in seconds."),
+    seconds: z.number().min(0).optional().describe("Same as time_seconds (the local Zenvi MCP server's name)."),
     width: z.number().int().min(64).max(1920).optional().describe("Image width in pixels (default: project width, at most 960)."),
     project_id: projectIdArg,
   }),
@@ -512,6 +513,8 @@ const previewFrame = defineTool({
   invoked: "Frame ready",
   meta: widgetToolMeta(),
   async run(ctx, input) {
+    const at = input.time_seconds ?? input.seconds;
+    if (at === undefined) throw new ApiError(400, "invalid_request", "time_seconds is required: the timeline time of the frame, in seconds.");
     const projectId = await resolveProjectId(ctx, input.project_id);
     const loaded = await ctx.services.projects.get(ctx.principal.userId, projectId);
     const preview = await ctx.services.frames.preview({
@@ -519,13 +522,13 @@ const previewFrame = defineTool({
       projectId,
       project: loaded.project,
       revision: loaded.revision,
-      seconds: input.time_seconds,
+      seconds: at,
       width: input.width,
       signal: ctx.signal,
     });
     return {
-      text: `Frame at ${seconds(input.time_seconds)}s of "${loaded.meta.name}". Image link (1 hour): ${preview.url}`,
-      data: { project_id: projectId, time_seconds: seconds(input.time_seconds), image_url: preview.url, url_expires_at: preview.urlExpiresAt },
+      text: `Frame at ${seconds(at)}s of "${loaded.meta.name}". Image link (1 hour): ${preview.url}`,
+      data: { project_id: projectId, time_seconds: seconds(at), image_url: preview.url, url_expires_at: preview.urlExpiresAt },
       images: [preview.image],
     };
   },

@@ -61,8 +61,9 @@ function briefOf(step: SnappyStepId, r: ToolRun): string | undefined {
       return n === null ? "motion transitions" : plural(n, "transition");
     }
     case "sound": {
-      const n = count(r.data, "cues");
-      return n === null ? "sound design" : plural(n, "sound");
+      // Hit points that got a sound: data.cues lists layers (a designed hit is 3-4 clips), W53 B9.
+      const n = typeof r.data.sounded === "number" ? r.data.sounded : count(r.data, "cues");
+      return n === null ? "sound design" : plural(n, "sound cue");
     }
     case "master": {
       const after = (r.data.after as { integratedLufs?: unknown } | undefined)?.integratedLufs;
@@ -140,7 +141,7 @@ function oneLine(text: string): string {
 }
 
 export interface SnappySummary {
-  /** "23 transitions · 18 sounds · mastered to −14 LUFS", plus mastering's absence said once. */
+  /** "23 transitions · 18 sound cues · mastered to −14 LUFS", plus mastering's absence said once. */
   description: string;
   /** One line per failed step, and for transitions that could not run (the point of the chain). */
   issues: string[];

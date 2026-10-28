@@ -2,7 +2,9 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import type { AudioPlan, AudioSegment, FramePlan, Project } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { liveChildCount } from "../ffmpeg/process.js";
+import { encodedTruePeak } from "../audio/encoded-peak.js";
+import { resolveBinary } from "../ffmpeg/binaries.js";
+import { liveChildCount, runBinary } from "../ffmpeg/process.js";
 import { createRgba } from "../image/rgba.js";
 import { audioRms, ffprobeJson, makeAudio, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { atempoChain, channelPan, gainExpression, simplifyGain } from "./audio-graph.js";
@@ -211,6 +213,23 @@ describe("renderProject", () => {
     expect(probe.streams.find((s) => s.codec_type === "video")?.codec_name).toBe(vcodec);
     expect(probe.streams.find((s) => s.codec_type === "audio")?.codec_name).toBe(acodec);
   });
+
+  it("holds -1 dBTP on the encoded file when the codec overshoots its limited input (W53 B3)", async () => {
+    // Square-wave thumps and 3 kHz pings: AAC at 48 kb/s turns this, limited to -2 dBTP, into +0.2 dBTP.
+    const hot = path.join(dir, "hot.wav");
+    await runBinary(resolveBinary("ffmpeg"), ["-v", "error", "-y", "-f", "lavfi", "-i", "aevalsrc='0.9*sgn(sin(2*PI*55*t))*exp(-12*mod(t,0.25))+0.5*sin(2*PI*3000*t)*exp(-30*mod(t+0.1,0.25))':s=48000:d=2.5", hot]);
+    const out = path.join(dir, "hot.mp4");
+    await renderProject(project(2), {
+      resolveMedia: (p) => p,
+      output: out,
+      options: { format: "mp4", width: 160, height: 90, fps: { num: 25, den: 1 }, quality: "low", audioBitrate: 48_000 },
+      engine: engine([segment({ path: hot })]),
+    });
+    const peak = await encodedTruePeak(out);
+    expect(peak).not.toBeNull();
+    expect(peak!).toBeLessThanOrEqual(-1);
+    expect(peak!).toBeGreaterThan(-6);
+  }, 60_000);
 
   it("writes numbered PNG frames", async () => {
     const out = path.join(dir, "seq", "shot.png");

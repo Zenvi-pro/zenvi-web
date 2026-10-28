@@ -159,10 +159,20 @@ async function callEngineTool(
   });
   const result = edit.value;
   const text = displayText(result);
-  if (!result.ok) return errorResult(text);
+  if (!result.ok) return errorResult(overBudgetText(tool.name, ctx.signal) ?? text);
   const structured: Record<string, unknown> = { ok: true, project_id: projectId };
   if (result.data !== undefined) structured.data = result.data;
   return okResult(text, structured, result.images ?? []);
+}
+
+/**
+ * A tool the request's time budget stopped (routes/mcp.ts) answers "cancelled"; it was not: say what
+ * happened. W54 E2E: a 14-clip build_reel_tool on the lab, refused twice as "cancelled", and the agent
+ * gave up asking the person whether they had cancelled it.
+ */
+export function overBudgetText(tool: string, signal: AbortSignal): string | undefined {
+  if (!signal.aborted || (signal.reason as { name?: unknown } | undefined)?.name !== "TimeoutError") return undefined;
+  return `Error: ${tool} ran past the time one call may take (under a minute) and was stopped; nothing changed. Ask for less in one call: fewer clips or files, a shorter range, or skip optional steps (for build_reel_tool, grade="none").`;
 }
 
 /**
