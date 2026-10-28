@@ -25,10 +25,10 @@ Fallback that verifies on slow moves: read the point on 3-4 preview frames (`zen
 add_kinetic_title_tool {"text": "LED · 2400 LM", "style": "documentary", "animation": "fade", "text_size": 0.045,
   "position_seconds": 0.2, "duration_seconds": 3.2, "y": 0.36}
 set_keyframes_tool {"timeline_clip_id": "<title clip>", "property": "location_x",
-  "points": [{"seconds": 0.2, "value": x0}, {"seconds": 1.7, "value": x0 - 0.04}, {"seconds": 3.2, "value": x0 - 0.05}]}
+  "points": [{"seconds": 0.2, "value": 0.3}, {"seconds": 1.7, "value": 0.26}, {"seconds": 3.2, "value": 0.25}]}
 set_keyframes_tool … location_y the same way
 ```
-(`x0`, `y0` = the title's `data.box` top-left; add the point's movement in frame fractions.) Static callouts with leader
+(0.3 = the title's `data.box` left edge at the start; later keys add the point's movement in frame fractions.) Static callouts with leader
 lines on a held shot: `add_motion_block_tool {"block": "hud_callouts", "params": {"points": [...]}}`.
 
 ## Timing & taste rules

@@ -23,7 +23,7 @@ Rendered by Blender (Zenvi 3D) as a linked clip.
 ```json
 add_3d_scene_tool {"scene": "title_3d", "position_seconds": 0.2, "duration_seconds": 3, "quality": "draft",
   "params": {"text": "NIGHTSHIFT", "style": "chrome", "animation": "tumble", "size": 0.7}}
-rerender_3d_scene_tool {"clip_id": "<the scene clip>", "quality": "final"}
+rerender_3d_scene_tool {"timeline_clip_id": "<the scene clip>", "quality": "final"}
 add_sfx_tool {"recipe": "whoosh_medium", "at_seconds": 0.7}
 add_sfx_tool {"recipe": "impact_boom", "at_seconds": 1.3, "gain_db": -12}
 ```

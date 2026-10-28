@@ -23,7 +23,7 @@ subject matte). The talking-head caption look; the type *is* the caption.
 ```json
 generate_subject_matte_tool {"clip_id": "<speaker clip>"}
 kinetic_captions_tool {"style": "creator", "emphasis": "deadline,idea,time", "behind_subject": "auto"}
-add_sfx_tool {"recipe": "pop", "at_seconds": <each emphasis word>, "gain_db": -16}
+add_sfx_tool {"recipe": "pop", "at_seconds": 1.45, "gain_db": -16}   (one per emphasis word, varied seed)
 ```
 Words come from the transcript (`transcribe_media_tool`, or the TTS voice's own word timings). With no transcription
 (not signed in) pass script `cues` (timeline seconds; a cue of several words shares its time by length):
@@ -44,6 +44,9 @@ whoosh only on cuts. No sound on connector words.
 ## Common mistakes
 - Every word emphasised (auto + a long list): pick 1 per clause.
 - Captions centred on the chest covering the hands.
+- `behind_subject` with B-roll inserts on a track above the speaker: the captions' cut-out of the speaker is drawn
+  over the inserts too (seen in the talking-head showcase, 2026-10-28). Use `behind_subject: "none"` when the edit
+  has inserts, or keep the behind-the-head words to stretches without them.
 - White connectors at the default 0.046 over a bright window or wall vanish (seen in the 16:9 test): raise `text_size`
   to 0.06-0.07 on 16:9, or give `avoid` boxes over the bright area.
 - Lag from estimated cues on a voice with long pauses: cue phrase by phrase, not the whole script as one cue.

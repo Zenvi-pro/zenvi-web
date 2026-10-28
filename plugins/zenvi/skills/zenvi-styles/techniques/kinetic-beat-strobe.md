@@ -24,11 +24,14 @@ Beat times from `detect_beats_tool` (or a grid: 150 bpm = 0.4 s per beat). One t
 ```json
 add_kinetic_title_tool {"text": "FAST", "style": "stack", "animation": "slam", "emphasis": "none", "text_size": 0.3,
   "ink": "#ffffff", "background": "#000000", "y": 0.5, "position_seconds": 0.2, "duration_seconds": 0.4}
-add_kinetic_title_tool {"text": "LOUD", … "ink": "#000000", "background": "#ffffff", "position_seconds": 0.6, …}
-add_kinetic_title_tool {"text": "BOLD", … "ink": "#ffffff", "background": "#e5202e", "position_seconds": 1.0, …}
-… last word "NOW" with "duration_seconds": 1.6
-add_sfx_tool {"recipe": "hit_transient", "at_seconds": <each word>, "gain_db": -14, "seed": <i>}   and impact_slam on the last
+add_kinetic_title_tool {"text": "LOUD", "style": "stack", "animation": "slam", "emphasis": "none", "text_size": 0.3,
+  "ink": "#000000", "background": "#ffffff", "y": 0.5, "position_seconds": 0.6, "duration_seconds": 0.4}
+add_kinetic_title_tool {"text": "BOLD", "style": "stack", "animation": "slam", "emphasis": "none", "text_size": 0.3,
+  "ink": "#ffffff", "background": "#e5202e", "y": 0.5, "position_seconds": 1.0, "duration_seconds": 0.4}
+add_sfx_tool {"recipe": "hit_transient", "at_seconds": 0.2, "gain_db": -14, "seed": 1}
 ```
+And so on, one word and one `hit_transient` (new `seed`) per beat; the last word (NOW) gets `duration_seconds: 1.6`
+and an `impact_slam`.
 A title lasts at least 0.4 s (`duration_seconds` min): for 3-11 frame holds place them at 0.4 s and cut each one's clips
 back with `trim_clip_tool` (`edge: "end"`, `at_seconds`) — do not overlap them, a later title can land on a lower track.
 No sequencer for mirrored/cropped full-bleed layout variants yet (`needs: type-strobe-sequencer`,
