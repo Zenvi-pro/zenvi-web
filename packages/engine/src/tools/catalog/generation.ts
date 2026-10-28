@@ -29,6 +29,9 @@ import { contractTool, unavailable, type CatalogTool } from "../define.js";
 import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFloat, pyG, pySlice } from "../pyfmt.js";
 import { applied } from "../receipt.js";
+import { energyVadWindows } from "../speech.js";
+import { ASR_KEY } from "../transcripts.js";
+import { scriptWordTimes, ttsTranscript } from "../tts-words.js";
 import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, lockedTrackError, newTracksNote, resolvePlacementTrack } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { applyPlacement, planPlacement, provisionalFile, placementText, type PlacementArgs } from "./clips.js";
@@ -308,14 +311,26 @@ export const generationTools: CatalogTool[] = [
       const path = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
       const info = await call.host.media!.probe(path);
       const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: text(input.name) || narrationName(narration) };
+      // The script over the voice's own pauses: caption timings with no speech recognition (tts-words.ts).
+      let words: ReturnType<typeof scriptWordTimes> = [];
+      try {
+        const envelope = await call.host.audio?.analyzeAudio(path, { signal: call.signal });
+        if (envelope) words = scriptWordTimes(narration, energyVadWindows(envelope, { minSpeechSec: 0.08, minSilenceSec: 0.15 }), Number(info.duration) || 0);
+      } catch (error) {
+        call.host.log?.(`generate_tts_and_add_to_timeline_tool: no word timings (${error instanceof Error ? error.message : String(error)})`);
+      }
       const clip = call.commit((tx) => {
         const file = addFile(tx, media, { dedupe: false, mediaType: "audio" });
+        if (words.length > 0) tx.update(["files", { id: file.id }], { ai_metadata: { ...record(file.ai_metadata), [ASR_KEY]: ttsTranscript(words) } });
         if (newTracks > 0) ensureTrack(tx, layer);
         return addClip(tx, { fileId: String(file.id), position, layer });
       });
       return (
         `Added TTS audio to timeline at position ${pyFloat(position)}s on track ${formatTrackLabelForLlm(layer, call.doc.project.layers)}${newTracksNote(newTracks)}` +
-        ` timeline_clip_id=${clip.id}.`
+        ` timeline_clip_id=${clip.id}.` +
+        (words.length > 0
+          ? ` Its ${words.length} words are timed to the voice's pauses: kinetic_captions_tool timeline_clip_ids=["${clip.id}"] captions it word by word.`
+          : " No word timings could be read from the voice: caption it with kinetic_captions_tool cues and say the captions are hand-timed.")
       );
     },
   }),

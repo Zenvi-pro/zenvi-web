@@ -38,6 +38,7 @@ import { hasAudioStream } from "./audio-mix.js";
 import type { ToolCall } from "./define.js";
 import { toFrame, toSeconds, type Fps } from "./frame-time.js";
 import { clipSpeed, sourceToTimelineSec, type TimedWord } from "./speech.js";
+import { TTS_SCRIPT_SOURCE } from "./tts-words.js";
 
 /** The `ai_metadata` key of a kept transcription. */
 export const ASR_KEY = "asr";
@@ -224,7 +225,8 @@ function fromStored(record: StoredTranscript, fresh: boolean, warnings: string[]
   return {
     words: record.words,
     source: record.transcriptionSource || SERVER_SOURCE,
-    exact: true,
+    // A TTS script laid over its voice (tts-words.ts) has the words exactly, their times from the voice's pauses.
+    exact: record.transcriptionSource !== TTS_SCRIPT_SOURCE,
     generation: record.generation,
     modelId: record.modelId,
     language: record.language,

@@ -48,7 +48,8 @@ import { directTool, unavailable, type CatalogTool, type ToolCall } from "../def
 import { loadFamilies } from "../fonts.js";
 import { applied, failed, refused } from "../receipt.js";
 import { colorHexAlpha, constantKeyframe, isLocked, projectSize, trackInfo } from "../titles-text.js";
-import { clipTarget, isTalkingFootage, isWordSource, wordsFor, wordsForClip } from "../transcripts.js";
+import { clipTarget, isTalkingFootage, isWordSource, storedTranscript, wordsFor, wordsForClip } from "../transcripts.js";
+import { TTS_SCRIPT_SOURCE } from "../tts-words.js";
 import { projectFps } from "../frame-time.js";
 import { captionScenes } from "../caption-scenes.js";
 import { addMatteFile, matteableClipProblem } from "../mattes.js";
@@ -219,7 +220,13 @@ async function wordsOf(call: ToolCall, clips: readonly Clip[], args: Input, warn
       continue;
     }
     warnings.push(...got.warnings);
-    if (!got.exact) warnings.push(`clip ${clip.id}: word times are estimated from the media index's phrases (transcribe it for exact timing)`);
+    if (!got.exact) {
+      warnings.push(
+        got.source === TTS_SCRIPT_SOURCE
+          ? `clip ${clip.id}: word times are the TTS script laid over the voice's pauses (no speech recognition here)`
+          : `clip ${clip.id}: word times are estimated from the media index's phrases (transcribe it for exact timing)`,
+      );
+    }
     for (const w of wordsForClip(got.words, clip, fps, got.generation)) {
       const start = Number(w.timelineStartSec);
       const end = Number(w.timelineEndSec);
@@ -303,11 +310,14 @@ export const kineticCaptionTools: CatalogTool[] = [
         clips = project.clips.filter((c) => isFootage(c) && !kineticTag(c) && Number(c.position) < to && Number(c.position) + Number(c.end) - Number(c.start) > from);
         if (clips.length === 0) return refused(TOOL, "Error: no footage clip on the timeline under the cues; add the picture first, or pass timeline_clip_ids.");
       } else {
+        const fileOf = (c: Clip) => project.files.find((f) => f.id === c.file_id);
         clips = project.clips.filter((c) => {
-          const file = project.files.find((f) => f.id === c.file_id);
+          const file = fileOf(c);
           return file !== undefined && isTalkingFootage(file) && !kineticTag(c);
         });
-        if (clips.length === 0) return refused(TOOL, "Error: no clip on the timeline has picture and sound to caption; pass timeline_clip_ids.");
+        // No one on camera: a generated voice-over, whose file knows its words.
+        if (clips.length === 0) clips = project.clips.filter((c) => storedTranscript(fileOf(c))?.transcriptionSource === TTS_SCRIPT_SOURCE);
+        if (clips.length === 0) return refused(TOOL, "Error: no clip on the timeline has picture and sound or a TTS voice to caption; pass timeline_clip_ids, or cues.");
       }
       const colours: { ink?: string; accent?: string } = {};
       for (const key of ["ink", "accent"] as const) {
