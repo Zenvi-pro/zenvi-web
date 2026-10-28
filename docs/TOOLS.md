@@ -4215,7 +4215,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `clip_ids` | string[] |  | Timeline clip ids (describe_project_tool or a receipt). Default: every footage and photo clip on an unlocked track (not titles). |
+| `clip_ids` | string[] |  | Timeline clip ids (describe_project_tool or a receipt). Default: the footage and photo clips of the base video track (the lowest unlocked one with any). |
 | `amount` | number |  | How dark the corners get, 0-1 (default 0.4; 0 removes the vignette). (min 0, max 1) |
 | `feather` | number |  | 0 = the falloff starts late and is quick, 1 = it starts near the centre and is gentle (default 0.5). (min 0, max 1) |
 

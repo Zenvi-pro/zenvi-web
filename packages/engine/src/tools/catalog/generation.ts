@@ -20,16 +20,17 @@
  */
 
 import { generateId } from "../../model/ids.js";
-import type { ProjectFile } from "../../model/types.js";
+import type { Project, ProjectFile } from "../../model/types.js";
 import { addClip, moveClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
+import { addTrack } from "../../ops/tracks.js";
 import { ensureTrack } from "../../ops/overlays.js";
 import { generateImage, generateTts, generateVideo } from "../backend.js";
 import { contractTool, unavailable, type CatalogTool } from "../define.js";
 import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFloat, pyG, pySlice } from "../pyfmt.js";
 import { applied } from "../receipt.js";
-import { defaultUnderlayLayerNumber, formatTrackLabelForLlm, lockedTrackError, newTracksNote, resolvePlacementTrack } from "../tracks.js";
+import { formatTrackLabelForLlm, lockedTrackError, newTracksNote, resolvePlacementTrack } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { applyPlacement, planPlacement, provisionalFile, placementText, type PlacementArgs } from "./clips.js";
 import { playheadSeconds, record, text } from "./common.js";
@@ -50,6 +51,35 @@ export function t2vDims(width: number, height: number): [number, number] {
 }
 
 /** Project Files name of a narration (zenvi-core develop ai_generation_tts.default_name). */
+const NARRATION_TRACK_NAME = "Narration";
+
+/** Narration audio already in the project: this tool's TTS files, or files the desktop tagged as narration. */
+function isNarrationFile(file: ProjectFile): boolean {
+  const tags = String((file as { tags?: unknown }).tags ?? "").toLowerCase().split(",").map((t) => t.trim());
+  return /(^|[\\/])zenvi_tts_[^\\/]*$/.test(String(file.path)) || tags.includes("narration");
+}
+
+/**
+ * The track narration at [start, end) goes on when the caller names none, or null for "create a Narration
+ * track right above the lowest one". Port of zenvi-core editor_tools/ai_generation_tts.py
+ * `pick_narration_track`: never the lowest track (the main picture track) and never a locked one; first a
+ * track holding only narration and free over the range, then the lowest empty track above the lowest.
+ */
+export function pickNarrationTrack(project: Project, start: number, end: number): number | null {
+  const rows = [...project.layers].sort((a, b) => a.number - b.number);
+  if (rows.length < 2) return null;
+  const narration = new Set(project.files.filter(isNarrationFile).map((f) => String(f.id)));
+  const onTrack = (layer: number) => project.clips.filter((c) => c.layer === layer);
+  const candidates = rows.slice(1).filter((t) => !t.lock);
+  const EPS = 1e-6;
+  for (const t of candidates) {
+    const clips = onTrack(t.number);
+    const overlaps = clips.some((c) => c.position < end - EPS && c.position + (c.end - c.start) > start + EPS);
+    if (clips.length > 0 && clips.every((c) => narration.has(String(c.file_id ?? ""))) && !overlaps) return t.number;
+  }
+  return candidates.find((t) => onTrack(t.number).length === 0)?.number ?? null;
+}
+
 export function narrationName(text: string): string {
   const words = text.split(/\s+/).filter(Boolean);
   return `Narration - ${words.slice(0, 6).join(" ")}${words.length > 6 ? "..." : ""}`;
@@ -288,7 +318,7 @@ export const generationTools: CatalogTool[] = [
       }
       const position = Math.max(0, asked ?? older ?? playheadSeconds(call));
       const project = call.doc.project;
-      let layer = defaultUnderlayLayerNumber(project.layers);
+      let layer: number | undefined;
       let newTracks = 0;
       if (input.track !== undefined && String(input.track).trim() !== "") {
         const r = resolvePlacementTrack(String(input.track), project.layers);
@@ -308,13 +338,22 @@ export const generationTools: CatalogTool[] = [
       const path = await writeGenerated.call(call.host.media, `zenvi_tts_${Date.now().toString(36)}.mp3`, bytes, "audio/mpeg");
       const info = await call.host.media!.probe(path);
       const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: text(input.name) || narrationName(narration) };
+      const seconds = Number(info.duration) || 0;
+      const picked = layer ?? pickNarrationTrack(call.doc.project, position, position + seconds);
       const clip = call.commit((tx) => {
         const file = addFile(tx, media, { dedupe: false, mediaType: "audio" });
-        if (newTracks > 0) ensureTrack(tx, layer);
-        return addClip(tx, { fileId: String(file.id), position, layer });
+        let target = picked;
+        if (target === null) {
+          // Every track above the main one is busy (or there is only one): a Narration track right above it.
+          const lowest = [...tx.project.layers].sort((a, b) => a.number - b.number)[0];
+          target = addTrack(tx, { ...(lowest ? { above: lowest.number } : {}), label: NARRATION_TRACK_NAME }).number;
+          newTracks = 1;
+        } else if (newTracks > 0) ensureTrack(tx, target);
+        return addClip(tx, { fileId: String(file.id), position, layer: target });
       });
+      const placed = clip.layer;
       return (
-        `Added TTS audio to timeline at position ${pyFloat(position)}s on track ${formatTrackLabelForLlm(layer, call.doc.project.layers)}${newTracksNote(newTracks)}` +
+        `Added TTS audio to timeline at position ${pyFloat(position)}s on track ${formatTrackLabelForLlm(placed, call.doc.project.layers)}${newTracksNote(newTracks)}` +
         ` timeline_clip_id=${clip.id}.`
       );
     },

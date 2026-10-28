@@ -64,7 +64,9 @@ describe("review_edit_tool over MCP", () => {
       expect(first.receipt.notes.join(" ")).toMatch(/not been reviewed/);
 
       await call(client, "review_edit_tool", { audio: false, image: false });
-      const reviewed = await call(client, "render_video", out);
+      // overwrite: what agents send to replace a file they rendered before (W53 B7): accepted.
+      const reviewed = await call(client, "render_video", { ...out, overwrite: "true" });
+      expect(reviewed.receipt.status).toBe("applied");
       expect(reviewed.receipt.notes.join(" ")).not.toMatch(/not been reviewed/);
 
       // Editing again makes the review stale.

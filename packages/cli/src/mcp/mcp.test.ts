@@ -61,7 +61,8 @@ describe("zenvi mcp", () => {
     expect(names).toEqual(expect.arrayContaining(["import_files_tool", "add_marker_tool", "open_project_file", "render_video", "preview_frame", "launch_editor", "push_to_cloud"]));
     expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
     const tool = (await client.listTools()).tools.find((t) => t.name === "preview_frame")!;
-    expect(tool.inputSchema).toMatchObject({ type: "object", required: ["seconds"] });
+    // seconds, or Zenvi Cloud's time_seconds (W53 B7).
+    expect(Object.keys((tool.inputSchema as { properties: object }).properties)).toEqual(expect.arrayContaining(["seconds", "time_seconds"]));
     expect(tool.annotations).toMatchObject({ readOnlyHint: true });
   });
 
@@ -87,8 +88,14 @@ describe("zenvi mcp", () => {
       await client.connect(a);
       open.push({ client, server });
 
-      const health = await call(client, "mcp_health");
+      // One health tool is listed (W54: #53's mcp_health_tool and #58's mcp_health were both); the old name still answers.
+      const names = (await client.listTools()).tools.map((t) => t.name);
+      expect(names).toContain("mcp_health_tool");
+      expect(names).not.toContain("mcp_health");
+      const health = await call(client, "mcp_health_tool");
       expect(health.receipt.status).toBe("applied");
+      expect(health.receipt.summary).toMatch(/^Zenvi is up\./);
+      expect((await call(client, "mcp_health")).receipt.summary).toBe(health.receipt.summary);
       expect(health.receipt.summary).toMatch(/personal token: Zenvi Cloud only/);
       expect(health.receipt.summary).toMatch(/AI voice \(text to speech\): off\. .*zenvi login/);
       expect(health.receipt.summary).toMatch(/Zenvi Cloud .*: on/);
@@ -163,7 +170,7 @@ describe("zenvi mcp", () => {
     const r = await call(client, "add_marker_tool", { position_seconds: 3 });
     expect(r.structured).toMatchObject({ engine: "desktop", status: "applied" });
     expect(desktop.calls.map((c) => c.tool)).toEqual(["add_marker_tool"]);
-    const frame = await call(client, "preview_frame", { seconds: 1 });
+    const frame = await call(client, "preview_frame", { time_seconds: 1 });
     expect((frame.result.content as Array<{ type: string }>).map((c) => c.type)).toEqual(["text", "image"]);
     expect(desktop.calls.at(-1)).toMatchObject({ tool: "inspect_timeline_tool", args: { start: 1, end: 1, maxFrames: 1 } });
   });
