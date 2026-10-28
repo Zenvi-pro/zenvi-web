@@ -16,6 +16,7 @@ import { VideoDecoder, videoDecodeArgs } from "./video.js";
 const exec = promisify(execFile);
 let dir: string;
 let numbered: string;
+let numberedLong: string;
 let numberedTs: string;
 let ntsc: string;
 
@@ -66,6 +67,7 @@ function frameNumber(image: { width: number; height: number; data: Uint8Array | 
 beforeAll(async () => {
   dir = await makeTempDir("zenvi-decode-");
   numbered = await numberedVideo(path.join(dir, "numbered.mp4"), "30", 2);
+  numberedLong = await numberedVideo(path.join(dir, "numbered-long.mp4"), "30", 4);
   numberedTs = await numberedVideo(path.join(dir, "numbered.ts"), "25", 2);
   ntsc = await numberedVideo(path.join(dir, "ntsc.mp4"), "30000/1001", 2);
   for (const [w, h] of [[64, 48], [32, 24], [16, 12]] as const) await measureLevels(numbered, w, h);
@@ -192,7 +194,7 @@ describe("decodeStill", () => {
 });
 
 describe("SourceManager", () => {
-  const plan = (clipId: string | null, k = 0): FramePlan =>
+  const plan = (clipId: string | null, k = 0, file = numbered): FramePlan =>
     ({
       frame: 1,
       time: 0,
@@ -200,26 +202,30 @@ describe("SourceManager", () => {
       height: 48,
       background: [0, 0, 0, 255],
       layers: clipId
-        ? [{ clipId, drawWidth: 64, drawHeight: 48, masks: [], effects: [], source: { kind: "video", fileId: "F", path: numbered, frame: k + 1, time: k / 30 } }]
+        ? [{ clipId, drawWidth: 64, drawHeight: 48, masks: [], effects: [], source: { kind: "video", fileId: "F", path: file, frame: k + 1, time: k / 30 } }]
         : [],
     }) as unknown as FramePlan;
 
   it("hands a clip's decoder to the next clip of the same file instead of starting ffmpeg and seeking again", async () => {
-    const project = { files: [{ id: "F", path: numbered, fps: { num: 30, den: 1 }, video_length: 60 }] } as unknown as Project;
+    // 120 frames, though the clips stop at 35: from frame 35 a decoder's 16-frame read-ahead plus the pipe and
+    // ffmpeg's own buffers can hold the rest of a 60-frame file, so its ffmpeg would reach the end and exit on
+    // its own, and the child count it is checked by would drop by one, sooner or later (CI, Linux).
+    const project = { files: [{ id: "F", path: numberedLong, fps: { num: 30, den: 1 }, video_length: 120 }] } as unknown as Project;
     const sources = new SourceManager(project, { resolveMedia: (p) => p });
+    const at = (clip: string | null, k = 0): FramePlan => plan(clip, k, numberedLong);
     const before = liveChildCount();
     const shown: number[] = [];
-    const show = async (clip: string, k: number) => shown.push(frameNumber((await sources.prepare(plan(clip, k))).layers[0]!));
+    const show = async (clip: string, k: number) => shown.push(frameNumber((await sources.prepare(at(clip, k))).layers[0]!));
     try {
       // A shows source frames 0-9; B (warmed 4 frames before its cut, as a render does) 12-21.
       for (let k = 0; k < 10; k += 1) {
-        if (k === 6) sources.warm(plan("B", 12), 4);
+        if (k === 6) sources.warm(at("B", 12), 4);
         await show("A", k);
       }
       for (let k = 12; k < 22; k += 1) await show("B", k);
       expect(liveChildCount() - before).toBe(1);
       // Five frames without the file: B's decoder is parked, and C (30-35) takes it over.
-      for (let i = 0; i < 5; i += 1) await sources.prepare(plan(null));
+      for (let i = 0; i < 5; i += 1) await sources.prepare(at(null));
       for (let k = 30; k < 36; k += 1) await show("C", k);
       expect(liveChildCount() - before).toBe(1);
       // A clip behind the stream's position cannot read forward: it gets its own decoder.

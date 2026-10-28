@@ -91,7 +91,7 @@ export async function inspectRender(file: string, options: RenderInspectOptions)
   ].join(",");
   const args = ["-hide_banner", "-nostats", "-nostdin", "-t", String(MAX_SECONDS), "-i", file, "-map", "0:v:0", "-vf", video];
   if (hasAudio) {
-    args.push("-map", "0:a:0", "-af", `silencedetect=noise=${options.silenceDb}dB:d=${options.silenceMinSeconds},ebur128=peak=true:framelog=quiet`);
+    args.push("-map", "0:a:0", "-af", `silencedetect=noise=${options.silenceDb}dB:d=${options.silenceMinSeconds},ebur128=peak=true:framelog=verbose`);
   }
   args.push("-f", "null", "-");
   const { stderr } = await runBinary(resolveBinary("ffmpeg"), args, {

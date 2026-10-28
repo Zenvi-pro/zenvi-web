@@ -141,7 +141,7 @@ export function channelPan(channels: number, layout: string, filter = -1, mappin
   return `pan=${layout}|${outputs.map((sources, k) => `c${k}=${sources.length ? sources.join("+") : "0*c0"}`).join("|")}`;
 }
 
-function layoutName(channels: number): string {
+export function layoutName(channels: number): string {
   return channels === 1 ? "mono" : channels === 2 ? "stereo" : channels === 6 ? "5.1" : channels === 8 ? "7.1" : `${channels}c`;
 }
 

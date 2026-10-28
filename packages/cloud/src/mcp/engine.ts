@@ -11,6 +11,7 @@
  */
 
 import type { AnyTool, HostCapability, ToolContext, ToolResult } from "@zenvi/engine";
+import { allTools, capabilityName, runTool } from "@zenvi/engine/tools";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
 import { guard, jsonSchema } from "./define.js";
@@ -189,16 +190,11 @@ export function displayText(result: ToolResult): string {
 }
 
 /**
- * Find the engine registry if this build of `@zenvi/engine` exports one
- * (`allTools` + `runTool`, W4's documented contract). Owner W7: switch to a
- * static import once the registry has landed everywhere.
+ * The engine registry. A static import on purpose: a dynamic one makes the
+ * esbuild bundle initialise the engine's modules lazily, and modules reached
+ * only through `export *` then never initialise (W53 B1: every cloud render
+ * failed on an undefined export preset table).
  */
-export async function loadEngineRegistry(): Promise<EngineRegistry | null> {
-  const mod = (await import("@zenvi/engine/tools")) as unknown as Record<string, unknown>;
-  const allTools = mod.allTools;
-  const runTool = mod.runTool;
-  if (!Array.isArray(allTools) || typeof runTool !== "function") return null;
-  const run = runTool as (ctx: ToolContext, name: string, args: unknown) => Promise<ToolResult>;
-  const named = typeof mod.capabilityName === "function" ? (mod.capabilityName as (capability: HostCapability) => string) : undefined;
-  return { tools: allTools as AnyTool[], run: (ctx, name, args) => run(ctx, name, args), ...(named ? { capabilityName: named } : {}) };
+export async function loadEngineRegistry(): Promise<EngineRegistry> {
+  return { tools: allTools as readonly AnyTool[], run: (ctx, name, args) => runTool(ctx, name, args), capabilityName };
 }
