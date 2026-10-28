@@ -77,7 +77,8 @@ too quiet and nobody has looked at the file.
    `"none"`), `add_motion_template_tool template=grid` with `steps` (a whip on
    each re-cut). Read the receipt's `data.transitions`; do not stack another
    pass on top. For cuts you made by hand: one call on the final cut,
-   `apply_motion_transitions_tool` `track`,
+   `apply_motion_transitions_tool` with no `track` (every scene change, across
+   tracks: a scene stacked on several tracks moves as one) or one `track`,
    `style: "hype"` or `"cinematic"`, `direction: "left"` (they are keyframes
    on the clips); `apply_motion_transition_tool` for one cut. Two or three
    presets per piece, repeated; one direction. A cut list of hard cuts plus
@@ -88,8 +89,10 @@ too quiet and nobody has looked at the file.
    matte composites (`text_behind_subject_tool`, `replace_background_tool`,
    `subject_glow_tool`, `pop_out_tool`), `speed_ramp_tool` on hero shots.
 8. **Captions and type: type moves.** `kinetic_captions_tool` for speech
-   (word by word, emphasis words big; `cues` when there is no transcribed
-   voice, `text_size`, `animation`); it places each caption in the shot's
+   (word by word, emphasis words big; a TTS voice-over keeps its script's word
+   timings, so pass its clip in `timeline_clip_ids`; `cues` when there is no
+   voice to time to, or the TTS receipt says it has no word timings (then say
+   the captions are hand-timed), `text_size`, `animation`); it places each caption in the shot's
    negative space and, after `generate_subject_matte_tool` on the footage,
    puts emphasis words behind the head. Title cards and word cards:
    `add_kinetic_title_tool` (`animation`: pop, slam, tilt, scramble,

@@ -9,7 +9,7 @@
  * video reach the open internet.
  */
 
-import { defaultExportEnd } from "@zenvi/engine";
+import { defaultExportEnd, finishGaps, finishLines } from "@zenvi/engine";
 import { z } from "zod";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import { ApiError } from "../http/errors.js";
@@ -450,12 +450,10 @@ const renderProject = defineTool({
       input.start_seconds !== undefined || input.end_seconds !== undefined
         ? { start: input.start_seconds ?? 0, end: input.end_seconds ?? Number.MAX_SAFE_INTEGER }
         : undefined;
-    if (range && range.end === Number.MAX_SAFE_INTEGER) {
-      // A start alone runs to where a whole render would end (the last picture, for video).
-      const { project } = await ctx.services.projects.get(ctx.principal.userId, projectId);
-      const format = input.format ?? PRESETS[(input.preset as PresetName | undefined) ?? "mp4"].format;
-      range.end = defaultExportEnd(project, !isAudioRenderFormat(format)).end;
-    }
+    const { project } = await ctx.services.projects.get(ctx.principal.userId, projectId);
+    const format = input.format ?? PRESETS[(input.preset as PresetName | undefined) ?? "mp4"].format;
+    // A start alone runs to where a whole render would end (the last picture, for video).
+    if (range && range.end === Number.MAX_SAFE_INTEGER) range.end = defaultExportEnd(project, !isAudioRenderFormat(format)).end;
     if (range && range.end <= range.start) throw new ApiError(400, "invalid_request", "end_seconds must be after start_seconds.");
     const job = await ctx.services.renders.start(ctx.principal.userId, projectId, {
       preset: input.preset as (typeof PRESET_NAMES)[number] | undefined,
@@ -468,7 +466,10 @@ const renderProject = defineTool({
     });
     const view = await ctx.services.renders.getById(ctx.principal.userId, job.renderId);
     const notes = job.notes.length > 0 ? ` ${job.notes.join(" ")}` : "";
-    return { text: `${renderText(view)}${notes}`, data: { ...renderData(view), notes: job.notes } };
+    // What the director's finish still owes the edit (grade, transitions, sound design, master), with the calls: agents act on receipts.
+    const gaps = isAudioRenderFormat(format) ? [] : finishGaps(project);
+    const finish = gaps.length > 0 ? ` Not finished: ${gaps.map((g) => g.kind).join(", ")} missing. ${finishLines(gaps).join(" ")}` : "";
+    return { text: `${renderText(view)}${notes}${finish}`, data: { ...renderData(view), notes: job.notes } };
   },
 });
 

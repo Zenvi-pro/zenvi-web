@@ -20,6 +20,7 @@ import {
   motionRecords,
   planMotionTransitionEdit,
   removeMotionTransition,
+  sceneCuts,
   trackCuts,
   type MotionTransitionInput,
   type MotionTransitionResult,
@@ -60,7 +61,7 @@ const listInput = z.strictObject({});
 const applyInput = z.strictObject({
   preset: z.enum(MOTION_TRANSITION_IDS).describe(`Which transition: ${PRESET_LINES}.`),
   clip1_id: z.string().max(64).optional().describe("Outgoing clip (the cut is at its end). With clip2_id omitted, the clip right after it on its track."),
-  clip2_id: z.string().max(64).optional().describe("Incoming clip, cut back to back after clip1_id on the same track."),
+  clip2_id: z.string().max(64).optional().describe("Incoming clip, starting the frame after clip1_id ends (on any track)."),
   track: z.string().max(64).optional().describe("Instead of clip ids: the track of the cut (UI track number, 1 = bottom; name; or layer number) ..."),
   time: z.number().min(0).optional().describe("... and the cut's timeline time in seconds (the nearest cut within 0.5 s)."),
   ...common,
@@ -69,7 +70,13 @@ const applyInput = z.strictObject({
 });
 
 const applyAllInput = z.strictObject({
-  track: z.string().max(64).describe("Track whose cuts get transitions: UI track number (1 = bottom), name, or layer number."),
+  track: z
+    .string()
+    .max(64)
+    .optional()
+    .describe(
+      "Track whose cuts get transitions: UI track number (1 = bottom), name, or layer number. Omit it (or \"all\") for every scene change across the tracks: scenes stacked on several tracks (a background and the blocks over it) move as one; clips that span the cut, flash frames and captions stay put.",
+    ),
   preset: z.enum(MOTION_TRANSITION_IDS).optional().describe(`One transition on every cut: ${PRESET_LINES}. Give this or style.`),
   style: z.enum(MOTION_TRANSITION_STYLE_IDS as [MotionTransitionStyle, ...MotionTransitionStyle[]]).optional().describe("A mix that repeats two or three presets: hype (whip, whip, crash zoom; the last cut a pull-back arrival) or cinematic (slide, blur dissolve; the last cut a zoom-through)."),
   ...common,
@@ -122,9 +129,9 @@ function message(error: unknown): string {
 }
 
 /** The cut an apply call names, as op input. */
-function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionInput, "outClipId" | "inClipId"> {
+function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionInput, "outClipId" | "inClipId" | "acrossTracks"> {
   if (args.clip1_id) {
-    if (args.clip2_id) return { outClipId: args.clip1_id, inClipId: args.clip2_id };
+    if (args.clip2_id) return { outClipId: args.clip1_id, inClipId: args.clip2_id, acrossTracks: true };
     const clip = project.clips.find((c) => c.id === args.clip1_id);
     if (!clip) throw new ToolError(`no clip with id ${args.clip1_id}`);
     const cuts = trackCuts(project, clip.layer);
@@ -155,8 +162,10 @@ function cutsElsewhere(project: Project, layer: number): string {
     .filter((t) => t.layer_number !== layer)
     .map((t) => ({ ui: t.ui_track, cuts: trackCuts(project, t.layer_number).length }))
     .filter((t) => t.cuts > 0);
-  if (tracks.length === 0) return "";
-  return ` Cuts are on ${tracks.map((t) => `track ${t.ui} (${t.cuts} cut${t.cuts === 1 ? "" : "s"})`).join(", ")}: pass track="${tracks[0]!.ui}".`;
+  const scenes = sceneCuts(project).filter((c) => c.outClip.layer !== c.inClip.layer).length;
+  const across = scenes > 0 ? ` ${scenes} scene change${scenes === 1 ? "" : "s"} cross${scenes === 1 ? "es" : ""} tracks: omit track to put transitions on every scene change.` : "";
+  if (tracks.length === 0) return across;
+  return ` Cuts are on ${tracks.map((t) => `track ${t.ui} (${t.cuts} cut${t.cuts === 1 ? "" : "s"})`).join(", ")}: pass track="${tracks[0]!.ui}".${across}`;
 }
 
 export const motionTransitionTools: CatalogTool[] = [
@@ -198,7 +207,7 @@ export const motionTransitionTools: CatalogTool[] = [
     name: APPLY,
     title: "Apply a motion transition",
     description:
-      "Put a motion transition on one cut between two clips that play back to back on a track: whip pan, slide, zoom punch in/out, zoom through a point, spin, squash and stretch, shake, glitch, white/black/invert flash or blur dissolve. " +
+      "Put a motion transition on one cut between two clips that play back to back on a track (or, given both clip ids, on two tracks: one starts the frame after the other ends): whip pan, slide, zoom punch in/out, zoom through a point, spin, squash and stretch, shake, glitch, white/black/invert flash or blur dissolve. " +
       "The outgoing clip's last frames accelerate out and the incoming clip's first frames settle in, smear peaking on the cut; no overlap, nothing moves on the timeline, the frame stays covered. " +
       "Existing animation on the clips (Ken Burns, keyframes) keeps playing outside the transition. Re-applying on the same cut replaces it. One undo step; the receipt lists the clips, frames, effects and sfx_cues (whoosh/hit/glitch times for sound design).",
     input: applyInput,
@@ -231,7 +240,7 @@ export const motionTransitionTools: CatalogTool[] = [
     name: APPLY_ALL,
     title: "Apply motion transitions to every cut",
     description:
-      "Put a motion transition on every cut of a track (clips back to back), one preset everywhere or a style mix (hype: whip, whip, crash zoom, repeated, landing on a pull-back; cinematic: slide, blur dissolve, repeated, ending in a zoom-through). " +
+      "Put a motion transition on every cut of a track (clips back to back), or with track omitted on every scene change across the tracks (scenes on separate tracks, a montage with its flashes on their own track), one preset everywhere or a style mix (hype: whip, whip, crash zoom, repeated, landing on a pull-back; cinematic: slide, blur dissolve, repeated, ending in a zoom-through). " +
       "The sequence keeps ONE direction, the current (direction, default left), on every cut and never alternates; reserved moves (up, zoom-through, pull-back) are accents for the climax or last cut, and two or three presets repeated read as design where more read as noise. " +
       "Cuts whose clips are too short are skipped with a warning; cuts that already have one are replaced. One undo step; the receipt lists every transition and its sfx_cues.",
     input: applyAllInput,
@@ -239,22 +248,30 @@ export const motionTransitionTools: CatalogTool[] = [
     run: (call, args) => {
       const project = call.doc.project;
       if ((args.preset === undefined) === (args.style === undefined)) return refused(APPLY_ALL, "Error: give preset or style (one of them).");
-      let layer: number;
+      const scenes = args.track === undefined || args.track.trim() === "" || args.track.trim().toLowerCase() === "all";
+      let layer: number | undefined;
       let frames: number | undefined;
       try {
-        layer = resolveLayer(project, args.track);
+        if (!scenes) layer = resolveLayer(project, args.track!);
         frames = framesOf(project, args.duration);
       } catch (error) {
         if (error instanceof ToolError) return refused(APPLY_ALL, `Error: ${message(error)}`);
         throw error;
       }
-      const cuts = trackCuts(project, layer);
-      if (cuts.length === 0) return unchanged(APPLY_ALL, `No cuts on ${trackName(project, layer)}: no clips play back to back there.${cutsElsewhere(project, layer)}`);
+      const cuts = layer === undefined ? sceneCuts(project) : trackCuts(project, layer).map((c) => ({ ...c, followers: undefined }));
+      if (cuts.length === 0) {
+        return unchanged(
+          APPLY_ALL,
+          layer === undefined ? "No scene changes: no picture clip starts on the frame after another ends, on any track." : `No cuts on ${trackName(project, layer)}: no clips play back to back there.${cutsElsewhere(project, layer)}`,
+        );
+      }
+      const where = layer === undefined ? "the scene changes" : trackName(project, layer);
       const inputs = cuts.map((cut, index): MotionTransitionInput => {
         const step = args.style ? styleStep(args.style, index, cuts.length) : { preset: args.preset as MotionTransitionId };
         const intensity = args.intensity !== undefined ? args.intensity : step.intensity;
         const direction: MotionDirection | "auto" = args.direction ?? "auto";
-        return { outClipId: cut.outClip.id, inClipId: cut.inClip.id, preset: step.preset, frames, intensity, direction };
+        const scene = cut.followers ? { acrossTracks: true, followers: cut.followers } : {};
+        return { outClipId: cut.outClip.id, inClipId: cut.inClip.id, preset: step.preset, frames, intensity, direction, ...scene };
       });
       const warnings: string[] = [];
       const results = call.commit((tx) => {
@@ -269,16 +286,21 @@ export const motionTransitionTools: CatalogTool[] = [
             warnings.push(`cut ${input.outClipId} → ${input.inClipId}: skipped (${error.message})`);
             continue;
           }
-          done.push(applyMotionTransition(tx, tryInput));
+          const r = applyMotionTransition(tx, tryInput);
+          for (const f of r.skippedFollowers ?? []) warnings.push(`cut at ${r.cut.toFixed(2)}s: clip ${f.id} stays still (${f.reason})`);
+          done.push(r);
         }
         return done;
-      }, `Motion transitions on ${trackName(project, layer)}`);
+      }, `Motion transitions on ${where}`);
       const after = call.doc.project;
-      if (results.length === 0) return refused(APPLY_ALL, `Error: no cut on ${trackName(project, layer)} could take a transition: ${warnings.join("; ")}`);
-      const summary = `Added ${results.length} motion transition(s) on ${trackName(after, layer)}${args.style ? ` (${args.style})` : ""}: ${results.map((r) => `${r.preset}@${r.cut.toFixed(2)}s`).join(", ")}.`;
+      if (results.length === 0) return refused(APPLY_ALL, `Error: no cut on ${where} could take a transition: ${warnings.join("; ")}`);
+      const moved = results.reduce((n, r) => n + r.clips.length, 0);
+      const summary =
+        `Added ${results.length} motion transition(s) on ${where}${args.style ? ` (${args.style})` : ""}: ${results.map((r) => `${r.preset}@${r.cut.toFixed(2)}s`).join(", ")}` +
+        (layer === undefined ? `; ${moved} clip(s) move with them.` : ".");
       return applied(APPLY_ALL, summary, {
         warnings,
-        data: { track: trackName(after, layer), transitions: results.map((r) => resultData(after, r)), sfx_cues: results.flatMap((r) => r.sfxCues) },
+        data: { track: layer === undefined ? "all" : trackName(after, layer), transitions: results.map((r) => resultData(after, r)), sfx_cues: results.flatMap((r) => r.sfxCues) },
       });
     },
   }),

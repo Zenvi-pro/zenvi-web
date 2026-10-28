@@ -33,6 +33,7 @@ import {
 } from "../audio-mix.js";
 import { STEM_ROLE_OF, mixRoleOf } from "../mix-roles.js";
 import { MIX_GENRES } from "../../mastering/score.js";
+import { markMastered } from "../../review/finish.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { measureMix } from "./analyze-mix.js";
 import { iterateMaster, PEAK_MARGIN_DB } from "./master-loop.js";
@@ -281,7 +282,7 @@ export const masteringTools: CatalogTool[] = [
       "Measure the timeline's mix (integrated loudness LUFS, true peak, per-role levels) and gain-stage it to a delivery target so it is loud, clean and balanced: " +
       "dialogue anchors the mix, music sits under it and ducks while someone talks, SFX stay over the bed. " +
       "Writes clip volume and Compressor makeup gain only (the desktop plays the same mix), one undo step, and returns the before/after loudness. " +
-      "Presets: social -14 LUFS / -1 dBTP, broadcast -23, podcast -16. Run it LAST, after the edit, music and sound design are in place; running it again changes nothing. " +
+      "Presets: social -14 LUFS / -1 dBTP, broadcast -23, podcast -16. Run it LAST, after the edit, music and sound design are in place (any audio edit after it unmasters the mix), then render_video and review_render_tool; running it again changes nothing. " +
         "iterate=true (with genre) first runs analyze_mix_tool's loop (duck the bed to 10 dB under the voice, fix levels, timing, masking: its top fixes, re-scored, up to 3 rounds) and then masters, all one undo step: the best finishing call. " +
       "If the true-peak ceiling stops the mix short of the target, the frames that peak are ridden down (the bed under a hit up to 10 dB, else every clip playing there up to 4 dB; limit=false: stop at the ceiling and say so). " +
       "dry_run=true measures and plans without changing anything. Refuses timelines with no audible audio.",
@@ -419,6 +420,7 @@ export const masteringTools: CatalogTool[] = [
         data.limitedBy = plan.limitedBy;
         shortfallNote();
         const where = plan.limitedBy === "peak" && plan.shortfallLu > 0.5 ? "At the true-peak ceiling" : "Already mastered";
+        if (!args.dry_run) markMastered(call.doc, args.preset, before.integratedLufs);
         return unchanged(TOOL, `${where}: ${fmtLufs(before.integratedLufs)}, ${fmtPeak(before.truePeakDbtp)} (target ${base.targetLufs} LUFS / ${base.ceilingDbtp} dBTP). Nothing changed.`, { data, warnings, notes });
       }
 
@@ -487,6 +489,7 @@ export const masteringTools: CatalogTool[] = [
           warnings.push(`The Sound Score could not be measured (${error instanceof Error ? error.message : String(error)}).`);
         }
       }
+      markMastered(call.doc, args.preset, after.integratedLufs);
       data.after = after;
       data.gainsDb = planNumbers(plan);
       data.duckDb = Math.round(plan.duckDb * 100) / 100;

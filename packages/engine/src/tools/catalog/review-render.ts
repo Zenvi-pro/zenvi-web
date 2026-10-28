@@ -30,6 +30,7 @@ import {
   type RepeatGroup,
   type Shot,
 } from "../../review/render.js";
+import { finishGaps, finishLines } from "../../review/finish.js";
 import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
 import { FrameRenderError, mediaFileProject, renderPixels, secondsToFrame } from "../color-frames.js";
@@ -252,6 +253,7 @@ export const reviewRenderTools: CatalogTool[] = [
       const problems = renderProblems(inspection, shots, repeats, end, targets);
       const swaps = repeats.length > 0 ? repeatSwaps(project, inspection.duration, shots, repeats, targets.repeatWindowSeconds) : [];
 
+      const finish = finishGaps(project);
       const tiles = tilesFor(shots, repeats, end, inspection, args.max_tiles ?? 12);
       const images: ToolImage[] = [];
       const warnings: string[] = [];
@@ -277,6 +279,7 @@ export const reviewRenderTools: CatalogTool[] = [
         (problems.length > 0 ? `\n${problemLines(problems)}` : "") +
         (swaps && swaps.length > 0 ? `\nSwap the repeats for footage not on screen yet (one call each, then render and review again):\n${swapLines(swaps)}` : "") +
         (swaps && swaps.length === 0 && repeats.length > 0 ? "\nNo unused clip or unused part of a clip is left to swap in: import more footage for the repeats." : "") +
+        (finish.length > 0 ? `\nNot finished (the open project), fix in this order, then render and review again:\n${finishLines(finish).map((l) => `- FINISH: ${l}`).join("\n")}` : "") +
         (images.length > 0 ? "\nContact sheet attached: shots in order, the last tile is the end; problems are framed red." : "");
       const data = {
         path: args.path,
@@ -285,6 +288,7 @@ export const reviewRenderTools: CatalogTool[] = [
         height: inspection.height,
         fps: inspection.fps,
         ok: count("problem") === 0,
+        finish,
         problems,
         end,
         loudness: loud,

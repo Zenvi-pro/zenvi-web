@@ -3746,7 +3746,7 @@ No arguments.
 
 ### apply_motion_transition_tool
 
-**Apply a motion transition** (direct tool). Put a motion transition on one cut between two clips that play back to back on a track: whip pan, slide, zoom punch in/out, zoom through a point, spin, squash and stretch, shake, glitch, white/black/invert flash or blur dissolve.
+**Apply a motion transition** (direct tool). Put a motion transition on one cut between two clips that play back to back on a track (or, given both clip ids, on two tracks: one starts the frame after the other ends): whip pan, slide, zoom punch in/out, zoom through a point, spin, squash and stretch, shake, glitch, white/black/invert flash or blur dissolve.
 
 Surfaces: mcp, cli, editor. edits.
 
@@ -3756,7 +3756,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | --- | --- | --- | --- |
 | `preset` | "whip" \| "slide" \| "zoom_in" \| "zoom_out" \| "zoom_through" \| "spin" \| "squash" \| "shake" \| "glitch" \| "flash_white" \| "flash_black" \| "flash_invert" \| "blur_dissolve" | yes | Which transition: whip (left/right/up/down), slide (left/right/up/down), zoom_in, zoom_out, zoom_through, spin (cw/ccw), squash (left/right/up/down), shake, glitch, flash_white, flash_black, flash_invert, blur_dissolve. |
 | `clip1_id` | string |  | Outgoing clip (the cut is at its end). With clip2_id omitted, the clip right after it on its track. |
-| `clip2_id` | string |  | Incoming clip, cut back to back after clip1_id on the same track. |
+| `clip2_id` | string |  | Incoming clip, starting the frame after clip1_id ends (on any track). |
 | `track` | string |  | Instead of clip ids: the track of the cut (UI track number, 1 = bottom; name; or layer number) ... |
 | `time` | number |  | ... and the cut's timeline time in seconds (the nearest cut within 0.5 s). (min 0) |
 | `duration` | number |  | Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3). (min 0.03, max 4) |
@@ -3767,7 +3767,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 ### apply_motion_transitions_tool
 
-**Apply motion transitions to every cut** (direct tool). Put a motion transition on every cut of a track (clips back to back), one preset everywhere or a style mix (hype: whip, whip, crash zoom, repeated, landing on a pull-back; cinematic: slide, blur dissolve, repeated, ending in a zoom-through).
+**Apply motion transitions to every cut** (direct tool). Put a motion transition on every cut of a track (clips back to back), or with track omitted on every scene change across the tracks (scenes on separate tracks, a montage with its flashes on their own track), one preset everywhere or a style mix (hype: whip, whip, crash zoom, repeated, landing on a pull-back; cinematic: slide, blur dissolve, repeated, ending in a zoom-through).
 
 Surfaces: mcp, cli, editor. edits.
 
@@ -3775,7 +3775,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `track` | string | yes | Track whose cuts get transitions: UI track number (1 = bottom), name, or layer number. |
+| `track` | string |  | Track whose cuts get transitions: UI track number (1 = bottom), name, or layer number. Omit it (or "all") for every scene change across the tracks: scenes stacked on several tracks (a background and the blocks over it) move as one; clips that span the cut, flash frames and captions stay put. |
 | `preset` | "whip" \| "slide" \| "zoom_in" \| "zoom_out" \| "zoom_through" \| "spin" \| "squash" \| "shake" \| "glitch" \| "flash_white" \| "flash_black" \| "flash_invert" \| "blur_dissolve" |  | One transition on every cut: whip (left/right/up/down), slide (left/right/up/down), zoom_in, zoom_out, zoom_through, spin (cw/ccw), squash (left/right/up/down), shake, glitch, flash_white, flash_black, flash_invert, blur_dissolve. Give this or style. |
 | `style` | "hype" \| "cinematic" |  | A mix that repeats two or three presets: hype (whip, whip, crash zoom; the last cut a pull-back arrival) or cinematic (slide, blur dissolve; the last cut a zoom-through). |
 | `duration` | number |  | Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3). (min 0.03, max 4) |

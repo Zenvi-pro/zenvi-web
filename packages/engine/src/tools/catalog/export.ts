@@ -56,6 +56,7 @@ import type { ContainerFormat, ExportHost, ExportResult } from "../types.js";
 import { record, text } from "./common.js";
 import { profileContext } from "./project-export-profiles.js";
 import { editorRun, nothingChanged, ok, selectedClipIds, ToolError } from "./timeline-edit-common.js";
+import { finishGaps, finishLines } from "../../review/finish.js";
 
 /** The arguments that choose what to render (the desktop's), as opposed to show_dialog / overwrite. */
 const EXPORT_ARGUMENTS = [
@@ -320,6 +321,13 @@ function exportReceipt(call: ToolCall, plan: ExportPlan, result: ExportResult, w
     receipt = ok(call, summary, { size_bytes: size, duration_seconds: Number(pyFixed(seconds, 3)), notes: plan.notes, ...summaryOf, path: result.location, ...extra });
   }
   receipt.warnings = warnings;
+  // The finish the director owes every edit (review/finish.ts): what is missing, with the calls that close it.
+  // In notes and data only: the summary is the desktop's export_video text.
+  const gaps = plan.export_type === "audio_only" ? [] : finishGaps(call.doc.project);
+  if (gaps.length > 0) {
+    receipt.notes = [...receipt.notes, ...finishLines(gaps)];
+    if (receipt.data && typeof receipt.data === "object") (receipt.data as Record<string, unknown>).finish = gaps;
+  }
   return receipt;
 }
 

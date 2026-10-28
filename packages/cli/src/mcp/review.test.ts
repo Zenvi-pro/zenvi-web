@@ -62,6 +62,9 @@ describe("review_edit_tool over MCP", () => {
       const first = await call(client, "render_video", out);
       expect(first.receipt.status).toBe("applied");
       expect(first.receipt.notes.join(" ")).toMatch(/not been reviewed/);
+      // A silent cut with hard cuts and no sound design: the receipt says what the finish owes, with the calls (no master: nothing sounds).
+      expect(first.receipt.summary).toMatch(/Not finished: transitions, sound missing/);
+      expect(first.receipt.notes.join(" ")).toContain("spot_sound_tool {}, then auto_sound_design_tool {}");
 
       await call(client, "review_edit_tool", { audio: false, image: false });
       // overwrite: what agents send to replace a file they rendered before (W53 B7): accepted.

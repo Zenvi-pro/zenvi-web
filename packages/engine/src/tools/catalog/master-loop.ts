@@ -15,6 +15,7 @@
 
 import { ProjectDocument, type Transaction } from "../../history/document.js";
 import type { FixCall, MixGenre, MixScore } from "../../mastering/score.js";
+import { MASTER_KEY, markMastered } from "../../review/finish.js";
 import { isAutoSfxClip } from "../../sfx/moments.js";
 import type { Project } from "../../model/types.js";
 import type { ToolCall } from "../define.js";
@@ -171,6 +172,10 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     mastered = remastered;
     final = next;
   }
+  // The master step marked the scratch copy mastered; the mark is not an edit (it goes on call.doc, untracked, below).
+  const { [MASTER_KEY]: _scratchMark, ...scratchSettings } = (scratch.project.settings ?? {}) as Record<string, unknown>;
+  const kept = (call.doc.project.settings as Record<string, unknown> | undefined)?.[MASTER_KEY];
+  if (scratch.project.settings) scratch.setUntracked(["settings"], kept === undefined ? scratchSettings : { ...scratchSettings, [MASTER_KEY]: kept });
   const changed = JSON.stringify(scratch.project) !== JSON.stringify(call.doc.project);
   if (!changed) final = first;
   const data = {
@@ -188,8 +193,10 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
   const summary =
     `Sound Score ${first.score} -> ${final.score} (raw ${first.rawScore} -> ${final.rawScore}) in ${rounds.filter((r) => r.kept).length} fix round(s)` +
     `${trimmed.length ? `, peaks: ${trimmed.join(", ")}` : ""}, then ${mastered?.summary ?? "mastering failed"}`;
+  const masteredLufs = (mastered?.data as { after?: { integratedLufs?: number | null } } | undefined)?.after?.integratedLufs;
   if (!changed) {
     await discardFrom(scratch.project, call.doc.project);
+    if (mastered?.status === "unchanged") markMastered(call.doc, String(masterArgs.preset ?? "social"), masteredLufs);
     return unchanged(tool, `${summary} Nothing changed.`, { data });
   }
   // DEPLOY.md S3.6: no mix comes out worse than it went in.
@@ -198,5 +205,6 @@ export async function iterateMaster(call: ToolCall, tool: string, masterArgs: Re
     return unchanged(tool, `${summary} That scores lower than before, so nothing was changed.`, { data });
   }
   call.commit((tx) => applyProjectState(tx, scratch.project), "Master audio (iterate)");
+  if (mastered?.status === "applied" || mastered?.status === "unchanged") markMastered(call.doc, String(masterArgs.preset ?? "social"), masteredLufs);
   return applied(tool, summary, { data, warnings: mastered?.warnings ?? [], notes: mastered?.notes ?? [] });
 }

@@ -30,6 +30,9 @@ import { contractTool, unavailable, type CatalogTool } from "../define.js";
 import { parseSecondsArg, TimeArgError } from "../placement.js";
 import { pyFloat, pyG, pySlice } from "../pyfmt.js";
 import { applied } from "../receipt.js";
+import { energyVadWindows } from "../speech.js";
+import { ASR_KEY } from "../transcripts.js";
+import { scriptWordTimes, ttsTranscript } from "../tts-words.js";
 import { formatTrackLabelForLlm, lockedTrackError, newTracksNote, resolvePlacementTrack } from "../tracks.js";
 import type { ImportedMedia } from "../types.js";
 import { applyPlacement, planPlacement, provisionalFile, placementText, type PlacementArgs } from "./clips.js";
@@ -340,8 +343,19 @@ export const generationTools: CatalogTool[] = [
       const media: ImportedMedia = { path, info: { ...info, media_type: "audio" }, name: text(input.name) || narrationName(narration) };
       const seconds = Number(info.duration) || 0;
       const picked = layer ?? pickNarrationTrack(call.doc.project, position, position + seconds);
+      // The script over the voice's own pauses: caption timings with no speech recognition (tts-words.ts).
+      // Without an envelope (no audio host, or it failed) the words spread over the voice's length.
+      let voiced: [number, number][] = [];
+      try {
+        const envelope = await call.host.audio?.analyzeAudio(path, { signal: call.signal });
+        if (envelope) voiced = energyVadWindows(envelope, { minSpeechSec: 0.08, minSilenceSec: 0.15 });
+      } catch (error) {
+        call.host.log?.(`generate_tts_and_add_to_timeline_tool: no speech runs (${error instanceof Error ? error.message : String(error)}); words spread over the voice's length`);
+      }
+      const words = scriptWordTimes(narration, voiced, seconds);
       const clip = call.commit((tx) => {
         const file = addFile(tx, media, { dedupe: false, mediaType: "audio" });
+        if (words.length > 0) tx.update(["files", { id: file.id }], { ai_metadata: { ...record(file.ai_metadata), [ASR_KEY]: ttsTranscript(words) } });
         let target = picked;
         if (target === null) {
           // Every track above the main one is busy (or there is only one): a Narration track right above it.
@@ -354,7 +368,12 @@ export const generationTools: CatalogTool[] = [
       const placed = clip.layer;
       return (
         `Added TTS audio to timeline at position ${pyFloat(position)}s on track ${formatTrackLabelForLlm(placed, call.doc.project.layers)}${newTracksNote(newTracks)}` +
-        ` timeline_clip_id=${clip.id}.`
+        ` timeline_clip_id=${clip.id}.` +
+        (words.length === 0
+          ? " No word timings could be read from the voice: caption it with kinetic_captions_tool cues and say the captions are hand-timed."
+          : voiced.length > 0
+            ? ` Its ${words.length} words are timed to the voice's pauses: kinetic_captions_tool timeline_clip_ids=["${clip.id}"] captions it word by word.`
+            : ` Its ${words.length} words are spread over the voice's length (its pauses could not be measured): kinetic_captions_tool timeline_clip_ids=["${clip.id}"] captions it word by word; say the timing is approximate.`)
       );
     },
   }),

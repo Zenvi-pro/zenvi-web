@@ -145,7 +145,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   add_timer_tool: { optional: ["media.writeGenerated"], partialNote: "without storing generated images only timeline_clip_id works" },
   get_transcript_tool: {
     optional: ["audio.transcribe"],
-    partialNote: "without speech recognition only media Zenvi indexed has a transcript (word timings estimated)",
+    partialNote: "without speech recognition only media Zenvi indexed (word timings estimated) and TTS voices (their script over the voice's pauses) have a transcript",
     webNote: SERVER_ASR,
   },
   reindex_project_file_tool: { webNote: "reports files that are already indexed; uploading for indexing runs in Zenvi desktop" },

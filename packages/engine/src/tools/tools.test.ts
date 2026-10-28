@@ -576,7 +576,7 @@ const SPECS: Record<string, Spec> = {
     happy: {
       args: { text: "Welcome to the show", position: "2" },
       // Never the bottom picture track (1000000), W53 B8.
-      summary: /^Added TTS audio to timeline at position 2\.0s on track (?!1000000 )\d+ .* timeline_clip_id=\w+\.$/,
+      summary: /^Added TTS audio to timeline at position 2\.0s on track (?!1000000 )\d+ .* timeline_clip_id=\w+\. Its 4 words are timed to the voice's pauses/,
       check: ({ host }) => expect(host.backendCalls.find((c) => c.path === "/api/v1/generation/tts")?.body).toMatchObject({ text: "Welcome to the show", voice: "alloy" }),
     },
     failure: { args: { text: "Hi", track: "Nope" }, summary: /^Error: Unknown track or layer 'Nope'/ },

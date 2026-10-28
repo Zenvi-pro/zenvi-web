@@ -41,6 +41,7 @@ import { detectSubjects, SUBJECT_KINDS, type DetectedSubject, type FrameSubjects
 import type { ImportedMedia } from "../types.js";
 import { placeMusicBed } from "./music-bed.js";
 import { aspectOf, displayName, musicFromBeats, usableRange, visualKind, writeCard } from "./reels.js";
+import { FINISH_HINT } from "../director-card.js";
 
 const ALIGN = "align_match_cut_tool";
 const DETECT = "detect_subject_tool";
@@ -352,7 +353,7 @@ const montageTool = directTool({
     "white flashes on downbeats, a motion transition once a bar between them (transitions: punch by default, flash for a flash montage, whip, none), a small zoom per shot and the music bed. " +
     "One undo step; data.sfx_cues lists the cut times for sound design, data.transitions the moves (auto_sound_design_tool hears both). " +
     "Give subject boxes per file (detect_subject_tool) or let it find circles; for a flash montage of unrelated images give each a full-frame box {x:0,y:0,w:1,h:1}. " +
-    "Warns (strict_variety: refuses) when the files are too few for the pace and says how many more to import.",
+    `Warns (strict_variety: refuses) when the files are too few for the pace and says how many more to import. ${FINISH_HINT}`,
   input: montageInput,
   annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   requires: ["media"],

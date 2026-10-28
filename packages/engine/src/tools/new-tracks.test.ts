@@ -120,7 +120,7 @@ describe("other placement tools on a track past the top", () => {
   it("generate_tts_and_add_to_timeline_tool adds the track in the same undo step as the audio", async () => {
     const doc = fixtureDoc();
     const r = await run(doc, "generate_tts_and_add_to_timeline_tool", { text: "Hi there", track: "6", position: "1" });
-    expect(r.summary).toMatch(/^Added TTS audio to timeline at position 1\.0s on track 6000000 \(stack_from_bottom=6, z_from_bottom=5\) on a new track timeline_clip_id=\w+\.$/);
+    expect(r.summary).toMatch(/^Added TTS audio to timeline at position 1\.0s on track 6000000 \(stack_from_bottom=6, z_from_bottom=5\) on a new track timeline_clip_id=\w+\. Its 2 words are timed to the voice's pauses/);
     expect(r.createdTracks.map((t) => t.layer)).toEqual([6_000_000]);
     expect(doc.undoLabels).toHaveLength(1);
   });

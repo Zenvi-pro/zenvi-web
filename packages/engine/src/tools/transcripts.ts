@@ -38,6 +38,7 @@ import { hasAudioStream } from "./audio-mix.js";
 import type { ToolCall } from "./define.js";
 import { toFrame, toSeconds, type Fps } from "./frame-time.js";
 import { clipSpeed, sourceToTimelineSec, type TimedWord } from "./speech.js";
+import { TTS_SCRIPT_SOURCE } from "./tts-words.js";
 
 /** The `ai_metadata` key of a kept transcription. */
 export const ASR_KEY = "asr";
@@ -224,7 +225,8 @@ function fromStored(record: StoredTranscript, fresh: boolean, warnings: string[]
   return {
     words: record.words,
     source: record.transcriptionSource || SERVER_SOURCE,
-    exact: true,
+    // A TTS script laid over its voice (tts-words.ts) has the words exactly, their times from the voice's pauses.
+    exact: record.transcriptionSource !== TTS_SCRIPT_SOURCE,
     generation: record.generation,
     modelId: record.modelId,
     language: record.language,
@@ -318,8 +320,9 @@ export async function wordsFor(call: ToolCall, target: WordTarget, request: Word
   const stored = storedTranscript(file);
   const sha = mediaSha256(file);
   const sameMedia = stored !== null && (!stored.sha256 || !sha || stored.sha256 === sha);
-  const reusable = stored !== null && sameMedia && languageMatches(stored, requested);
   const transcribe = request.transcribe ? call.host.audio?.transcribe : undefined;
+  // A TTS script has no detected language; with no speech recognition to ask, it is the voice's words in any.
+  const reusable = stored !== null && sameMedia && (languageMatches(stored, requested) || (stored.transcriptionSource === TTS_SCRIPT_SOURCE && !transcribe));
   const warnings: string[] = [];
   if (request.force && !transcribe) warnings.push("force ignored: speech recognition is not available on this Zenvi surface");
   const force = Boolean(request.force && transcribe);
