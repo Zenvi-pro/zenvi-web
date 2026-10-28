@@ -311,12 +311,16 @@ export const kineticCaptionTools: CatalogTool[] = [
         if (clips.length === 0) return refused(TOOL, "Error: no footage clip on the timeline under the cues; add the picture first, or pass timeline_clip_ids.");
       } else {
         const fileOf = (c: Clip) => project.files.find((f) => f.id === c.file_id);
-        clips = project.clips.filter((c) => {
+        const talking = project.clips.filter((c) => {
           const file = fileOf(c);
           return file !== undefined && isTalkingFootage(file) && !kineticTag(c);
         });
-        // No one on camera: a generated voice-over, whose file knows its words.
-        if (clips.length === 0) clips = project.clips.filter((c) => storedTranscript(fileOf(c))?.transcriptionSource === TTS_SCRIPT_SOURCE);
+        // A generated voice-over is the edit's voice: stock footage's own sound is mostly ambience. With one on the
+        // timeline it is captioned, with the footage whose speech is already known (a kept or indexed transcript);
+        // footage nobody has heard yet would be paid for and transcribed into captions of its background noise.
+        const tts = project.clips.filter((c) => storedTranscript(fileOf(c))?.transcriptionSource === TTS_SCRIPT_SOURCE);
+        const heard = (c: Clip): boolean => storedTranscript(fileOf(c)) !== null || (clipTarget(project, c)?.cues.length ?? 0) > 0;
+        clips = tts.length > 0 ? [...tts, ...talking.filter(heard)] : talking;
         if (clips.length === 0) return refused(TOOL, "Error: no clip on the timeline has picture and sound or a TTS voice to caption; pass timeline_clip_ids, or cues.");
       }
       const colours: { ink?: string; accent?: string } = {};

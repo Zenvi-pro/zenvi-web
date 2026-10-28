@@ -47,4 +47,28 @@ describe("generate_tts_and_add_to_timeline_tool word timings", () => {
     expect(transcript.status, transcript.summary).toBe("applied");
     expect(JSON.stringify(transcript.data)).toContain("Welcome");
   });
+
+  it("spreads the words over the voice's length when its pauses cannot be measured", async () => {
+    const ed = new EditHarness({ host: { without: ["audio"] } });
+    ed.addClip(ed.addFile("video"), { position: 0, end: 6 });
+    const summary = (await ed.call("generate_tts_and_add_to_timeline_tool", { text: "Stay for the twist", position_seconds: "0" })).summary;
+    expect(summary).toMatch(/Its 4 words are spread over the voice's length .*say the timing is approximate\.$/);
+    const clipId = /timeline_clip_id=(\w+)\./.exec(summary)![1]!;
+    const file = ed.doc.project.files.find((f) => f.id === ed.clip(clipId)!.file_id)!;
+    const words = (file.ai_metadata as { asr: { words: { startSec: number; endSec: number }[] } }).asr.words;
+    expect(words).toHaveLength(4);
+    expect(words[0]!.startSec).toBe(0);
+    expect(words.at(-1)!.endSec).toBeCloseTo(Number(file.duration), 2);
+  });
+
+  it("captions the TTS voice, not stock footage's ambient sound, when both are on the timeline", async () => {
+    const ed = new EditHarness({ host: { omit: ["audio.transcribe"] } });
+    ed.addClip(ed.addFile("video", { hasAudio: true }), { position: 0, end: 6 });
+    const summary = (await ed.call("generate_tts_and_add_to_timeline_tool", { text: "Welcome to the show", position_seconds: "0" })).summary;
+    const voice = /timeline_clip_id=(\w+)\./.exec(summary)![1]!;
+    const captions = await ed.call("kinetic_captions_tool", {});
+    expect(captions.status, captions.summary).toBe("applied");
+    const sources = new Set(ed.doc.project.clips.flatMap((c) => (c.zenvi_kinetic_captions as { source_clip_ids?: string[] } | undefined)?.source_clip_ids ?? []));
+    expect([...sources]).toEqual([voice]);
+  });
 });
