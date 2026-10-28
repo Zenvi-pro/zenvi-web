@@ -74,9 +74,9 @@ export interface ToolNeeds {
 }
 
 const WATCH = ["frames", "backend"] as (HostCapability | HostMethod)[];
-/** How the web surfaces transcribe (zenvi-backend POST /api/v1/transcription). */
+/** How the web surfaces transcribe (zenvi-backend POST /api/v1/transcription; the CLI on device after `zenvi speech setup`). */
 const SERVER_ASR =
-  "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
+  "speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free";
 const WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
 /** Where a host cannot list its fonts (the browser), a title's font is taken as given, as the desktop does without Qt's list. */
 const FONTS_UNCHECKED =
@@ -120,6 +120,15 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     methods: ["media.writeGenerated"],
     optional: ["frames.fontFamilies"],
     partialNote: FONTS_UNCHECKED,
+  },
+  align_lyrics_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
+  place_on_word_tool: {
+    optional: ["audio.transcribe"],
+    partialNote: "without speech recognition only words of kept transcripts (TTS voices, aligned lyrics) and indexed media are found",
+  },
+  insert_broll_on_words_tool: {
+    optional: ["audio.transcribe", "media.importUrl"],
+    partialNote: "without speech recognition only kept or indexed transcripts are searched; stock=true needs URL downloads",
   },
   add_captions_tool: {
     optional: ["media.writeGenerated", "storage.readText", "audio.transcribe"],
@@ -447,6 +456,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
       "audio.generateSfx": "ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
+      "audio.transcribe": "zenvi speech setup ran (on device, free), else signed in with zenvi login",
       motion: "headless Chrome is installed: zenvi motion setup",
       scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
       fx: "ffmpeg is installed (ZENVI_FX=0 turns it off)",
