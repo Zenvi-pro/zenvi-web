@@ -185,6 +185,6 @@ export function displayText(result: ToolResult): string {
  * only through `export *` then never initialise (W53 B1: every cloud render
  * failed on an undefined export preset table).
  */
-export async function loadEngineRegistry(): Promise<EngineRegistry | null> {
+export async function loadEngineRegistry(): Promise<EngineRegistry> {
   return { tools: allTools as readonly AnyTool[], run: (ctx, name, args) => runTool(ctx, name, args), capabilityName };
 }

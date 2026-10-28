@@ -50,10 +50,7 @@ async function main(): Promise<void> {
     tables = new MemoryTableStore();
   }
 
-  const engine = await loadEngineRegistry().catch((error: unknown) => {
-    log.error("engine tool registry failed to load", { error: errorMessage(error) });
-    return null;
-  });
+  const engine = await loadEngineRegistry();
 
   const found = (name: "ffmpeg" | "ffprobe"): boolean => {
     const binary = resolveBinary(name);
@@ -106,7 +103,7 @@ async function main(): Promise<void> {
       publicBaseUrl: config.publicBaseUrl,
       storage: blobs.kind,
       renderer: services.renders.rendererAvailable,
-      engineTools: engine?.tools.length ?? 0,
+      engineTools: engine.tools.length,
       motion: services.motion !== null,
       mattes: services.mattes !== null,
       renderWorkers: config.renderQueue ?? "none",
