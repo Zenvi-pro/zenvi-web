@@ -25,6 +25,7 @@ import type { Scene3dId, Scene3dParams } from "../scenes3d/catalog.js";
 import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { Scene3dQuality, Scene3dRender } from "../scenes3d/link.js";
 import type { PictureEvent } from "../sfx/events.js";
+import type { WatchCritique, WatchRequest } from "../review/watch.js";
 import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
 export type ToolSurface = "assistant" | "mcp" | "cli" | "editor";
@@ -967,6 +968,16 @@ export interface MotionHost {
   setup?(signal?: AbortSignal): Promise<MotionRuntimeStatus>;
 }
 
+/**
+ * Watching a rendered file with sound (review/watch.ts): the host makes a
+ * small proxy of the file and has it critiqued, through the Zenvi backend as
+ * the signed-in person or Gemini with a developer key. Rejects with a
+ * `WatchError` in words (signed out, out of credits, too long).
+ */
+export interface WatchHost {
+  watch(path: string, request?: WatchRequest): Promise<WatchCritique>;
+}
+
 export interface ToolHost {
   media?: MediaHost;
   player?: PlayerHost;
@@ -983,6 +994,7 @@ export interface ToolHost {
   scenes3d?: Scene3dHost;
   fx?: FxHost;
   library?: LibraryHost;
+  watch?: WatchHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }
