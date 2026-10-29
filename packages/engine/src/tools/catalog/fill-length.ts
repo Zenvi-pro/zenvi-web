@@ -16,7 +16,8 @@
  *   repeat the last resort: the track's shots again, the earliest first.
  *
  * Everything is appended at the end, so no cut, title or sound already placed
- * moves. A title or card that ended with the picture moves to the new end;
+ * moves. A title or card that ended with the picture moves to the new end
+ * (an overlay over more of the edit, a grain or a watermark, runs on to it);
  * music that stops early runs on into its file, or repeats its last phrase on
  * a bar line (as build_reel_tool does). One undo step.
  */
@@ -209,7 +210,7 @@ export const fillLengthTools: CatalogTool[] = [
     description:
       "Make an edit that runs short reach the asked length instead of shipping short: the last shot holds longer into its unused media (up to 3 s), then new shots go after it from unused footage (bin files not on the timeline, then unseen moments of the timeline's own files; " +
       "each the track's median shot length, in whole beats when the music's beat is known), then the last shots slow (not below max_slow), and as a last resort earlier shots repeat (named in a warning). Everything is added at the end, so no cut, title or sound already placed moves (slowed tail shots excepted); " +
-      "a title or card that ended with the picture moves to the new end, and music that stops early runs on into its file or repeats its last 4 bars on a bar line. dry_run=true only proposes. One undo step; the receipt lists what was added and anything still short.",
+      "a title or card that ended with the picture moves to the new end (an overlay over more of the edit runs on to it), added shots are muted under music, and music that stops early runs on into its file or repeats its last 4 bars on a bar line. dry_run=true only proposes. One undo step; the receipt lists what was added and anything still short.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     run: async (call, args: Input) => {
@@ -260,7 +261,17 @@ export const fillLengthTools: CatalogTool[] = [
       const newEnd = oldEnd + missing - plan.short;
       const fresh = plan.shots.filter((s) => !s.repeat);
       const repeats = plan.shots.filter((s) => s.repeat);
-      const cards = project.clips.filter((c) => c.layer !== layer && Math.abs(endOf(c) - oldEnd) <= g.tol && !isAudioOnlyMedia(fileById(project, String(c.file_id ?? ""))));
+      const ending = project.clips.filter((c) => c.layer !== layer && Math.abs(endOf(c) - oldEnd) <= g.tol && !isAudioOnlyMedia(fileById(project, String(c.file_id ?? ""))));
+      // An end card (it starts with the last shot or later) moves to the new end; an overlay over more of the
+      // edit (grain, a watermark, a caption bar) runs on to it where its media allows, rather than slide off its start.
+      const cards = ending.filter((c) => c.position >= last.position - g.tol);
+      const overlays = ending.filter((c) => {
+        if (c.position >= last.position - g.tol || isRetimed(c as unknown as Record<string, unknown>)) return false;
+        const file = fileById(project, String(c.file_id ?? ""));
+        return !file || visualKind(file) !== "video" || (Number(file.duration) || 0) - c.end >= newEnd - oldEnd - g.tol;
+      });
+      // Shots you hear under the music are muted (as the builders place them); without music they keep their sound.
+      const underMusic = mixEntries(project).some((e) => e.mixRole === "music" && !isMuted(e));
       const summary = [
         plan.hold > 0 ? `held the last shot ${r3(plan.hold)} s longer` : "",
         fresh.length > 0 ? `added ${fresh.length} shot(s) of ${r3(shotLength)} s${beat ? " (whole beats)" : ""} from ${[...new Set(fresh.map((s) => displayName(fileById(project, s.fileId)!)))].join(", ")}` : "",
@@ -273,6 +284,7 @@ export const fillLengthTools: CatalogTool[] = [
       for (const m of music) if (m.loop) warnings.push(`${clipTitle(m.clip)} runs out: its last ${LOOP_BARS} bar(s) from ${r3(m.loop.from)} s repeat on a bar line.`);
       const musicStops = mixEntries(project).filter((e) => e.mixRole === "music" && !isMuted(e) && endOf(e.clip) >= oldEnd - 1 && endOf(e.clip) < newEnd - g.frame && !music.some((m) => m.clip.id === e.clip.id));
       for (const e of musicStops) warnings.push(`${clipTitle(e.clip)} stops at ${r3(endOf(e.clip))} s, before the new end: extend or replace it.`);
+      for (const c of ending) if (!cards.includes(c) && !overlays.includes(c)) warnings.push(`${clipTitle(c)} ends at the old end, ${r3(oldEnd)} s: its media cannot run on to the new end.`);
       const data = {
         from_seconds: r3(oldEnd),
         to_seconds: r3(newEnd),
@@ -281,6 +293,7 @@ export const fillLengthTools: CatalogTool[] = [
         ...(plan.slow !== null ? { slow: r3(plan.slow.speed), slowed_clip_ids: plan.slow.clipIds } : {}),
         short_seconds: r3(plan.short),
         moved_cards: cards.map((c) => c.id),
+        ...(overlays.length > 0 ? { extended_overlays: overlays.map((c) => c.id) } : {}),
         music: music.map((m) => ({ clip_id: m.clip.id, ...(m.extendTo !== undefined ? { runs_on: true } : { loops_from: r3(m.loop!.from) }) })),
       };
       if (summary.length === 0) return refused(TOOL, `Error: nothing to fill ${r3(missing)} s with: ${warnings[0] ?? "the last shot has no media left and no footage is free"}.`);
@@ -299,7 +312,7 @@ export const fillLengthTools: CatalogTool[] = [
           const file = fileById(tx.project, s.fileId)!;
           tail = addClip(tx, { fileId: s.fileId, position: cursor, layer: layer!, start: s.start, end: s.end });
           if (aspectOf(file) !== null) setClipProperty(tx, tail.id, "scale", ScaleMode.CROP);
-          if (file.has_audio && music.length + musicStops.length > 0) setClipProperty(tx, tail.id, "volume", 0);
+          if (file.has_audio && underMusic) setClipProperty(tx, tail.id, "volume", 0);
           created.push(tail.id);
           cursor += s.end - s.start;
         };
@@ -324,6 +337,7 @@ export const fillLengthTools: CatalogTool[] = [
         }
         for (const s of plan.shots) if (s.repeat) append(s);
         for (const c of cards) setClipTiming(tx, c.id, { position: c.position + (cursor - oldEnd) });
+        for (const c of overlays) setClipTiming(tx, c.id, { end: c.end + (cursor - oldEnd) });
         for (const m of music) placeMoreMusic(tx, m, cursor, created);
       }, "Fill to length");
       return applied(TOOL, text, { warnings, data: { ...data, createdClipIds: created } });

@@ -3,7 +3,7 @@ import { BEAT_SAMPLE_RATE } from "../../analysis/beats.js";
 import { ProjectDocument } from "../../history/document.js";
 import { createProject } from "../../model/defaults.js";
 import type { Project } from "../../model/types.js";
-import { addClip, addFile } from "../../ops/index.js";
+import { addClip, addFile, setClipTiming } from "../../ops/index.js";
 import type { ToolReceipt } from "../receipt.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
@@ -79,6 +79,23 @@ describe("fill_to_length_tool", () => {
     expect(song.end).toBeCloseTo(20, 6);
     doc.undo();
     expect(picture(doc)).toHaveLength(2);
+  });
+
+  it("runs an overlay over the whole edit on to the new end, and mutes added shots under music that already runs past it", async () => {
+    const doc = shortEdit(60);
+    doc.transaction("overlay and a longer song", (tx) => {
+      setClipTiming(tx, "CLIPSONG01", { end: 30 });
+      addFile(tx, media("/m/grain.png", imageInfo("/m/grain.png")), { id: "FILEGRAIN1" });
+      const top = Math.max(...tx.project.layers.map((l) => l.number));
+      addClip(tx, { fileId: "FILEGRAIN1", position: 0, layer: top, start: 0, end: 8, id: "CLIPGRAIN1" });
+    });
+    const { receipt, data } = await fill(doc, { seconds: 20 });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    const grain = doc.project.clips.find((c) => c.id === "CLIPGRAIN1")!;
+    expect([grain.position, grain.end]).toEqual([0, 20]);
+    expect(data.extended_overlays).toEqual(["CLIPGRAIN1"]);
+    expect(data.moved_cards).toEqual(["CLIPCARD01"]);
+    for (const id of data.createdClipIds as string[]) expect(doc.project.clips.find((c) => c.id === id)!.volume.Points[0]!.co.Y).toBe(0);
   });
 
   it("repeats the music's last bars on a bar line when the song runs out, and cuts the new shots in whole beats", async () => {
