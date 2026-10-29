@@ -1392,6 +1392,18 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { transition_id: "MTNOPE" }, status: "refused", summary: /^Error: no motion transition with id MTNOPE\.$/ },
   },
+  add_plate_wipe_tool: {
+    happy: {
+      args: { clip1_id: IDS.clipB, shape: "burst" },
+      summary: /^Added a burst plate wipe on the cut at 15\.00s \(track 1\): covers in 6 frames, holds 2, leaves \(through\) in 9, the next clip pulling back behind it\.$/,
+      check: ({ receipt }) => expect((receipt.data as { sfx_cues: { kind: string }[] }).sfx_cues.map((c) => c.kind)).toEqual(["whoosh", "hit"]),
+    },
+    failure: { args: { track: String(L1), time: 3 }, status: "refused", summary: /^Error: No cut on track/ },
+  },
+  make_transition_mask_tool: {
+    happy: { args: { pattern: "rings", count: 4 }, summary: /^Made a 1280×720 transition mask of 4 rings \(4 steps\): file [A-Z0-9]+\. Pass it to update_transition_tool as mask_file_id\.$/ },
+    failure: { args: { pattern: "hexagons" }, status: "refused", summary: /^Error: Invalid arguments/ },
+  },
 
   speed_ramp_tool: {
     happy: {
