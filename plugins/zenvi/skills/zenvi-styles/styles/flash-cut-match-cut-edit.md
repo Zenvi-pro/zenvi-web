@@ -56,7 +56,9 @@ or a one-word hook. `add_kinetic_title_tool {"style": "creator", "animation":
 ## Motion & transitions
 85 %+ hard cuts. White flash frames tied to a sound hit (1-3 frames;
 `apply_motion_transition_tool flash_white` between clips, or a decaying white
-plate over a title). One zoom-through or whip per section at most. Dissolves
+plate over a title). Inverted flash frames: `apply_look_tool` `invert` on a
+1-3 frame clip (or `solarize`); `apply_motion_transitions_tool style: "flash"`
+spaces inverts, glitches and white frames over every other cut. One zoom-through or whip per section at most. Dissolves
 almost never.
 
 ## Sound & music
