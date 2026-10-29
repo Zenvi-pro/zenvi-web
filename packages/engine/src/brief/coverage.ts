@@ -117,45 +117,41 @@ export function footageCoverage(project: Project, brief: Brief): FootageCoverage
   const own = files.filter((f) => footageOrigin(f) === "media");
   const fetched = files.filter((f) => footageOrigin(f) !== "media");
   const assigned = new Set<string>();
-  const shots: ShotCoverage[] = [];
   const rows = rowsOf(brief);
   // Named files first, so a word match never takes a file a row asked for.
   for (const row of rows) if (row.file_id && byId.has(row.file_id)) assigned.add(row.file_id);
 
-  for (const row of rows) {
+  const planned: (ShotCoverage | null)[] = rows.map((row) => {
     const base = { at: row.at, picture: row.picture, source: row.source };
-    if (row.source === "motion" || row.source === "3d" || row.source === "title") {
-      shots.push({ ...base, status: "built" });
-      continue;
-    }
+    if (row.source === "motion" || row.source === "3d" || row.source === "title") return { ...base, status: "built" };
     if (row.file_id) {
       const file = byId.get(row.file_id);
-      shots.push(
-        file
-          ? { ...base, status: "covered", file_id: row.file_id, origin: footageOrigin(file) }
-          : { ...base, status: row.source === "media" ? "ask" : row.source === "stock" ? "fetch" : "generate", reason: `file ${row.file_id} is not in the bin` },
-      );
-      continue;
+      return file
+        ? { ...base, status: "covered", file_id: row.file_id, origin: footageOrigin(file) }
+        : { ...base, status: row.source === "media" ? "ask" : row.source === "stock" ? "fetch" : "generate", reason: `file ${row.file_id} is not in the bin` };
     }
     // The person's media first: their footage belongs to the film; then what was fetched or generated already.
     const match = bestFile(row.picture, own, assigned) ?? bestFile(row.picture, fetched, assigned);
-    if (match) {
-      assigned.add(String(match.id));
-      shots.push({ ...base, status: "covered", file_id: String(match.id), origin: footageOrigin(match) });
-      continue;
-    }
+    if (!match) return null;
+    assigned.add(String(match.id));
+    return { ...base, status: "covered", file_id: String(match.id), origin: footageOrigin(match) };
+  });
+  // Rows no words matched, once every word match has its file.
+  const shots = rows.map((row, i): ShotCoverage => {
+    const done = planned[i];
+    if (done) return done;
+    const base = { at: row.at, picture: row.picture, source: row.source };
     // Bench P5: agents plan rows without file ids over files with no words to match (unindexed shot_01.mp4,
     // import_stock_media_tool's pexels_<id>.mp4 without its query): the next file of that origin no row has taken stands in.
     const origin: FootageOrigin = row.source === "media" ? "media" : row.source === "stock" ? "stock" : "generate";
     const next = files.find((f) => footageOrigin(f) === origin && !assigned.has(String(f.id)));
     if (next) {
       assigned.add(String(next.id));
-      shots.push({ ...base, status: "covered", file_id: String(next.id), origin, reason: "assumed: name its file_id in the storyboard" });
-      continue;
+      return { ...base, status: "covered", file_id: String(next.id), origin, reason: "assumed: name its file_id in the storyboard" };
     }
-    if (row.source === "media") shots.push({ ...base, status: "ask", reason: own.length > 0 ? "no file of yours shows it: name its file_id, or fetch / generate it" : "the bin has no footage of yours" });
-    else shots.push({ ...base, status: row.source === "stock" ? "fetch" : "generate" });
-  }
+    if (row.source === "media") return { ...base, status: "ask", reason: own.length > 0 ? "no file of yours shows it: name its file_id, or fetch / generate it" : "the bin has no footage of yours" };
+    return { ...base, status: row.source === "stock" ? "fetch" : "generate" };
+  });
 
   const counts: Record<ShotStatus, number> = { covered: 0, fetch: 0, generate: 0, ask: 0, built: 0 };
   for (const s of shots) counts[s.status] += 1;
