@@ -63,7 +63,13 @@ export type ProblemKind =
   | "loudness"
   | "silent_audio"
   | "no_audio"
-  | "audio_dropout";
+  | "audio_dropout"
+  // The rhythm checks of a fast-cut edit (review/rhythm.ts).
+  | "uniform_shot_lengths"
+  | "static_shot"
+  | "flat_brightness"
+  | "flat_hue"
+  | "cut_without_sound";
 
 export interface Problem {
   kind: ProblemKind;

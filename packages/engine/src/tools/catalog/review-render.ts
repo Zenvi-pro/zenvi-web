@@ -5,6 +5,10 @@
  * problems; this tool hashes every shot's middle frame to find repeated
  * shots and draws one contact sheet of the shots and the last frame.
  *
+ * A fast-cut file also gets the rhythm checks (review/rhythm.ts): shot
+ * lengths that never vary, shots that go still, brightness and colour that
+ * never move, cuts with no sound on them.
+ *
  * Frames come from the host's frame renderer on scratch projects holding the
  * file, so any host that renders timeline frames can read them: one project
  * per frame for the hashes, one grid project (the file once per tile, each
@@ -31,6 +35,7 @@ import {
   type Shot,
 } from "../../review/render.js";
 import { finishGaps, finishLines } from "../../review/finish.js";
+import { onsetRatios, rhythmReview } from "../../review/rhythm.js";
 import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
 import { FrameRenderError, mediaFileProject, renderPixels, secondsToFrame } from "../color-frames.js";
@@ -207,7 +212,8 @@ export const reviewRenderTools: CatalogTool[] = [
     title: "Review the rendered file",
     description:
       "Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), " +
-      "how it ends (a hold or end card, never black or cut off), and shots repeated too soon (perceptual hash of each shot's middle frame), " +
+      "how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame), " +
+      "and for a fast cut its rhythm (shot lengths that never vary, shots that go still, brightness and colour that never move, cuts with no sound), " +
       "with one contact sheet of the shots and the last frame (problems framed red). Call it on the file render/export wrote, after mastering; " +
       "fix every PROBLEM line and render again. Changes nothing.",
     input,
@@ -251,6 +257,17 @@ export const reviewRenderTools: CatalogTool[] = [
       const repeats = repeatedShots(shots, hashes);
       const end = endVerdict(inspection, shots);
       const problems = renderProblems(inspection, shots, repeats, end, targets);
+      let onsets: number[] | null = null;
+      if (inspection.hasAudio && call.host.audio?.decodePcm && shots.length > 1) {
+        try {
+          const pcm = await call.host.audio.decodePcm(inspection.path, { sampleRate: 8000, maxSeconds: inspection.duration, signal: call.signal });
+          onsets = onsetRatios(pcm.samples, pcm.sampleRate, shots.slice(1).map((s) => s.start));
+        } catch (error) {
+          call.host.log?.(`review audio onsets failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      const rhythm = rhythmReview(shots, inspection.duration, inspection.picture, onsets, inspection.frozen);
+      problems.push(...rhythm.problems);
       const swaps = repeats.length > 0 ? repeatSwaps(project, inspection.duration, shots, repeats, targets.repeatWindowSeconds) : [];
 
       const finish = finishGaps(project);
@@ -300,6 +317,7 @@ export const reviewRenderTools: CatalogTool[] = [
         black: inspection.black,
         frozen: inspection.frozen,
         silences: inspection.silences,
+        rhythm: { fast_cut: rhythm.fastCut, shots: rhythm.pictures, weak_cuts: rhythm.weakCuts },
         sheet: images.length > 0 ? { tiles: tiles.map((t, i) => ({ tile: i + 1, time: t.time, label: t.label, flag: t.flag ?? null })) } : null,
       };
       return { receipt: applied(TOOL, summary, { data, warnings }, 0), images };
