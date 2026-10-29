@@ -163,6 +163,8 @@ export function planPictogram(params: Params): PictogramPlan | { error: string }
     layouts.push(key as LayoutKind);
   }
   if (layouts[0] === "hold") return { error: "pictogram_morph layouts: hold keeps the previous layout's icons, so it cannot come first" };
+  // A second hold would bring the dissolved icons back only to dissolve them again.
+  if (layouts.some((k, j) => k === "hold" && layouts[j - 1] === "hold")) return { error: "pictogram_morph layouts: hold cannot follow hold" };
   return { groups, layouts };
 }
 

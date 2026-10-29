@@ -52,6 +52,7 @@ describe("planPictogram", () => {
     const manifest = getBlock("pictogram_morph")!;
     expect(checkParams(manifest, { groups: ["A=500"] })).toEqual({ ok: false, error: expect.stringContaining("set unit to 2") });
     expect(checkParams(manifest, { layouts: ["hold"] })).toMatchObject({ ok: false });
+    expect(checkParams(manifest, { layouts: ["grid", "hold", "hold"] })).toMatchObject({ ok: false, error: expect.stringContaining("hold cannot follow hold") });
     expect(checkParams(manifest, { layouts: ["grid", "spiral"] })).toMatchObject({ ok: false, error: expect.stringContaining("spiral") });
     expect(checkParams(manifest, { groups: ["A 5"] })).toMatchObject({ ok: false });
   });
