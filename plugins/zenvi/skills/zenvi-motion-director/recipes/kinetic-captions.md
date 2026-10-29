@@ -31,6 +31,14 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
 
 ## Tools
 
+0. One call first, once the take (or the TTS voice over a picture) is in the
+   bin: `build_talking_head_tool` (`speaker_file_ids`, `broll_file_ids` named
+   for what they show, `keywords` to choose, `hook` of 1-3 words). It
+   jump-cuts the pauses with the framing changing on every cut, punches in on
+   the strongest words, cuts to B-roll on the nouns that name a picture, sets
+   the hook behind the speaker (or over them without a matte), one whip up,
+   creator captions and a bed, in one undo step; `data.decisions` lists every
+   step and fallback. The steps below refine it.
 1. Voice: `generate_tts_and_add_to_timeline_tool` `text` (write it to be
    said: short sentences, the emphasis words on stressed beats), `voice:
    "onyx"` or `"nova"`, `position_seconds: 0`. Its receipt says how the

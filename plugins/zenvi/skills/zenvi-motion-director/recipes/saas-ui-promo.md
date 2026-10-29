@@ -36,6 +36,14 @@ Text never sits straight on a busy photo: type scenes go on the light
 
 ## Tools
 
+0. One call first: `build_product_launch_tool` (`product`, `problem`,
+   `tagline`, `features` as 'Title: detail', `proof` {stat, label} or
+   {quote}, `cta`, `url`, `file_ids` for the plates, `logo_file_id`). Every
+   section lands on the bar: the problem, the reveal (3D title, else a
+   kinetic headline block, else type) on a hit, glass cards for the features,
+   a counter over a light field, the logo reveal end card; one undo step,
+   each fallback in `data.decisions`. The steps below add the prompt bar and
+   the second glass scene.
 1. Plates: 2 landscape clips (soft, misty, lots of sky). Grade them light and
    quiet so glass reads over them: `color_grade_clip_tool` `scope: "all"`,
    `exposure: 0.3`, `saturation: 0.7`, `contrast: -0.15`; and
