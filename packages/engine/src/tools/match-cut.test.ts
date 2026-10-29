@@ -11,6 +11,7 @@ import type { RgbaImage } from "../render/types.js";
 import { frameWindow } from "../timeline/windows.js";
 import { runTool } from "./registry.js";
 import { hasDarkEdges } from "./subjects.js";
+import { fakeShotHost } from "./test-support/fake-shots.js";
 import { fakeHost } from "./test-support/fake-host.js";
 import { audioInfo, media, videoInfo } from "./test-support/fixture.js";
 import { pixelFrameHost, type Painter } from "./test-support/pixel-host.js";
@@ -292,6 +293,22 @@ describe("match_cut_montage_tool", () => {
       expect(Math.abs(seen.x - 640), `F1 at ${shot.source_start}s`).toBeLessThanOrEqual(2);
       expect(Math.abs(seen.y - 360), `F1 at ${shot.source_start}s`).toBeLessThanOrEqual(2);
     }
+  });
+
+  it("orders the chain by look with order=look, keeping the opener and the payoff", async () => {
+    const base = project();
+    base.clips = [];
+    const host = fakeHost();
+    const [a, b, c, d] = PATHS;
+    // F0 and F2 show a face, F1 and F3 a city: the look chain is F0 → F2 → F1 → F3.
+    host.shots = fakeShotHost({ [a!]: [[0, "face"]], [b!]: [[0, "city"]], [c!]: [[0, "face"]], [d!]: [[0, "city"]] }, { durations: { [a!]: 10, [b!]: 10, [c!]: 10, [d!]: 10 }, tints: { [c!]: 0.1 } });
+    const result = await runTool({ doc: new ProjectDocument(base), host }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 6, order: "look" });
+    expect(result.data?.status, result.data?.summary).toBe("applied");
+    expect((result.data?.data as { file_order: string[] }).file_order).toEqual(["F0", "F2", "F1", "F3"]);
+    // Without the model the given order stays, with a warning.
+    const bare = await runTool({ doc: new ProjectDocument(project()), host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 6, order: "look", replace: true });
+    expect((bare.data?.data as { file_order: string[] }).file_order).toEqual(["F0", "F1", "F2", "F3"]);
+    expect(bare.data?.warnings?.join(" ")).toMatch(/order=look kept the given order: this surface has no shot model/);
   });
 
   it("says which files a short montage leaves out", async () => {

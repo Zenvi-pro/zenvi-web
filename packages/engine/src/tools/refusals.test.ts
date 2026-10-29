@@ -17,6 +17,8 @@ const ALL_CAPABILITIES: HostCapability[] = ["media", "player", "ui", "exporter",
 /** Minimal valid arguments so a refusal comes from the surface, not from validation. */
 const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   search_clips_tool: { query: "cameras" },
+  find_shots_tool: { query: "a dog" },
+  shot_similarity_tool: { file_ids: [IDS.interview, IDS.broll] },
   add_kinetic_title_tool: { text: "Title" },
   add_type_block_tool: { block: "write_on", text: "Title" },
   match_cut_montage_tool: { file_ids: [IDS.interview] },

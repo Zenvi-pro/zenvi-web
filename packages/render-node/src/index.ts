@@ -47,5 +47,7 @@ export * from "./matte/host.js";
 export * from "./speech/models.js";
 export * from "./speech/runtime.js";
 export * from "./speech/local.js";
+export * from "./shots/siglip.js";
+export * from "./shots/host.js";
 export * from "./render/contact-sheet.js";
 export * from "./audio/measure-mix.js";
