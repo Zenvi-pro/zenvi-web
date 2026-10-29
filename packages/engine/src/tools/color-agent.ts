@@ -376,10 +376,17 @@ export function mergeColorGrade(effect: Json | null, rawPatch: Json): Json {
   if (isRecord(colorObj)) {
     const keepId = payload.id;
     const keepOrder = payload.order;
-    payload = structuredClone(colorObj);
+    // Over the current grade: a partial paste keeps the fields (and the effect `type`) it leaves out.
+    payload = { ...payload, ...structuredClone(colorObj) };
     payload.class_name = COLOR_GRADE_CLASS_NAME;
     if (keepId) payload.id = keepId;
     if (keepOrder !== undefined && keepOrder !== null) payload.order = keepOrder;
+    // A hand-written paste ({"exposure": 1}) gives plain numbers; libopenshot (and the engine's
+    // kernel) read only keyframes, so a plain number would silently grade nothing.
+    for (const key of SCALAR_KEYS) {
+      const value = payload[key];
+      if (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) setScalar(payload, key, toFloat(value, key));
+    }
   }
   for (const [key, raw] of Object.entries(patch)) {
     if (["color", "lut", "wheels", "reset"].includes(key) || (CURVE_KEYS as readonly string[]).includes(key) || key in CURVE_ALIASES) continue;

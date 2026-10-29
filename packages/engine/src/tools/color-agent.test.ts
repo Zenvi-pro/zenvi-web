@@ -121,6 +121,12 @@ describe("tests/test_color_agent_tools.py", () => {
     expect(scalarY(merged, "exposure")).toBeCloseTo(0.4);
   });
 
+  it("a hand-written paste of plain numbers grades (tool truth: apply_color_tool color)", () => {
+    const merged = mergeColorGrade(blankColorGrade("keep-me"), { color: { exposure: 1, saturation: "1.5" } });
+    expect(scalarY(merged, "exposure")).toBeCloseTo(1);
+    expect(scalarY(merged, "saturation")).toBeCloseTo(1.5);
+  });
+
   it("summaries, reference hints and the warm-gap distance", () => {
     const summary = summarizeColorGrade(mergeColorGrade(blankColorGrade("e"), { temperature: 0.1 }));
     expect(summary.present).toBe(true);
