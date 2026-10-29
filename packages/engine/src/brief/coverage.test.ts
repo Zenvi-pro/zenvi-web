@@ -60,15 +60,15 @@ describe("footageCoverage", () => {
     const coverage = footageCoverage(doc.project, brief());
     expect(coverage.shots.map((s) => [s.status, s.file_id ?? null, s.origin ?? null])).toEqual([
       ["covered", IDS.interview, "media"],
-      // The interview is taken by the first row; a second match counts only when it fits well even so.
-      ["ask", null, null],
+      // The interview is taken by the first row; the person's next free file stands in (the b-roll, by bin order).
+      ["covered", "FILEBROL01", "media"],
       ["covered", "FILESTOCK1", "stock"],
       ["fetch", null, null],
       ["generate", null, null],
       ["built", null, null],
     ]);
-    expect(coverage.counts).toEqual({ covered: 2, fetch: 1, generate: 1, ask: 1, built: 1 });
-    // The workshop clip is the person's footage no shot uses; the b-roll and logo are on the timeline already.
+    expect(coverage.counts).toEqual({ covered: 3, fetch: 1, generate: 1, ask: 0, built: 1 });
+    // The workshop clip is the person's footage no shot uses; the logo is on the timeline already.
     expect(coverage.unused_media).toEqual(["FILEOWN001"]);
     expect(coverage.next).toEqual([
       { tool: "gather_stock_footage_tool", args: { queries: ["trail at dawn"], count: 2, coherence: "shoot", match_file_id: IDS.interview } },
@@ -78,9 +78,22 @@ describe("footageCoverage", () => {
       },
     ]);
     const lines = coverageLines(coverage, doc.project);
-    expect(lines[0]).toBe("Footage: 2/5 shots covered (1 by your media, 1 by stock); missing: 1 to fetch, 1 to generate, 1 need a file from the person.");
+    expect(lines[0]).toBe("Footage: 3/5 shots covered (2 by your media, 1 by stock); missing: 1 to fetch, 1 to generate.");
     expect(lines).toContain('- 3s "trail at dawn": fetch');
     expect(lines.at(-1)).toBe("Then cut, and unify_grade_tool on the assembled set so every source shares one grade.");
+  });
+
+  it("lets the person's next unplanned file stand in for a media row it cannot match by words, and calls a sparse plan thin", () => {
+    const doc = docWithStock();
+    const coverage = footageCoverage(doc.project, brief([row(0, "phone hero", "media"), row(3, "phone detail", "media")]));
+    // The interview's summary does not mention a phone; the rows take the person's files in bin order.
+    expect(coverage.shots.map((s) => [s.status, s.file_id, s.reason])).toEqual([
+      ["covered", IDS.interview, "assumed: name its file_id in the storyboard"],
+      ["covered", IDS.broll, "assumed: name its file_id in the storyboard"],
+    ]);
+    expect(coverage.seconds_per_shot).toBe(3);
+    const sparse = footageCoverage(doc.project, brief([row(0, "phone hero", "media")]));
+    expect(coverageLines(sparse, doc.project)[1]).toMatch(/^Thin: 1 footage shot\(s\) for the whole piece, one every 6 s\./);
   });
 
   it("names a file the plan points at that is not in the bin", () => {
@@ -100,7 +113,7 @@ describe("get_brief_tool's footage plan", () => {
     const doc = docWithStock();
     doc.transaction("brief", (tx) => tx.update(["settings"], { zenvi_brief: brief() }));
     const result = await runTool({ doc, host: fakeHost() }, "get_brief_tool", {});
-    expect(result.data?.summary).toMatch(/\nFootage: 2\/5 shots covered [\s\S]*\nNext: gather_stock_footage_tool \{"queries":\["trail at dawn"\]/);
+    expect(result.data?.summary).toMatch(/\nFootage: 3\/5 shots covered [\s\S]*\nNext: gather_stock_footage_tool \{"queries":\["trail at dawn"\]/);
     expect((result.data?.data as { footage: { counts: Record<string, number> } }).footage.counts.fetch).toBe(1);
   });
 });

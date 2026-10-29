@@ -41,6 +41,8 @@ export interface NextCall {
 
 export interface FootageCoverage {
   shots: ShotCoverage[];
+  /** Seconds of the brief per footage shot. */
+  seconds_per_shot: number | null;
   counts: Record<ShotStatus, number>;
   /** The person's picture files no shot uses and the timeline does not play. */
   unused_media: string[];
@@ -52,6 +54,8 @@ const MATCH = 0.5;
 /** Most shots a gather or a generated set is asked for in one call (the tools' own limits). */
 const MAX_QUERIES = 12;
 const MAX_SET = 8;
+/** Seconds per footage shot past which the plan is a slideshow (the styles cut every 1.5-3 s). */
+const THIN_SECONDS = 4;
 
 function record(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -140,6 +144,13 @@ export function footageCoverage(project: Project, brief: Brief): FootageCoverage
       shots.push({ ...base, status: "covered", file_id: String(match.id), origin: footageOrigin(match) });
       continue;
     }
+    // Bench P5: agents plan "media" rows without file ids over unindexed files (shot_01.mp4): no words to match, so the next file of theirs no row has taken stands in.
+    const next = row.source === "media" ? own.find((f) => !assigned.has(String(f.id))) : undefined;
+    if (next) {
+      assigned.add(String(next.id));
+      shots.push({ ...base, status: "covered", file_id: String(next.id), origin: "media", reason: "assumed: name its file_id in the storyboard" });
+      continue;
+    }
     if (row.source === "media") shots.push({ ...base, status: "ask", reason: own.length > 0 ? "no file of yours shows it: name its file_id, or fetch / generate it" : "the bin has no footage of yours" });
     else shots.push({ ...base, status: row.source === "stock" ? "fetch" : "generate" });
   }
@@ -168,7 +179,9 @@ export function footageCoverage(project: Project, brief: Brief): FootageCoverage
       args: { shots: [...new Set(toGenerate)].slice(0, MAX_SET), ...(style ? { style } : {}), ...(anchor ? { reference_file_id: String(anchor) } : {}) },
     });
   }
-  return { shots, counts, unused_media: unused, next };
+  const footage = shots.length - counts.built;
+  const perShot = footage > 0 ? Math.round((brief.length_seconds / footage) * 10) / 10 : null;
+  return { shots, counts, seconds_per_shot: perShot, unused_media: unused, next };
 }
 
 /** The coverage as receipt lines; none when the brief plans no footage. */
@@ -182,6 +195,12 @@ export function coverageLines(coverage: FootageCoverage, project: Project): stri
   const lines = [
     `Footage: ${counts.covered}/${footage} shots covered${covered.length ? ` (${covered.join(", ")})` : ""}${missing.length ? `; missing: ${missing.join(", ")}` : ""}.`,
   ];
+  if (coverage.seconds_per_shot !== null && coverage.seconds_per_shot > THIN_SECONDS) {
+    lines.push(
+      `Thin: ${footage} footage shot(s) for the whole piece, one every ${coverage.seconds_per_shot} s. Product, brand and explainer edits cut every 1.5-3 s: ` +
+        "plan more shots (several moments of one file count), and fetch or generate what the bin lacks.",
+    );
+  }
   for (const s of shots.filter((r) => r.status === "fetch" || r.status === "generate" || r.status === "ask").slice(0, 8)) {
     lines.push(`- ${s.at} "${s.picture.slice(0, 80)}": ${s.status}${s.reason ? ` (${s.reason})` : ""}`);
   }
