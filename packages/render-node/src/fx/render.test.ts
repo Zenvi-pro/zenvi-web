@@ -123,6 +123,14 @@ describe("Zenvi FX renderer", () => {
     expect(near).toBeLessThan(far / 3);
   }, 60_000);
 
+  it("fits the CRT bezels and the screenprint to a portrait frame", async () => {
+    const portrait = await makeVideo(dir, "portrait.mp4", { width: 180, height: 320, fps: "30", duration: 1 });
+    for (const bezel of ["none", "rounded", "tv"]) {
+      const r = await renderer("portrait").render({ path: portrait, start: 0, end: 1, effects: stack([{ effect: "crt", params: { bezel } }, { effect: "print_ink", amount: 0.5 }], 1) });
+      expect(r, bezel).toMatchObject({ width: 180, height: 320, frames: 30 });
+    }
+  }, 60_000);
+
   it("renders the CRT and screenprint looks to something different from the source", async () => {
     const fx = renderer("looks");
     for (const effect of ["crt", "print_ink"]) {
@@ -137,7 +145,9 @@ describe("Zenvi FX renderer", () => {
     it("pushes the clip's first frames along the motion before the cut, then lands clean", async () => {
       const r = await renderer("mosh").render({ path: clip, start: 0, end: 2, effects: mosh({ ghost: 0 }), carry: { path: moving, at: 1.5 } });
       expect(r.frames).toBe(60);
-      expect((await streams(r.path))[0]).toMatchObject({ pix_fmt: "yuv422p10le", nb_read_frames: "60" });
+      const [video, audio] = await streams(r.path);
+      expect(video).toMatchObject({ pix_fmt: "yuv422p10le", nb_read_frames: "60" });
+      expect(audio).toMatchObject({ codec_type: "audio", codec_name: "pcm_s16le" });
       expect(await frameDiff(r.path, clip, 0.1)).toBeGreaterThan(6);
       // 0.5 s is 15 frames: from the 16th on the clip is untouched.
       expect(await frameDiff(r.path, clip, 0.7)).toBeLessThan(2.5);

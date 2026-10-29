@@ -612,7 +612,7 @@ function crt(g: Graph, input: string, e: FxEffect<"crt">, span: Span): string {
 
   if (e.params.curvature > 0) {
     // The glass bulges, so the picture is pushed out to meet its edges: crop in about as far as the lens pulls the middle of the sides.
-    cur = zoomed(g, cur, 1 + 0.2 * e.params.curvature, 0.5, 0.5, { width: cw, height: ch });
+    cur = zoomed(g, cur, 1 + 0.3 * e.params.curvature, 0.5, 0.5, { width: cw, height: ch });
     const bent = g.label();
     g.add(`[${cur}]lenscorrection=k1=${num(0.4 * e.params.curvature)}:k2=${num(0.2 * e.params.curvature)}:i=bilinear:fc=black[${bent}]`);
     cur = bent;
