@@ -29,7 +29,7 @@ Native fallback with one title per word: `kinetic-beat-strobe`.
 
 ## Timing & taste rules
 - 3-6 words, short; the run lasts 2-4 beats, before the climax.
-- Ground flips ≤ 3 a second (WCAG 2.3.1; the block enforces it).
+- Ground flips and hit flashes ≤ 3 a second (WCAG 2.3.1; the block enforces both: faster hits punch without a flash).
 - A word held < 7 frames must have been read before (a repeat).
 
 ## Sound for it

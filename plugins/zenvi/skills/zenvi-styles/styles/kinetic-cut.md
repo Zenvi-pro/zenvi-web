@@ -127,7 +127,7 @@ natural length; the last shot holds to `duration_seconds`.
 - Half the shots carry a layer that IS the subject; reskin test ≤ 1/3 generic; open and close on the through-line.
 - No `static_shot` warning (or a reason); `flat_brightness` / `flat_hue` fixed or a stated palette choice.
 - A sound on every cut (`cut_without_sound` clear); climax has the sub, the end lands on the music's last hit.
-- Strobe: ground flips ≤ 3 a second (the block enforces it); words held ≥ 7 frames unless repeated.
+- Strobe: ground flips and hit flashes ≤ 3 a second (the block enforces both; faster hits only punch); words held ≥ 7 frames unless repeated.
 - Ends on a held lockup ≥ 1.5 s with only facts the person gave.
 
 ## Mix-and-match

@@ -20,6 +20,8 @@ export interface Hit {
   t: number;
   strength: number;
   shake?: number;
+  /** Scales the hit's flash (default 1); 0 punches without a flash, to keep flashes 3 a second or fewer. */
+  flash?: number;
 }
 
 /** How hard hits push the picture. */
@@ -47,14 +49,16 @@ export type HitLookName = keyof typeof HIT_LOOKS;
 const HIT_TAIL = 1.2;
 
 /** Sum of the hits' exponential decays at `t` (engine.js `env`): 7 for the punch, 9 aberration, 10 bloom, 24 flash. */
-export function hitEnvelope(hits: readonly Hit[], t: number, decay: number): number {
+export function hitEnvelope(hits: readonly Hit[], t: number, decay: number, weight: (h: Hit) => number = (h) => h.strength): number {
   let v = 0;
   for (const h of hits) {
     const u = t - h.t;
-    if (u >= 0 && u < HIT_TAIL) v += h.strength * Math.exp(-decay * u);
+    if (u >= 0 && u < HIT_TAIL) v += weight(h) * Math.exp(-decay * u);
   }
   return v;
 }
+
+const flashWeight = (h: Hit): number => h.strength * (h.flash ?? 1);
 
 /** The camera at `t`: a zoom about the frame centre and a shake offset in design px. */
 export function hitCamera(hits: readonly Hit[], t: number, punch: number): { zoom: number; x: number; y: number } {
@@ -74,7 +78,7 @@ export function hitCamera(hits: readonly Hit[], t: number, punch: number): { zoo
 export function hitFinish(hits: readonly Hit[], t: number, look: HitLook, bloom: number): { chroma: number; flash: number; bloom: number } {
   return {
     chroma: (look.chroma + look.chromaHit * hitEnvelope(hits, t, 9)) / 960,
-    flash: Math.min(1, look.flash * hitEnvelope(hits, t, 24)),
+    flash: Math.min(1, look.flash * hitEnvelope(hits, t, 24, flashWeight)),
     bloom: Math.min(1, bloom * 0.72 + 0.22 * hitEnvelope(hits, t, 10)),
   };
 }
@@ -326,7 +330,7 @@ export function applyFinish(
 export function hitTrack(el: HTMLElement, hits: readonly Hit[], look: HitLook = HIT_LOOKS.punchy): Track {
   return (t) => {
     const cam = hitCamera(hits, t, look.punch);
-    const flash = Math.min(1, look.flash * hitEnvelope(hits, t, 24));
+    const flash = Math.min(1, look.flash * hitEnvelope(hits, t, 24, flashWeight));
     el.style.transform = cam.zoom === 1 && cam.x === 0 && cam.y === 0 ? "" : `translate(${cam.x.toFixed(2)}px, ${cam.y.toFixed(2)}px) scale(${cam.zoom.toFixed(4)})`;
     el.style.filter = flash > 0.004 ? `brightness(${(1 + flash * 1.5).toFixed(3)})` : "";
   };

@@ -104,7 +104,14 @@ export function strobeStep(shot: Shot, bpm: number): number {
   return Math.max(half, Math.min(60 / bpm, (shot.end - shot.start) / Math.max(1, words)));
 }
 
-/** The hits: every cut, every strobe word (half strength), the climax heavier with a shake (design px at 1080). */
+/** Flashes at least this far apart: 3 a second or fewer (WCAG 2.3.1). */
+const FLASH_GAP = 1 / 3;
+
+/**
+ * The hits: every cut, every strobe word (half strength), the climax heavier
+ * with a shake (design px at 1080). Stronger hits keep their flash first; a
+ * hit closer than FLASH_GAP to a kept flash only punches.
+ */
 export function shotHits(shots: readonly Shot[], bpm: number, scale = 1): Hit[] {
   const hits: Hit[] = [];
   for (const shot of shots) {
@@ -113,6 +120,11 @@ export function shotHits(shots: readonly Shot[], bpm: number, scale = 1): Hit[] 
       const step = strobeStep(shot, bpm);
       for (let t = shot.start + step; t < shot.end - 0.05; t += step) hits.push({ t, strength: 0.55 });
     }
+  }
+  const flashes: number[] = [];
+  for (const h of [...hits].sort((a, b) => b.strength - a.strength || a.t - b.t)) {
+    if (flashes.some((t) => Math.abs(t - h.t) < FLASH_GAP - 1e-6)) h.flash = 0;
+    else flashes.push(h.t);
   }
   return hits;
 }

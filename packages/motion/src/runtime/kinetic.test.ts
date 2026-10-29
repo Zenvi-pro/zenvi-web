@@ -27,6 +27,10 @@ describe("hits", () => {
     expect(at(1.2).chroma).toBeGreaterThan(at(5).chroma);
     expect(at(5).chroma).toBeCloseTo(1.6 / 960, 9);
     expect(at(5).bloom).toBeCloseTo(0.36, 6);
+    // A hit without its flash still punches and splits the picture.
+    const dim = hitFinish([{ t: 1, strength: 1, flash: 0 }], 1, HIT_LOOKS.punchy, 0.5);
+    expect(dim.flash).toBe(0);
+    expect(dim.chroma).toBeCloseTo(at(1).chroma, 9);
   });
 });
 

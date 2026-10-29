@@ -53,6 +53,17 @@ describe("the schedule", () => {
     expect(hits.filter((h) => h.strength === 0.55).map((h) => h.t)).toEqual([1.25]);
   });
 
+  it("keeps flashes 3 a second or fewer, the climax and the full cuts first (WCAG 2.3.1)", () => {
+    // Half-beat cuts at 120 BPM and a strobe at 200 BPM: hits every 0.15-0.25 s.
+    const fast = scheduleShots([spec("0.5 slam A"), spec("0.5 slam B"), spec("0.5 slam C !"), spec("2 strobe ONE TWO THREE FOUR FIVE SIX")], 120, 3);
+    const hits = shotHits(fast, 120);
+    expect(hits.find((h) => h.t === 0.25)!.flash).toBe(0);
+    expect(hits.find((h) => h.strength === 1.35)!.flash).toBeUndefined();
+    const flashing = hits.filter((h) => h.flash !== 0).map((h) => h.t).sort((a, b) => a - b);
+    for (let i = 1; i < flashing.length; i += 1) expect(flashing[i]! - flashing[i - 1]!).toBeGreaterThanOrEqual(1 / 3 - 1e-6);
+    expect(flashing.length).toBeGreaterThan(2);
+  });
+
   it("cues a sound on every cut and a tick run while the number counts", () => {
     const cues = shotCues(shots, 120);
     for (const s of shots) expect(cues.some((c) => c.t === s.start && (c.kind === "impact" || c.kind === "whoosh"))).toBe(true);
