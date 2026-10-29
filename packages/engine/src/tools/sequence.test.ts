@@ -8,6 +8,7 @@ import { runTool } from "./registry.js";
 import { storeTranscript, type StoredTranscript } from "./transcripts.js";
 import { audioInfo, media, videoInfo } from "./test-support/fixture.js";
 import { fakeHost } from "./test-support/fake-host.js";
+import { fakeShotHost } from "./test-support/fake-shots.js";
 import { pixelFrameHost } from "./test-support/pixel-host.js";
 import type { FrameHost, ToolHost } from "./types.js";
 
@@ -95,6 +96,19 @@ describe("sequence_shots_tool", () => {
     const again = await runTool({ doc, host }, "sequence_shots_tool", { track, arc: "flat", close: "none" });
     expect(again.data?.summary).toMatch(/already in this order/);
     expect(doc.undoLabels).toEqual(["Sequence shots"]);
+  });
+
+  it("uses the shot model's look term when it is installed, and says so", async () => {
+    const doc = new ProjectDocument(project(true));
+    const track = doc.project.layers[0]!.number;
+    const shots = fakeShotHost({ "/m/take.mp4": [[0, "city"], [1, "car"]] }, { durations: { "/m/take.mp4": 4 } });
+    const withLooks = await runTool({ doc, host: { frames: sampler(), shots } }, "sequence_shots_tool", { track, dry_run: true, arc: "flat", close: "none" });
+    expect((withLooks.data?.data as { look: boolean }).look).toBe(true);
+    // The take is embedded once (cached keyframes serve every window's ends).
+    expect(shots.calls).toEqual(["embed /m/take.mp4 0.5"]);
+    const without = await runTool({ doc, host: { frames: sampler() } }, "sequence_shots_tool", { track, dry_run: true, arc: "flat", close: "none" });
+    expect((without.data?.data as { look: boolean }).look).toBe(false);
+    expect((without.data?.data as Data).order.map((r) => r.id)).toEqual(["C2", "C0", "C3", "C1"]);
   });
 
   it("dry_run plans without touching the timeline", async () => {

@@ -5,8 +5,10 @@
  *   continuity   a cut costs less when the action continues (the next shot
  *                starts where the last one was heading), the shape and
  *                layout carry (match on shape), the subject sits where the
- *                eye already is, the colour holds and the motion keeps its
- *                direction; the next moment of the same source costs least
+ *                eye already is, the colour holds, the motion keeps its
+ *                direction and, with shot embeddings, the next shot shows
+ *                what the last one ended on (look); the next moment of the
+ *                same source costs least
  *   duplicates   the same picture twice in a row costs a lot
  *   energy arc   shots are ranked by energy (motion, contrast) and pulled
  *                toward a curve: build, peak (build → peak → release,
@@ -23,6 +25,7 @@
  * three shots (or-opt, runs reversed too). Pure: numbers in, plan out.
  */
 
+import { cosine, NEAR_DUPLICATE, type Vector } from "../shots/vectors.js";
 import { meanAbsDistance, shapeDistance, type Flow, type ShotFeatures } from "./features.js";
 
 export const ENERGY_ARCS = ["build", "peak", "release", "flat"] as const;
@@ -38,6 +41,8 @@ export interface SequenceShotInput {
   source?: { key: string; start: number; end: number };
   /** Seconds from the sequence start where this shot must start (its line in the voice-over). */
   speechAt?: number;
+  /** Shot embeddings of its first and last moments (the host's shot model), when every shot has them. */
+  look?: { head: Vector; tail: Vector };
 }
 
 export interface SequenceGoal {
@@ -52,7 +57,7 @@ export interface SequenceGoal {
   continuity?: number;
 }
 
-export type CutReason = "next moment of the same source" | "action continues" | "same shape and layout" | "subject in place" | "colour carries" | "motion carries";
+export type CutReason = "next moment of the same source" | "action continues" | "same shape and layout" | "subject in place" | "colour carries" | "motion carries" | "looks alike";
 
 export interface SequenceCut {
   /** Indices of the shots on either side. */
@@ -86,8 +91,13 @@ export interface SequencePlan {
   offSpeech: { index: number; seconds: number }[];
 }
 
-/** Weights of the cut-cost parts, each part scaled by its median over all pairs first. */
-const W = { shape: 1, colour: 0.6, extrapolate: 0.6, focus: 0.3, flow: 0.3 };
+/**
+ * Weights of the cut-cost parts, each part scaled by its median over all
+ * pairs first. Look (1 - cosine of shot embeddings, tail to head) alone
+ * recovers 38 % of editors' neighbouring shots on the re-edit bench
+ * (filename order 14 %), so it weighs as much as shape.
+ */
+const W = { shape: 1, colour: 0.6, extrapolate: 0.6, focus: 0.3, flow: 0.3, look: 1 };
 /** Normalised shape distance below which two frames are the same picture. */
 const DUPLICATE = 0.06;
 const DUPLICATE_COST = 4;
@@ -111,6 +121,8 @@ interface Parts {
   extrapolate: number;
   focus: number;
   flow: number;
+  /** NaN without shot embeddings. */
+  look: number;
 }
 
 function flowMismatch(a: Flow | null, b: Flow | null): number {
@@ -122,13 +134,16 @@ function flowMismatch(a: Flow | null, b: Flow | null): number {
   return Math.hypot(a.dx - b.dx, a.dy - b.dy) / (ma + mb);
 }
 
-function rawParts(a: ShotFeatures, b: ShotFeatures): Parts {
+function rawParts(sa: SequenceShotInput, sb: SequenceShotInput): Parts {
+  const a = sa.features;
+  const b = sb.features;
   return {
     shape: shapeDistance(a.tail, b.head),
     colour: meanAbsDistance(a.tailColour, b.headColour),
     extrapolate: a.nextLuma ? meanAbsDistance(a.nextLuma, b.headLuma) : NaN,
     focus: Math.hypot(a.tailFocus.x - b.headFocus.x, a.tailFocus.y - b.headFocus.y),
     flow: flowMismatch(a.tailFlow, b.headFlow),
+    look: sa.look && sb.look ? 1 - cosine(sa.look.tail, sb.look.head) : NaN,
   };
 }
 
@@ -181,7 +196,9 @@ export interface CutMatrix {
 export function cutMatrix(shots: readonly SequenceShotInput[]): CutMatrix {
   const n = shots.length;
   const raw: Parts[] = [];
-  for (let i = 0; i < n; i += 1) for (let j = 0; j < n; j += 1) raw.push(rawParts(shots[i]!.features, shots[j]!.features));
+  // Look counts only when every shot has embeddings, so shots without them are not favoured.
+  const looks = shots.every((s) => s.look);
+  for (let i = 0; i < n; i += 1) for (let j = 0; j < n; j += 1) raw.push(rawParts(shots[i]!, shots[j]!));
   const off = raw.filter((_, k) => Math.floor(k / n) !== k % n);
   const scale: Parts = {
     shape: median(off.map((p) => p.shape)),
@@ -189,6 +206,7 @@ export function cutMatrix(shots: readonly SequenceShotInput[]): CutMatrix {
     extrapolate: median(off.map((p) => p.extrapolate)),
     focus: median(off.map((p) => p.focus)),
     flow: median(off.map((p) => p.flow)),
+    look: looks ? median(off.map((p) => p.look)) : NaN,
   };
   const cost = new Float64Array(n * n);
   const duplicate = new Uint8Array(n * n);
@@ -203,10 +221,11 @@ export function cutMatrix(shots: readonly SequenceShotInput[]): CutMatrix {
         extrapolate: Number.isFinite(r.extrapolate) ? r.extrapolate / scale.extrapolate : r.shape / scale.shape,
         focus: r.focus / scale.focus,
         flow: r.flow / scale.flow,
+        look: looks && scale.look > 0 ? r.look / scale.look : NaN,
       };
       parts.push(p);
       if (i === j) continue;
-      let c = W.shape * p.shape + W.colour * p.colour + W.extrapolate * p.extrapolate + W.focus * p.focus + W.flow * p.flow;
+      let c = W.shape * p.shape + W.colour * p.colour + W.extrapolate * p.extrapolate + W.focus * p.focus + W.flow * p.flow + (Number.isFinite(p.look) ? W.look * p.look : 0);
       const a = shots[i]!;
       const b = shots[j]!;
       const sameSource = a.source && b.source && a.source.key === b.source.key;
@@ -217,8 +236,10 @@ export function cutMatrix(shots: readonly SequenceShotInput[]): CutMatrix {
       }
       const fa = a.features;
       const fb = b.features;
-      // The same picture twice: alike at the head and in the middle (not the next moment of one source).
-      if (!sameSource && a.speechAt === undefined && b.speechAt === undefined && shapeDistance(fa.head, fb.head) < DUPLICATE && shapeDistance(fa.middle, fb.middle) < DUPLICATE) {
+      // The same picture twice: alike at the head and in the middle, or (embeddings) at both ends (not the next moment of one source).
+      const sameLook = looks && cosine(a.look!.head, b.look!.head) >= NEAR_DUPLICATE && cosine(a.look!.tail, b.look!.tail) >= NEAR_DUPLICATE;
+      const samePicture = (shapeDistance(fa.head, fb.head) < DUPLICATE && shapeDistance(fa.middle, fb.middle) < DUPLICATE) || sameLook;
+      if (!sameSource && a.speechAt === undefined && b.speechAt === undefined && samePicture) {
         duplicate[i * n + j] = 1;
         c += DUPLICATE_COST;
       }
@@ -359,6 +380,7 @@ const REASON_PARTS: [keyof Parts, CutReason][] = [
   ["focus", "subject in place"],
   ["colour", "colour carries"],
   ["flow", "motion carries"],
+  ["look", "looks alike"],
 ];
 
 function describeCut(m: CutMatrix, shots: readonly SequenceShotInput[], a: number, b: number, typical: number): SequenceCut {

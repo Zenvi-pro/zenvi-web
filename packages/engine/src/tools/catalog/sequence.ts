@@ -25,6 +25,7 @@ import { fpsFloat } from "../../timeline/time.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused, unchanged, failed } from "../receipt.js";
 import { shotFrames, type ShotWindow } from "../shot-frames.js";
+import { shotLooks } from "../shots.js";
 import { isLocked } from "../titles-text.js";
 import { storedTranscript } from "../transcripts.js";
 
@@ -178,6 +179,8 @@ export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal
     if (typeof frames === "string") return unordered(frames.replace(/^Error: /, ""));
     shots.push({ features: shotFeatures(frames), seconds: end, ...(still ? { still: true } : {}) });
   }
+  const looks = await shotLooks(call, ids.map((id, k) => ({ file: project.files.find((f) => String(f.id) === id)!, start: 0, end: shots[k]!.seconds })));
+  looks?.forEach((look, k) => (shots[k]!.look = look));
   const plan = planSequence(shots, goal);
   const out = plan.order.map((k) => ids[k]!);
   return {
@@ -194,7 +197,7 @@ export const sequenceTools: CatalogTool[] = [
       "Order (and trim to slots) candidate shots the way an editor cuts them, instead of bin order: each cut carries something across (the action continues, the same shape and position, the subject where the eye already is, the colour, the motion's direction), " +
       "an energy arc (peak: build, peak, release), no near-duplicate back to back, the strongest shot held for the payoff, and speaker shots on their own words in the voice-over (speech_at, or says + a transcribed voice_file_id). " +
       "Reorders timeline clips in place (shots of clip_ids, or every clip on a track) or lays bin files / windows on a track; dry_run returns the order only (data.file_ids for match_cut_montage_tool / build_reel_tool). " +
-      "One undo step; data.cuts says why each cut joins (match 0-1, reasons) and how the order compares with the given one.",
+      "With the shot model installed (embed_media_tool) the next shot also shows what the last one ended on (data.look). One undo step; data.cuts says why each cut joins (match 0-1, reasons) and how the order compares with the given one.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["frames"],
@@ -260,6 +263,9 @@ export const sequenceTools: CatalogTool[] = [
           ...(c.speechAt !== undefined ? { speechAt: c.speechAt } : {}),
         });
       }
+      // What each shot opens and ends on, when the shot model is installed: the look term of the cut costs.
+      const looks = await shotLooks(call, cands.map((c) => c.window));
+      looks?.forEach((look, k) => (shots[k]!.look = look));
       const goal: SequenceGoal = {
         ...(args.arc ? { arc: args.arc } : {}),
         ...(open !== undefined ? { open } : {}),
@@ -307,6 +313,8 @@ export const sequenceTools: CatalogTool[] = [
         file_ids: rows.map((r) => r.file_id),
         cuts,
         dropped: plan.dropped.map((d) => ({ id: idOf(cands[d.index]!), why: d.why })),
+        // Whether the shot model's look term was in the cut costs (installed on this host).
+        look: looks !== null,
         arc: plan.arc,
         close: plan.close ? { id: idOf(cands[plan.close.index]!), why: plan.close.why } : null,
         mean_match: plan.meanMatch,
