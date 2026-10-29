@@ -172,11 +172,19 @@ async function edited(
   const doc = new ProjectDocument(structuredClone(await startingProject(clips, files)));
   const host = await runHost(session);
   for (const step of steps) {
+    const before = doc.undoLabels.length;
+    const snapshot = withoutHistory(doc.project);
     const result = await runTool({ doc, host }, step.tool, resolveRefs(doc.project, step.args));
     if (!result.ok) return `${step.tool} refused ${JSON.stringify(step.args)}: ${result.text.slice(0, 300)}`;
+    // One intent = one undo step, and no change outside the history layer (CLAUDE.md).
+    const added = doc.undoLabels.length - before;
+    if (added > 1) return `${step.tool} made ${added} undo steps for one call (${doc.undoLabels.slice(before).join(", ")})`;
+    if (added === 0 && withoutHistory(doc.project) !== snapshot) return `${step.tool} changed the project without an undo step`;
   }
   return { project: doc.project, host };
 }
+
+const withoutHistory = (project: Project): string => JSON.stringify({ ...project, history: undefined });
 
 /**
  * Generated ids the cases cannot know: `"@effect:Blur"` → the id of the
