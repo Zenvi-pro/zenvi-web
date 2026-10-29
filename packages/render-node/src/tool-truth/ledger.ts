@@ -39,15 +39,19 @@ export const KNOWN_FAILURES: Readonly<Record<string, KnownFailure>> = {
       "a font only the engine bundles (Instrument Serif, packages/engine/assets/fonts) draws in render-node but libopenshot's Caption effect falls back: the desktop " +
       "has to register the engine's fonts with Qt (QFontDatabase::addApplicationFont) for captions to match. The oracle registers no application fonts; check zenvi-core.",
   },
+  "edit_captions_tool font": {
+    only: "full",
+    issue: "as add_captions_tool font: the engine-bundled family is not available to libopenshot's Caption effect.",
+  },
+  "add_motion_template_tool subtitle": {
+    only: "full",
+    issue:
+      "end_card's subtitle moves the render-node frame but barely the libopenshot one (mean |ΔRGB| 0.17): the template's SVG text uses an engine-bundled " +
+      "family libopenshot's Qt SVG renderer does not have (same root cause as add_captions_tool font).",
+  },
   "add_timer_tool font": {
     only: "full",
     issue: "as add_captions_tool font: libopenshot's Timer effect does not find the engine-bundled family, so the desktop draws the default font.",
-  },
-  "add_sfx_tool seed": {
-    only: "full",
-    issue:
-      "seed 1 and seed 7 render different WAVs in render-node (residual -13 dB) but libopenshot plays the same mix for both projects: " +
-      "check which file each project's sfx clip resolves to on the desktop (zenvi-media cache vs the project's assets folder).",
   },
   "add_sfx_tool pan": {
     issue:

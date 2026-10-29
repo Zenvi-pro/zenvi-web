@@ -12,11 +12,11 @@
 
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { Project, RgbaImage } from "@zenvi/engine";
+import type { MixPcm, Project, RgbaImage } from "@zenvi/engine";
 import { decodeRgba, removeDir } from "../test-support/fixtures.js";
 import { RENDER_WIDTH } from "./fixtures.js";
 
@@ -29,10 +29,12 @@ export interface OracleRender {
   image?: RgbaImage;
   /** Per-channel RMS (dBFS) and brightness of the whole mix. */
   sound?: Record<string, number>;
+  /** The mix itself (stereo), to compare like render-node's. */
+  mix?: MixPcm;
 }
 
 const SCRIPT = String.raw`
-import json, math, os, sys
+import array, json, math, os, sys
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt5.QtWidgets import QApplication
 app = QApplication([])  # libopenshot's text effects (Caption, Timer) paint with Qt
@@ -65,12 +67,15 @@ for job in jobs:
             end = max([c.Position() + c.Duration() for c in t.Clips()] + [0])
             frames = int(math.ceil(end * project["fps"]["num"] / project["fps"]["den"]))
             sums, mono, prev, diff, count = [0.0, 0.0], 0.0, 0.0, 0.0, 0
+            pcm = array.array("f")
             for n in range(1, frames + 1):
                 fr = t.GetFrame(n)
                 ch = fr.GetAudioChannelsCount()
                 for i in range(fr.GetAudioSamplesCount()):
                     l = fr.GetAudioSample(0, i, 1)
                     r = fr.GetAudioSample(1, i, 1) if ch > 1 else l
+                    pcm.append(l)
+                    pcm.append(r)
                     sums[0] += l * l
                     sums[1] += r * r
                     m = (l + r) / 2
@@ -78,6 +83,8 @@ for job in jobs:
                     diff += (m - prev) ** 2
                     prev = m
                     count += 1
+            with open(job["pcm"], "wb") as f:
+                pcm.tofile(f)
             db = lambda s: 20 * math.log10(max(math.sqrt(s / max(1, count)), 1e-6))
             result["sound"] = {"rms_left": db(sums[0]), "rms_right": db(sums[1]), "rms": db(mono),
                                "brightness": math.sqrt(diff / max(1, count)) / max(math.sqrt(mono / max(1, count)), 1e-9)}
@@ -113,7 +120,7 @@ export async function libopenshotOracle(
       projects.map(async (project, i) => {
         const file = path.join(dir, `p${i}.json`);
         await writeFile(file, JSON.stringify(project));
-        return { project: file, frame: options.frame, picture: options.picture, sound: options.sound, png: path.join(dir, `p${i}.png`) };
+        return { project: file, frame: options.frame, picture: options.picture, sound: options.sound, png: path.join(dir, `p${i}.png`), pcm: path.join(dir, `p${i}.f32`) };
       }),
     );
     const jobsFile = path.join(dir, "jobs.json");
@@ -122,7 +129,19 @@ export async function libopenshotOracle(
     const raw = JSON.parse(stdout.trim().split(/\r?\n/).pop() ?? "[]") as OracleRender[];
     return await Promise.all(
       raw.map(async (r, i) => {
-        if (r.error || !options.picture) return r;
+        if (r.error) return r;
+        if (!options.picture) {
+          if (!options.sound) return r;
+          const bytes = await readFile(jobs[i]!.pcm);
+          const interleaved = new Float32Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 4));
+          const left = new Float32Array(interleaved.length / 2);
+          const right = new Float32Array(interleaved.length / 2);
+          for (let s = 0; s < left.length; s += 1) {
+            left[s] = interleaved[2 * s]!;
+            right[s] = interleaved[2 * s + 1]!;
+          }
+          return { ...r, mix: { sampleRate: projects[i]!.sample_rate, channels: [left, right] } };
+        }
         const p = projects[i]!;
         const height = Math.round((RENDER_WIDTH * p.height) / p.width);
         const data = await decodeRgba(jobs[i]!.png, { width: RENDER_WIDTH, height });

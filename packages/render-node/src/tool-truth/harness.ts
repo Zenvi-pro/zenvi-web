@@ -333,12 +333,13 @@ async function desktopCheck(
       if (out.correlation < 0.3) out.warnings = [`render-node and libopenshot change different pixels (correlation ${out.correlation.toFixed(2)})`];
     }
   }
-  if (c.probe.kind === "sound" && b.sound && v.sound) {
-    const moved = Object.keys(b.sound).filter((k) => Math.abs((b.sound![k] ?? 0) - (v.sound![k] ?? 0)) > 0.05);
-    out.change = moved.length;
+  if (c.probe.kind === "sound" && b.mix && v.mix) {
+    // The same criterion as render-node's: the residual of the two mixes.
+    const residual = soundResidualDb(b.mix, v.mix);
+    out.change = Number.isFinite(residual) ? residual : -999;
     if (c.inert) {
-      if (moved.length > 0) failures.push(`libopenshot mix changed (${moved.join(", ")}) but render-node plays nothing different`);
-    } else if (moved.length === 0) failures.push(`libopenshot mix did not change (${JSON.stringify(b.sound)}): the desktop does not read this value`);
+      if (soundChanged(residual)) failures.push(`libopenshot mix changed (residual ${residual.toFixed(1)} dB) but render-node plays nothing different`);
+    } else if (!soundChanged(residual)) failures.push(`libopenshot mix did not change (residual ${residual.toFixed(1)} dB, ${JSON.stringify(b.sound)}): the desktop does not read this value`);
   }
   return out;
 }

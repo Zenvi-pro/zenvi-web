@@ -113,6 +113,11 @@ export const EFFECT_INERT: ReadonlyMap<string, string> = new Map([
   ["AudioVisualization.channel_layout=Split", "the fixture's two channels are identical, so Split draws the same picture"],
   ["SphericalProjection.interpolation=Bicubic", "Auto picks bicubic at this scale in both renderers"],
   ["Timer.mode=Clock", "at 0.5 s a clock from midnight shows the same digits as the count-up in MM:SS"],
+  // Basic keying (the choice CI tries) keys the fixture differently from the default; the others key it
+  // exactly like the default Cb,Cr vector in both renderers, even at fuzz 5.
+  ...["HSV/HSL hue", "HSV saturation", "HSL saturation", "HSV value", "HSL luminance", "LCH luminosity", "LCH chroma", "LCH hue", "CIE Distance", "Cb,Cr vector"].map(
+    (name): [string, string] => [`ChromaKey.keymethod=${name}`, "keys the evenly lit fixture exactly like the default method in both renderers"],
+  ),
 ]);
 
 /** Effect parameters the matrix does not exercise, with why. */
