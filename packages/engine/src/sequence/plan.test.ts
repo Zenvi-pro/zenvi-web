@@ -85,6 +85,15 @@ describe("planSequence", () => {
     expect(plan.starts).toEqual([0, 1, 1.5]);
   });
 
+  it("gives up the default payoff, not a slot length, when the pinned shots fill every slot", () => {
+    const shots = [shot(take(0, 1), 2), shot(take(10, 11, [90, 40, 0]), 3), shot(take(20, 21, [0, 0, 160]), 4)];
+    const plan = planSequence(shots, { open: 0, slots: [1] });
+    expect(plan.order).toEqual([0]);
+    expect(plan.lengths).toEqual([1]);
+    expect(plan.close).toBeNull();
+    expect(() => planSequence(shots, { open: 0, close: 2, slots: [1] })).toThrow(/pinned/);
+  });
+
   it("refuses impossible goals as programmer errors", () => {
     const s = [shot(take(0, 1)), shot(take(5, 6))];
     expect(() => planSequence([], {})).toThrow();

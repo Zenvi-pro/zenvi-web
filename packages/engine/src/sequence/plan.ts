@@ -399,7 +399,11 @@ export function planSequence(shots: readonly SequenceShotInput[], goal: Sequence
       if (candidates.length) close = { index: candidates.reduce((a, b) => (strength[b]! > strength[a]! ? b : a)), why: "strongest shot" };
     }
   }
-  const keep = new Set<number>([...(goal.open !== undefined ? [goal.open] : []), ...(close ? [close.index] : []), ...shots.flatMap((s, i) => (s.speechAt !== undefined ? [i] : []))]);
+  const keep = new Set<number>([...(goal.open !== undefined ? [goal.open] : []), ...(goal.close != null ? [goal.close] : []), ...shots.flatMap((s, i) => (s.speechAt !== undefined ? [i] : []))]);
+  if (goal.slots && keep.size > goal.slots.length) throw new Error("slots must be at least as many as the pinned shots (open, close, speechAt)");
+  // The default payoff is a preference, not a pin: it holds only when a slot is left for it.
+  if (close && close.why === "strongest shot" && !keep.has(close.index) && goal.slots && keep.size >= goal.slots.length) close = null;
+  if (close) keep.add(close.index);
   const chosen = goal.slots && goal.slots.length < n ? chooseForSlots(m, strength, keep, goal.slots.length) : { items: shots.map((_, i) => i), dropped: [] };
   const problem: Problem = {
     m,
