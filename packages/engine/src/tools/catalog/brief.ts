@@ -173,6 +173,9 @@ export const briefTools: CatalogTool[] = [
       const known = new Set(project.files.map((f) => String(f.id)));
       const unknownFiles = brief.shots.filter((s) => s.file_id && !known.has(s.file_id)).map((s) => s.file_id!);
       const warnings = unknownFiles.length > 0 ? [`Shot plan names files not in the bin: ${[...new Set(unknownFiles)].join(", ")} (inspect_media_bin_tool lists the ids).`] : [];
+      // Bench sk0: agents made to save a brief saved the least that validates, which changed nothing in the edit.
+      const thin = [brief.shots.length === 0 && "no shot plan", brief.techniques.length === 0 && "no borrowed technique", !brief.critique && "no self-critique"].filter(Boolean);
+      if (thin.length > 0) warnings.push(`A thin brief (${thin.join(", ")}): it plans little. Map shots to beats, borrow what the moment needs, critique it against the style's checklist (BRIEF.md 5), and save again.`);
       call.commit((tx) => tx.update(["settings"], { [BRIEF_KEY]: brief }), "Save brief");
       const { lines } = checkLines(call, brief);
       return applied(SAVE, [briefSummary(brief), ...lines].join("\n"), { data: { brief }, warnings });

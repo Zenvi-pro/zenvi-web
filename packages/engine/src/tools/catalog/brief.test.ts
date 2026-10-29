@@ -132,6 +132,14 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(doc.undoLabels).toEqual(["fixture"]);
   });
 
+  it("warns about a thin brief: no shots, no technique, no critique", async () => {
+    const doc = bin();
+    const thin = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, shots: [], techniques: [] });
+    expect(thin.data!.warnings.join(" ")).toContain("A thin brief (no shot plan, no borrowed technique, no self-critique)");
+    const full = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, critique: "Moved the logo off the hook" });
+    expect(full.data!.warnings.join(" ")).not.toContain("thin brief");
+  });
+
   it("warns when the shot plan names a file the bin does not have", async () => {
     const doc = bin();
     const result = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, shots: [{ source: "media", file_id: "NOPEXXXXXX", note: "x" }] });
