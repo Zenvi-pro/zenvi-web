@@ -43,12 +43,6 @@ export const KNOWN_FAILURES: Readonly<Record<string, KnownFailure>> = {
     only: "full",
     issue: "as add_captions_tool font: the engine-bundled family is not available to libopenshot's Caption effect.",
   },
-  "add_motion_template_tool subtitle": {
-    only: "full",
-    issue:
-      "end_card's subtitle moves the render-node frame but barely the libopenshot one (mean |ΔRGB| 0.17): the template's SVG text uses an engine-bundled " +
-      "family libopenshot's Qt SVG renderer does not have (same root cause as add_captions_tool font).",
-  },
   "add_timer_tool font": {
     only: "full",
     issue: "as add_captions_tool font: libopenshot's Timer effect does not find the engine-bundled family, so the desktop draws the default font.",

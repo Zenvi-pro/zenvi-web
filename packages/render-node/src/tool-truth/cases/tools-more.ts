@@ -61,7 +61,8 @@ export const MORE_TOOL_CASES: readonly TruthCase[] = [
   param(kineticType, "font_family", "anton", { base: "inter" }),
   param(kineticType, "position_seconds", 0.8, { expect: [down("coverage")] }),
   param(kineticType, "duration_seconds", 0.5, { expect: [down("coverage")] }),
-  param(endCard, "subtitle", "and a subtitle"),
+  // The subtitle is small type: dark palette, so its pixels stand out from the card.
+  param(endCard, "subtitle", "AND A MUCH LONGER SUBTITLE LINE", { with: { duration_seconds: 2, palette: "ui_dark" }, probe: at(1.6) }),
   param(endCard, "backdrop", false, { base: true }),
   param(endCard, "variant", "plain"),
   param(scroll, "words", ["alpha", "beta", "gamma", "delta"]),

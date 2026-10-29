@@ -27,6 +27,8 @@ const SCREEN = "#1eae24";
 
 /** Extra properties both runs set so the parameter under test has something to act on (`Class.*` for every parameter). */
 const CONTEXT: Readonly<Record<string, Args>> = {
+  // Its defaults (brightness 0, contrast 3) move the bars by about half a level: on the edge of "changed".
+  "Brightness.*": { brightness: 0.3 },
   "Caption.background": { background_alpha: 1 },
   "Caption.background_corner": { background_alpha: 1 },
   "Caption.background_padding": { background_alpha: 1 },
@@ -196,7 +198,6 @@ export const IDENTITY_DEFAULTS: ReadonlyMap<string, string> = new Map([
   ["ColorMap", "no LUT"],
   ["Displace", "no displacement map"],
   ["Mask", "no mask image"],
-  ["Brightness", "brightness 0 with contrast 3 moves the bars by under half a level in both renderers"],
 ]);
 
 function effectClips(effect: EffectDefinition, key?: string): TruthClip[] {
