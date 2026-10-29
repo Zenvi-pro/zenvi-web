@@ -8,8 +8,9 @@
 
 import { isAudioOnlyMedia } from "../model/media.js";
 import type { ProjectFile } from "../model/types.js";
+import { findMoments, type Moment } from "../shots/moments.js";
 import { chainOrder } from "../shots/order.js";
-import { cosine, meanDirection, type Vector } from "../shots/vectors.js";
+import { cosine, matchProbability, meanDirection, type Vector } from "../shots/vectors.js";
 import type { ToolCall } from "./define.js";
 import { fileLabel, matteRecord } from "./mattes.js";
 import type { ShotEmbeddings, ShotHost } from "./types.js";
@@ -116,4 +117,40 @@ export async function lookOrder(call: ToolCall, files: readonly ProjectFile[], t
   if (unread.length > 0) return `could not read the picture of ${unread.join(", ")}`;
   const sim = (vectors as Vector[]).map((a) => (vectors as Vector[]).map((b) => cosine(a, b)));
   return chainOrder(sim, { fixFirst: true, fixLast: true });
+}
+
+/** A keyframe stays in its peak's moment while its text cosine is within this of the peak (about 3x lower odds). */
+const MOMENT_DROP = 0.012;
+
+export interface ShotMoment extends Moment {
+  file: ProjectFile;
+  /** Chance the moment shows the query (the model's image–text head), 0-1. */
+  match: number;
+}
+
+/**
+ * The moments of `files` that best show `query`, best first: at most
+ * `perFile` from one file. `embeddings` holds each file's keyframes (files
+ * without are skipped). Used by find_shots_tool and by tools that pick
+ * footage for words (B-roll).
+ */
+export async function findShotMoments(
+  call: ToolCall,
+  host: ShotHost,
+  files: readonly ProjectFile[],
+  embeddings: ReadonlyMap<string, ShotEmbeddings>,
+  query: string,
+  options: { limit: number; perFile: number },
+): Promise<ShotMoment[]> {
+  const [text] = await host.embedText([query], call.signal);
+  const found: ShotMoment[] = [];
+  for (const file of files) {
+    const e = embeddings.get(file.id);
+    if (!e) continue;
+    const scores = e.vectors.map((v) => cosine(v, text!));
+    const still = isStill(file);
+    const moments = findMoments(e.times, scores, { interval: still ? 0 : shotInterval(file), duration: still ? 0 : Number(file.duration) || 0, drop: MOMENT_DROP, max: options.perFile });
+    for (const m of moments) found.push({ ...m, file, match: matchProbability(m.score, host.model) });
+  }
+  return found.sort((a, b) => b.score - a.score).slice(0, options.limit);
 }

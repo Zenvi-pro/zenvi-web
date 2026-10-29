@@ -12,13 +12,12 @@
 
 import { z } from "zod";
 import type { Clip, ProjectFile } from "../../model/types.js";
-import { findMoments, type Moment } from "../../shots/moments.js";
 import { chainOrder, chainScore } from "../../shots/order.js";
-import { cosine, matchProbability, NEAR_DUPLICATE, type Vector } from "../../shots/vectors.js";
+import { cosine, NEAR_DUPLICATE, type Vector } from "../../shots/vectors.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { fileLabel } from "../mattes.js";
 import { applied, unchanged } from "../receipt.js";
-import { embeddableFiles, embeddableProblem, embeddingsOf, isStill, shotInterval, shotVectors, type ShotWindow } from "../shots.js";
+import { embeddableFiles, embeddableProblem, embeddingsOf, findShotMoments, isStill, shotInterval, shotVectors, type ShotWindow } from "../shots.js";
 import { guarded, toolError } from "../titles-text.js";
 import type { ShotEmbeddings, ShotHost } from "../types.js";
 
@@ -28,8 +27,6 @@ const FIND = "find_shots_tool";
 const SIMILAR = "shot_similarity_tool";
 /** Seconds of embedding one call starts before it stops and asks to be called again. */
 const DEFAULT_BUDGET_SECONDS = 120;
-/** A keyframe stays in its peak's moment while its text cosine is within this of the peak (about 3x lower odds). */
-const MOMENT_DROP = 0.012;
 /** Below this match probability nothing in the bin clearly shows the query. */
 const WEAK_MATCH = 0.02;
 
@@ -171,26 +168,15 @@ export const shotTools: CatalogTool[] = [
         if (files.length === 0) toolError("the bin has no video or image files to search; import footage first");
         const host = await readyHost(call, input.download);
         const pass = await embedAll(call, host, files, DEFAULT_BUDGET_SECONDS);
-        const [query] = await host.embedText([input.query], call.signal);
-        const limit = input.limit ?? 5;
-        const perFile = input.per_file ?? 1;
-        const found: (Moment & { file: ProjectFile })[] = [];
-        for (const file of files) {
-          const e = pass.done.get(file.id);
-          if (!e) continue;
-          const scores = e.vectors.map((v) => cosine(v, query!));
-          const duration = isStill(file) ? 0 : Number(file.duration) || 0;
-          for (const m of findMoments(e.times, scores, { interval: isStill(file) ? 0 : shotInterval(file), duration, drop: MOMENT_DROP, max: perFile })) found.push({ ...m, file });
-        }
-        found.sort((a, b) => b.score - a.score);
-        const moments = found.slice(0, limit).map((m) => ({
+        const found = await findShotMoments(call, host, files, pass.done, input.query, { limit: input.limit ?? 5, perFile: input.per_file ?? 1 });
+        const moments = found.map((m) => ({
           file_id: m.file.id,
           name: fileLabel(m.file),
           start_seconds: round(m.start),
           end_seconds: round(m.end),
           peak_seconds: round(m.peak),
           score: round(m.score),
-          match: round(matchProbability(m.score, host.model), 3),
+          match: round(m.match, 3),
           ...(isStill(m.file) ? { still: true } : {}),
         }));
         const warnings = passWarnings(pass);
