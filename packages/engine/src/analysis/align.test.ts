@@ -51,6 +51,10 @@ describe("alignText", () => {
     expect(got.heardRatio).toBe(0);
     expect(got.words[0]!.startSec).toBe(5);
     expect(got.words.at(-1)!.endSec).toBeLessThanOrEqual(6);
+    // A whole song with nothing heard: the lyrics span it rather than crowding its last seconds.
+    const song = alignText("never gonna give you up\nnever gonna let you down", [], { start: 0, end: 180 });
+    expect(song.lines[0]!.startSec).toBe(0);
+    expect(song.lines[1]!.endSec).toBe(180);
   });
 
   it("aligns long texts in a band without losing the matches", () => {

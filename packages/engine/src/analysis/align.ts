@@ -214,7 +214,8 @@ export function alignText(text: string, heard: readonly TimedText[], range: { st
     } else {
       const gapStart = before ? spoken[before[1]]!.endSec : floor;
       const gapEnd = after ? spoken[after[1]]!.startSec : ceiling;
-      if (gapEnd - gapStart <= need * 1.5) {
+      // Nothing heard on either side (recognition heard none of the text): the whole range, not a corner of it.
+      if ((!before && !after) || gapEnd - gapStart <= need * 1.5) {
         from = gapStart;
         to = gapEnd;
       } else if (!before || (after && tokens[k]!.line > tokens[before[0]]!.line)) {
