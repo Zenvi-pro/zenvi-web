@@ -140,7 +140,7 @@ export async function colourFrame(call: ToolCall, file: ProjectFile, time: numbe
   const scratch = singleFileProject(call.doc.project, file);
   const [width] = fitSize(scratch.width, scratch.height, edge);
   if (frames.renderFrames) {
-    for await (const image of frames.renderFrames(scratch, [time], { width })) return image;
+    for await (const image of frames.renderFrames(scratch, [time], { width, ...(call.signal ? { signal: call.signal } : {}) })) return image;
   }
   const png = await frames.renderFrame(scratch, time, { width, format: "png" });
   if (png.mimeType !== "image/png") throw new Error("this surface renders frames the tracker cannot read");

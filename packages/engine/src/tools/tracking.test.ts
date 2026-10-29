@@ -216,6 +216,22 @@ describe("screen_zoom_follow_tool", () => {
     expect(clipKeyframe(clip, "scale_x", 1)).toBeCloseTo(1, 5);
     expect(clipKeyframe(clip, "scale_x", 1 + 30 * 3.9)).toBeCloseTo(1, 5);
   });
+
+  it("refuses overlapping stops given by hand, with no undo step", async () => {
+    const { doc, host } = setup();
+    doc.transaction("screen", (tx) => addClip(tx, { fileId: "FSCR", position: 3, layer: 2, start: 0, end: 4, id: "CSCR" }));
+    const undo = doc.undoLabels.length;
+    const result = await runTool({ doc, host }, "screen_zoom_follow_tool", {
+      clip_id: "CSCR",
+      stops: [
+        { start: 0.5, end: 3, x: 0.2, y: 0.2 },
+        { start: 1, end: 2, x: 0.8, y: 0.8 },
+      ],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.text).toMatch(/overlap/);
+    expect(doc.undoLabels).toHaveLength(undo);
+  });
 });
 
 describe("add_guide_overlay_tool", () => {

@@ -662,14 +662,19 @@ const zoomTool = directTool({
     if (foot.kind !== "video" && !args.stops) return refused(ZOOM, `Error: ${args.clip_id} is a still image: give stops by hand.`);
     const bad = args.stops?.find((s) => !(s.end > s.start));
     if (bad) return refused(ZOOM, `Error: stop ${bad.start}-${bad.end}s must end after it starts.`);
+    // zoomFollow keys stops in start order: an overlap would key a later stop before an earlier one ends and jump back.
+    const sorted = [...(args.stops ?? [])].sort((a, b) => a.start - b.start);
+    const overlap = sorted.findIndex((s, i) => i > 0 && s.start < sorted[i - 1]!.end);
+    if (overlap > 0) return refused(ZOOM, `Error: stops ${sorted[overlap - 1]!.start}-${sorted[overlap - 1]!.end}s and ${sorted[overlap]!.start}-${sorted[overlap]!.end}s overlap.`);
     let stops: ZoomStop[];
     let from: "stops" | "cursor" | "picture" = "stops";
     if (args.stops) stops = args.stops;
     else {
-      const samples = args.cursor ? [] : await activitySamples(call, foot.file, foot.start, foot.end, args.rate ?? 6).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
+      const cursor = args.cursor?.length ? args.cursor : undefined;
+      const samples = cursor ? [] : await activitySamples(call, foot.file, foot.start, foot.end, args.rate ?? 6).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
       if (typeof samples === "string") return failed(ZOOM, `Error: could not read ${args.clip_id}'s frames: ${samples}`);
-      from = args.cursor ? "cursor" : "picture";
-      stops = planZoomStops(samples, (args.cursor ?? []).map((c) => ({ time: c.t, x: c.x, y: c.y })), { minHold: args.min_hold ?? 1.2 });
+      from = cursor ? "cursor" : "picture";
+      stops = planZoomStops(samples, (cursor ?? []).map((c) => ({ time: c.t, x: c.x, y: c.y })), { minHold: args.min_hold ?? 1.2 });
     }
     if (stops.length === 0) return unchanged(ZOOM, `Found nothing to zoom on in ${args.clip_id} (no focused activity); nothing changed. Give cursor positions or stops.`, { data: { clip_id: args.clip_id, stops: [] } });
     const result = call.commit((tx: Transaction) => zoomFollow(tx, { clipId: args.clip_id, stops, zoom: args.zoom ?? 1.3, ease: args.ease ?? 0.45 }), "Screen zoom follow");
