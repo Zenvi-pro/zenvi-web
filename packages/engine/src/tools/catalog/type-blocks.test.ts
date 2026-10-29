@@ -128,6 +128,11 @@ describe("add_type_block_tool", () => {
     const b = await beats;
     expect(b.ok, b.text).toBe(true);
     expect(dataOf(b).hits).toEqual([0.5, 1]);
+    // Words without text have no lockup: the last word holds 0.4 s, not the 1.2 s a lockup gets.
+    const bare = doc();
+    expect((await runTool({ doc: bare, host: fakeHost() }, "add_type_block_tool", { block: "strobe", words: ["ONE", "TWO"], hold_frames: 3 })).ok).toBe(true);
+    expect(tagged(bare)).toHaveLength(2);
+    expect(seconds(tagged(bare).sort((a, b) => Number(a.position) - Number(b.position)).at(-1)!)[1]).toBeCloseTo(6 / 30 + 0.4, 6);
     const few = await runTool({ doc: doc(), host: fakeHost() }, "add_type_block_tool", { block: "strobe", words: ["ONE", "TWO", "THREE"], beats: [0.5, 1] });
     expect(few.text).toMatch(/Error: strobe needs 4 beats/);
   });

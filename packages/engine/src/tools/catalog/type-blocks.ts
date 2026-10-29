@@ -98,7 +98,7 @@ const input = z.strictObject({
   echo: z.enum(ECHO_STYLES).optional().describe("echo_stack: outline (default: echoes as outlines) or solid (dimmer fills)."),
   gap_frames: z.number().int().min(1).max(12).optional().describe("echo_stack: frames between one pair of copies and the next (default 2)."),
   words: z.array(z.string().min(1).max(40)).min(1).max(40).optional().describe("strobe: the words, one per cut; wheel: the drum's lines in order, 2-12 (default: text split at spaces)."),
-  lockup: z.string().max(80).optional().describe("strobe: the held end card (default: the whole text; empty string: none, the last word holds)."),
+  lockup: z.string().max(80).optional().describe("strobe: the held end card (default: the text, none when `words` come without it; empty string: none, the last word holds 0.4 s)."),
   hold_frames: z.number().int().min(1).max(90).optional().describe("strobe: frames each word holds (default 4, ~0.13 s at 30 fps: a strobe; 8-12 for a staccato list); wheel: frames each word rests before the drum turns (default 0.7 s); paper: frames per stop-motion pose (default 2)."),
   beats: z.array(z.number().min(0)).min(2).max(400).optional().describe("strobe: timeline seconds to cut on instead of hold_frames (detect_beats_tool's beats moved to the music's position); a word per beat from the first one at or after position_seconds, the lockup on the next. wheel: the drum turns on these beats (the first n-1 after position_seconds)."),
   seed: z.number().int().min(0).max(2 ** 31).optional().describe("paper: seed of the boil (default 1): the same seed boils the same."),
@@ -179,6 +179,8 @@ export const typeBlockTools: CatalogTool[] = [
       const words = listed ? (args.words ?? (args.text ?? "").split(/\s+/).filter(Boolean)) : [];
       if (listed && words.length === 0) return refused(TOOL, `Error: ${block} needs words or text.`);
       if (block === "wheel" && (words.length < 2 || words.length > 12)) return refused(TOOL, `Error: wheel takes 2-12 words (got ${words.length}).`);
+      // Given words, the lockup defaults to the text (none without it); the strobe's length and warnings follow the lockup it gets.
+      const lockup = args.lockup ?? (args.words ? (args.text ?? "") : words.join(" "));
 
       // The strobe's cuts: on the given beats, or every hold_frames.
       let starts: number[] = [];
@@ -195,10 +197,10 @@ export const typeBlockTools: CatalogTool[] = [
           const hold = args.hold_frames ?? 4;
           starts = Array.from({ length: words.length + 1 }, (_, i) => i * hold);
         }
-        const lockFrames = Math.round((args.lockup === "" ? 0.4 : 1.2) * fps);
+        const lockFrames = Math.round((lockup === "" ? 0.4 : 1.2) * fps);
         frames = args.duration_seconds !== undefined ? Math.round(args.duration_seconds * fps) : starts.at(-1)! + lockFrames;
         if (frames <= starts[words.length - 1]!) return refused(TOOL, `Error: ${words.length} words need more than ${(starts[words.length - 1]! / fps).toFixed(2)} s; give a longer duration_seconds or fewer words.`);
-        if (frames < starts.at(-1)! + Math.round(0.3 * fps) && args.lockup !== "") warnings.push("the lockup shows for under 0.3 s; give a longer duration_seconds");
+        if (frames < starts.at(-1)! + Math.round(0.3 * fps) && lockup !== "") warnings.push("the lockup shows for under 0.3 s; give a longer duration_seconds");
       } else if (block === "wheel") {
         const turn = Math.max(2, Math.round(0.32 * fps));
         if (args.beats) {
@@ -265,7 +267,7 @@ export const typeBlockTools: CatalogTool[] = [
             });
             break;
           case "strobe":
-            out = buildStrobe({ ...base, words, starts, lockup: args.lockup ?? (args.words ? (args.text ?? "") : words.join(" ")), ground, ink, accent, layouts: args.layouts ?? STROBE_LAYOUTS });
+            out = buildStrobe({ ...base, words, starts, lockup, ground, ink, accent, layouts: args.layouts ?? STROBE_LAYOUTS });
             break;
         }
       } catch (error) {
