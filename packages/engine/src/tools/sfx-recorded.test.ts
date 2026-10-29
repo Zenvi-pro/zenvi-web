@@ -171,7 +171,7 @@ describe("add_sfx_tool with the recorded kit", () => {
     expect(elsewhere.text).toMatch(/cannot fetch Zenvi's recorded kit/);
   });
 
-  it("takes kit:NNNN ids, cuts a recording to the asked duration, says where align=start starts it, and plays sub_drop as a sub", async () => {
+  it("takes kit:NNNN ids, cuts a recording to the asked duration, says where align=start starts it, plays sub_drop as a sub and sparkle as a sparkle", async () => {
     // Regressions (sk2-product-brand): each of these was refused, ignored or misreported.
     const doc = edit();
     const host = kitHost();
@@ -194,6 +194,11 @@ describe("add_sfx_tool with the recorded kit", () => {
     const subs = sfxClips(doc).map((c) => recordedSample(kitIdOf(doc, c)!)).filter((s) => s?.group === "sub");
     expect(subs).toHaveLength(3);
     for (const s of subs) expect((s!.endMs - s!.onsetMs) / 1000).toBeGreaterThanOrEqual(0.9);
+
+    for (const at of [0.2, 1.5, 2.2, 3.2]) await runTool({ doc, host }, "add_sfx_tool", { recipe: "sparkle", at_seconds: at });
+    const sparkles = sfxClips(doc).map((c) => recordedSample(kitIdOf(doc, c)!)).filter((s) => s?.group === "sparkle" && String(s.id) !== pick);
+    expect(sparkles.length).toBeGreaterThanOrEqual(4);
+    for (const s of sparkles) expect(`${s!.name} ${s!.tags.join(" ")}`).not.toMatch(/notification|bicycle|ship|watch/i);
   });
 
   it("counts a placed kit sound at its hit point, not where its pre-roll starts", async () => {

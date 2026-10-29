@@ -200,6 +200,8 @@ function groupSeed(seed: number, group: RecordedGroup): number {
 const MAX_ATTACK_MS = 30;
 /** Peaking recipes that may build for longer before their peak. */
 const LONG_PEAK_RECIPES: ReadonlySet<string> = new Set(["whoosh_long", "whoosh_rise"]);
+/** Names and tags of the sparkle group's recordings that sound like one: magic, a glint, glass. */
+const SPARKLE_WORDS = /sparkl|twinkl|magic|shiny|glitter|fairy|crystal|glass/i;
 /** Shortest recording that plays as a sub drop. */
 const SUB_DROP_MIN_SECONDS = 0.9;
 /** Recipes that play a hero hit: never from the softest third of their group. */
@@ -225,6 +227,8 @@ function suited(group: RecordedGroup, recipe: string, samples: readonly Recorded
   if (HERO_RECIPES.has(recipe)) keep((s) => kitTraits(s, kit).energy !== "soft");
   // A sub drop is a long low tail; the group's dry kicks (under 0.9 s) read as a kick drum.
   if (recipe === "sub_drop") keep((s) => soundSeconds(s) >= SUB_DROP_MIN_SECONDS);
+  // The sparkle group also holds bells, a watch chime and notification pings (sk3-creator-social heard a phone ping).
+  if (recipe === "sparkle") keep((s) => SPARKLE_WORDS.test(`${s.name} ${s.tags.join(" ")}`));
   return pool;
 }
 
