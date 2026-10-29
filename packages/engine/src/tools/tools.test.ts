@@ -619,6 +619,19 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { prompt: "a red fox", track: "Nope" }, summary: /^Error: Unknown track or layer 'Nope'/ },
   },
+  generate_broll_set_tool: {
+    happy: {
+      args: { shots: "steam over a coffee cup; hands around the cup", style: "warm tungsten, 35mm lens" },
+      summary: /^Generated 2 still\(s\) and 2 clip\(s\) of 5s for a set of 2 shot\(s\):\n {2}1\. clip \w+ still \w+ {2}'steam over a coffee cup'\n/,
+      check: ({ doc, host }) => {
+        const paths = host.backendCalls.map((c) => c.path);
+        expect(paths.filter((p) => p === "/api/v1/generation/image")).toHaveLength(2);
+        expect(paths.filter((p) => p === "/api/v1/generation/morph")).toHaveLength(2);
+        expect(doc.undoLabels.at(-1)).toBe("Generate B-roll set (2)");
+      },
+    },
+    failure: { args: { shots: ["a cup"] }, status: "refused", summary: /^Error: give the set's style/ },
+  },
   ingest_web_video_tool: {
     happy: {
       args: { url: "https://youtu.be/abc", intent: "reference" },

@@ -119,6 +119,11 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   fetch_remotion_video_from_supabase_tool: { methods: ["media.importUrl"] },
   generate_video_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
   generate_image_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
+  generate_broll_set_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["media.importUrl", "frames"],
+    partialNote: "animate=true needs URL downloads; the reference's look and image need frame rendering",
+  },
   // Hosted surfaces do not download third-party pages (terms of service, blocked server addresses): only the person's own computer does.
   ingest_web_video_tool: { methods: ["media.fetchWebVideo"] },
   generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },

@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { BRIEF_KEY, briefSchema, briefShape, briefSummary, readBrief, type Brief } from "../../brief/brief.js";
 import { checkBrief } from "../../brief/check.js";
+import { coverageLines, footageCoverage } from "../../brief/coverage.js";
 import { methodProblems } from "../../brief/method.js";
 import {
   brightnessOf,
@@ -185,14 +186,15 @@ export const briefTools: CatalogTool[] = [
       if (thin.length > 0) warnings.push(`A thin brief (${thin.join(", ")}): it plans little. Map shots to beats, borrow what the moment needs, critique it against the style's checklist (BRIEF.md 5), and save again.`);
       call.commit((tx) => tx.update(["settings"], { [BRIEF_KEY]: brief }), "Save brief");
       const { lines } = checkLines(call, brief);
-      return applied(SAVE, [briefSummary(brief), ...lines].join("\n"), { data: { brief }, warnings });
+      const footage = footageCoverage(call.doc.project, brief);
+      return applied(SAVE, [briefSummary(brief), ...lines, ...coverageLines(footage, call.doc.project)].join("\n"), { data: { brief, footage }, warnings });
     },
   }),
   directTool({
     name: GET,
     title: "Get the creative brief",
     description:
-      "The creative brief saved with save_brief_tool, and how the edit measures against it: the project's frame and length, a picture change at each beat, each borrowed technique on the timeline, and the style's finish checklist to look for. Read it before each stage of a long edit and before you say done. Changes nothing.",
+      "The creative brief saved with save_brief_tool, and how the edit measures against it: the project's frame and length, a picture change at each beat, each borrowed technique on the timeline, the shot list against the bin (shots your media covers, shots still to fetch or generate, with the one call for each) and the style's finish checklist to look for. Read it before each stage of a long edit and before you say done. Changes nothing.",
     input: z.strictObject({}),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     run: (call) => {
@@ -202,7 +204,8 @@ export const briefTools: CatalogTool[] = [
       }
       const { lines, check } = checkLines(call, brief);
       const checklist = brief.checklist.length > 0 ? [`Checklist: ${brief.checklist.join(" · ")}`] : [];
-      return applied(GET, [briefSummary(brief), ...lines, ...checklist].join("\n"), { data: { brief, check } }, 0);
+      const footage = footageCoverage(call.doc.project, brief);
+      return applied(GET, [briefSummary(brief), ...lines, ...coverageLines(footage, call.doc.project), ...checklist].join("\n"), { data: { brief, check, footage } }, 0);
     },
   }),
 ];
