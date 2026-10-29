@@ -218,6 +218,21 @@ describe("caption animations", () => {
     expect(Math.sign(pointsOf(word("g0w0").props, "rotation")[0]!.co.Y)).not.toBe(Math.sign(pointsOf(word("g0w1").props, "rotation")[0]!.co.Y));
   });
 
+  it("rotation turns emphasis words with any animation and leaves connectors level", () => {
+    for (const id of ["pop", "slam", "tilt"] as const) {
+      const built = build(id, { rotation: 6 });
+      const emphasis = built.plan.layers.find((l) => l.source.kind === "svg" && l.source.svg.includes("#ff2d2d"))!;
+      const turns = pointsOf(emphasis.props, "rotation").map((p) => p.co.Y);
+      expect(Math.abs(turns[turns.length - 1]!), id).toBeCloseTo(6, 6);
+      const connector = built.plan.layers.find((l) => l.name === "g0w0")!;
+      const level = connector.props.rotation === undefined ? [0] : pointsOf(connector.props, "rotation").map((p) => p.co.Y);
+      expect(level[level.length - 1], id).toBe(0);
+    }
+    const flat = build("tilt", { rotation: 0 });
+    const emphasis = flat.plan.layers.find((l) => l.source.kind === "svg" && l.source.svg.includes("#ff2d2d"))!;
+    expect(pointsOf(emphasis.props, "rotation").at(-1)!.co.Y).toBe(0);
+  });
+
   it("typewriter types each word with a stepping Crop, one clip a word, no fade", () => {
     const built = build("typewriter");
     expect(built.plan.layers).toHaveLength(words().length);

@@ -81,6 +81,12 @@ export interface KineticCaptionInput {
   y?: number;
   /** Entrance and exit instead of the style's own (styles.ts CAPTION_ANIMATIONS). */
   motion?: CaptionMotion;
+  /**
+   * Degrees emphasis words rest turned, signs alternating word by word, with
+   * any animation (Dc3mgNJO73W's slightly rotated emphasis words); connectors
+   * stay level. Instead of the tilt animation's own 7.
+   */
+  rotation?: number;
   lib: FontLibrary;
 }
 
@@ -629,9 +635,11 @@ export function buildKineticCaptions(input: KineticCaptionInput): KineticCaption
     };
     /** Rotation at rest and at the start of a word's entrance (tilt): emphasis words stay turned, connectors settle level; signs alternate. */
     const turnOf = (w: SetWord): { rest: number; turn: number } => {
-      if (!tilt) return { rest: 0, turn: 0 };
       const sign = w.index % 2 === 0 ? -1 : 1;
-      return w.emphasis ? { rest: sign * tilt.rest, turn: sign * tilt.from } : { rest: 0, turn: sign * tilt.from * 0.5 };
+      if (!tilt) return input.rotation && w.emphasis ? { rest: sign * input.rotation, turn: sign * input.rotation } : { rest: 0, turn: 0 };
+      const rest = input.rotation ?? tilt.rest;
+      const swing = Math.max(tilt.from, Math.abs(rest)) * (rest < 0 ? -1 : 1);
+      return w.emphasis ? { rest: sign * rest, turn: sign * swing } : { rest: 0, turn: sign * tilt.from * 0.5 };
     };
     // Letters moving one by one take a track each; the words of a group share the letter tracks in turn.
     const lettersUsed = { under: 0, front: 0 };

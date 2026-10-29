@@ -120,6 +120,7 @@ const input = z.strictObject({
   text_size: z.number().min(0.015).max(0.2).optional().describe("Connector word size, share of the frame's short side (style default: creator 0.046, karaoke 0.059, stack 0.11); emphasis words keep their ratio to it."),
   y: unit.optional().describe("Vertical centre of the captions, 0 top - 1 bottom (default: the style's own spots). Kept inside the caption safe area (on 9:16 out of the top 12 % and the bottom 20 %) and off the avoid boxes; split ignores it."),
   animation: z.enum(CAPTION_ANIMATION_IDS).optional().describe(`How words enter, instead of the style's own. ${ANIMATION_LINES}`),
+  rotation: z.number().min(-30).max(30).optional().describe("Degrees the emphasis words rest turned, alternating left and right word by word, with any animation (slightly rotated emphasis words: 4-8). Connectors stay level. 0 keeps everything level (also under tilt)."),
   behind_subject: z
     .enum(["auto", "emphasis", "all", "none"])
     .optional()
@@ -401,6 +402,7 @@ export const kineticCaptionTools: CatalogTool[] = [
           ...(args.text_size !== undefined ? { size: args.text_size / baseShare(style) } : {}),
           ...(args.y !== undefined ? { y: args.y } : {}),
           ...(args.animation ? { motion: CAPTION_ANIMATIONS[args.animation].motion } : {}),
+          ...(args.rotation !== undefined ? { rotation: args.rotation } : {}),
           lib,
         });
       } catch (error) {
@@ -468,6 +470,7 @@ export const kineticCaptionTools: CatalogTool[] = [
           data: {
             style,
             ...(args.animation ? { animation: args.animation } : {}),
+            ...(args.rotation !== undefined ? { rotation: args.rotation } : {}),
             behind_subject: result.cutouts.length > 0 ? (behind === "emphasis" ? "emphasis" : "all") : "none",
             placement: scenes.length > 0 ? { scenes: scenes.length, heads: scenes.filter((s) => s.head).length } : "style",
             text_size: round(args.text_size ?? baseShare(style)),
