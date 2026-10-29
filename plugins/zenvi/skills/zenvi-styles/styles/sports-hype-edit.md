@@ -3,7 +3,7 @@ id: sports-hype-edit
 kind: style
 summary: "For athlete, action-sport and match hype: withheld music, one drop on the hero action, scale contrast, a held resolve."
 categories: [sports-hype-edit]
-tools: [gather_stock_footage_tool, add_clip_to_timeline_tool, detect_beats_tool, detect_subject_tool, align_match_cut_tool, apply_motion_transition_tool, set_clip_speed_tool, speed_ramp_tool, unify_grade_tool, add_kinetic_title_tool, add_track_tool, set_track_role_tool, add_sfx_tool, automate_volume_tool, auto_sound_design_tool, master_audio_tool, render_video, review_render_tool]
+tools: [gather_stock_footage_tool, add_clip_to_timeline_tool, detect_beats_tool, detect_subject_tool, align_match_cut_tool, apply_motion_transition_tool, set_clip_speed_tool, speed_ramp_tool, unify_grade_tool, add_kinetic_title_tool, add_track_tool, set_track_role_tool, add_sfx_tool, automate_volume_tool, auto_sound_design_tool, master_audio_tool, review_render_tool]
 pace: fast
 mood: [triumphant, gritty, cinematic, energetic]
 aspect: ["9:16", "16:9"]

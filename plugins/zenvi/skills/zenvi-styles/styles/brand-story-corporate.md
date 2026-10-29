@@ -7,8 +7,8 @@ tools: [set_project_setting_tool, gather_stock_footage_tool, search_clip_scenes_
 pace: medium
 mood: [warm, human, hopeful, confident]
 aspect: ["16:9", "9:16"]
-pairs_with: [T049, T100, T081, T047, T045, T061, T059, T002, T082, T117]
-avoid_with: [T116, T127, T112, T106]
+pairs_with: [t049, t100, t081, t047, t045, t061, t059, t002, t082, t117]
+avoid_with: [t116, t127, t112, t106]
 needs: [action-foley-spotter, screen-quad-zoom-through]
 ---
 
@@ -53,7 +53,7 @@ then hits sound on cuts.
 - ~3 in 4 photographed shots carry a move (push-in the most common);
   statics are for punch lines and UI holds. Add a 3-6 % push on stills.
 - Momentum cuts keep the direction of travel across the frame edge
-  (wide → tracking legs → heel strike, T049).
+  (wide → tracking legs → heel strike, t049).
 - Source: one clip per ~1.4 s plus 50 %; the same people across the film
   (one family of stock: same talent, same location).
 
@@ -81,8 +81,8 @@ then hits sound on cuts.
 ## Motion & transitions
 
 - Hard cuts ~70 %; match cuts at the product entrances (device to screen,
-  T100; slow-mo subject to its illustration); a whip into a routine
-  montage once (T045 burst of 0.5-1 s shots); dissolves only at section
+  t100; slow-mo subject to its illustration); a whip into a routine
+  montage once (t045 burst of 0.5-1 s shots); dissolves only at section
   ends; 1-3 white flashes per 90 s at most.
 - Speed ramp (`speed_ramp_tool` `hero`) on the one slow-motion hero beat.
 
@@ -93,7 +93,7 @@ then hits sound on cuts.
   hero product beat, a bass hit or chime on the logo. Cuts follow phrases
   and actions (~19 % on beat, ~54 % on onsets).
 - Live story: real foley on real actions (marker, tap, keys, pour, foil,
-  footsteps; T081), at or under the music; whooshes only on physical
+  footsteps; t081), at or under the music; whooshes only on physical
   motion (≤ 3 per 90 s). ~10-15 cues per minute, well under one per cut.
   Motion-graphic brand piece: synth hits on cuts and entrances (cue
   coverage ≥ 1.5x chance).
@@ -159,11 +159,11 @@ hands. Render, `review_render_tool`, one fix pass.
 
 ## Mix-and-match
 
-Borrow: T049 wide-to-macro momentum cut, T100 match into a screen, T081
-foley on actions, T047 word-keyed cutaway (with VO), T045 routine burst
-into a whip, T059 HUD chips on live footage, T002 exploded mockup (motion
-brand piece), T061 lockup, T082 L-cut, T117 black chapter cards. Never:
-T116/T127 giant kinetic type over a live story, T112 verdict cards, T106
+Borrow: t049 wide-to-macro momentum cut, t100 match into a screen, t081
+foley on actions, t047 word-keyed cutaway (with VO), t045 routine burst
+into a whip, t059 HUD chips on live footage, t002 exploded mockup (motion
+brand piece), t061 lockup, t082 L-cut, t117 black chapter cards. Never:
+t116/t127 giant kinetic type over a live story, t112 verdict cards, t106
 warp tunnels, whooshes on every cut of a live narrative.
 
 ## Reference moments

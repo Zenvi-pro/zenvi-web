@@ -7,8 +7,8 @@ tools: [set_project_setting_tool, gather_stock_footage_tool, search_freesound_mu
 pace: medium
 mood: [clean, confident, light, premium]
 aspect: ["16:9", "9:16", "1:1"]
-pairs_with: [T116, T057, T110, T045, T127, T005, T061, T086, T066, T050, T052]
-avoid_with: [T021, T105, T084, T023]
+pairs_with: [t116, t057, t110, t045, t127, t005, t061, t086, t066, t050, t052]
+avoid_with: [t021, t105, t084, t023]
 needs: []
 ---
 
@@ -36,7 +36,7 @@ both end on one lockup.
 | beat | 15 s | 30 s | 60 s | 90 s |
 | --- | --- | --- | --- | --- |
 | Hook: claim, problem line or the prompt already typing (no logo) | 0-2 | 0-3.5 | 0-7 | 0-10 |
-| Setup: "what if" pivot, the giant word (T116) | 2-4 | 3.5-8 | 7-15 | 10-20 |
+| Setup: "what if" pivot, the giant word (t116) | 2-4 | 3.5-8 | 7-15 | 10-20 |
 | Demo: prompt types, result generates, UI acts, 1-3 s per state | 4-9 | 8-19 | 15-38 | 20-58 |
 | Proof / range: one number or chart, use cases, logos | 9-12 | 19-25 | 38-50 | 58-76 |
 | Payoff: cut speed-up into one tagline | 12-13.5 | 25-27 | 50-55 | 76-82 |
@@ -49,7 +49,7 @@ both end on one lockup.
 - Hybrid reels add live inserts (hands on a keyboard, a face reacting, a
   coffee) of 0.6-1.5 s between UI shots to reset attention.
 - Backdrops: a light `gradient_field` for type, pale soft landscape plates
-  behind glass (T057), or a dark obsidian field for a premium dark mode.
+  behind glass (t057), or a dark obsidian field for a premium dark mode.
   Never type straight on a busy photo.
 - Screen captures under 1.6 s stay still; longer ones push in 100 → 108 %.
 
@@ -68,7 +68,7 @@ both end on one lockup.
 - Neo-grotesque sans (Inter) everywhere; mono (JetBrains Mono) for prompts
   and code; a serif italic accent (Instrument Serif) once or twice per piece.
 - Statement text 4-7 % of frame height; hero words 10-25 % (3-9x the
-  connector text, T116); UI microcopy ≥ 2.5 % (≥ 4 % for a typed prompt).
+  connector text, t116); UI microcopy ≥ 2.5 % (≥ 4 % for a typed prompt).
 - Every text element enters with motion (rise, blur, pop, typewriter) and
   leaves cleanly; nothing static for over 3 s.
 - Spell-check every string; use the brief's nouns, never "Revolutionize
@@ -79,12 +79,12 @@ both end on one lockup.
 - Scenes move into each other: `apply_motion_transitions_tool` `style:
   "cinematic"` (slide and blur dissolve, last cut a zoom-through) or one
   preset (`blur_dissolve`, `slide`); one direction (left).
-- Zoom-through (T110) is the signature, at 1-3 section changes; white
+- Zoom-through (t110) is the signature, at 1-3 section changes; white
   flash into a light card optional. Designed transitions on < 15 % of cuts
   in hybrid reels; between whole motion scenes, always a move, never a
   crossfade.
 - Cards enter staggered by 2-3 frames; the pointer click scales to ~90 %.
-- A 4-6 frame strobe on a drum fill (T045) at most once.
+- A 4-6 frame strobe on a drum fill (t045) at most once.
 
 ## Sound & music
 
@@ -93,7 +93,7 @@ both end on one lockup.
   hit**. Cuts land on onsets (~70 %), not the grid.
 - A sound on every UI event: keystrokes while typing, click on send, toggle,
   pop per card landing, whoosh on each transition, riser under a chart draw,
-  hit or sub drop on the lockup (T086). 18-45 cues per minute.
+  hit or sub drop on the lockup (t086). 18-45 cues per minute.
 - Levels (CRAFT.md SaaS palette): music-led bed -14…-16 LUFS; UI clicks
   18-22 dB under the hero; hero hit momentary ~-11 LUFS; no heavy subs or
   cinematic booms except the lockup. With VO: voice -15 LUFS, bed 8-12 LU under.
@@ -175,11 +175,11 @@ Render, `review_render_tool`, one fix pass.
 
 ## Mix-and-match
 
-Borrow: T116 giant word, T066 prompt bar hero, T057 glass over nature,
-T110 zoom-through chain, T052 chart draw, T050 counter, T045 strobe once,
-T127 strobe text stack, T005 perspective UI plane, T086 cue per UI event,
-T061 lockup. Never: T021 dark headlight tease, T105 black-to-white jump,
-T084 dead music stop mid-piece, film grain, whip-pan chains, a whoosh on
+Borrow: t116 giant word, t066 prompt bar hero, t057 glass over nature,
+t110 zoom-through chain, t052 chart draw, t050 counter, t045 strobe once,
+t127 strobe text stack, t005 perspective UI plane, t086 cue per UI event,
+t061 lockup. Never: t021 dark headlight tease, t105 black-to-white jump,
+t084 dead music stop mid-piece, film grain, whip-pan chains, a whoosh on
 every plain cut of a hybrid reel.
 
 ## Reference moments

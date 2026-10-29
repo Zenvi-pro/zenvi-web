@@ -3,7 +3,7 @@ id: flash-cut-match-cut-edit
 kind: style
 summary: "For experimental music edits and trailer bursts: shape match chains, flash frames on hits, vacuums, a designed end."
 categories: [flash-cut-match-cut-edit]
-tools: [gather_stock_footage_tool, detect_beats_tool, detect_subject_tool, align_match_cut_tool, match_cut_montage_tool, add_clip_to_timeline_tool, color_grade_clip_tool, apply_look_tool, apply_fx_tool, apply_motion_transition_tool, add_kinetic_title_tool, add_track_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool]
+tools: [gather_stock_footage_tool, detect_beats_tool, detect_subject_tool, align_match_cut_tool, match_cut_montage_tool, add_clip_to_timeline_tool, color_grade_clip_tool, apply_look_tool, apply_fx_tool, apply_motion_transition_tool, add_kinetic_title_tool, add_track_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, review_render_tool]
 pace: frantic
 mood: [hypnotic, intense, surreal, rhythmic]
 aspect: ["9:16", "16:9", "1:1"]

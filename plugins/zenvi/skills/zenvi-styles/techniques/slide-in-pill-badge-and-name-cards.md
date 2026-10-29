@@ -3,7 +3,7 @@ id: slide-in-pill-badge-and-name-cards
 kind: technique
 summary: "When a speaker, price or fact needs a label: name card or pill slides/pops in about 10 frames with a soft cue."
 categories: [podcast-clip-vertical, tech-review]
-tools: [add_motion_block_tool, add_kinetic_title_tool, add_sfx_tool, preview_frame, add_title_tool]
+tools: [add_motion_block_tool, add_kinetic_title_tool, add_sfx_tool, add_title_tool]
 pace: medium
 mood: [informative, polished, friendly]
 aspect: ["9:16", "16:9", "1:1"]

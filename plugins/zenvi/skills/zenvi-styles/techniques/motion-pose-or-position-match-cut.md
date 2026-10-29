@@ -3,7 +3,7 @@ id: motion-pose-or-position-match-cut
 kind: technique
 summary: "When two shots share a pose, path or position: align the subject across the cut and cut on the motion peak."
 categories: [fitness-lifestyle, flash-cut-match-cut-edit, travel-cinematic-montage, video-essay-explainer]
-tools: [align_match_cut_tool, match_cut_montage_tool, detect_subject_tool, preview_frame, swap_shot_tool, unify_grade_tool, trim_clip_tool]
+tools: [align_match_cut_tool, match_cut_montage_tool, detect_subject_tool, swap_shot_tool, unify_grade_tool, trim_clip_tool]
 pace: medium
 mood: [crafted, satisfying, flowing]
 aspect: ["9:16", "16:9", "1:1", "4:5"]

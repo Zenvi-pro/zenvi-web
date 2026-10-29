@@ -3,7 +3,7 @@ id: vfx-tutorial-breakdown
 kind: style
 summary: "For VFX breakdowns and how-to reels: result first, labelled before/after, step cards, the result again last."
 categories: [vfx-tutorial-breakdown]
-tools: [add_clip_to_timeline_tool, add_shape_mask_tool, set_clip_properties_tool, color_grade_clip_tool, apply_look_tool, pop_out_tool, add_kinetic_title_tool, add_motion_template_tool, add_motion_block_tool, kinetic_captions_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool]
+tools: [add_clip_to_timeline_tool, add_shape_mask_tool, set_clip_properties_tool, color_grade_clip_tool, apply_look_tool, pop_out_tool, add_kinetic_title_tool, add_motion_template_tool, add_motion_block_tool, kinetic_captions_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, review_render_tool]
 pace: medium
 mood: [clever, helpful, revealing, playful]
 aspect: ["9:16", "16:9"]

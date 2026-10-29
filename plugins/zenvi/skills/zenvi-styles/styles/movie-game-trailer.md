@@ -40,9 +40,9 @@ third; none holds one cut rate.
 | Macro insert with dry foley (match, lock, pin) | 3-4 | 6.5-9 | 12-15 | 17-21 |
 | Billing / tagline card, small, on black | 4-5.5 | 9-11.5 | 15-18 | 21-25 |
 | World build, 1.5-2.5 s shots | 5.5-8.5 | 11.5-17 | 18-36 | 25-55 |
-| Held hit: one 4-6 s shot, overlay or push builds (T029) | 8.5-11 | 17-21.5 | 36-42 | 55-62 |
+| Held hit: one 4-6 s shot, overlay or push builds (t029) | 8.5-11 | 17-21.5 | 36-42 | 55-62 |
 | Black + dead silence | 0.5 | 0.8 | 0.6-1.9 | 0.6-1.9 |
-| Escalation: 0.4-0.8 s shots, one white flash (T109) | 11.5-13.5 | 22-26.5 | 43-55 | 63-82 |
+| Escalation: 0.4-0.8 s shots, one white flash (t109) | 11.5-13.5 | 22-26.5 | 43-55 | 63-82 |
 | Black, then title card with sub drop | 13.5-15 | 27-30 | 55-60 | 83-90 |
 
 At 60-90 s add one dialogue or VO line inside the build with the music
