@@ -77,10 +77,10 @@ const input = z.strictObject({
   duration_seconds: z.number().min(0.2).max(30).optional().describe("Length, seconds (default: text_on_path 3, write_on 2.5, stencil 2.4, echo_stack 1.8, paper 2.4, strobe the words' holds + 1.2 s of lockup, wheel its turns + 1 s)."),
   font_family: z.string().max(40).optional().describe(`A bundled family, drawn as outlines (same on every surface): ${FONT_FAMILY_LIST}. Default: write_on instrument-serif; text_on_path, wheel and paper archivo-black; the others anton.`),
   font_weight: z.number().int().min(100).max(900).optional().describe("Weight for families that have several (inter): 100-900."),
-  ink: z.string().max(40).optional().describe("Colour of the type (default white; paper: the paper, default cream)."),
+  ink: z.string().max(40).optional().describe("Colour of the type, all but stencil (default white; paper: the paper, default cream)."),
   ground: z.string().max(40).optional().describe("stencil: the card's colour (default near-black); strobe: the first ground (default near-black; it flips with ink and accent)."),
   accent: z.string().max(40).optional().describe("strobe: the third ground (default #ff3b1f); paper: the cut edge and the marks (default near-black)."),
-  text_size: z.number().min(0.02).max(1).optional().describe("Em size as a share of the frame's short side (default: fitted to the block)."),
+  text_size: z.number().min(0.02).max(1).optional().describe("Em size as a share of the frame's short side, all but strobe and write_on paths (default: fitted to the block)."),
   x: unit.optional().describe("text_on_path, write_on, wheel, paper: horizontal centre, 0 left - 1 right (default 0.5)."),
   y: unit.optional().describe("text_on_path, write_on, stencil, wheel, paper: vertical centre, 0 top - 1 bottom (default 0.5)."),
   shape: z.enum(PATH_SHAPES).optional().describe("text_on_path: ring (default; the line closes on itself), arc (over the centre), wave (across the frame)."),
@@ -110,15 +110,17 @@ type Input = z.infer<typeof input>;
 
 /** Arguments each block reads (the common ones aside). */
 const OWN: Readonly<Record<Block, readonly (keyof Input)[]>> = {
-  text_on_path: ["x", "y", "shape", "radius", "spin"],
-  write_on: ["x", "y", "paths", "view_box", "width", "stroke_width", "fill", "draw_seconds"],
-  stencil: ["y", "ground", "open", "shadow"],
-  echo_stack: ["copies", "echo", "gap_frames"],
-  strobe: ["ground", "accent", "words", "lockup", "hold_frames", "beats", "layouts"],
-  wheel: ["x", "y", "words", "hold_frames", "beats"],
-  paper: ["x", "y", "accent", "hold_frames", "seed", "marks"],
+  text_on_path: ["ink", "text_size", "x", "y", "shape", "radius", "spin"],
+  write_on: ["ink", "text_size", "x", "y", "paths", "view_box", "width", "stroke_width", "fill", "draw_seconds"],
+  stencil: ["text_size", "y", "ground", "open", "shadow"],
+  echo_stack: ["ink", "text_size", "copies", "echo", "gap_frames"],
+  strobe: ["ink", "ground", "accent", "words", "lockup", "hold_frames", "beats", "layouts"],
+  wheel: ["ink", "text_size", "x", "y", "words", "hold_frames", "beats"],
+  paper: ["ink", "text_size", "x", "y", "accent", "hold_frames", "seed", "marks"],
 };
-const COMMON: readonly (keyof Input)[] = ["block", "text", "position_seconds", "duration_seconds", "font_family", "font_weight", "ink", "text_size"];
+const COMMON: readonly (keyof Input)[] = ["block", "text", "position_seconds", "duration_seconds", "font_family", "font_weight"];
+/** write_on reads these with paths only, and text_size with text only. */
+const PATHS_ONLY: readonly (keyof Input)[] = ["view_box", "width"];
 
 export const typeBlockTools: CatalogTool[] = [
   directTool({
@@ -141,6 +143,10 @@ export const typeBlockTools: CatalogTool[] = [
       if (stray.length > 0) return refused(TOOL, `Error: ${stray.join(", ")} do not apply to ${block} (it reads ${[...OWN[block]].join(", ")}).`);
       if (block !== "strobe" && block !== "wheel" && !(block === "write_on" && args.paths) && !args.text?.trim()) return refused(TOOL, `Error: ${block} needs text.`);
       if (args.paths && args.text) return refused(TOOL, "Error: write_on takes text or paths, not both.");
+      if (block === "write_on") {
+        const unread = args.paths ? (args.text_size !== undefined ? ["text_size"] : []) : PATHS_ONLY.filter((k) => args[k] !== undefined);
+        if (unread.length > 0) return refused(TOOL, `Error: ${unread.join(", ")} do not apply to write_on ${args.paths ? "paths (size them with width)" : "text (they size paths)"}.`);
+      }
       const colour = (value: string | undefined, fallback: string, what: string): string => (value === undefined ? fallback : colorHexAlpha(value, what)[0]);
       let ink: string;
       let ground: string;

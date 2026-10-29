@@ -177,6 +177,15 @@ describe("add_type_block_tool", () => {
     const r = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "stencil", text: "HI", copies: 5 });
     expect(r.ok).toBe(false);
     expect(r.text).toMatch(/Error: copies do not apply to stencil/);
+    // Arguments a block would silently drop are refused too.
+    const ink = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "stencil", text: "HI", ink: "#ff0000" });
+    expect(ink.text).toMatch(/Error: ink do not apply to stencil/);
+    const size = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "strobe", text: "A B", text_size: 0.2 });
+    expect(size.text).toMatch(/Error: text_size do not apply to strobe/);
+    const box = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "write_on", text: "Hi", width: 0.5 });
+    expect(box.text).toMatch(/Error: width do not apply to write_on text/);
+    const em = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "write_on", paths: ["M0 0 L10 0"], text_size: 0.2 });
+    expect(em.text).toMatch(/Error: text_size do not apply to write_on paths/);
     const even = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "echo_stack", text: "HI", copies: 4 });
     expect(even.text).toMatch(/Error: echo_stack copies must be odd/);
     expect(snapshotOf(d.project)).toEqual(before);
