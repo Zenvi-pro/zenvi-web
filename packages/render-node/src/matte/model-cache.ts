@@ -1,7 +1,7 @@
 /**
- * Matting model weights, downloaded on first use into Zenvi's cache folder
- * (`<cache>/models/<id>/`) with their licence text, each checked against a
- * pinned SHA-256. Weights are never committed or bundled.
+ * Model weights (matting, shot embeddings), downloaded into Zenvi's cache
+ * folder (`<cache>/models/<id>/`) with their licence text, each checked
+ * against a pinned SHA-256. Weights are never committed or bundled.
  */
 
 import { createHash } from "node:crypto";
@@ -14,6 +14,8 @@ export interface ModelAsset {
   file: string;
   url: string;
   sha256: string;
+  /** Size of the pinned file, when known: a larger download is refused early (otherwise above 64 MB). */
+  bytes?: number;
 }
 
 export interface ModelDescriptor {
@@ -25,6 +27,8 @@ export interface ModelDescriptor {
   homepage: string;
   weights: ModelAsset;
   licenseText: ModelAsset;
+  /** More files the model needs next to its weights (a second network, the tokenizer). */
+  extra?: readonly ModelAsset[];
 }
 
 /**
@@ -50,7 +54,6 @@ export const RVM_MOBILENETV3: ModelDescriptor = {
   },
 };
 
-/** Weights are 15 MB; anything much larger is not the file we pinned. */
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
 export interface ModelCacheOptions {
@@ -81,7 +84,7 @@ async function download(asset: ModelAsset, dest: string, options: ModelCacheOpti
   const response = await (options.fetch ?? fetch)(asset.url, { signal: options.signal, redirect: "follow" });
   if (!response.ok) throw new Error(`downloading ${asset.url} failed: HTTP ${response.status}`);
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > MAX_ASSET_BYTES) throw new Error(`${asset.url} is larger than expected (${bytes.byteLength} bytes)`);
+  if (bytes.byteLength > (asset.bytes ?? MAX_ASSET_BYTES)) throw new Error(`${asset.url} is larger than expected (${bytes.byteLength} bytes)`);
   const digest = createHash("sha256").update(bytes).digest("hex");
   if (digest !== asset.sha256) throw new Error(`${asset.url} does not match its pinned checksum (got ${digest}, want ${asset.sha256})`);
   const part = `${dest}.part-${process.pid}-${Math.random().toString(36).slice(2)}`;
@@ -94,14 +97,31 @@ async function download(asset: ModelAsset, dest: string, options: ModelCacheOpti
   verified.add(dest);
 }
 
+function assets(model: ModelDescriptor): ModelAsset[] {
+  return [model.licenseText, model.weights, ...(model.extra ?? [])];
+}
+
+/** Megabytes `ensureModel` downloads, for the messages that ask before downloading. */
+export function modelDownloadMb(model: ModelDescriptor): number {
+  return Math.round(assets(model).reduce((sum, a) => sum + (a.bytes ?? 0), 0) / 1e6);
+}
+
+/** Whether every file of the model is in the cache and matches its checksum (downloads nothing). */
+export async function modelPresent(model: ModelDescriptor, options: Pick<ModelCacheOptions, "env" | "root"> = {}): Promise<boolean> {
+  const dir = modelDir(model, options);
+  for (const asset of assets(model)) if (!(await present(path.join(dir, asset.file), asset.sha256))) return false;
+  return true;
+}
+
 /**
- * The model's weights file, downloading the weights and the licence text
- * first when they are missing or do not match their checksums.
+ * The model's weights file, downloading the weights, the licence text and
+ * the extra files first when they are missing or do not match their
+ * checksums. The extra files sit next to the weights.
  */
 export async function ensureModel(model: ModelDescriptor, options: ModelCacheOptions = {}): Promise<string> {
   const dir = modelDir(model, options);
   await mkdir(dir, { recursive: true });
-  for (const asset of [model.licenseText, model.weights]) {
+  for (const asset of assets(model)) {
     const dest = path.join(dir, asset.file);
     if (await present(dest, asset.sha256)) continue;
     options.log?.(`downloading ${model.name} ${asset.file} from ${asset.url}`);

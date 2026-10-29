@@ -42,5 +42,7 @@ export * from "./matte/model-cache.js";
 export * from "./matte/rvm.js";
 export * from "./matte/generate.js";
 export * from "./matte/host.js";
+export * from "./shots/siglip.js";
+export * from "./shots/host.js";
 export * from "./render/contact-sheet.js";
 export * from "./audio/measure-mix.js";
