@@ -214,6 +214,19 @@ export interface RenderInspection {
   silences: TimeRange[];
   /** EBU R128 of the mix; null without an audio stream. A value is null when the audio is silent. */
   loudness: { integratedLufs: number | null; rangeLu: number | null; truePeakDb: number | null } | null;
+  /** The picture sampled at `fps` (hosts that can measure it): per-frame means and change, for the rhythm checks. */
+  picture?: PictureSeries;
+}
+
+/** Per sampled frame: luma (0-1), chroma U and V (-1..1, 0 = grey) and mean luma change from the frame before (0-1). */
+export interface PictureSeries {
+  fps: number;
+  /** Seconds of each sample. */
+  t: number[];
+  luma: number[];
+  u: number[];
+  v: number[];
+  motion: number[];
 }
 
 export interface PlayerHost {

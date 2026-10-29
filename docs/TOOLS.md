@@ -3775,7 +3775,7 @@ Availability: editor partial (without frame composing there is no contact sheet,
 
 ### review_render_tool
 
-**Review the rendered file** (direct tool). Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), with one contact sheet of the shots and the last frame (problems framed red).
+**Review the rendered file** (direct tool). Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), and for a fast cut its rhythm (shot lengths that never vary, shots that go still, brightness and colour that never move, cuts with no sound), with one contact sheet of the shots and the last frame (problems framed red).
 
 Surfaces: mcp, cli, editor. read-only. Needs: media, frames.
 

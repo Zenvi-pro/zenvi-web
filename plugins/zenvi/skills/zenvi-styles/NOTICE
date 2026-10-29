@@ -5,3 +5,68 @@ Tweenkit's kinetic-cut-video skill (skills/kinetic-cut-video/SKILL.md,
 references/motif-method.md and scripts/brief.py), MIT License,
 Copyright (c) 2026 wmzspace. Zenvi's adaptation is
 packages/engine/src/brief/method.ts and packages/cli/src/mcp/directions.ts.
+The motif method in BRIEF.md (motifs and a through-line, the storyboard's
+duration / composition / text-entrance / tone columns and their variety
+rules, the reskin test, the creative-direction draw) is adapted from
+Tweenkit's kinetic-cut-video skill (skills/kinetic-cut-video/SKILL.md,
+references/motif-method.md and scripts/brief.py), MIT License,
+Copyright (c) 2026 wmzspace. Zenvi's adaptation is
+packages/engine/src/brief/method.ts and packages/cli/src/mcp/directions.ts.
+
+METHOD-motif.md, styles/kinetic-cut.md and techniques/kcut-*.md are adapted
+from the same skill (SKILL.md, references/motif-method.md,
+references/fx-api.md); its QA report (scripts/build.py) is adapted in
+packages/engine/src/review/rhythm.ts, and its engine in
+packages/motion/src/runtime/kinetic.ts and the kinetic_cut_scene block (see
+packages/motion/NOTICE). Source: https://github.com/wmzspace/claude-motion-skills
+(tweenkit/skills/kinetic-cut-video). FX.star and brand marks are not ported.
+
+MIT License
+
+Copyright (c) 2026 wmzspace
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------
+
+techniques/shot-*.md and SHOTCRAFT.md are translated and adapted from the
+shot recipe cards of video-shotcraft (https://github.com/vincentwei1021/video-shotcraft,
+references/shots/**, Copyright 2026 Wei Yihao, Apache License
+2.0). Changes: the cards were translated from Chinese, merged where several
+cards are one move, and rewritten as Zenvi tool sequences (motion blocks,
+3D scenes, native keyframes, transitions, FX and sound) in place of the
+original Remotion implementations; no code, demo, image or brand element of
+the original is included. Each file names the card(s) it comes from.
+
+video-shotcraft carries no NOTICE file of its own; its cards record that
+their motion techniques were researched from publicly released product
+videos and open-source project pages and re-implemented from scratch with
+neutral placeholder copy (references/shots/ATTRIBUTION.md).
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use these files except in compliance with the License. You may obtain a copy
+of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
