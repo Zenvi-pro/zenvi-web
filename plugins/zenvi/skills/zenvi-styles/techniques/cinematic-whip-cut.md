@@ -20,6 +20,8 @@ The camera snaps sideways so fast the image streaks; the next shot arrives mid-s
 settles. It joins locations or angles as one gesture. Shines in travel, car and sport
 edits and in trailer action runs; wrong in calm documentary and story scenes.
 
+Related shot card: `shot-shot-transitions` (whip-pan, brake style).
+
 ## Build it in Zenvi
 
 1. One cut: `apply_motion_transition_tool` `{"preset": "whip", "clip1_id": "<outgoing>",
@@ -39,6 +41,7 @@ edits and in trailer action runs; wrong in calm documentary and story scenes.
 - Best when the outgoing shot already moves in the whip's direction (pan or subject motion);
   cut on movement, not on a still frame.
 - Land the whip on a beat or the off-beat before a downbeat.
+- Hold the outgoing shot >= 0.7 s (20 f) before the whip; cover ~70 % of the travel in the first 30 % of the time, then a long ease-out settle - one continuous velocity curve, never two eases glued together (the speed jumps twice) (video-shotcraft, Apache-2.0, `shot-shot-transitions`).
 
 ## Sound for it
 

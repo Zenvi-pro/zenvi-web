@@ -21,6 +21,8 @@ and ends on one long held shot (the release). It is the backbone of trailers and
 films; the dossiers measure it: best pieces have a 2-3x ratio between slowest and fastest
 third and a last shot at least 3x the median.
 
+Related shot cards: `shot-trailer-grammar-moves`, `shot-beat-cut-moves`, `shot-sakuga-timing-shift`.
+
 ## Build it in Zenvi
 
 1. `detect_beats_tool` `{"fileId": "<music>"}` -> `beats` and `downbeats` (seconds). Check
@@ -43,6 +45,7 @@ third and a last shot at least 3x the median.
   section change (drop, chorus) or the climax.
 - The release shot is the best shot, moving slowly (push-in, drift), 4-7 s.
 - Keep a repeating device (subject position, direction of motion) through the fast part.
+- Equal lengths read as a beat, so a burst inside the ramp uses identical shot lengths (e.g. three 9-frame shots), each with a different composition (video-shotcraft, Apache-2.0, `shot-trailer-grammar-moves`).
 
 ## Sound for it
 

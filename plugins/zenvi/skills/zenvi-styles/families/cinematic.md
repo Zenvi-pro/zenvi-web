@@ -86,6 +86,29 @@ the better pass.
   shows - judged "heavy" four times), day-for-night on sky shots, parallax/dolly-zoom without a clean
   plate (ghost), burn light leak over a whole clip.
 
+## Shot cards (`shot-*`) that extend this family
+
+The `shot-*` techniques are translations of the video-shotcraft shot cards (Apache-2.0,
+`~/zenvi-motion/research/ext-skills/video-shotcraft/references/shots/`; licence in the styles NOTICE).
+They are mostly motion-graphics and UI shots. Ids below assume `shot-<card name>`. Timing numbers
+taken from them are cited inline in the cinematic files.
+
+| Layer | Cinematic id | Shot cards to borrow with it |
+| --- | --- | --- |
+| Texture | `film-emulation`, `halation-bloom`, `light-leak` | `shot-grain-dissolve`, `shot-light-play-moves`, `shot-spotlight-sweep-moves`, `shot-white-flash-logo-simplify-cut` |
+| Frame | `aspect-ratio-reveal` | `shot-crane-rise-reveal`, `shot-text-as-mask` |
+| Camera | `push-in`, `rack-focus`, `dolly-zoom`, `parallax`, `speed-ramp` | `shot-crash-zoom-punch`, `shot-tension-camera-moves` (pull-back isolation, bullet time), `shot-space-camera-moves`, `shot-overhead-camera-moves`, `shot-steep-tilt-glide` (3D graphics camera moves) |
+| Cutting | `shot-scale-grammar`, `match-on-action`, `whip-cut`, `montage-rhythm` | `shot-rhythm-interrupt-moves` (punch-in ladder), `shot-beat-cut-moves` (flash crops), `shot-circle-match-iris`, `shot-transition-hidden-cut`, `shot-shot-transitions`, `shot-sakuga-timing-shift`, `shot-panel-grid-moves` |
+| Titles and sound | `title-sequence`, `trailer-sound`, `silence-before-hit` | `shot-trailer-grammar-moves` (bumper hook), `shot-letterspace-materialize`, `shot-brand-ink-open` |
+
+Duplicates merged (one id kept; the other should be a pointer):
+- `shot-speed-ramp-freeze` -> **`cinematic-speed-ramp`** (same time-remap device; the freeze variant and
+  its numbers now live in the cinematic file).
+- `shot-depth-layer-moves` -> **`cinematic-parallax`** (the graphics-layer path and its layer ratios now
+  live in the cinematic file).
+Everything else is related, not a duplicate: the cards build UI and graphics shots, the cinematic files
+treat footage, so both ids stay and point at each other.
+
 ## Gaps found (ids for GAPS.md)
 
 `clean-plate-inpaint`, `focus-pull-between-planes`, `anamorphic-streak-flare`, `lens-flare-element`,

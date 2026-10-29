@@ -21,6 +21,8 @@ blacks a touch lifted, a warm glow (halation) around bright edges, and a picture
 by a pixel or two in the gate. Shines on brand films, weddings, travel and anything that should
 feel crafted rather than recorded.
 
+Related shot card: `shot-grain-dissolve` (grain as a transition into a wordmark).
+
 ## Build it in Zenvi
 
 1. Tone: `color_grade_clip_tool` `{"timeline_clip_ids": [...], "highlights": -0.3, "shadows": 0.06,

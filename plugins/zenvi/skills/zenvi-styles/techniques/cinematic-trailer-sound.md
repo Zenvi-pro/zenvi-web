@@ -21,6 +21,8 @@ boom ("braam") on each title card; a riser that grows into the drop and is cut o
 reverse swell sucking into a slam; sub drops under the big hits. Levels and spacing are in
 `~/zenvi-motion/sound/CRAFT.md` (hype and trailer palettes).
 
+Related shot card: `shot-trailer-grammar-moves`.
+
 ## Build it in Zenvi
 
 Per moment, with `add_sfx_tool` (every recipe peaks on `at_seconds`):

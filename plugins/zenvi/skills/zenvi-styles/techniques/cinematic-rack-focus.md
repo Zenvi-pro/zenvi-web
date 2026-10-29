@@ -20,6 +20,8 @@ The lens racks from out of focus to sharp (or between two planes) so the viewer'
 lands where the director wants. Shines on the first shot of a trailer, an eye or a face
 in a documentary open, a product detail, a name on a door.
 
+Related shot card: `shot-tension-camera-moves` (focus falling off the surroundings in a pull-back).
+
 ## Build it in Zenvi
 
 1. `add_effect_tool` `{"timeline_clip_id": "<id>", "effect": "Blur", "properties":

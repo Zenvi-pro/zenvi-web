@@ -21,6 +21,8 @@ continues that motion from a new angle or size, so the eye follows the action an
 the cut. Its graphic cousin is the shape match (round thing -> round thing, same place, same
 size). Shines in action, sport, cars, and every story edit.
 
+Related shot cards: `shot-circle-match-iris` (shape match through an iris), `shot-transition-hidden-cut` (foreground occluder wipe).
+
 ## Build it in Zenvi
 
 Two angles of one take (stock rarely has both): play the wide, then cut to a digital punch-in
@@ -42,6 +44,8 @@ GAPS #32; `visual-match-cut-sequencer`, GAPS #20): pick the frame from a contact
   (the tight shot repeats the last 1-3 frames of the wide) so it feels continuous.
 - Change size by at least 1.5x (wide -> tight) or the cut reads as a jump cut.
 - The next shot after the tight angle keeps the same screen direction.
+- Shape match: the two circles must share a centre within ~10 px at 1080p (0.5 % of the width) or the match is visibly off; pulse the anchor (2 x scale 1.0 -> 1.16) before the cut so the eye is on it (video-shotcraft, Apache-2.0, `shot-circle-match-iris`).
+- Occluder cut: the cut frame is the one where the occluder's solid core covers the whole frame; the soft edges cover the frames either side (`shot-transition-hidden-cut`).
 
 ## Sound for it
 

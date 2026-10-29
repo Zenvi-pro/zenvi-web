@@ -20,6 +20,8 @@ The frame's shape changes on screen: black bars open from a thin slit to the 2.3
 first shot, or the band widens to full 16:9 at the payoff (the "IMAX" moment). Shines on a wide
 landscape opener, a venue reveal, the hero product or the couple's first look.
 
+Related shot cards: `shot-crane-rise-reveal`, `shot-text-as-mask`.
+
 ## Build it in Zenvi
 
 `add_shape_mask_tool` `{"clip_ids": ["<first shot>"], "shape": "rectangle", "width": 2.0,
@@ -36,6 +38,7 @@ landscape opener, a venue reveal, the hero product or the couple's first look.
 - Shape keyframes interpolate linearly (no ease option yet, `mask-keyframe-easing`); use more
   points (slow - fast - slow) to fake an ease-out.
 - One reveal per piece; a second one at the climax (band -> full frame) at most.
+- Reveal moves (video-shotcraft, Apache-2.0, `shot-crane-rise-reveal`): hold the start >= 0.7 s (20 f) so it can be read, move over 2.7-4.3 s (80-130 f; faster loses the eye, slower drags), then >= 1 s still once the full frame is reached.
 
 ## Sound for it
 

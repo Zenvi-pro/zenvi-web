@@ -21,6 +21,8 @@ slow shot (fog, a road, a face in shadow) or on black, holds long enough to read
 leaves with the picture. In documentaries it comes after the cold open; in trailers it is the
 last card. Shines wherever the edit needs to say "this is a film".
 
+Related shot cards: `shot-letterspace-materialize` (wide-tracked wordmark drawn on), `shot-brand-ink-open`, `shot-crane-rise-reveal`.
+
 ## Build it in Zenvi
 
 1. Background shot, slow and dark, at least title + 2 s long: `add_clip_to_timeline_tool`; check the
@@ -42,6 +44,8 @@ with a slow `cinematic-push-in` on the background.
 - Hold >= 2.5 s for 2-4 words; size 0.08-0.12 of the short side, centred, in the 2.39 band if bars.
 - Title out = picture out: end them together with a 1-1.5 s fade, never a hard cut to black.
 - One typeface, white or the film's light ink; no outline, no drop shadow box.
+- Drawn-on titles (video-shotcraft, Apache-2.0, `shot-letterspace-materialize`): every letter starts and finishes on the same frame (staggered letters were judged wrong there too), ~1.7 s of drawing (50 f; under 1 s you cannot see it drawn, over 2.7 s drags), tracking ~0.6 em, then >= 1 s fully still so the word is read once.
+- End any opening title with a full second of stillness before it leaves (`shot-brand-ink-open`).
 
 ## Sound for it
 

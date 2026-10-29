@@ -20,6 +20,8 @@ Bright sources spill light into their surroundings: bloom is the soft glow, hala
 red-orange fringe film adds around hard highlights. It makes night footage expensive and day
 footage dreamy. Shines on headlights, practicals, stage lights, candles, sun glints.
 
+Related shot cards: `shot-light-play-moves`, `shot-spotlight-sweep-moves`.
+
 ## Build it in Zenvi
 
 1. `apply_fx_tool` `{"clip_id": "<id>", "effects": [{"effect": "bloom", "amount": 0.6,

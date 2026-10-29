@@ -20,6 +20,8 @@ The subject is lifted off its background and the two planes move at different sp
 photo or a static shot gains depth (the documentary "Ken Burns in 3D" move). Shines on archival
 photos, portraits in a landscape, title backgrounds.
 
+`shot-depth-layer-moves` (multi-layer parallax slider for graphics) is merged here; this file is the one id. Graphics layers have no clean-plate problem, so that path works today.
+
 ## Build it in Zenvi
 
 Not buildable cleanly today. The layers exist: `replace_background_tool` `{"clip_id",
@@ -40,6 +42,10 @@ Fallback that looks good today (one plane, still "camera"):
 
 - 4-6 s, linear or very gentle ease; the planes never change direction.
 - Foreground moves 1.5-2x the background's distance.
+- Layer speeds 0.35 / 0.7 / 1.4 of the camera move (+ 0 for type), at least 2x between neighbouring layers or the depth is unreadable; <= 4 layers (video-shotcraft, Apache-2.0, `shot-depth-layer-moves`).
+- Anchor the depth: blur the nearest and farthest layer, desaturate the back, add haze; without anchors it reads as stickers sliding.
+- 4-5.5 s, and end the slide on the subject centred, then give it a beat (a 1.03 lift); an endless slide reads as a screensaver.
+- Graphics path today: separate image / title / motion-block clips on stacked tracks, one `set_keyframes_tool` `location_x` ramp per layer scaled by the factors above.
 
 ## Sound for it
 

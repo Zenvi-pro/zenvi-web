@@ -20,6 +20,8 @@ Light spilling onto the film: a warm leak drifting in from an edge, or a burn th
 at the end of a roll. As a transition it is the softest join there is; as a texture it says
 "memory". Shines in weddings, summer travel, music videos, warm brand stories.
 
+Related shot cards: `shot-transition-hidden-cut` (cut hidden in a warm light peak, an occluder or a slam), `shot-white-flash-logo-simplify-cut`, `shot-light-play-moves`.
+
 ## Build it in Zenvi
 
 Burn as a transition (only on the tail of the outgoing shot):
@@ -39,6 +41,8 @@ missing (`lens-flare-element`).
 - Leaks: amount 0.3-0.5, one every 6-10 s; vary `seed` so no two are the same.
 - Use it on warm shots and on cuts between similar warmth; a burn into a cold night shot breaks.
 - Put the flash on a beat or a lyric, otherwise it reads as unmotivated.
+- White flash: start at 95 % opacity and fall to 0 over 4 frames ease-out; longer than 6 frames it turns into a soft dissolve and loses the shutter snap. Put the hard cut inside the 1-3 brightest frames (video-shotcraft, Apache-2.0, `shot-beat-cut-moves`, `shot-transition-hidden-cut`).
+- Give a flash a wind-up: 0.4 s of brightening (about 1.7x) before it, or it reads as a dropped frame (`shot-white-flash-logo-simplify-cut`).
 
 ## Sound for it
 

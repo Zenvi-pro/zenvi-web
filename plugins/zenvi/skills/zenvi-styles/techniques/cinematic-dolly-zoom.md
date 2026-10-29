@@ -19,6 +19,8 @@ needs: [clean-plate-inpaint, parallax-layer-camera-rig]
 The camera dollies one way while the lens zooms the other: the subject stays the same size,
 the background swells or collapses behind them. One per film, on the moment of realisation.
 
+Related shot card: `shot-tension-camera-moves` (pull-back isolation and bullet time - buildable for graphics).
+
 ## Build it in Zenvi
 
 Not buildable cleanly today. The emulation is two layers: `replace_background_tool`
@@ -40,6 +42,7 @@ Fallback that looks good today:
 - 2-4 s, ease in-out, background 1.0 -> 1.2-1.35 (or reversed).
 - The subject must be still; any motion breaks the illusion.
 - Once per film.
+- Pull-back isolation, the buildable cousin (video-shotcraft, Apache-2.0, `shot-tension-camera-moves`): scale 2.2 -> 0.62 over ~3.7 s (110 f) ease-out cubic about the subject, the surroundings dimming nearest-first; then hold >= 1.3 s still. At most two emotional camera moves per film, each once.
 
 ## Sound for it
 

@@ -21,6 +21,8 @@ It turns stock stills and locked-off shots into "camera work" and builds tension
 a line or a riser. Shines on faces, a lone figure in a landscape, products on a table,
 an interview answer that matters.
 
+Related shot cards: `shot-crash-zoom-punch` (the fast cousin), `shot-trailer-grammar-moves` (micro-push inside a fast run).
+
 ## Build it in Zenvi
 
 1. `set_keyframes_tool` `{"timeline_clip_id": "<id>", "property": "scale_x", "points":
@@ -39,6 +41,8 @@ an interview answer that matters.
 - One push direction per sequence; alternate push-in / static for rhythm, not in / out.
 - Sources narrower than the frame (2048x1080, 2.39:1) start at 1.07 so no bars show.
 - On the last shot under a title, keep pushing through the title; stopping early feels dead.
+- Inside a fast run every shot still creeps: scale 1.0 -> 1.04 linear per shot; three static frames in a row read as a slideshow (video-shotcraft, Apache-2.0, `shot-trailer-grammar-moves`).
+- Crash zoom (`shot-crash-zoom-punch`): 4-8 frames (6 f at 30 fps) to 2.4-2.8x so the target fills 60-75 % of the frame; land with a 3-6 % overshoot (elastic) or a decaying shake (~14 px, 0.06 s time constant, under 20 px); hold the wide >= 1 s before and the close >= 1.5 s after. Over 10 f it is just a push.
 
 ## Sound for it
 

@@ -21,6 +21,8 @@ close-up (how they feel) - or reversed, detail first then context, for a mystery
 Each step is at least 1.5x tighter. Shines in every story edit; it is what makes stock B-roll feel
 like a scene instead of a list.
 
+Related shot cards: `shot-rhythm-interrupt-moves` (jump-cut punch-in ladder), `shot-beat-cut-moves` (wide -> card -> close crops on white flashes).
+
 ## Build it in Zenvi
 
 1. Pick shots of one subject in one place (the judge rejected an aerial of another lake as the
@@ -39,6 +41,8 @@ from a contact sheet.
 - Shots shorten as they tighten (the close-up is the shortest), except the emotional hold.
 - Reverse order (ECU -> WS) for cold opens and reveals: detail, detail, then the room.
 - Cut on action between the steps when there is movement (`cinematic-match-on-action`).
+- Punch-in ladder on one take (video-shotcraft, Apache-2.0, `shot-rhythm-interrupt-moves`): 1.0 -> 1.6 -> 2.6, each step held >= 1.2 s (35 f), steps >= 1.5x apart (less reads as a camera bump), a 2-frame dip to 92 % brightness on each jump (without it the jump reads as a dropped frame), last step held >= 1.5 s.
+- Flash-cut version (`shot-beat-cut-moves`): crops 1.0 / 1.6 / 2.8 in that order on three white flashes 0.6-0.75 s apart, tightening; hold the final close-up twice as long as the others.
 
 ## Sound for it
 
