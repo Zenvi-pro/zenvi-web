@@ -45,6 +45,8 @@ export interface HitPoint {
   t: number;
   kind: string;
   needsCue: boolean;
+  /** The sound that covers it on its own (the spotter's pick); default by kind. */
+  recipe?: string;
 }
 
 /** A placed sound effect: `t` is its hit point on the timeline. */
@@ -447,7 +449,7 @@ export function scoreMix(input: ScoreInput): MixScore {
     const recipe = (kind: string): string => (kind === "transition" ? "whoosh_short" : kind === "title" ? "pop" : kind === "ui" ? "ui_tap" : "impact_punch");
     put("H1_coverage", need.length ? (need.length - uncovered.length) / need.length : null, COVERAGE_MIN[genre] ?? 0.9, 1, "placement", {
       text: `${uncovered.length} hit point(s) have no cue: ${uncovered.slice(0, 5).map((h) => `${h.kind} @${h.t.toFixed(2)}`).join(", ")}`,
-      calls: uncovered.slice(0, 5).map((h) => ({ tool: "add_sfx_tool", args: { recipe: recipe(h.kind), at_seconds: r2(h.t) } })),
+      calls: uncovered.slice(0, 5).map((h) => ({ tool: "add_sfx_tool", args: { recipe: h.recipe ?? recipe(h.kind), at_seconds: r2(h.t) } })),
     });
     const untiedCues = cues.filter((c) => c.role !== "micro" && !hits.some((h) => Math.abs(h.t - c.t) <= tol));
     const placed = untiedCues.filter((c) => !c.auto);

@@ -171,6 +171,31 @@ describe("add_sfx_tool with the recorded kit", () => {
     expect(elsewhere.text).toMatch(/cannot fetch Zenvi's recorded kit/);
   });
 
+  it("takes kit:NNNN ids, cuts a recording to the asked duration, says where align=start starts it, and plays sub_drop as a sub", async () => {
+    // Regressions (sk2-product-brand): each of these was refused, ignored or misreported.
+    const doc = edit();
+    const host = kitHost();
+    const search = await runTool({ doc, host }, "search_sound_library_tool", { category: "sparkle", near_seconds: 0.5 });
+    const pick = dataOf<{ pick: string }>(search).pick.replace(/^kit:/, "");
+    const prefixed = await runTool({ doc, host }, "add_sfx_tool", { provider: "kit", sound_id: `kit:${pick}`, at_seconds: 0.5 });
+    expect(prefixed.ok, prefixed.text).toBe(true);
+
+    const short = await runTool({ doc, host }, "add_sfx_tool", { recipe: "impact_punch", at_seconds: 1, duration: 0.3 });
+    expect(short.ok, short.text).toBe(true);
+    const punch = sfxClips(doc).find((c) => recordedSample(kitIdOf(doc, c)!)?.group === "punch")!;
+    expect(punch.end - punch.start).toBeLessThanOrEqual(0.3 + 0.05);
+
+    const started = await runTool({ doc, host }, "add_sfx_tool", { recipe: "whoosh_fall", at_seconds: 2, align: "start" });
+    expect(started.ok, started.text).toBe(true);
+    expect(started.text).toMatch(/starting on 2\.00 s, its peak at 2\.\d\d s/);
+    expect(sfxClips(doc).some((c) => Math.abs(c.position - 2) < 1e-6)).toBe(true);
+
+    for (const at of [2.5, 3, 3.5]) await runTool({ doc, host }, "add_sfx_tool", { recipe: "sub_drop", at_seconds: at });
+    const subs = sfxClips(doc).map((c) => recordedSample(kitIdOf(doc, c)!)).filter((s) => s?.group === "sub");
+    expect(subs).toHaveLength(3);
+    for (const s of subs) expect((s!.endMs - s!.onsetMs) / 1000).toBeGreaterThanOrEqual(0.9);
+  });
+
   it("counts a placed kit sound at its hit point, not where its pre-roll starts", async () => {
     // Regression: the variety rules read clip starts, so a whoosh peaking on 2 s counted as 0.4 s earlier than the moments asked about.
     const doc = edit();

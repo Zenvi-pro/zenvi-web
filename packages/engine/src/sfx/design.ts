@@ -168,6 +168,34 @@ function choose(input: DesignInput): { keep: Set<number>; dry: Map<number, strin
 }
 
 /** The design for a cue sheet. */
+/** The UI sound a block event plays (a toggle, a pop, a key per swapped letter, a click); undefined: the palette's pick. */
+function uiEventRecipe(event: HitPoint["event"]): string | undefined {
+  return event === "toggle" ? "toggle" : event === "pop" ? "pop" : event === "swap" ? "keyboard_key" : event === "click" ? "mouse_click" : undefined;
+}
+
+/**
+ * The one sound that covers a hit point on its own (master_audio_tool's
+ * coverage fix): a block's click is a click and its swap a key, a move a
+ * whoosh, a glint a sparkle; only hits get an impact.
+ */
+export function soloRecipe(p: Pick<HitPoint, "role" | "event" | "kind">): string {
+  if (p.kind === "title") return "pop";
+  switch (p.role) {
+    case "ui":
+      return p.event === "type" ? "typing_burst" : (uiEventRecipe(p.event) ?? "ui_tap");
+    case "micro":
+      return p.event === "glint" ? "sparkle" : "ui_tap";
+    case "move":
+      return "whoosh_short";
+    case "transition":
+      return p.kind === "transition" ? "whoosh_short" : "impact_punch";
+    case "impact":
+      return p.event === "land" ? "impact_thud" : "impact_punch";
+    default:
+      return "impact_punch";
+  }
+}
+
 export function designSound(input: DesignInput): SoundDesign {
   const { points, palette, duration } = input;
   const rng = new Rng(Math.imul(input.seed | 0, 2654435761) ^ 0x5d2);
@@ -279,7 +307,7 @@ export function designSound(input: DesignInput): SoundDesign {
           // Ticks pitch-walk upward across the run (CRAFT.md §10 flash montage, counters).
           for (let k = 0; k < count; k += 1) add(i, "ui_tap", "ui", role, p.t + k / rate, { pitch: Math.min(6, k * 0.25), pan: uiPan, duration: 0.06 }, `${p.label} (tick ${k + 1}/${count})`);
         } else {
-          const recipe = p.event === "toggle" ? "toggle" : p.event === "pop" ? "pop" : p.event === "swap" ? "keyboard_key" : p.event === "click" ? "mouse_click" : pool.pick("ui", palette.ui);
+          const recipe = uiEventRecipe(p.event) ?? pool.pick("ui", palette.ui);
           add(i, recipe, "ui", role, p.t, { pan: uiPan, pitch: pitch() }, p.label);
         }
         break;
