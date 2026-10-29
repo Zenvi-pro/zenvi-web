@@ -21,6 +21,8 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   shot_similarity_tool: { file_ids: [IDS.interview, IDS.broll] },
   add_kinetic_title_tool: { text: "Title" },
   add_type_block_tool: { block: "write_on", text: "Title" },
+  build_product_launch_tool: { product: "Oarlight", features: ["Fast"] },
+  build_trailer_tool: { title: "The Long Way" },
   match_cut_montage_tool: { file_ids: [IDS.interview] },
   track_point_tool: { clip_id: IDS.clipA },
   pin_to_track_tool: { footage_clip_id: IDS.clipA },

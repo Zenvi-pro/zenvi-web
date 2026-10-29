@@ -11,6 +11,13 @@ moves and look, flashes on downbeats, an opening hook title, shot labels,
 an end card, and the music bed faded out. Your job is the part a director
 does: the brief, the footage, the music, the words, and the final check.
 
+Four more videos have their own one-call builder, each one undo step with
+a receipt of every decision and fallback: `build_explainer_tool` (a voice-over
+explainer or documentary), `build_talking_head_tool` (a creator talking to
+camera), `build_product_launch_tool` (problem, reveal, features, proof, end
+card) and `build_trailer_tool` (three acts, braams, title cards). Use them
+instead of `build_reel_tool` for those asks, then finish the same way.
+
 When the ask names a genre or technique `build_reel_tool` does not cover
 (match cuts aligned on a subject, flash montages, kinetic captions, glass UI
 promos, 3D product shots, grid montages, video essays), points at a reference

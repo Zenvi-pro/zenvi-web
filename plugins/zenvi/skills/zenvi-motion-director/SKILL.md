@@ -33,14 +33,15 @@ is the rules every genre shares. Do not plan before you have read it.
 | --- | --- | --- |
 | shapes or poses that line up across cuts | `recipes/match-cut-montage.md` | match_cut_montage_tool, detect_subject_tool |
 | a new image every few frames, "evolution of" | `recipes/flash-montage.md` | gather_stock_footage_tool, match_cut_montage_tool transitions=flash |
-| person talking, captions are the show | `recipes/kinetic-captions.md` | generate_tts…, generate_subject_matte_tool, kinetic_captions_tool (cues, text_size, animation), add_kinetic_title_tool |
-| app, AI tool, SaaS launch | `recipes/saas-ui-promo.md` | add_motion_block_tool (glass_cards, prompt_bar, kinetic_headline, counter, word_rotator) |
-| one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
+| person talking, captions are the show | `recipes/kinetic-captions.md` | **build_talking_head_tool first** (jump cuts, punch-ins, keyword B-roll, hook behind the speaker, captions), then generate_tts…, generate_subject_matte_tool, kinetic_captions_tool (cues, text_size, animation), add_kinetic_title_tool |
+| app, AI tool, SaaS launch | `recipes/saas-ui-promo.md` | **build_product_launch_tool first** (problem → reveal → features → proof → end card), then add_motion_block_tool (glass_cards, prompt_bar, kinetic_headline, counter, word_rotator) |
+| one product, 3D, "spins in" | `recipes/3d-product-ad.md` | build_product_launch_tool three_d, add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
 | type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
 | tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
 | map, countries, stats, "over the years", data explainer | `recipes/data-explainer.md` | add_motion_block_tool (geo_map, pictogram_morph, bar_race, data_clock, chart_build) |
-| voice-over essay, story, explainer | `recipes/documentary.md` | TTS, kinetic_captions_tool documentary, add_kinetic_title_tool, build_reel_tool cinematic, grid collage |
-| sport, cars, launch hype, "fast", "hype", "trailer", "edit to this song" | `recipes/hype-reel.md` | **build_reel_tool hype first** (ramp, glitch drop, whips, flashes, one look built in), auto_sound_design_tool every_cut, review_edit_tool |
+| voice-over essay, story, explainer | `recipes/documentary.md` | **build_explainer_tool first** (B-roll on keywords, chapters, counters, captions), TTS, kinetic_captions_tool documentary, add_kinetic_title_tool, build_reel_tool cinematic, grid collage |
+| film, game or event trailer (three acts, braams, title cards) | `recipes/hype-reel.md` (Trailers) | **build_trailer_tool first**, then the finish |
+| sport, cars, launch hype, "fast", "hype", "edit to this song" | `recipes/hype-reel.md` | **build_reel_tool hype first** (ramp, glitch drop, whips, flashes, one look built in), auto_sound_design_tool every_cut, review_edit_tool |
 | how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
 | intro, showreel, "about me" | `recipes/showreel-intro.md` | title_3d, word_rotator, grid zoom_into, particle_burst |
 
