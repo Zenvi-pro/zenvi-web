@@ -5,6 +5,7 @@ import { ProjectDocument } from "../../history/document.js";
 import { createProject } from "../../model/defaults.js";
 import { addClip, deleteClips } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
+import { addTransition } from "../../ops/transitions.js";
 import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
 import type { ToolReceipt } from "../receipt.js";
 import { runTool } from "../registry.js";
@@ -98,6 +99,7 @@ describe("snap_cuts_to_beats_tool", () => {
       addClip(tx, { fileId: "SHOT0XXXXX", position: 0, layer: video!, start: 0, end: 3.3, id: "CLIPSHOT0X" });
       addClip(tx, { fileId: "SHOT1XXXXX", position: 3.3, layer: video!, start: 0, end: 2.2, id: "CLIPSHOT1X" });
       addClip(tx, { fileId: "SHOT2XXXXX", position: 5.5, layer: video!, start: 0, end: 4, id: "CLIPSHOT2X" });
+      addTransition(tx, { layer: video!, position: 8.5, duration: 1, maskId: "common/fade", direction: "out", id: "TRANSFADE1" });
     });
     const roll = await run(doc as unknown as ReturnType<typeof fixtureDoc>, { bpm: 120, offset_seconds: 0, mode: "roll" });
     expect(roll.receipt.status).toBe("unchanged");
@@ -121,5 +123,8 @@ describe("snap_cuts_to_beats_tool", () => {
       [5, 0, 4],
     ]);
     expect(timing("CLIPSONGXX")).toEqual([0, 0, 30]);
+    // The fade out on the last shot moves up with it.
+    expect(doc.project.effects.find((t) => t.id === "TRANSFADE1")!.position).toBeCloseTo(8, 6);
+    expect(data.movedTransitionIds).toEqual(["TRANSFADE1"]);
   });
 });
