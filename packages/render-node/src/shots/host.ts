@@ -27,10 +27,15 @@ const FRAME_BYTES = SIZE * SIZE * 3;
 const CHUNK = 32;
 const CACHE_FORMAT = 1;
 
+/** What the host runs: SigLIP, or a stand-in (tests). */
+export type ShotModel = Pick<Siglip, "info" | "embedImages" | "embedText">;
+
 export interface NodeShotHostOptions extends ModelCacheOptions {
   /** Project path → local file (default: the path itself). */
   resolveMedia?: (projectPath: string) => string;
   threads?: number;
+  /** Another model than SigLIP (tests): always ready, nothing to download. */
+  model?: ShotModel;
 }
 
 interface CacheFile {
@@ -74,13 +79,14 @@ function decodeVectors(base64: string, dims: number): Float32Array[] {
 }
 
 export function createNodeShotHost(options: NodeShotHostOptions = {}): ShotHost {
-  const model = new Siglip(options);
+  const model: ShotModel = options.model ?? new Siglip(options);
   const local = options.resolveMedia ?? ((p: string) => p);
   const root = path.join(options.root ?? cacheDir(options.env), "shots", SIGLIP_BASE.id);
   const missing = (): string =>
     `the shot model (SigLIP base, Apache-2.0) is not downloaded yet: a one-time ${modelDownloadMb(SIGLIP_BASE)} MB download into Zenvi's cache. ` +
     "Ask the person first, then call embed_media_tool with download=true (or run `zenvi shots setup`)";
   const status = async (): Promise<ShotModelStatus> => {
+    if (options.model) return { ready: true, detail: `${model.info.name} is loaded` };
     if (!onnxRuntimeAvailable()) return { ready: false, detail: "shot embeddings need onnxruntime-node (npm install onnxruntime-node)" };
     if (await modelPresent(SIGLIP_BASE, options)) return { ready: true, detail: `${SIGLIP_BASE.name} (${SIGLIP_BASE.license}) is installed` };
     return { ready: false, detail: missing(), downloadMb: modelDownloadMb(SIGLIP_BASE) };
@@ -123,7 +129,7 @@ export function createNodeShotHost(options: NodeShotHostOptions = {}): ShotHost 
     model: model.info,
     status,
     async setup(signal) {
-      if (!onnxRuntimeAvailable()) return status();
+      if (options.model || !onnxRuntimeAvailable()) return status();
       await ensureModel(SIGLIP_BASE, { ...options, signal: signal ?? options.signal });
       return status();
     },
