@@ -4435,7 +4435,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 ### fill_to_length_tool
 
-**Fill to length** (direct tool). Make an edit that runs short reach the asked length instead of shipping short: the last shot holds longer into its unused media (up to 3 s), then new shots go after it from unused footage (bin files not on the timeline, then unseen moments of the timeline's own files; each the track's median shot length, in whole beats when the music's beat is known), then the last shots slow (not below max_slow).
+**Fill to length** (direct tool). Make an edit that runs short reach the asked length instead of shipping short: the last shot holds longer into its unused media (up to 3 s), then new shots go after it from unused footage (bin files not on the timeline, then unseen moments of the timeline's own files; each the track's median shot length, in whole beats when the music's beat is known), then the last shots slow (not below max_slow), and as a last resort earlier shots repeat (named in a warning).
 
 Surfaces: mcp, cli, editor. edits.
 
@@ -4445,7 +4445,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | --- | --- | --- | --- |
 | `seconds` | number | yes | The length the edit should run, seconds (e.g. the brief's length). (min 1, max 3600) |
 | `track` | string |  | The picture track to extend (UI track number, name or layer number). Default: the track with the most video clips. |
-| `steps` | ("hold" \| "broll" \| "slow")[] |  | Which fills to use, tried in this order: hold (the last shot runs on into its media, up to 3 s), broll (new shots after it from unused footage), slow (the last new shot, or the track's last few shots, slowed, not below max_slow). Default all three. |
+| `steps` | ("hold" \| "broll" \| "slow" \| "repeat")[] |  | Which fills to use, tried in this order: hold (the last shot runs on into its media, up to 3 s), broll (new shots after it from unused footage), slow (the last new shot, or the track's last few shots, slowed, not below max_slow), repeat (the track's shots again, earliest first: the last resort). Default all four. |
 | `file_ids` | string[] |  | Footage the broll step may use, in order. Default: bin videos and photos not on the timeline, then unseen moments of the timeline's own files. |
 | `max_slow` | number |  | Slowest speed the slow step plays a shot at (default 0.75). (min 0.25, max 1) |
 | `dry_run` | boolean |  | true: only say what would be added (nothing changes). |

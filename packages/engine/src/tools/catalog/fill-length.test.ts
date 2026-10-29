@@ -117,4 +117,19 @@ describe("fill_to_length_tool", () => {
     const done = await fill(doc, { seconds: 7 });
     expect(done.receipt.status).toBe("unchanged");
   });
+
+  it("repeats earlier shots, the earliest first, only as the last resort, and says so", async () => {
+    const doc = shortEdit();
+    const { receipt, data } = await fill(doc, { seconds: 14, steps: ["repeat"] });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    expect(data.shots).toEqual([
+      { file_id: "FILEAAAAAA", start: 0.2, end: 4.2, repeat: true },
+      { file_id: "FILEBBBBBB", start: 0.2, end: 2.2, repeat: true },
+    ]);
+    expect(receipt.warnings?.join(" ")).toMatch(/2 shot\(s\) at the end repeat earlier footage/);
+    expect(picture(doc).slice(2)).toEqual([
+      ["FILEAAAAAA", 8, 0.2, 4.2],
+      ["FILEBBBBBB", 12, 0.2, 2.2],
+    ]);
+  });
 });
