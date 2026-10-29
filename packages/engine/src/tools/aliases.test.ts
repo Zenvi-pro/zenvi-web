@@ -25,6 +25,17 @@ describe("aliasArguments", () => {
     expect(aliasArguments(schema("file_id"), other).args).toBe(other);
   });
 
+  it("does not rename onto an argument that means something else", () => {
+    // master_audio_tool's limit is the limiter switch: max_results "0" would turn it off.
+    const master = { properties: { limit: { type: "boolean" } } };
+    expect(aliasArguments(master, { max_results: "0" })).toEqual({ args: { max_results: "0" }, notes: [] });
+    // detect_subject_tool's time is a source time; at_seconds is a timeline moment.
+    const detect = { properties: { time: { type: "number", description: "Source seconds to look at." } } };
+    expect(aliasArguments(detect, { at_seconds: 2 }).notes).toEqual([]);
+    const frame = { properties: { time: { type: "number", description: "Timeline seconds to analyze." } } };
+    expect(aliasArguments(frame, { at_seconds: 2 }).args).toEqual({ time: 2 });
+  });
+
   it("does not touch the caller's object", () => {
     const args = { clip_id: "A" };
     aliasArguments(schema("timeline_clip_id"), args);

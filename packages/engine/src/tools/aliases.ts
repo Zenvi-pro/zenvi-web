@@ -85,12 +85,23 @@ function itemsOf(node: unknown): SchemaNode | undefined {
   return undefined;
 }
 
+/**
+ * A rename that would change what the value means: a count read as a switch
+ * (master_audio_tool's `limit`), a timeline moment as a source time
+ * (detect_subject_tool's `time`). Those calls stay refused.
+ */
+function changesMeaning(key: string, target: unknown): boolean {
+  if (!isRecord(target)) return false;
+  if (target.type === "boolean") return true;
+  return key === "at_seconds" && typeof target.description === "string" && /^source\b/i.test(target.description);
+}
+
 function aliasObject(properties: Record<string, unknown>, args: Record<string, unknown>, names: Readonly<Record<string, readonly string[]>>, where: string, notes: string[]): Record<string, unknown> {
   let out: Record<string, unknown> | undefined;
   const edit = (): Record<string, unknown> => (out ??= { ...args });
   for (const key of Object.keys(args)) {
     if (Object.hasOwn(properties, key)) continue;
-    const targets = (names[key] ?? []).filter((name) => Object.hasOwn(properties, name));
+    const targets = (names[key] ?? []).filter((name) => Object.hasOwn(properties, name) && !changesMeaning(key, properties[name]));
     // One id where the tool takes only the list (separate_clip_audio_tool's timeline_clip_ids): the list of one.
     const plural = targets.length === 0 && Object.hasOwn(properties, `${key}s`) && /_ids?$/.test(key) ? `${key}s` : undefined;
     const target = targets.length === 1 ? targets[0]! : plural;
