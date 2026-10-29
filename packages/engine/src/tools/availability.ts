@@ -60,6 +60,7 @@ export type HostMethod =
   | "exporter.supports"
   | "frames.fontFamilies"
   | "frames.renderSheet"
+  | "frames.sampleFrames"
   | "audio.measureMix";
 
 export interface ToolNeeds {
@@ -257,6 +258,10 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   create_sound_kit_tool: {
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
     partialNote: "without Openverse (or stock search), downloads and audio decoding only procedural kits are made",
+  },
+  sequence_shots_tool: {
+    optional: ["frames.sampleFrames"],
+    partialNote: "without frame sampling each shot is compared on a few rendered frames (its ends and five through it), so its energy is coarser",
   },
   match_cut_montage_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated", "frames"],
@@ -468,6 +473,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "exporter.supports",
       "frames.fontFamilies",
       "frames.renderSheet",
+      "frames.sampleFrames",
       "audio.measureMix",
     ],
     conditional: {
@@ -594,6 +600,7 @@ function needName(need: HostCapability | HostMethod): string {
     "frames.fontFamilies": "listing the fonts titles render with",
     "frames.renderSheet": "composing contact sheets",
     "media.decodeLuma": "decoding video frames for motion analysis",
+    "frames.sampleFrames": "decoding a stretch of frames in one pass",
     "audio.measureMix": "mixing and measuring the audio",
   };
   return names[need as HostMethod];

@@ -40,6 +40,7 @@ const DIRECT_TOOLS = [
   "hold_point_reframe_tool",
   "auto_reframe_tool",
   "screen_zoom_follow_tool",
+  "sequence_shots_tool",
   "unify_grade_tool",
   "review_edit_tool",
   "review_render_tool",

@@ -35,7 +35,9 @@ eyes), and inside a group keep the shape centred.
    framing, no zoom. Without boxes the tool hunts for circles in every image
    and zooms 4-17x into whatever it finds. Shape matches then come from
    choosing images whose spiral or circle is already centred at a similar
-   size, and putting them next to each other in `file_ids`. The tool ends on
+   size, and putting them next to each other in `file_ids` (`sequence_shots_tool`
+   with `dry_run: true`, `continuity: 2` finds those neighbours: pass its
+   `data.file_ids`). The tool ends on
    the last downbeat before `duration_seconds`: ask for 1-2 s more than the
    run needs; its first and last shots are held, so keep the first short
    (trim it to 0.6-0.8 s) and put the end title over the last.

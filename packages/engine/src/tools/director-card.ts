@@ -4,9 +4,9 @@
  * miss, for the MCP servers' `instructions` (sent at initialize, so every
  * client sees it whether or not it loads a skill). Bench round 5: agents that
  * never opened the recipe left grade and sound to chance. It must stay under
- * 400 tokens: 366 on Claude Sonnet 5.5 as written, 926 characters (Bedrock
- * converse usage, 2026-10-28), so the CLI's test bounds it at 1000
- * characters. The recipes keep the craft. DIRECTOR_CARD and DIRECTOR_START go
+ * 400 tokens: 366 on Claude Sonnet 5.5 at 926 characters (Bedrock
+ * converse usage, 2026-10-28), 993 with the ORDER line, so the CLI's test
+ * bounds it at 1000 characters. The recipes keep the craft. DIRECTOR_CARD and DIRECTOR_START go
  * out only from the CLI's `zenvi mcp`, where render_video and
  * read_director_recipe exist; FINISH_HINT is in engine tool descriptions on
  * every surface, so it names Zenvi Cloud's render_project too.
@@ -26,8 +26,15 @@ const FINISH =
   "Finish every edit, in order: unify_grade_tool; apply_motion_transitions_tool (no track = every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
   "master_audio_tool iterate=true, last; render_video; review_render_tool; watch_render_tool once, fix its HIGH issues. Receipts name what is still missing: make those calls.";
 
+/**
+ * Re-edit bench (2026-10-28): agents given a bin of finished shots cut them in
+ * bin order (Kendall tau -0.14 against the editor's) and never opened a skill.
+ */
+const ORDER = "Given shots to re-edit: order them with sequence_shots_tool first.";
+
 export const DIRECTOR_CARD: string = [
   `Whole videos (reel, ad, promo, montage, a reference to recreate): before the first edit read the genre's recipe with read_director_recipe {recipe} (or the zenvi-motion-director skill's recipes/). ${RECIPES}`,
+  ORDER,
   FINISH,
   "Captions on a TTS voice: kinetic_captions_tool timeline_clip_ids=[the TTS clip] uses its word timings.",
 ].join("\n");
@@ -37,4 +44,4 @@ export const DIRECTOR_CARD: string = [
 const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
-export const DIRECTOR_START: string = `A new edit: read the genre's recipe first, read_director_recipe {recipe}. ${RECIPES} ${FINISH} ${BEST_OF}`;
+export const DIRECTOR_START: string = `A new edit: read the genre's recipe first, read_director_recipe {recipe}. ${RECIPES} ${ORDER} ${FINISH} ${BEST_OF}`;
