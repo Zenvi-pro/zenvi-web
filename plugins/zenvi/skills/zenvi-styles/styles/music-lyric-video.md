@@ -3,7 +3,7 @@ id: music-lyric-video
 kind: style
 summary: "For a song or spoken-word piece: lyrics on the vocal onsets, resets in the breaths, one treatment, the song as the mix."
 categories: [music-lyric-video]
-tools: [set_project_setting_tool, gather_stock_footage_tool, import_files_tool, transcribe_media_tool, get_transcript_tool, analyze_timeline_audio_tool, add_marker_tool, add_clip_to_timeline_tool, set_clip_properties_tool, unify_grade_tool, fade_clip_tool, set_keyframes_tool, kinetic_captions_tool, add_kinetic_title_tool, add_captions_tool, edit_captions_tool, subject_glow_tool, generate_subject_matte_tool, master_audio_tool, review_edit_tool, review_render_tool]
+tools: [set_project_setting_tool, apply_look_tool, gather_stock_footage_tool, import_files_tool, transcribe_media_tool, get_transcript_tool, analyze_timeline_audio_tool, add_marker_tool, add_clip_to_timeline_tool, set_clip_properties_tool, unify_grade_tool, fade_clip_tool, set_keyframes_tool, kinetic_captions_tool, add_kinetic_title_tool, add_captions_tool, edit_captions_tool, subject_glow_tool, generate_subject_matte_tool, master_audio_tool, review_edit_tool, review_render_tool]
 pace: calm
 mood: [emotional, intimate, moody, dreamy]
 aspect: ["9:16", "16:9", "1:1", "4:5"]
@@ -60,7 +60,7 @@ Stanza blocks run 3-7 s (median ~4 s).
 ## Look & grade
 
 - One treatment for the whole piece: a single hue (cobalt night
-  `unify_grade_tool` look `duotone #02060f #9cc3ff` at ~0.85), zero
+  `apply_look_tool` look_id `duotone #02060f #9cc3ff`; generated looks are refused by `unify_grade_tool`), zero
   saturation, or pure black and off-white.
 - The focal element is the brightest thing in frame: type or a glowing
   silhouette (`generate_subject_matte_tool` + `subject_glow_tool`).
@@ -97,8 +97,11 @@ Stanza blocks run 3-7 s (median ~4 s).
 ## Captions/VO
 
 The lyric is the caption. Timing source, in order of preference: a known
-lyric sheet with hand-set cues (`kinetic_captions_tool` `cues`, one cue per
-sung line, end = stanza clear time); `transcribe_media_tool` on a spoken or
+lyric sheet with hand-set line onsets: one `add_kinetic_title_tool` per line
+(start = vocal onset, end = stanza clear, `y` stepped per line), because
+`kinetic_captions_tool` regroups overlapping cues out of order; vocal onsets
+from the stem's silences (`analyze_timeline_audio_tool` needs an indexed
+clip); `transcribe_media_tool` on a spoken or
 clearly sung vocal; never trust ASR on a dense sung mix (`lyric-forced-alignment`
 is missing: no tool aligns known lyrics to sung audio).
 
@@ -115,10 +118,12 @@ add_clip_to_timeline_tool {"file_id": "<night sea>", "position_seconds": 0, "sta
 add_clip_to_timeline_tool {"file_id": "<silhouette>", "position_seconds": 7.75, "start_seconds": 0, "end_seconds": 7.25, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<waves>", "position_seconds": 17, "start_seconds": 2, "end_seconds": 13, "track": "1"}
 set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volume": 0}}
-unify_grade_tool {"look": "duotone #02060f #9cc3ff", "look_intensity": 0.85}
+apply_look_tool {"clipIds": "all", "look_id": "duotone #02060f #9cc3ff"}
 fade_clip_tool {"clip_id": "<silhouette>", "fade_out_seconds": 0.4}
 fade_clip_tool {"clip_id": "<waves>", "fade_in_seconds": 0.3, "fade_out_seconds": 1.5}
-kinetic_captions_tool {"style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.05, "cues": [{"start": 0.6, "end": 6.9, "text": "<line 1>"}, {"start": 2.4, "end": 6.9, "text": "<line 2>"}, {"start": 4.3, "end": 6.9, "text": "<line 3>"}]}
+add_kinetic_title_tool {"text": "<line 1>", "position_seconds": 0.6, "duration_seconds": 6.3, "style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.065, "y": 0.38, "stagger_seconds": 0}
+add_kinetic_title_tool {"text": "<line 2>", "position_seconds": 2.4, "duration_seconds": 4.5, "style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.065, "y": 0.5, "stagger_seconds": 0}
+add_kinetic_title_tool {"text": "<line 3>", "position_seconds": 4.3, "duration_seconds": 2.6, "style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.065, "y": 0.62, "stagger_seconds": 0}
 master_audio_tool {"preset": "social", "speech_clip_ids": "<vocal>", "music_clip_ids": "<bed>"}
 review_edit_tool {}
 ```
@@ -160,5 +165,4 @@ chorus drop cut 22.8 s, faceless dancers 62.4 s).
 
 ## Example (verified 2026-10-28)
 
-See the end of this file once the judged example is in; build script:
-`~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/music-lyric-video.build.sh`.
+28 s at 1920x1080 from 3 Pexels night-sea clips, a CC0 piano bed (Freesound 610640, szegvari) and an original spoken lyric (macOS `say`): `~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/music-lyric-video.*` (render, contact sheet, judge and pairwise JSON, build script). Watch judge 6.5/10 absolute; pairwise 6.8 against the reference type-on-black lyric edit (4.1, a win). Text onsets land on the line onsets; the cobalt duotone holds (grade 7). v1 used one `kinetic_captions_tool` call with overlapping cues: it regrouped the words out of order ('the name sea slow says'), so build a stanza with one `add_kinetic_title_tool` per line (`y` 0.38 / 0.5 / 0.62) instead. `duotone` looks go through `apply_look_tool` (`clipIds` 'all'), not `unify_grade_tool`. Remaining notes: the synthetic voice (use a real vocal), serif at `text_size` 0.055 is small over shimmering highlights (0.065 and a dark veil), and carry a quiet room tone through the black rest.

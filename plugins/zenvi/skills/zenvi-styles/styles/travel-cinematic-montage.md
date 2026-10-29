@@ -119,8 +119,8 @@ Then one `add_clip_to_timeline_tool` per cut, back to back, each exactly
 ```json
 add_clip_to_timeline_tool {"file_id": "<walk away 1>", "position_seconds": 2, "start_seconds": 3, "end_seconds": 4, "track": "1"}
 set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volume": 0}}
-set_keyframes_tool {"timeline_clip_id": "<skyline wide>", "property": "scale_x", "points": [{"timeline_seconds": 12, "value": 1}, {"timeline_seconds": 15.5, "value": 2.2}], "ease": "ease_in_expo"}
-set_keyframes_tool {"timeline_clip_id": "<skyline wide>", "property": "scale_y", "points": [{"timeline_seconds": 12, "value": 1}, {"timeline_seconds": 15.5, "value": 2.2}], "ease": "ease_in_expo"}
+set_keyframes_tool {"timeline_clip_id": "<skyline wide>", "property": "scale_x", "points": [{"timeline_seconds": 12, "value": 1}, {"timeline_seconds": 15.5, "value": 2.2}], "ease": "ease_in_quart"}
+set_keyframes_tool {"timeline_clip_id": "<skyline wide>", "property": "scale_y", "points": [{"timeline_seconds": 12, "value": 1}, {"timeline_seconds": 15.5, "value": 2.2}], "ease": "ease_in_quart"}
 set_keyframes_tool {"timeline_clip_id": "<release>", "property": "scale_x", "points": [{"timeline_seconds": 24, "value": 1}, {"timeline_seconds": 28.5, "value": 1.06}]}
 unify_grade_tool {"look": "warm_cinema", "look_intensity": 0.45}
 add_kinetic_title_tool {"text": "<PLACE>", "position_seconds": 28.5, "duration_seconds": 1.5, "style": "documentary", "animation": "fade", "emphasis": "none", "text_size": 0.13, "background": "#000000", "stagger_seconds": 0}
@@ -169,5 +169,4 @@ cadence through a viewfinder frame).
 
 ## Example (verified 2026-10-28)
 
-See the end of this file once the judged example is in; build script:
-`~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/travel-cinematic-montage.build.sh`.
+30 s at 1920x1080 from 24 Pexels travel clips and a CC BY 4.0 bed (Freesound 746585, ViraMiller): `~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/travel-cinematic-montage.*` (render, contact sheet, judge and pairwise JSON, build script). Watch judge 5.6/10 absolute (v1 5.2, where the release shot was missing); pairwise 5.3 against the reference match-cut walk film (8.5). The 1.0 s cadence and the direction blocks read (pacing 7, structure 7). It loses on grade: one `unify_grade_tool` pass does not match flat log clips to saturated ones, so pick clips of one camera family or grade outliers with `color_grade_clip_tool` before the look. With 2 ambience beds it still read as sound-thin; on a cadence this calm add one ambience per block, not whooshes.

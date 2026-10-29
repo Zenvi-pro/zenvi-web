@@ -166,5 +166,4 @@ b-roll carousel 0-10.9 s, whip pivot with three inserts 67.2-79.7 s).
 
 ## Example (verified 2026-10-28)
 
-See the end of this file once the judged example is in; build script:
-`~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/real-estate-tour.build.sh`.
+30 s at 1920x1080 from 11 Pexels house clips and a CC BY 4.0 guitar bed (Freesound 746694, ViraMiller): `~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/real-estate-tour.*` (render, contact sheet, judge and pairwise JSON, build script). Watch judge 3.5/10 absolute (v1 2.8, foley missing and an over-graded pool shot); pairwise 3.1 against the reference luxury tour (6.2). Foley now reads; the judge's main complaint is that every cut shows a different house, and a phone-style POV door shot that does not match the interiors. With one property's footage this sequence needs no new tool; with stock, keep exteriors and the reveal from one house and drop any shot whose camera clearly differs.

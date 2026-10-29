@@ -47,7 +47,9 @@ All boundaries sit on bar downbeats or phrase ends of the song.
   is a deliberate emotional hold.
 - Alternate scale: never 3 consecutive shots of the same scale; detail →
   medium → wide.
-- Inserts belong to the scene next to them (same room, same moment).
+- Inserts belong to the scene next to them (same room, same moment), and
+  the day runs in order: prep, arrival, ceremony, party, payoff. A prep detail
+  after the party reads as an error.
 - Macro texture → full-body movement cut: a hand on silk to a twirl, the
   fabric's motion carrying across the hard cut.
 - One couple. Stock of several couples reads as stock: favour anonymous
@@ -91,7 +93,9 @@ All boundaries sit on bar downbeats or phrase ends of the song.
 - Real sound at action, at least one per 25 s: an engine start, doors,
   clapping, laughter, applause. Use the footage's own sound
   (`separate_clip_audio_tool`) when it was recorded; otherwise a real CC0
-  recording (`search_sfx_tool`) placed on the action frame.
+  recording (`search_sfx_tool`) placed on the action frame; Openverse lookups
+  can fail (500), so keep a recorded-kit fallback (`search_sound_library_tool`,
+  e.g. the kit's car arrival / engine idle).
 - Diegetic sound carries the cut (`diegetic-sound-carries-the-cut`): the song
   dips 3-7 dB for 2-4 s (`automate_volume_tool` `dip`, fade 250 ms) while the
   real sound speaks, then returns. Crowd sound enters on the hard cut to the
@@ -116,7 +120,10 @@ import_stock_media_tool {"source": "freesound", "sound_id": "<id>", "preview_url
 detect_beats_tool {"file_id": "<music>"}
 ```
 
-Shots back to back on the downbeats (97.5 bpm: a bar every 2.46 s):
+Shots back to back on the downbeats (97.5 bpm: a bar every 2.46 s), times
+on whole frames. `apply_transition_tool` pulls the second clip back by the
+overlap and leaves a gap after it, so add dissolves before placing the
+later clips (or re-place them):
 
 ```json
 add_clip_to_timeline_tool {"file_id": "<rings>", "position_seconds": 0, "start_seconds": 1, "end_seconds": 3.47, "track": "1"}
@@ -173,5 +180,4 @@ between prep details 26.0 s, hard cut on action 35.3 s, white flashes 10.9 /
 
 ## Example (verified 2026-10-28)
 
-See the end of this file once the judged example is in; build script:
-`~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/wedding-event-film.build.sh`.
+30 s at 1920x1080 from 11 Pexels wedding clips and a CC BY 4.0 piano bed (Freesound 744876, ViraMiller): `~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/wedding-event-film.*` (render, contact sheet, judge and pairwise JSON, build script). Watch judge 3.7/10 absolute (v1 3.5); pairwise 3.6 against the reference highlight film (4.8). Engine and applause read (sound design 5). It loses on stock: several different couples, and prep inserts (bouquet, jacket) placed after the party broke the day's chronology. Rules this added above: one couple, chronological order (prep, arrival, ceremony, party, payoff). Tool lessons: `apply_transition_tool` moves the second clip back by the overlap and leaves a gap after it (black frames), so build dissolves first and place later clips after it, or keep hard cuts; Openverse lookups failed with 500 twice, so keep a recorded-kit fallback (`search_sound_library_tool`).

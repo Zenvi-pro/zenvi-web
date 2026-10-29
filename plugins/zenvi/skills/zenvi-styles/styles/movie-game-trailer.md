@@ -188,5 +188,4 @@ sub drop 121.2 s).
 
 ## Example (verified 2026-10-28)
 
-See the end of this file once the judged example is in; build script:
-`~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/movie-game-trailer.build.sh`.
+30 s at 1920x816 from 15 Pexels desert / fire clips and a CC BY 4.0 build track (Freesound 440524, tyops): `~/zenvi-motion/fleet/artifacts/sk4-cinematic-story/styles/movie-game-trailer.*` (render, contact sheet, judge and pairwise JSON, build script). Watch judge 7.1/10 absolute (v1 6.1); pairwise 5.1 against the reference studio trailer (8.5). Sound design 8, pacing 8, structure 8: the black-and-silence beat, the fire superimposition and the flash into the dark insert read as intended. v2 fixed a pillarboxed scope frame (`scale` `Crop`), a riser that ended before the hit (`at_seconds` is the hit), noisy footage sound (volume 0) and a slow 1.2 s fade-in hook. Remaining notes: the default sans card lacks identity (pick a tracked display face with `font` via `add_title_tool` when one is installed, and push the title 3-4 % while it holds), and mixed-source clips clash in resolution.
