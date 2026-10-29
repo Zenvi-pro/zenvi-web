@@ -842,6 +842,8 @@ export interface FxRenderRequest {
   end: number;
   /** The parsed stack (parseFxStack), in order; the host builds its graph with buildFxGraph. */
   effects: FxEffect[];
+  /** The footage before the cut that a `datamosh_carry` in the stack carries the motion of: its file's `path` and the second it ends at. */
+  carry?: { path: string; at: number };
   signal?: AbortSignal;
   onProgress?: (fraction: number) => void;
 }
