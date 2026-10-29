@@ -20,7 +20,7 @@ import { FINISH_HINT } from "../../director-card.js";
 import { refused } from "../../receipt.js";
 import { isTalkingFootage } from "../../transcripts.js";
 import { displayName, visualKind } from "../reels.js";
-import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMusic, pictureProblem, replaceArg, voiceWords } from "./common.js";
+import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMusic, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
 import { Composer, binOf, builderTracks, clearTimeline, placeBed, placeShot, round3 } from "./compose.js";
 
 const TOOL = "build_talking_head_tool";
@@ -79,8 +79,10 @@ export const talkingHeadTools: CatalogTool[] = [
       for (const id of speakerIds) {
         const file = files.get(id)!;
         const got = await voiceWords(call, file);
-        if ("error" in got) notes.push(`${displayName(file)}: ${got.error}; it plays whole, with no jump cuts, keyword B-roll or punch-ins.`);
-        takes.push({ fileId: id, duration: Number(file.duration) || 0, words: "error" in got ? [] : got.words });
+        // No words: the pauses still come from the take's loudness, so the jump cuts survive (captions, keywords and punch-ins do not).
+        const spoken = "error" in got ? await voiceActivity(call, file) : null;
+        if ("error" in got) notes.push(`${displayName(file)}: ${got.error}; ${spoken ? "its pauses are cut from its loudness, with no keyword B-roll, punch-ins or captions of its words" : "it plays whole, with no jump cuts, keyword B-roll or punch-ins"}.`);
+        takes.push({ fileId: id, duration: Number(file.duration) || 0, words: "error" in got ? spoken ?? [] : got.words });
       }
       // Without pause removal each take is one window (its words still drive captions, B-roll and punch-ins).
       const keepAll = args.remove_pauses === false;

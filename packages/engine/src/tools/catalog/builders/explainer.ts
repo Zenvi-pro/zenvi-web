@@ -19,7 +19,7 @@ import { directTool, type CatalogTool } from "../../define.js";
 import { FINISH_HINT } from "../../director-card.js";
 import { refused } from "../../receipt.js";
 import { displayName, visualKind } from "../reels.js";
-import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMusic, pickVoice, pictureProblem, replaceArg, voiceWords } from "./common.js";
+import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMusic, pickVoice, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
 import { Composer, binOf, builderTracks, clearTimeline, placeBed, placeShot, round3 } from "./compose.js";
 
 const TOOL = "build_explainer_tool";
@@ -99,8 +99,14 @@ export const explainerTools: CatalogTool[] = [
       if (voice) {
         const got = await voiceWords(call, voice);
         if ("error" in got) {
-          if (!args.script?.trim()) return refused(TOOL, `Error: the voice's words are needed to cut on its keywords and pauses: ${got.error}. Pass the script to time it by length.`);
-          notes.push(`The voice's words could not be read (${got.error}): the script is spread over the voice by length.`);
+          const spoken = args.script?.trim() ? null : await voiceActivity(call, voice);
+          if (spoken) {
+            words = spoken.map((w) => ({ text: w.text, start: w.startSec, end: w.endSec }));
+            wordSource = "voice activity (no words)";
+            notes.push(`The voice's words could not be read (${got.error}): the cuts follow its pauses, with no keyword B-roll, spoken numbers or captions. Pass the script for those.`);
+          } else if (!args.script?.trim()) {
+            return refused(TOOL, `Error: the voice's words are needed to cut on its keywords and pauses: ${got.error}. Pass the script to time it by length.`);
+          } else notes.push(`The voice's words could not be read (${got.error}): the script is spread over the voice by length.`);
         } else {
           words = got.words.map((w) => ({ text: w.text, start: w.startSec, end: w.endSec }));
           wordSource = got.exact ? got.source : `${got.source} (estimated timings)`;
@@ -195,6 +201,7 @@ export const explainerTools: CatalogTool[] = [
 
       const captionStyle = args.captions ?? "documentary";
       if (captionStyle === "none") c.skip("captions", "captions=none");
+      else if (wordSource.startsWith("voice activity")) c.skip("captions", "no words to show: speech recognition is not available here and no script was given");
       else if (placed.voiceClip) {
         const got = await c.run("captions", "kinetic_captions_tool", { timeline_clip_ids: [placed.voiceClip], style: captionStyle, animation: "rise", placement: "style" }, "the voice's words on the lower safe line");
         if (!got && args.script?.trim()) {

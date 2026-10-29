@@ -187,3 +187,33 @@ describe("build_product_launch_tool", () => {
     expect(step(data, "reveal hit")).toMatchObject({ outcome: "applied" });
   });
 });
+
+describe("without words (no speech recognition here, nothing kept)", () => {
+  function wordless(): ProjectDocument {
+    const doc = project();
+    const p = structuredClone(doc.project);
+    for (const f of p.files) delete f.ai_metadata;
+    return new ProjectDocument(p);
+  }
+
+  it("the talking head still jump-cuts on the take's loudness, and says what it could not do", async () => {
+    const doc = wordless();
+    const result = await runTool({ doc, host: fakeHost({ omit: ["audio.transcribe"] }) }, "build_talking_head_tool", { speaker_file_ids: ["TAKE000001"], caption_style: "none" });
+    expect(result.ok, result.text).toBe(true);
+    const receipt = result.data as { notes: string[]; data: Built };
+    // One piece per stretch of the fake voice's speech, the framing alternating.
+    expect((receipt.data.segments as { scale: number }[]).map((s) => s.scale)).toEqual([1, 1.4, 1]);
+    expect(receipt.notes.join(" ")).toMatch(/pauses are cut from its loudness/);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("the explainer cuts on the voice's pauses and skips the captions, saying why", async () => {
+    const doc = wordless();
+    const result = await runTool({ doc, host: fakeHost({ omit: ["audio.transcribe"] }) }, "build_explainer_tool", { voice_file_id: "VOICE00001", broll_file_ids: ["ROCKET0001", "CITY000001"] });
+    expect(result.ok, result.text).toBe(true);
+    const data = (result.data as { data: Built }).data;
+    expect(data.word_source).toBe("voice activity (no words)");
+    expect(step(data, "captions")).toMatchObject({ outcome: "skipped", why: expect.stringMatching(/no words to show/) });
+  });
+});
+

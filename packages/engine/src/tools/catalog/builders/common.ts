@@ -13,6 +13,7 @@ import { isAudioOnlyMedia } from "../../../model/media.js";
 import { buildSummaryPreview } from "../../ai-metadata.js";
 import { beatsOfFile, canTrackBeats } from "../../beats.js";
 import type { ToolCall } from "../../define.js";
+import { energyVadWindows } from "../../speech.js";
 import { fileTarget, isWordSource, wordsFor } from "../../transcripts.js";
 import { displayName, visualKind } from "../reels.js";
 
@@ -46,6 +47,23 @@ export async function voiceWords(call: ToolCall, file: ProjectFile): Promise<Voi
   if (!isWordSource(got)) return { error: got.message };
   if (got.words.length === 0) return { error: `no words were found in ${displayName(file)}` };
   return { words: got.words, exact: got.exact, source: got.source };
+}
+
+/**
+ * Where a voice speaks, from its loudness alone, as untitled phrase-long
+ * "words": what cuts on the pauses when no words can be read (no speech
+ * recognition on this surface, no script). Null when the audio cannot be read.
+ */
+export async function voiceActivity(call: ToolCall, file: ProjectFile): Promise<TimedText[] | null> {
+  const path = String(file.path ?? "");
+  if (!path || !call.host.audio?.analyzeAudio) return null;
+  try {
+    const envelope = await call.host.audio.analyzeAudio(path, { signal: call.signal });
+    const windows = envelope ? energyVadWindows(envelope, { minSpeechSec: 0.12, minSilenceSec: 0.3 }) : [];
+    return windows.length > 0 ? windows.map(([startSec, endSec]) => ({ text: "", startSec, endSec })) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The voice an explainer is led by: audio named like one, else audio with kept words, else the only audio file. */
