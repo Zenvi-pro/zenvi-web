@@ -3,7 +3,7 @@ id: podcast-clip-vertical
 kind: style
 summary: "For a 30-90 s vertical cut of a podcast or interview: one story, picture follows the voice, karaoke captions, name card."
 categories: [podcast-clip-vertical]
-tools: [transcribe_media_tool, get_transcript_tool, diarize_media_tool, remove_silence_tool, split_clip_tool, set_clip_properties_tool, swap_shot_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, add_clip_to_timeline_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool, edit_captions_tool, set_project_setting_tool, unify_grade_tool, analyze_mix_tool]
+tools: [transcribe_media_tool, get_transcript_tool, diarize_media_tool, remove_silence_tool, split_clip_tool, set_clip_properties_tool, swap_shot_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, add_clip_to_timeline_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, review_render_tool, edit_captions_tool, set_project_setting_tool, unify_grade_tool, analyze_mix_tool]
 pace: medium
 mood: [conversational, candid, informative]
 aspect: ["9:16"]

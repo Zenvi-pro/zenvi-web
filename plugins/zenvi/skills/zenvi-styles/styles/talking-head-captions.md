@@ -3,7 +3,7 @@ id: talking-head-captions
 kind: style
 summary: "For a creator speaking to camera (advice, story, hot take): tight speech, word-synced captions, noun B-roll, punch-ins."
 categories: [talking-head-captions]
-tools: [remove_silence_tool, remove_words_tool, transcribe_media_tool, get_transcript_tool, split_clip_tool, set_clip_properties_tool, gather_stock_footage_tool, add_clip_to_timeline_tool, unify_grade_tool, kinetic_captions_tool, add_kinetic_title_tool, generate_subject_matte_tool, text_behind_subject_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool, set_project_setting_tool, analyze_mix_tool]
+tools: [remove_silence_tool, remove_words_tool, transcribe_media_tool, get_transcript_tool, split_clip_tool, set_clip_properties_tool, gather_stock_footage_tool, add_clip_to_timeline_tool, unify_grade_tool, kinetic_captions_tool, add_kinetic_title_tool, generate_subject_matte_tool, text_behind_subject_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, review_render_tool, set_project_setting_tool, analyze_mix_tool]
 pace: fast
 mood: [direct, energetic, confident]
 aspect: ["9:16", "4:5"]

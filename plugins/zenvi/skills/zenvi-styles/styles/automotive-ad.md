@@ -7,8 +7,8 @@ tools: [set_project_setting_tool, gather_stock_footage_tool, search_freesound_mu
 pace: medium
 mood: [premium, dark, powerful, restrained]
 aspect: ["2.39:1", "16:9", "9:16"]
-pairs_with: [T021, T105, T104, T046, T078, T025, T084, T061, T071]
-avoid_with: [T045, T116, T127]
+pairs_with: [t021, t105, t104, t046, t078, t025, t084, t061, t071]
+avoid_with: [t045, t116, t127]
 needs: []
 ---
 
@@ -37,10 +37,10 @@ runtime is the rule; the tables are that rule at four lengths.
 | beat | 15 s | 30 s | 60 s | 90 s |
 | --- | --- | --- | --- | --- |
 | Tease (near-black, rim light, fog) | 0-2 | 0-3.5 | 0-7 | 0-10 |
-| Light-up on one hit (T021) | 2 | 3.5 | 7 | 10 |
+| Light-up on one hit (t021) | 2 | 3.5 | 7 | 10 |
 | Detail inserts, 1.2-2.5 s each | 2-6 | 3.5-11 | 7-24 | 10-36 |
-| Function / interior with foley (T078) | 6-9 | 11-18 | 24-38 | 36-57 |
-| Tighten: 0.4-1 s burst (T046) | 9-10.5 | 18-21.5 | 38-44 | 57-66 |
+| Function / interior with foley (t078) | 6-9 | 11-18 | 24-38 | 36-57 |
+| Tighten: 0.4-1 s burst (t046) | 9-10.5 | 18-21.5 | 38-44 | 57-66 |
 | Stillness before the peak | 0.4 | 0.5 | 0.75 | 0.75 |
 | Hero reveal, 2.3-5 s holds, on the peak (70-85 %) | 11-13.5 | 22-27 | 45-54 | 67-81 |
 | End card with sub drop or cymbal tail | 13.5-15 | 27-30 | 54-60 | 81-90 |
@@ -57,7 +57,7 @@ runtime is the rule; the tables are that rule at four lengths.
   orbit. Add a 3-6 % push (`set_keyframes_tool` scale) on any held static.
 - Source count: about one clip per 1.5 s of runtime plus 50 % spare; the
   same car (or one model) throughout. Mixed cars read as stock.
-- Match cuts (T104) between old and new parts or two round parts at the
+- Match cuts (t104) between old and new parts or two round parts at the
   same centre and scale, on a hit: 1 every 10-15 s at most.
 
 ## Look & grade
@@ -65,9 +65,9 @@ runtime is the rule; the tables are that rule at four lengths.
 - Two families; pick one per film or travel deliberately from one to the
   other: low-key (mean luma ~45-55: night, teal shadows, amber lights) or
   high-key (luma ~100: white cyclorama, champagne). Going dark → white
-  inside the film (T105 on a hit) is a strong arc.
+  inside the film (t105 on a hit) is a strong arc.
 - One accent colour: the car's paint or its lights is the only saturated
-  hue (T025). Surroundings desaturated (saturation 0.6-0.8).
+  hue (t025). Surroundings desaturated (saturation 0.6-0.8).
 - `unify_grade_tool` first, then the look at 0.5-0.7; vignette 0.2 with
   feather 0.85 on a scope frame (0.4 reads as a fuzzy oval tunnel on 2.39:1). No
   grain on studio footage. Bloom/halation only on lights (`apply_fx_tool`
@@ -81,7 +81,7 @@ runtime is the rule; the tables are that rule at four lengths.
 - End card: product name or one tagline at 3.5-6 % of frame height,
   neo-grotesque sans (Inter), uppercase tracked or mixed case, fade or rise
   in over ~1 s, never a slam. Optional legal line 1.5-2 %.
-- Hairline callouts (T071) only in a technical "feature" film: 1 px line,
+- Hairline callouts (t071) only in a technical "feature" film: 1 px line,
   small mono labels, gone before the next cut.
 
 ## Motion & transitions
@@ -102,7 +102,7 @@ runtime is the rule; the tables are that rule at four lengths.
   hits on the light-up and the reveal. Never a whoosh on every cut.
 - Levels (CRAFT.md): music-led, bed at -14…-16 LUFS short-term; hero hits
   momentary -9…-11 LUFS (0 to +3 LU over the bed); mechanical close-mic
-  foley at or above the bed (T078); whooshes 4 dB under the hero.
+  foley at or above the bed (t078); whooshes 4 dB under the hero.
 - Keep dynamics: one near-silent beat before the peak (`automate_volume_tool`
   `suck_out` or a dip of 0.4-0.8 s), loudness range high. Deliver
   `master_audio_tool` social (-14 LUFS, -1 dBTP).
@@ -177,11 +177,11 @@ Then render and `review_render_tool` on the file; one fix pass.
 
 ## Mix-and-match
 
-Borrow: T021 (opening), T105 (dark to white jump), T104 (shape match),
-T078 (close-mic foley), T046 (tighten then release), T025 (accent grade),
-T084 (music stops dead for a story beat), T061 (card), T071 (hairline
-callouts for a tech film), T003 (model-year chapters, needs a 3D morph).
-Never: T045 strobe bursts with flash frames, T116/T127 giant kinetic type,
+Borrow: t021 (opening), t105 (dark to white jump), t104 (shape match),
+t078 (close-mic foley), t046 (tighten then release), t025 (accent grade),
+t084 (music stops dead for a story beat), t061 (card), t071 (hairline
+callouts for a tech film), t003 (model-year chapters, needs a 3D morph).
+Never: t045 strobe bursts with flash frames, t116/t127 giant kinetic type,
 glitch transitions, whoosh-on-every-cut sound design, captions.
 
 ## Reference moments

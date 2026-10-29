@@ -3,7 +3,7 @@ id: karaoke-word-highlight-captions
 kind: technique
 summary: "When speech carries the piece on mute: 2-4 word caps chunks, the spoken word flips to one accent colour, snap-in."
 categories: [podcast-clip-vertical, talking-head-captions]
-tools: [kinetic_captions_tool, transcribe_media_tool, get_transcript_tool, edit_captions_tool, preview_frame, generate_subject_matte_tool]
+tools: [kinetic_captions_tool, transcribe_media_tool, get_transcript_tool, edit_captions_tool, generate_subject_matte_tool]
 pace: fast
 mood: [direct, energetic, informative]
 aspect: ["9:16", "4:5", "1:1"]

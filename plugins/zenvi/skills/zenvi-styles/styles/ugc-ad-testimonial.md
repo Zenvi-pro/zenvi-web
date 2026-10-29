@@ -3,7 +3,7 @@ id: ugc-ad-testimonial
 kind: style
 summary: "For a creator-style product ad or testimonial: hook in 3 s, real demo actions, proof as a number, one CTA."
 categories: [ugc-ad-testimonial]
-tools: [add_clip_to_timeline_tool, trim_clip_tool, split_clip_tool, search_clip_scenes_tool, remove_silence_tool, set_clip_properties_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, set_keyframes_tool, unify_grade_tool, add_sfx_tool, spot_sound_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool, set_project_setting_tool, analyze_mix_tool]
+tools: [add_clip_to_timeline_tool, trim_clip_tool, split_clip_tool, search_clip_scenes_tool, remove_silence_tool, set_clip_properties_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, set_keyframes_tool, unify_grade_tool, add_sfx_tool, spot_sound_tool, duck_under_speech_tool, master_audio_tool, review_render_tool, set_project_setting_tool, analyze_mix_tool]
 pace: fast
 mood: [honest, energetic, persuasive]
 aspect: ["9:16", "4:5"]

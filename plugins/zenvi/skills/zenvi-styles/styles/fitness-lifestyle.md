@@ -3,7 +3,7 @@ id: fitness-lifestyle
 kind: style
 summary: "For training, sport-at-home and lifestyle shorts: cold open on action, cuts on the strike, real foley, one held breath."
 categories: [fitness-lifestyle]
-tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, unify_grade_tool, speed_ramp_tool, align_match_cut_tool, add_kinetic_title_tool, add_sfx_tool, search_sound_library_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool, watch_clip_window_tool, set_project_setting_tool, analyze_mix_tool]
+tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, unify_grade_tool, speed_ramp_tool, align_match_cut_tool, add_kinetic_title_tool, add_sfx_tool, search_sound_library_tool, automate_volume_tool, master_audio_tool, review_render_tool, watch_clip_window_tool, set_project_setting_tool, analyze_mix_tool]
 pace: medium
 mood: [focused, energetic, aspirational, deadpan]
 aspect: ["9:16", "16:9", "4:5"]

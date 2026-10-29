@@ -3,7 +3,7 @@ id: kinetic-type-motion-design
 kind: style
 summary: "For type-led promos and manifestos: one idea per beat, ground inversions, one pattern break, a held lockup."
 categories: [kinetic-type-motion-design]
-tools: [detect_beats_tool, add_kinetic_title_tool, add_motion_block_tool, add_motion_template_tool, add_clip_to_timeline_tool, add_track_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool]
+tools: [detect_beats_tool, add_kinetic_title_tool, add_motion_block_tool, add_motion_template_tool, add_clip_to_timeline_tool, add_track_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, review_render_tool]
 pace: fast
 mood: [bold, clean, confident, rhythmic]
 aspect: ["9:16", "1:1", "16:9"]

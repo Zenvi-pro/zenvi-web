@@ -3,7 +3,7 @@ id: gaming-montage
 kind: style
 summary: "For game trailers, teasers and community hype reels: a type or world hook, a slam on the drop, onset cuts, lockup."
 categories: [gaming-montage]
-tools: [gather_stock_footage_tool, add_clip_to_timeline_tool, detect_beats_tool, set_keyframes_tool, color_grade_clip_tool, add_kinetic_title_tool, add_motion_block_tool, add_motion_template_tool, unify_grade_tool, add_track_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool]
+tools: [gather_stock_footage_tool, add_clip_to_timeline_tool, detect_beats_tool, set_keyframes_tool, color_grade_clip_tool, add_kinetic_title_tool, add_motion_block_tool, add_motion_template_tool, unify_grade_tool, add_track_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, review_render_tool]
 pace: fast
 mood: [epic, hype, dark, triumphant]
 aspect: ["16:9", "9:16", "1:1"]
