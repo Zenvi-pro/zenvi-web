@@ -154,6 +154,13 @@ export function sourceSecondsAt(project: Project, clip: Clip, n: number): number
   return (remappedClipFrame(clip, n) - 1) / (fps.num / fps.den);
 }
 
+/** Maps a point of the clip's source frame (0-1) to canvas pixels at clip frame `n`, through clipTransform itself. */
+export function sourceToCanvas(project: Project, clip: Clip, n: number): (u: number, v: number) => [number, number] {
+  const g = clipGeometry(project, clip, n);
+  const t = clipTransform(clip, n, g.srcW, g.srcH, g.width, g.height, fpsOf(project));
+  return (u, v) => t.map(u * g.srcW, v * g.srcH);
+}
+
 /** Where `box` is drawn at clip frame `n` with the clip's current keyframes (through clipTransform itself). */
 export function subjectOnCanvas(project: Project, clip: Clip, n: number, box: SubjectBox): CanvasSubject {
   const g = clipGeometry(project, clip, n);
