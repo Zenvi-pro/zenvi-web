@@ -1,12 +1,6 @@
 import { splitText, type BlockContext } from "../../runtime/index.js";
 import { onColor } from "../ui.js";
-
-/** Chip colours by the status word in it: green done, amber waiting, red stuck (the convention of status boards). */
-const STATUS: readonly [RegExp, string][] = [
-  [/done|live|shipped|complete|paid|active|on track|ready|approved|yes/i, "#2FBF71"],
-  [/review|pending|progress|scheduled|draft|waiting|queued|soon/i, "#F2A93B"],
-  [/block|fail|overdue|late|error|off track|declined|no\b/i, "#EF5350"],
-];
+import { statusColor } from "./status.js";
 
 interface Cell {
   text: string;
@@ -49,7 +43,7 @@ export function build(ctx: BlockContext): void {
       const box = ctx.el("div", "dt-cell", el);
       if (cell.chip && cell.text) {
         const chip = ctx.el("span", "dt-chip", box, cell.text);
-        const bg = STATUS.find(([re]) => re.test(cell.text))?.[1] ?? palette.accent;
+        const bg = statusColor(cell.text, palette.accent);
         Object.assign(chip.style, { background: bg, color: onColor(bg) });
         chips.push(chip);
       } else {
