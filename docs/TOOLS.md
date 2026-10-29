@@ -3673,10 +3673,10 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `duration_seconds` | number |  | Length, seconds (default: text_on_path 3, write_on 2.5, stencil 2.4, echo_stack 1.8, paper 2.4, strobe the words' holds + 1.2 s of lockup, wheel its turns + 1 s). (min 0.2, max 30) |
 | `font_family` | string |  | A bundled family, drawn as outlines (same on every surface): inter (grotesk), anton (condensed), bebas-neue (condensed), archivo-black (display), instrument-serif (serif), space-mono (mono), varela-round (rounded), caveat-brush (hand), silkscreen (pixel). Default: write_on instrument-serif; text_on_path, wheel and paper archivo-black; the others anton. |
 | `font_weight` | integer |  | Weight for families that have several (inter): 100-900. (min 100, max 900) |
-| `ink` | string |  | Colour of the type (default white; paper: the paper, default cream). |
+| `ink` | string |  | Colour of the type, all but stencil (default white; paper: the paper, default cream). |
 | `ground` | string |  | stencil: the card's colour (default near-black); strobe: the first ground (default near-black; it flips with ink and accent). |
 | `accent` | string |  | strobe: the third ground (default #ff3b1f); paper: the cut edge and the marks (default near-black). |
-| `text_size` | number |  | Em size as a share of the frame's short side (default: fitted to the block). (min 0.02, max 1) |
+| `text_size` | number |  | Em size as a share of the frame's short side, all but strobe and write_on paths (default: fitted to the block). (min 0.02, max 1) |
 | `x` | number |  | text_on_path, write_on, wheel, paper: horizontal centre, 0 left - 1 right (default 0.5). (min 0, max 1) |
 | `y` | number |  | text_on_path, write_on, stencil, wheel, paper: vertical centre, 0 top - 1 bottom (default 0.5). (min 0, max 1) |
 | `shape` | "ring" \| "arc" \| "wave" |  | text_on_path: ring (default; the line closes on itself), arc (over the centre), wave (across the frame). |
@@ -3694,7 +3694,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `echo` | "outline" \| "solid" |  | echo_stack: outline (default: echoes as outlines) or solid (dimmer fills). |
 | `gap_frames` | integer |  | echo_stack: frames between one pair of copies and the next (default 2). (min 1, max 12) |
 | `words` | string[] |  | strobe: the words, one per cut; wheel: the drum's lines in order, 2-12 (default: text split at spaces). |
-| `lockup` | string |  | strobe: the held end card (default: the whole text; empty string: none, the last word holds). |
+| `lockup` | string |  | strobe: the held end card (default: the text, none when `words` come without it; empty string: none, the last word holds 0.4 s). |
 | `hold_frames` | integer |  | strobe: frames each word holds (default 4, ~0.13 s at 30 fps: a strobe; 8-12 for a staccato list); wheel: frames each word rests before the drum turns (default 0.7 s); paper: frames per stop-motion pose (default 2). (min 1, max 90) |
 | `beats` | number[] |  | strobe: timeline seconds to cut on instead of hold_frames (detect_beats_tool's beats moved to the music's position); a word per beat from the first one at or after position_seconds, the lockup on the next. wheel: the drum turns on these beats (the first n-1 after position_seconds). |
 | `seed` | integer |  | paper: seed of the boil (default 1): the same seed boils the same. (min 0, max 2147483648) |
