@@ -134,7 +134,7 @@ export const productLaunchTools: CatalogTool[] = [
           if (!done) {
             const insteadOf = mode === "none" ? "a 3D reveal (three_d=none)" : "a 3D reveal";
             headline = Boolean(
-              await c.fallback("reveal", insteadOf, "add_motion_block_tool", { block: "kinetic_headline", params: { text: `*${args.product}*`, kicker: args.tagline ?? "", style: "rise" }, ...span(s), placement: shown.has(s) ? "over_video" : "full_frame" }, "the product name as a kinetic headline block"),
+              await c.fallback("reveal", insteadOf, "add_motion_block_tool", { block: "kinetic_headline", params: { text: `*${args.product}*`, kicker: args.tagline ?? "", style: "rise" }, ...span(s), placement: shown.has(s) || fields.has(s) ? "over_video" : "full_frame" }, "the product name as a kinetic headline block"),
             );
             done = headline;
           }
@@ -177,7 +177,7 @@ export const productLaunchTools: CatalogTool[] = [
       if (proof && args.proof?.stat) {
         const m = /^([$€£]?)([\d.,]+)(.*)$/.exec(args.proof.stat.trim());
         const counter = m
-          ? await c.run("proof", "add_motion_block_tool", { block: "counter", params: { values: ["0", m[2]!.replace(/,/g, "")], prefix: m[1]!, suffix: m[3]!.trim(), label: args.proof.label ?? "" }, ...span(proof), placement: shown.has(proof) ? "over_video" : "full_frame" }, "the proof counts up")
+          ? await c.run("proof", "add_motion_block_tool", { block: "counter", params: { values: ["0", m[2]!.replace(/,/g, "")], prefix: m[1]!, suffix: m[3]!.trim(), label: args.proof.label ?? "" }, ...span(proof), placement: shown.has(proof) || fields.has(proof) ? "over_video" : "full_frame" }, "the proof counts up")
           : null;
         if (!counter) {
           await c.fallback("proof", "a counter block", "add_kinetic_title_tool", { text: [args.proof.stat, args.proof.label].filter(Boolean).join(" "), ...span(proof), style: "creator", ...backdrop(proof) }, "the stat in kinetic type");
