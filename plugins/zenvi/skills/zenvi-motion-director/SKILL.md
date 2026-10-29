@@ -12,7 +12,9 @@ this skill is for edits that must hold up next to a professional one.
 
 ## Start here: the brief, then its style's recipe
 
-**Step 0 is the brief.** `get_brief_tool`; when there is none, load the
+**Step 0 is the brief**, on the project it belongs to: editing an existing
+`.zvn`, `open_project_file` it first (opening a file replaces the session's
+project, brief and all). `get_brief_tool`; when there is none, load the
 `zenvi-styles` skill and compile it (its `BRIEF.md`: `inspect_media_bin_tool`,
 one style, up to four techniques, the self-critique, `save_brief_tool`;
 without the plugin, `read_director_recipe` `{"styles": "brief"}`). The

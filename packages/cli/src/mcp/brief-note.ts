@@ -9,11 +9,12 @@
  * Notes alone were not enough (bench pilots read three of them and cut
  * anyway), and neither was refusing the first cut once (the pilot repeated
  * the call), so until a brief is saved the calls that lay down material are
- * refused while the timeline is nearly empty. A quick edit needs only a
- * short brief. ZENVI_MCP_BRIEF=off turns the gate off.
+ * refused while the timeline is nearly empty. A piece under 6 s needs only a
+ * short brief (brief/method.ts exempts it); a longer one, the motif method.
+ * ZENVI_MCP_BRIEF=off turns the gate off.
  */
 
-import { readBrief, type Project } from "@zenvi/engine";
+import { METHOD_MIN_SECONDS, readBrief, type Project } from "@zenvi/engine";
 
 /** Calls that gather or lay down the material of a whole video. */
 const STARTS_A_VIDEO = new Set([
@@ -51,7 +52,7 @@ export function briefNote(tool: string, project: Project): string | undefined {
 const GATED = new Set([...STARTS_A_VIDEO].filter((t) => !["set_project_setting_tool", "search_pexels_videos_tool", "search_freesound_music_tool", "import_files_tool"].includes(t)));
 
 export const BRIEF_GATE =
-  'Error: no brief saved, nothing changed. Step 0 of a video is the creative brief: read_director_recipe {styles: "brief"}, then save_brief_tool (goal, platform, aspect, length_seconds, style, hook, beats; for a quick edit one beat is enough), then make this call again.';
+  `Error: no brief saved, nothing changed. Step 0 of a video is the creative brief: read_director_recipe {styles: "brief"}, then save_brief_tool (goal, platform, aspect, length_seconds, style, hook, beats; under ${METHOD_MIN_SECONDS} s one beat is enough, from ${METHOD_MIN_SECONDS} s on the motifs, storyboard, reskin and direction of BRIEF.md 4), then make this call again.`;
 
 /** Whether `tool` on `project` lays down material before any brief, which the gate refuses. */
 export function briefGate(tool: string, project: Project): boolean {
