@@ -3519,7 +3519,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `duration_seconds` | number |  | Target length, seconds (default 40). (min 15, max 120) |
 | `music_file_id` | string |  | Score in the bin. Default: the longest audio file; none when there is none. |
 | `braams` | boolean |  | Braams on act two, the climax and the title, a riser into the silence (default true). |
-| `look` | "cinematic" \| "none" |  | cinematic (default): lifted shadows, 35mm grain and slow push-ins on every shot; none: the footage as it is. |
+| `look` | "push" \| "cinematic" \| "none" |  | push (default): a slow push-in on every shot, the footage's own colour (unify_grade_tool in the finish sets one look); cinematic: lifted shadows and 35mm grain as well; none: the footage as it is. |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (in the same undo step). |
 
 ### align_match_cut_tool
