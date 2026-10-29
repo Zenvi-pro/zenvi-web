@@ -49,6 +49,7 @@ const DIRECT_TOOLS = [
   "apply_motion_transition_tool",
   "apply_motion_transitions_tool",
   "remove_motion_transition_tool",
+  "add_plate_wipe_tool",
   "speed_ramp_tool",
   "list_motion_blocks_tool",
   "setup_motion_runtime_tool",
