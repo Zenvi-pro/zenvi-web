@@ -164,6 +164,7 @@ export const OFFSCREEN: Readonly<Record<string, string>> = {
   align_lyrics_tool: "word timings on the file's transcript, read by the caption and word tools",
   detect_music_structure_tool: "the song's sections as snap points and timeline markers",
   make_transition_mask_tool: "adds a mask image to Project Files, not the timeline",
+  save_brief_tool: "the creative brief, saved with the project for the director to read",
 };
 
 export interface BacklogEntry {
@@ -255,6 +256,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   datamosh_cut_tool: { reason: "not proven yet: datamosh_carry needs two clips with motion at the cut", params: "*" },
   place_on_word_tool: { reason: "needs word timings (speech recognition)", params: "*" },
   insert_broll_on_words_tool: { reason: "needs word timings (speech recognition)", params: "*" },
+  generate_broll_set_tool: { reason: "generates footage through the Zenvi backend (account, credits)", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {
