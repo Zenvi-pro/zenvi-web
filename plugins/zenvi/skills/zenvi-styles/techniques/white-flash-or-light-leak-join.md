@@ -3,7 +3,7 @@ id: white-flash-or-light-leak-join
 kind: technique
 summary: "For a scene or act boundary: 4-12 frames of white or a warm leak hide the join, often into a darker shot."
 categories: [movie-game-trailer, wedding-event-film]
-tools: [apply_motion_transition_tool, list_motion_transitions_tool, apply_fx_tool, list_fx_tool, color_grade_clip_tool, add_sfx_tool, master_audio_tool]
+tools: [add_clip_to_timeline_tool, set_clip_properties_tool, apply_motion_transition_tool, list_motion_transitions_tool, apply_fx_tool, list_fx_tool, color_grade_clip_tool, add_sfx_tool, master_audio_tool]
 pace: medium
 mood: [dramatic, luminous, romantic]
 aspect: ["16:9", "2.39:1", "9:16"]

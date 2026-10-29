@@ -48,7 +48,7 @@ master_audio_tool {"target_lufs": -15, "true_peak_dbtp": -1.0, "balance": "keep"
 
 With one long clip instead of several, `split_clip_tool` at the rest
 marker and swap the second half. Add audio clips after any
-`set_clip_properties_tool {"scope": "all", "volume": 0}`: scope all mutes
+`set_clip_properties_tool {"scope": "all", "properties": {"volume": 0}}`: scope all mutes
 them too (the first build here mastered a silent mix and was refused).
 
 ## Timing & taste rules
