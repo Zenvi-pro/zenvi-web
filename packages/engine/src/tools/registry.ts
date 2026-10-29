@@ -75,6 +75,7 @@ import { searchTools } from "./catalog/search.js";
 import { soundDesignTools } from "./catalog/sound-design.js";
 import { speedRampTools } from "./catalog/speed-ramp.js";
 import { onsetSnapTools } from "./catalog/onset-snap.js";
+import { beatSnapTools } from "./catalog/beat-snap.js";
 import { shotRampTools } from "./catalog/shot-ramp.js";
 import { musicStructureTools } from "./catalog/music-structure.js";
 import { actionFoleyTools } from "./catalog/action-foley.js";
@@ -147,7 +148,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...categoryBuilderTools, ...matchCutTools, ...sequenceTools, ...trackingTools, ...colorUnifyTools, ...briefTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...variantTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...alignLyricsTools, ...placeOnWordTools, ...brollOnWordsTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...plateWipeTools, ...transitionMaskTools, ...speedRampTools, ...onsetSnapTools, ...shotRampTools, ...musicStructureTools, ...actionFoleyTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...brollSetTools, ...matteTools, ...shotTools, ...lookMaskTools]) {
+  for (const tool of [...implemented, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...categoryBuilderTools, ...matchCutTools, ...sequenceTools, ...trackingTools, ...colorUnifyTools, ...briefTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...variantTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...alignLyricsTools, ...placeOnWordTools, ...brollOnWordsTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...plateWipeTools, ...transitionMaskTools, ...speedRampTools, ...onsetSnapTools, ...beatSnapTools, ...shotRampTools, ...musicStructureTools, ...actionFoleyTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...brollSetTools, ...matteTools, ...shotTools, ...lookMaskTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -171,7 +172,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...categoryBuilderTools, ...matchCutTools, ...sequenceTools, ...trackingTools, ...colorUnifyTools, ...briefTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...variantTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...alignLyricsTools, ...placeOnWordTools, ...brollOnWordsTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...plateWipeTools, ...transitionMaskTools, ...speedRampTools, ...onsetSnapTools, ...shotRampTools, ...musicStructureTools, ...actionFoleyTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...brollSetTools, ...matteTools, ...shotTools, ...lookMaskTools];
+  return [...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...categoryBuilderTools, ...matchCutTools, ...sequenceTools, ...trackingTools, ...colorUnifyTools, ...briefTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...variantTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...alignLyricsTools, ...placeOnWordTools, ...brollOnWordsTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...plateWipeTools, ...transitionMaskTools, ...speedRampTools, ...onsetSnapTools, ...beatSnapTools, ...shotRampTools, ...musicStructureTools, ...actionFoleyTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...brollSetTools, ...matteTools, ...shotTools, ...lookMaskTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */
