@@ -296,7 +296,8 @@ describe("build_product_launch_tool with five features", () => {
     const data = await build(doc, "build_product_launch_tool", { product: "Oarlight", features: ["A", "B", "C", "D", "E"], file_ids: ["CITY000001"], three_d: "none" }, host);
     const sections = (data.sections as { kind: string; start: number; end: number }[]).filter((s) => s.kind === "feature");
     const cards = step(data, "features")!;
-    expect(cards, cards.why).toMatchObject({ outcome: "applied" });
+    // The glass blurs the product's footage, drawn by the block (without it the block draws an opaque sky).
+    expect(cards, cards.why).toMatchObject({ outcome: "applied", args: { placement: "full_frame", params: expect.objectContaining({ background: "CITY000001" }) } });
     expect(Number(cards.args!.position_seconds) + Number(cards.args!.duration_seconds)).toBeCloseTo(sections[3]!.end, 3);
     expect(step(data, "feature 5")).toMatchObject({ outcome: "fallback", args: expect.objectContaining({ position_seconds: sections[4]!.start }) });
   });
