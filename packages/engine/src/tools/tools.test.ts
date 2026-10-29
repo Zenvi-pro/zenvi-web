@@ -1172,9 +1172,9 @@ const SPECS: Record<string, Spec> = {
   fork_project_tool: {
     happy: {
       args: { name: "fast-cuts" },
-      summary: /^Kept the edit \(\d+ clips\) as variant "fast-cuts" at \/projects\/variants\/current-fast-cuts\.zvn\. The open project is unchanged\./,
+      summary: /^Kept the edit \(\d+ clips\) as variant "fast-cuts" at \/projects\/current-fast-cuts\.zvn\. The open project is unchanged\./,
       check: ({ host, receipt }) => {
-        expect(host.calls).toContain("saveCopy /projects/variants/current-fast-cuts.zvn");
+        expect(host.calls).toContain("saveCopy /projects/current-fast-cuts.zvn");
         expect(receipt.undoSteps).toBe(0);
       },
     },

@@ -177,8 +177,8 @@ one-call `zenvi-reels` and say so under gaps when you skip.
 fork_project_tool {"name": "warm-grade"}
 pick_best_variant_tool {"brief": "15 s hype reel for a sneaker drop", "variants": [
   {"name": "base", "project": "reel.zvn", "render": "renders/base.mp4"},
-  {"name": "fast-cuts", "project": "variants/reel-fast-cuts.zvn", "render": "renders/fast-cuts.mp4"},
-  {"name": "warm-grade", "project": "variants/reel-warm-grade.zvn", "render": "renders/warm-grade.mp4"}]}
+  {"name": "fast-cuts", "project": "reel-fast-cuts.zvn", "render": "renders/fast-cuts.mp4"},
+  {"name": "warm-grade", "project": "reel-warm-grade.zvn", "render": "renders/warm-grade.mp4"}]}
 ```
 
 `compare_renders_tool {"a": ..., "b": ...}` is the same judgment for any two

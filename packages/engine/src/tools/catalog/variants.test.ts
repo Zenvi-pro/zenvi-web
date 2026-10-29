@@ -76,8 +76,8 @@ describe("fork_project_tool", () => {
     const first = (await runTool({ doc, host: ed.host }, "fork_project_tool", { name: "warm-grade" })).data!;
     expect(first.status).toBe("applied");
     expect(first.undoSteps).toBe(0);
-    expect((first.data as Row).project).toBe("/work/variants/trip-warm-grade.zvn");
-    expect(ed.host.written.get("/work/variants/trip-warm-grade.zvn")).toBe(JSON.stringify(doc.toJSON()));
+    expect((first.data as Row).project).toBe("/work/trip-warm-grade.zvn");
+    expect(ed.host.written.get("/work/trip-warm-grade.zvn")).toBe(JSON.stringify(doc.toJSON()));
     expect(doc.undoLabels).toEqual([]);
 
     const again = (await runTool({ doc, host: ed.host }, "fork_project_tool", { name: "warm-grade" })).data!;

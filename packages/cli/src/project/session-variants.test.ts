@@ -29,7 +29,7 @@ describe("variants in a CLI session", () => {
     const fork = await session.run("fork_project_tool", { name: "with-marker" });
     expect(fork.result.ok).toBe(true);
     expect(session.file).toBe(base);
-    const variant = path.join(dir, "variants", "trip-with-marker.zvn");
+    const variant = path.join(dir, "trip-with-marker.zvn");
     // The variant's own change, made as if it had been opened and edited.
     const edited: Project = { ...(await readProjectFile(variant)), markers: [{ id: "M1", position: 1, icon: "blue.png", vector: "blue" }] as Project["markers"] };
     await writeProjectFile(variant, edited);
@@ -54,7 +54,7 @@ describe("variants in a CLI session", () => {
     const pick = await session.run("pick_best_variant_tool", {
       variants: [
         { name: "base", project: "trip.zvn", render: "a.mp4" },
-        { name: "marker", project: "variants/trip-with-marker.zvn", render: "b.mp4" },
+        { name: "marker", project: "trip-with-marker.zvn", render: "b.mp4" },
       ],
     });
     expect(pick.result.ok).toBe(true);
@@ -63,5 +63,17 @@ describe("variants in a CLI session", () => {
     expect(pick.savedTo).toBe(base);
     expect((await readProjectFile(base)).markers).toHaveLength(1);
     expect(session.doc.undoLabels).toEqual(["Pick best variant: marker"]);
+  });
+
+  it("keeps the variant beside the project, so relative paths mean the same in the variant and the base", async () => {
+    const base = path.join(dir, "reel.zvn");
+    await writeProjectFile(base, createProject());
+    const session = await ProjectSession.open(base, { registry: engineRegistry(), surface: "mcp" });
+    expect((await session.run("fork_project_tool", { name: "fast" })).result.ok).toBe(true);
+    // The skill's flow: open the variant, work on it, then open the base again by the name it was given.
+    expect((await session.run("open_project_tool", { file_path: "reel-fast.zvn" })).result.ok).toBe(true);
+    expect(session.file).toBe(path.join(dir, "reel-fast.zvn"));
+    expect((await session.run("open_project_tool", { file_path: "reel.zvn" })).result.ok).toBe(true);
+    expect(session.file).toBe(base);
   });
 });

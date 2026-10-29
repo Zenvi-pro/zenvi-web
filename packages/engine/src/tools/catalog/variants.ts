@@ -134,11 +134,16 @@ const variantName = z
   .regex(/^[a-z0-9][a-z0-9-]{0,31}$/, "a short lowercase name: letters, digits and dashes (e.g. \"fast-cuts\")")
   .describe("The variant's name, saying how it differs: \"fast-cuts\", \"bold-type\", \"warm-grade\".");
 
-/** Where a variant of the open project is kept: `variants/<project>-<name>.zvn` next to it, so its media paths still resolve. */
+/**
+ * Where a variant of the open project is kept: `<project>-<name>.zvn` in the
+ * same folder. Hosts resolve relative paths (renders, media, the base project)
+ * from the open project's folder, so a variant in a subfolder would render
+ * `renders/x.mp4` somewhere else and could not reopen the base by its name.
+ */
 function variantPath(current: string | null, name: string): string {
   const base = (current ?? "").split(/[\\/]/).pop() ?? "";
   const stem = PROJECT_EXTS.reduce((s, ext) => (s.endsWith(ext) ? s.slice(0, -ext.length) : s), base) || "project";
-  return `variants/${stem}-${name}.zvn`;
+  return `${stem}-${name}.zvn`;
 }
 
 /**
@@ -165,7 +170,7 @@ interface Variant {
 
 const forkInput = z.strictObject({
   name: variantName,
-  path: z.string().min(1).optional().describe("Where to keep the copy instead (a .zvn path relative to the project's folder). Default variants/<project>-<name>.zvn."),
+  path: z.string().min(1).optional().describe("Where to keep the copy instead (a .zvn path relative to the project's folder). Keep it in the project's folder, so relative render and project paths mean the same in every variant. Default <project>-<name>.zvn."),
   replace: z.boolean().optional().describe("Replace a variant already saved under this name (default false: refused)."),
 });
 
@@ -198,7 +203,7 @@ export const variantTools: CatalogTool[] = [
     name: FORK,
     title: "Keep the edit as a variant",
     description:
-      "Save a copy of the open edit as a named variant (variants/<project>-<name>.zvn, the same media, no copy of any file) and stay on the open project; changes nothing and makes no undo step. " +
+      "Save a copy of the open edit as a named variant (<project>-<name>.zvn next to it, the same media, no copy of any file) and stay on the open project; changes nothing and makes no undo step. " +
       "Best-of-N: fork 2-3 variants that differ on purpose (pacing, type system, grade or music), open_project_tool each and make its change, render each as a short proxy, then pick_best_variant_tool.",
     input: forkInput,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },

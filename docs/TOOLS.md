@@ -3562,7 +3562,7 @@ Availability: editor — (needs watching a render with sound (the zenvi CLI and 
 
 ### fork_project_tool
 
-**Keep the edit as a variant** (direct tool). Save a copy of the open edit as a named variant (variants/<project>-<name>.zvn, the same media, no copy of any file) and stay on the open project; changes nothing and makes no undo step.
+**Keep the edit as a variant** (direct tool). Save a copy of the open edit as a named variant (<project>-<name>.zvn next to it, the same media, no copy of any file) and stay on the open project; changes nothing and makes no undo step.
 
 Surfaces: mcp, cli, editor. edits. Needs: storage.
 
@@ -3571,7 +3571,7 @@ Availability: editor — (needs saving a copy of the project as another project)
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
 | `name` | string | yes | The variant's name, saying how it differs: "fast-cuts", "bold-type", "warm-grade". |
-| `path` | string |  | Where to keep the copy instead (a .zvn path relative to the project's folder). Default variants/<project>-<name>.zvn. |
+| `path` | string |  | Where to keep the copy instead (a .zvn path relative to the project's folder). Keep it in the project's folder, so relative render and project paths mean the same in every variant. Default <project>-<name>.zvn. |
 | `replace` | boolean |  | Replace a variant already saved under this name (default false: refused). |
 
 ### compare_renders_tool
