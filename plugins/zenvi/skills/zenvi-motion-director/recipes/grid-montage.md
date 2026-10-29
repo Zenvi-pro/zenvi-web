@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Grid montage
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 A letterboxed band in a vertical frame splits into panels that fill one per
 beat, each a different clip; the layout steps 3 → 4 → 6 and merges into one
 full shot. Reference feel: one tile per beat at ~150 bpm, a hit per tile,

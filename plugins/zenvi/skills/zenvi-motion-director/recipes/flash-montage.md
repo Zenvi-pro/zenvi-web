@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Flash montage
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "flash-montage", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 A new image every 3-6 frames on one idea ("the evolution of time"), shapes
 matched across cuts, glow and grain, flash frames, a glowing end word.
 Reference feel: 12 s, ~0.16 s per shot, 5 flash events per 10 s, loud.

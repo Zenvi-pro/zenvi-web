@@ -123,7 +123,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       title: "Read a director recipe",
       description:
         "The motion director's recipe for a genre (structure in seconds, shot lengths, sound plan, the exact tool calls and the finish), the same text as the resource zenvi://director/<recipe> and the zenvi-motion-director skill's recipes/. " +
-        "Read it before the first edit of a whole video. recipe=director gives the director's shared rules; sound_palette a sound designer palette (zenvi://sound/<palette>); styles the brief compiler (brief, step 0 of every edit), the styles index (index) or one style or technique by id (zenvi://styles/<id>). Read-only.",
+        "For a whole video call produce_video_tool first (it builds the recipe of the style it picks); read a recipe to layer on its cut, fix its findings or build by hand. recipe=director gives the director's shared rules; sound_palette a sound designer palette (zenvi://sound/<palette>); styles the brief compiler (brief, step 0 of every edit), the styles index (index) or one style or technique by id (zenvi://styles/<id>). Read-only.",
       inputSchema: {
         type: "object",
         properties: {

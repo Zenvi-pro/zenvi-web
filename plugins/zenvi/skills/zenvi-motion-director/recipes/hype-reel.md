@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Hype / sport reel
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "hype-reel", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 Very fast (a cut every 0.2-0.3 s on a 120-160 bpm track, 4-frame bursts after
 the drop), a slow-motion wind-up that rushes into the drop, a white flash and
 a glitch on it, negative and glitch hits on the climax's bar lines, whips in

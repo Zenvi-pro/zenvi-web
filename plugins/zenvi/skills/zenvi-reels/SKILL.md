@@ -5,6 +5,12 @@ description: Make a finished short-form video (Instagram Reel, TikTok, YouTube S
 
 # One-shot reels with Zenvi
 
+**First call: `produce_video_tool`** `{"request": "<the ask as written>", "output": "output.mp4"}`.
+It writes the brief, gathers the footage and music when the bin is short, cuts
+with `build_reel_tool` (or the builder the style needs), finishes, renders and
+reviews in one call, and lists what to fix. The rest of this file is how to go
+beyond it or do the same steps by hand.
+
 A reel is cut to music. Zenvi's `build_reel_tool` does the whole cut in one
 step (and one undo step): shots on the music's beats, the style's camera
 moves and look, flashes on downbeats, an opening hook title, shot labels,

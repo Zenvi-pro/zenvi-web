@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # 3D product ad
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "3d-product-ad", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 A prompt types the wish, icons burst, a "Generating…" state, then the
 product spins in and lands in a clean studio with floating callout chips.
 White, soft shadows, few cuts (~2.8 s), the motion carries it. One bold

@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Kinetic-caption talking head
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "kinetic-captions", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 A person talks; the captions are the show: one word at a time in sync with
 the voice, connector words small and white, emphasis words huge, condensed,
 in the accent colour, placed around the subject (some behind the head), a few

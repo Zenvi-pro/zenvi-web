@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Documentary / video essay
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "documentary", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 A voice tells a story over a B-roll montage: small centred one-word captions,
 shots of 0.5-1.5 s, a dark slightly desaturated grade, a photo-collage split,
 a small logo bug, low impacts on topic changes and a quiet music bed.

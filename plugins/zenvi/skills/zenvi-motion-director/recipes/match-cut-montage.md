@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Match-cut montage
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "match-cut-montage", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 Shots that share a shape or pose (circles: cup, lamp, sun, moon, eye, vinyl,
 lens, clock; poses: arms out, head down) cut so the subject never jumps.
 Reference feel: 15 s, ~0.3 s average shot, a sound on 75 % of cuts.

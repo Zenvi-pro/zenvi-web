@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Tutorial / breakdown
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "tutorial", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 A how-to or effect breakdown packaged as a designed object: grid paper,
 footage in bordered cards, numbered captions, handwritten-feel labels with
 arrows, a before/after, ending on "Save this". 9:16 first. Each step 2-4 s,

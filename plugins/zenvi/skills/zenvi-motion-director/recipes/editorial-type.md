@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Editorial / brand type
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "editorial-type", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 Type is the picture: one object (a flower, a shoe, a cookie), thin crosshair
 grids with tiny mono labels, image tiles in rectangular frames, kinetic words
 with letter swaps, false-colour variants, white/black flash frames. Tight

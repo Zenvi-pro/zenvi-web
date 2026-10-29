@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # Data / map explainer
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 A voice explains numbers and places: the camera pushes from the whole globe
 into the region, markers pop 0.2 s apart while it is still moving, a unit-icon
 chart regroups to make the point and dissolves to footage with a few icons

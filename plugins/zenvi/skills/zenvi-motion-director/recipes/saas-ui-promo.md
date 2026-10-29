@@ -12,6 +12,11 @@ avoid_with: []
 ---
 # SaaS / UI promo
 
+**One call first:** `produce_video_tool` `{"request": "<the brief as written>", "style": "saas-ui-promo", "output": "output.mp4"}`
+cuts this recipe with its builder, finishes, renders and reviews in one call. The rest of
+this file is for layering on that cut and fixing what its review lists, or for
+building by hand when no builder fits.
+
 Glass UI over landscape photos, big headline with a serif-italic accent,
 cards that enter in depth with a stagger, a pointer that clicks and causes
 something, counters, a word rotator, a URL end card. Light, calm, premium.
