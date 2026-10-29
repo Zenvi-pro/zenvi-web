@@ -30,6 +30,7 @@ import { addTrack } from "../../ops/tracks.js";
 import { removeTransition } from "../../ops/transitions.js";
 import { boxAt, subjectOnCanvas, type CanvasSubject, type FitMode, type SubjectBox } from "../../matchcut/fit.js";
 import { planMontage, type MontageMusic, type MontagePlan } from "../../matchcut/montage.js";
+import { loopMusic, loopNote, onLoopedClock } from "../../reels/loop.js";
 import { REUSE_GAP_SECONDS } from "../../reels/plan.js";
 import { flashSvg } from "../../reels/typography.js";
 import { MONTAGE_TRANSITIONS, planMontageTransitions, type MontageCut, type MontageRule } from "../../transitions/motion/montage.js";
@@ -143,7 +144,7 @@ const montageInput = z.strictObject({
     .describe("Subject boxes per file. Files without one are searched for a circle at each shot's first frame (detect_subject_tool), or kept centred when this surface cannot read frames."),
   music_file_id: z.string().optional().describe("Music in the media bin to cut to. Default: the longest audio file in the bin."),
   ...beatOverrideShape,
-  duration_seconds: z.number().min(2).max(60).optional().describe("Target length, seconds (default: one pass through the files, at least 8 s). Ends on a downbeat."),
+  duration_seconds: z.number().min(2).max(60).optional().describe("Target length, seconds (default: one pass through the files, at least 8 s). Ends on a downbeat; music shorter than this loops whole phrases on a bar line to reach it."),
   target: targetSchema.optional().describe("Where every subject lands. Default: the frame's centre, at the size the first file shows its subject."),
   fit: fitSchema,
   cover: coverSchema.describe("Default zoom_all: every subject the same size and no black edges."),
@@ -491,6 +492,13 @@ const montageTool = directTool({
       warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow bpm (default 120).");
     }
 
+    // An asked length the music cannot fill: whole phrases loop on a bar line (reels/loop.ts).
+    const loop = beats && args.duration_seconds !== undefined ? loopMusic(beats, args.duration_seconds) : null;
+    if (loop && beats) {
+      warnings.push(loopNote(beats, loop, args.duration_seconds!));
+      beats = { ...loop.music, onsets: onLoopedClock(loop.segments, beats.onsets) };
+    }
+
     // order=look chains the files by the shot model. Otherwise a list in the bin's own order is no chain:
     // shapes are chained first (re-edit bench, 2026-10-28).
     const notes: string[] = [];
@@ -618,7 +626,7 @@ const montageTool = directTool({
         deleteClips(tx, tx.project.clips.map((c) => String(c.id)), { ripple: false });
       }
       const track = montageTracks(tx);
-      if (music) placeMusicBed(tx, String(music.id), plan.musicStart, plan.duration, track.music, displayName(music));
+      if (music) placeMusicBed(tx, String(music.id), plan.musicStart, plan.duration, track.music, displayName(music), loop?.segments);
       const clips = plan.shots.map((shot, i) => {
         const src = sources[i]!;
         const file = files.get(src.fileId)!;
