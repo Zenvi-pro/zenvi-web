@@ -28,6 +28,12 @@ describe("parsePathData", () => {
     for (let i = 0; i < line!.points.length; i += 2) expect(Math.hypot(line!.points[i]! - 50, line!.points[i + 1]!)).toBeCloseTo(50, 0);
   });
 
+  it("reads arc flags written without separators, as svgo writes them", () => {
+    expect(parsePathData("M0 0a5 5 0 0110 0")).toEqual(parsePathData("M0 0 a5 5 0 0 1 10 0"));
+    expect(parsePathData("M0 0A5 5 0 01.5 0").at(-1)).toMatchObject({ x: 0.5, y: 0 });
+    expect(() => parsePathData("M0 0 A5 5 0 2 1 10 0")).toThrow(/flags of 0 or 1/);
+  });
+
   it("refuses data that is not a path", () => {
     expect(() => parsePathData("L 0 0")).toThrow(/start with M/);
     expect(() => parsePathData("M 0 0 L 5")).toThrow(/missing a number/);

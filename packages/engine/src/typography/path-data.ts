@@ -38,6 +38,15 @@ export function parsePathData(d: string): PathCommand[] {
     if (t === undefined || /[a-z]/i.test(t)) throw new Error(`path command ${cmd} is missing a number`);
     return Number(t);
   };
+  // An arc's flags are one character each and need no separator ("a5 5 0 0110 0" is flags 0, 1 then x 10): svgo writes them so.
+  const flag = (): boolean => {
+    const t = tokens[i];
+    if (t === undefined || (t[0] !== "0" && t[0] !== "1")) throw new Error(`path command ${cmd} needs flags of 0 or 1`);
+    if (t.length === 1) i += 1;
+    else if (/^(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(t.slice(1))) tokens[i] = t.slice(1);
+    else throw new Error(`path command ${cmd} needs flags of 0 or 1`);
+    return t[0] === "1";
+  };
   while (i < tokens.length) {
     const t = tokens[i]!;
     if (/[a-z]/i.test(t)) {
@@ -110,8 +119,8 @@ export function parsePathData(d: string): PathCommand[] {
         const rx = Math.abs(take());
         const ry = Math.abs(take());
         const phi = take();
-        const large = take() !== 0;
-        const sweep = take() !== 0;
+        const large = flag();
+        const sweep = flag();
         const x2 = ox + take();
         const y2 = oy + take();
         out.push(...arcCubics(x, y, rx, ry, phi, large, sweep, x2, y2));
