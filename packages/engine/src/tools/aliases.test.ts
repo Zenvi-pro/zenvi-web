@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { aliasArguments, matchOption } from "./aliases.js";
+import { runTool } from "./registry.js";
+import { fakeHost } from "./test-support/fake-host.js";
+import { fixtureDoc, IDS } from "./test-support/fixture.js";
 
 const schema = (...names: string[]) => ({ properties: Object.fromEntries(names.map((n) => [n, {}])) });
 
@@ -31,6 +34,73 @@ describe("aliasArguments", () => {
   it("ignores arguments that are not an object", () => {
     expect(aliasArguments(schema("timeline_clip_id"), "x").notes).toEqual([]);
     expect(aliasArguments(undefined, { clip_id: "A" }).notes).toEqual([]);
+  });
+});
+
+describe("aliasArguments on items and enum values", () => {
+  const easing = { type: "string", enum: ["", "ease_in", "ease_out"] };
+  const interpolation = { type: "string", enum: ["", "bezier", "linear", "constant"] };
+
+  it("moves an enum value to the argument next to it that has it, at the top and inside items", () => {
+    const keyframes = { properties: { ease: easing, interpolation, points: { type: "array", items: { properties: { value: {}, ease: easing, interpolation } } } } };
+    const r = aliasArguments(keyframes, { ease: "linear", points: [{ value: 1, ease: "linear" }, { value: 2, ease: "ease_in" }] });
+    expect(r.args).toEqual({ interpolation: "linear", points: [{ value: 1, interpolation: "linear" }, { value: 2, ease: "ease_in" }] });
+    expect(r.notes).toEqual([
+      "'linear' is not a ease; used it as interpolation='linear'. Pass interpolation next time.",
+      "'linear' is not a points[0].ease; used it as points[0].interpolation='linear'. Pass interpolation next time.",
+    ]);
+    // Both given: the call means something we cannot guess.
+    const both = { ease: "linear", interpolation: "constant" };
+    expect(aliasArguments(keyframes, both).args).toBe(both);
+  });
+
+  it("renames an item's id to effect (list_fx_tool's key, apply_fx_tool's name)", () => {
+    const fx = { properties: { clip_id: {}, effects: { type: "array", items: { properties: { effect: {}, amount: {} } } } } };
+    const r = aliasArguments(fx, { timeline_clip_id: "A", effects: [{ id: "bloom" }] });
+    expect(r.args).toEqual({ clip_id: "A", effects: [{ effect: "bloom" }] });
+    expect(r.notes).toHaveLength(2);
+  });
+
+  it("reads an old genre spelling, but only where the schema has the new one", () => {
+    const genre = (options: string[]) => ({ properties: { genre: { anyOf: [{ type: "string", enum: options }, { type: "null" }] } } });
+    expect(aliasArguments(genre(["hype", "product_3d"]), { genre: "3d_product" }).args).toEqual({ genre: "product_3d" });
+    expect(aliasArguments(genre(["hype"]), { genre: "3d_product" }).args).toEqual({ genre: "3d_product" });
+  });
+});
+
+describe("aliases through runTool (sk2-product-brand regressions)", () => {
+  it("set_keyframes_tool takes ease 'linear' as interpolation, and trim_clip_tool takes timeline_clip_id", async () => {
+    const doc = fixtureDoc();
+    const keyed = await runTool({ doc, host: fakeHost() }, "set_keyframes_tool", {
+      timeline_clip_id: IDS.clipA,
+      property: "alpha",
+      ease: "linear",
+      points: [{ seconds: 0, value: 0 }, { seconds: 1, value: 1, ease: "linear" }],
+    });
+    expect(keyed.ok, keyed.text).toBe(true);
+    const alpha = doc.project.clips.find((c) => c.id === IDS.clipA)!.alpha.Points;
+    expect(alpha.map((p) => p.interpolation)).toEqual([1, 1]);
+    expect(keyed.text).toMatch(/Pass interpolation next time/);
+
+    const trimmed = await runTool({ doc, host: fakeHost() }, "trim_clip_tool", { timeline_clip_id: IDS.clipB, end_seconds: 4 });
+    expect(trimmed.ok, trimmed.text).toBe(true);
+    expect(doc.project.clips.find((c) => c.id === IDS.clipB)!.end).toBe(4);
+  });
+
+  it("apply_fx_tool takes list_fx_tool's id, and master/analyze take product_3d or 3d_product", async () => {
+    const doc = fixtureDoc();
+    const fx = await runTool({ doc, host: fakeHost() }, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ id: "not_an_fx" }] });
+    // The id reached the effect check: refused for the name, not for an unknown key.
+    expect(fx.text).toMatch(/'not_an_fx' is not one of .* \(at effects\.0\.effect\)/);
+    for (const genre of ["product_3d", "3d_product"]) {
+      const scored = await runTool({ doc, host: fakeHost() }, "analyze_mix_tool", { genre });
+      expect(scored.text).not.toMatch(/Invalid arguments/);
+      const mastered = await runTool({ doc, host: fakeHost() }, "master_audio_tool", { genre, iterate: true });
+      expect(mastered.text).not.toMatch(/Invalid arguments/);
+    }
+    const music = await runTool({ doc, host: fakeHost() }, "search_freesound_music_tool", { query: "lo-fi", max_results: 3 });
+    expect(music.text).not.toMatch(/Invalid arguments/);
+    expect(music.text).toMatch(/used it as 'count'/);
   });
 });
 
