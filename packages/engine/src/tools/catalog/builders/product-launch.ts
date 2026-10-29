@@ -39,7 +39,7 @@ const input = z.strictObject({
     .describe("The proof: a stat that counts up (stat '2400', label 'teams'), or a short quote."),
   cta: z.string().max(60).optional().describe("End card call to action."),
   url: z.string().max(60).optional().describe("End card URL."),
-  file_ids: z.array(z.string().min(1)).max(30).optional().describe("Product footage, screens and photos in order: the problem, the reveal, then one per feature and the proof. Default: every video and image in the bin."),
+  file_ids: z.array(z.string().min(1)).max(30).optional().describe("Product footage, screens and photos in order: the problem, the reveal, then one per feature (the proof and the end card draw their own backgrounds). Default: every video and image in the bin."),
   logo_file_id: z.string().min(1).optional().describe("The logo (a bin image) for the end card."),
   three_d: z.enum(["auto", "title_3d", "logo_extrude", "device_mockup", "none"]).optional().describe("The reveal in 3D (Zenvi 3D, needs Blender): auto = title_3d with the product name; device_mockup shows the reveal's footage on a phone; none = no 3D."),
   music_file_id: z.string().min(1).optional().describe("Music to cut to. Default: the longest audio file in the bin; without music the sections follow 120 BPM."),
@@ -82,10 +82,10 @@ export const productLaunchTools: CatalogTool[] = [
       const notes: string[] = [];
       if (ids.length === 0) notes.push("No footage in the bin: every section is type and motion on a dark card.");
 
-      // Which picture each section shows: the files in order, the end card has none (its block or template draws it).
+      // Which picture each section shows: the files in order. The proof counts over a light field and the end card draws its own (the SaaS references: a number never sits on a busy photo).
       const shown = new Map<LaunchSection, string>();
       let next = 0;
-      for (const s of plan.sections) if (s.kind !== "end" && ids.length > 0) shown.set(s, ids[next++ % ids.length]!);
+      for (const s of plan.sections) if (s.kind !== "end" && s.kind !== "proof" && ids.length > 0) shown.set(s, ids[next++ % ids.length]!);
 
       const c = new Composer(call, TOOL);
       const placed = c.edit("sections", plan.sections.map((s) => `${s.kind}${s.index !== undefined ? ` ${s.index + 1}` : ""} ${round3(s.start)}-${round3(s.end)} s`).join(", "), (tx) => {

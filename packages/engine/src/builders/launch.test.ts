@@ -47,4 +47,22 @@ describe("explainer plan", () => {
     expect(chapters.map((c) => c.at)).toEqual([1.4, 4.8]);
     expect(numberSlots(words)).toEqual([{ word: 5, value: "40", prefix: "", suffix: "%", at: 3.5 }]);
   });
+
+  it("reads a number said in words before 'percent', and keeps chapters out of the hook", () => {
+    const said = [
+      { text: "Rivers", start: 0, end: 0.4 },
+      { text: "carried", start: 0.45, end: 0.8 },
+      { text: "forty-five", start: 0.85, end: 1.3 },
+      { text: "percent.", start: 1.35, end: 1.8 },
+      { text: "Then", start: 3, end: 3.2 },
+      { text: "ninety", start: 9, end: 9.3 },
+      { text: "nine", start: 9.35, end: 9.6 },
+      { text: "percent", start: 9.65, end: 10 },
+    ];
+    expect(numberSlots(said).map((n) => [n.value, n.suffix])).toEqual([
+      ["45", "%"],
+      ["99", "%"],
+    ]);
+    expect(planChapters(["One"], words, 11, 2).map((c) => c.at)).toEqual([4.8]);
+  });
 });

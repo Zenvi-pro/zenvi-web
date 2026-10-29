@@ -129,10 +129,22 @@ export class Composer {
     this.call.commit((tx) => applyProjectState(tx, target), label);
     return applied(this.tool, summary, {
       ...fields,
-      warnings: [...(fields.warnings ?? []), ...this.warnings],
+      warnings: [...(fields.warnings ?? []), ...collapse(this.warnings)],
       data: { ...data, decisions: this.decisions, fallbacks: this.decisions.filter((d) => d.outcome !== "applied").length, next_calls: this.next },
     });
   }
+}
+
+/** The same warning about several clips once, with how many ("captions: clip AB12…: x" for six clips -> "captions: x (6 clips)"). */
+function collapse(warnings: readonly string[]): string[] {
+  const groups = new Map<string, { first: string; n: number }>();
+  for (const w of warnings) {
+    const key = w.replace(/clip [A-Za-z0-9]{6,}: /, "");
+    const g = groups.get(key);
+    if (g) g.n += 1;
+    else groups.set(key, { first: w, n: 1 });
+  }
+  return [...groups].map(([key, g]) => (g.n > 1 ? `${key} (${g.n} clips)` : g.first));
 }
 
 /** Clear the timeline (clips and transitions) on the scratch project: `replace=true`. */

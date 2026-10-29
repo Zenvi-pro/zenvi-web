@@ -115,7 +115,9 @@ export const explainerTools: CatalogTool[] = [
       const duration = Math.round(Math.min(voice ? voiceLength : Infinity, words[words.length - 1]!.end + 0.8) * fps) / fps;
 
       const pictures = brollIds.map((id) => files.get(id)!);
-      const hits = planKeywordBroll(words, keywordMedia(pictures), givenKeywords(args.keywords), { minStart: 0, minGap: 0.5, minHold: 2, maxHold: 4.5, until: duration });
+      const pace = EXPLAINER_PACES[args.pace ?? "documentary"];
+      // A keyword only places its cut: the shot holds as the pace allows, so the hits keep apart by the pace too.
+      const hits = planKeywordBroll(words, keywordMedia(pictures), givenKeywords(args.keywords), { minStart: 0, minGap: 0.2, minHold: pace.min, maxHold: pace.max, until: duration });
       const matched = new Set(hits.map((h) => h.fileId));
       const fill = brollIds.filter((id) => !matched.has(id));
       const shots = planExplainerShots(duration, words, hits, fill.length > 0 ? fill : brollIds, fps, args.pace ?? "documentary");
@@ -143,14 +145,16 @@ export const explainerTools: CatalogTool[] = [
       });
       if (!music) c.skip("music", "no music in the bin: the voice plays alone");
 
+      const firstPause = words.findIndex((w, i) => i > 0 && w.start - words[i - 1]!.end > 0.3);
+      const hookHold = args.hook?.trim() ? Math.max(2, Math.min(3.5, firstPause > 0 ? words[firstPause]!.start : 3)) : 0;
+      const chapters = planChapters(args.chapters ?? [], words, duration, hookHold > 0 ? hookHold + 0.2 : 0);
       if (args.hook?.trim()) {
-        const firstPause = words.findIndex((w, i) => i > 0 && w.start - words[i - 1]!.end > 0.3);
-        const hold = Math.max(2, Math.min(3.5, firstPause > 0 ? words[firstPause]!.start : 3));
+        const hold = hookHold;
         await c.run("hook", "add_kinetic_title_tool", { text: args.hook, position_seconds: 0.2, duration_seconds: round3(hold), style: "editorial" }, "the promise over the first sentence, before the first cut");
       }
 
-      for (const [i, slot] of planChapters(args.chapters ?? [], words, duration).entries()) {
-        await c.run(`chapter ${i + 1}`, "add_kinetic_title_tool", { text: slot.title, position_seconds: round3(slot.at), duration_seconds: CHAPTER_SECONDS, style: "editorial", animation: "rise" }, `chapter card in the pause at ${round3(slot.at)} s`);
+      for (const [i, slot] of chapters.entries()) {
+        await c.run(`chapter ${i + 1}`, "add_kinetic_title_tool", { text: slot.title, position_seconds: round3(slot.at), duration_seconds: CHAPTER_SECONDS, style: "editorial", animation: "rise", y: 0.2 }, `chapter card in the pause at ${round3(slot.at)} s`);
         // A topic change lands on a low hit (the documentary references).
         await c.run(`chapter ${i + 1} hit`, "add_sfx_tool", { recipe: "impact_thud", at_seconds: round3(slot.at), gain_db: -14, seed: i + 1 }, "a low impact on the topic change");
       }
@@ -220,7 +224,7 @@ export const explainerTools: CatalogTool[] = [
           voice_clip_id: placed.voiceClip,
           shots: shots.map((s, i) => ({ clip_id: placed.clips[i], file_id: s.fileId, start: s.start, end: s.end, cue: s.cue, ...(s.keyword ? { keyword: s.keyword } : {}) })),
           keywords: hits.map((h) => ({ word: h.text, at: round3(h.start), file_id: h.fileId, source: h.source })),
-          chapters: planChapters(args.chapters ?? [], words, duration).map((s) => ({ title: s.title, at: round3(s.at) })),
+          chapters: chapters.map((s) => ({ title: s.title, at: round3(s.at) })),
         },
         { notes },
       );

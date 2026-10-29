@@ -99,13 +99,17 @@ export function planExplainerShots(duration: number, words: readonly CaptionWord
   return shots;
 }
 
-/** Chapter cards: chapter i of n starts at the pause nearest i/n of the way (the first after the opening sentence). */
-export function planChapters(titles: readonly string[], words: readonly CaptionWord[], duration: number): ChapterSlot[] {
-  const gaps = pauses(words, 0.25);
+/**
+ * Chapter cards: chapter i of n starts at the pause nearest i/n of the way;
+ * the first at the first pause after `after` (the hook's end), and none
+ * before it.
+ */
+export function planChapters(titles: readonly string[], words: readonly CaptionWord[], duration: number, after = 0): ChapterSlot[] {
+  const gaps = pauses(words, 0.25).filter(([a]) => a >= after);
   const n = titles.length;
   const used = new Set<number>();
   return titles.map((title, i) => {
-    const target = i === 0 ? Math.min(duration * 0.1, 4) : (duration * i) / n;
+    const target = i === 0 ? Math.max(after, Math.min(duration * 0.1, 4)) : Math.max(after, (duration * i) / n);
     let best = -1;
     gaps.forEach(([a], j) => {
       if (used.has(j) || a < 1) return;
@@ -120,20 +124,46 @@ export function planChapters(titles: readonly string[], words: readonly CaptionW
 }
 
 const PERCENT = new Set(["percent", "per", "%"]);
+const UNITS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
 
-/** Spoken numbers worth a counter: a digit group, with % or a unit word after it, at least `spacing` apart, at most `max`. */
+/** A number said in words ("forty", "forty-five", "ninety nine") at `i`: its value and how many words it took, or null. */
+function spokenNumber(words: readonly CaptionWord[], i: number): { value: number; used: number } | null {
+  const at = (k: number) => (words[k] ? words[k]!.text.toLowerCase().replace(/[^a-z-]/g, "") : "");
+  const [first, ...rest] = at(i).split("-");
+  const unit = (w: string | undefined) => (w ? UNITS.indexOf(w) : -1);
+  const tens = TENS.indexOf(first ?? "");
+  if (tens >= 2) {
+    const inline = unit(rest[0]);
+    if (inline > 0 && inline < 10) return { value: tens * 10 + inline, used: 1 };
+    const next = unit(at(i + 1));
+    return next > 0 && next < 10 ? { value: tens * 10 + next, used: 2 } : { value: tens * 10, used: 1 };
+  }
+  const u = unit(first);
+  return u >= 10 ? { value: u, used: 1 } : null;
+}
+
+/**
+ * Spoken numbers worth a counter, at least `spacing` apart, at most `max`:
+ * a digit group (with %, k, m or x, or "percent" after it; a plain number
+ * from 10, never a year), or a number said in words followed by "percent".
+ */
 export function numberSlots(words: readonly CaptionWord[], max = 2, spacing = 6): NumberSlot[] {
   const out: NumberSlot[] = [];
   words.forEach((w, i) => {
-    const m = /^([$€£]?)(\d[\d,.]*)(%|k|m|x)?$/i.exec(w.text.replace(/[^\p{L}\p{N}%$€£.,]/gu, "").replace(/[.,]$/, ""));
-    if (!m) return;
-    const digits = m[2]!.replace(/,/g, "");
-    if (/^(19|20)\d\d$/.test(digits)) return; // a year is a date, not a stat
-    const after = words[i + 1] ? bareWord(words[i + 1]!.text) : "";
-    const suffix = m[3] ?? (PERCENT.has(after) ? "%" : "");
-    if (!suffix && Number(digits) < 10) return;
     if (out.some((s) => Math.abs(s.at - w.start) < spacing)) return;
-    out.push({ word: i, value: digits, prefix: m[1]!, suffix, at: w.start });
+    const m = /^([$€£]?)(\d[\d,.]*)(%|k|m|x)?$/i.exec(w.text.replace(/[^\p{L}\p{N}%$€£.,]/gu, "").replace(/[.,]$/, ""));
+    if (m) {
+      const digits = m[2]!.replace(/,/g, "");
+      if (/^(19|20)\d\d$/.test(digits)) return; // a year is a date, not a stat
+      const after = words[i + 1] ? bareWord(words[i + 1]!.text) : "";
+      const suffix = m[3] ?? (PERCENT.has(after) ? "%" : "");
+      if (!suffix && Number(digits) < 10) return;
+      out.push({ word: i, value: digits, prefix: m[1]!, suffix, at: w.start });
+      return;
+    }
+    const said = spokenNumber(words, i);
+    if (said && PERCENT.has(words[i + said.used] ? bareWord(words[i + said.used]!.text) : "")) out.push({ word: i, value: String(said.value), prefix: "", suffix: "%", at: w.start });
   });
   return out.slice(0, max);
 }
