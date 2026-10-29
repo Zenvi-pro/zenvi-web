@@ -18,8 +18,8 @@ export const FINISH_HINT =
 
 /** The genre router: which recipe to read. */
 const RECIPES =
-  "Recipes: match-cut-montage (shapes line up), flash-montage (a new image every few frames), hype-reel (fast, sport, trailer: build_reel_tool hype), documentary (voice-over), kinetic-captions (talking head), " +
-  "saas-ui-promo, 3d-product-ad, editorial-type (type, mask reveals), grid-montage, tutorial, showreel-intro.";
+  "Recipes: match-cut-montage (shapes line up), flash-montage (a new image every few frames), hype-reel (build_reel_tool hype; trailer: build_trailer_tool), documentary (voice-over: build_explainer_tool), kinetic-captions (talking head: build_talking_head_tool), " +
+  "saas-ui-promo and 3d-product-ad (launch: build_product_launch_tool), editorial-type, grid-montage, tutorial, showreel-intro.";
 
 /** The finish every recipe ends with, in order. */
 const FINISH =

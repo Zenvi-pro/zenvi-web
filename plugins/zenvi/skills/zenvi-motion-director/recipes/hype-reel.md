@@ -6,8 +6,8 @@ a glitch on it, negative and glitch hits on the climax's bar lines, whips in
 one direction, condensed display type that slams in, a hit on every cut,
 loud, every shot in one graded world. Cars, bikes, sport, launches, events.
 
-"Hype", "trailer", "edit to this song", "make it fast": the cut is
-`build_reel_tool` first, not clips placed by hand. Hand cutting is for
+"Hype", "edit to this song", "make it fast": the cut is
+`build_reel_tool` first (a three-act film trailer: `build_trailer_tool`, see Trailers), not clips placed by hand. Hand cutting is for
 fixing single shots after it.
 
 ## Structure (12-20 s)
@@ -74,6 +74,16 @@ fixing single shots after it.
    `repeated-footage` are `low`: fix them too when you can (more clips,
    rebuild with `replace: true`), but they do not block. Call it again; stop
    when no `high` or `medium` problem is left.
+
+## Trailers
+
+A film, game or event trailer is not a hype reel: three acts (the world in
+long faded shots, the trouble at half that, a climax whose cuts get faster),
+a riser into a beat of silence on black, the title on a braam, act cards on
+black. `build_trailer_tool` (`title`, `act_cards`, `end_card`,
+`duration_seconds`, `file_ids` in story order, `music_file_id`) cuts all of
+it in one undo step; then the Finish (`auto_sound_design_tool` with the
+receipt's `next_calls`).
 
 ## Finish (every run, in this order; never skip it)
 
