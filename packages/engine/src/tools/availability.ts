@@ -421,7 +421,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "library"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "shots", "motion", "scenes3d", "fx", "library"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -457,6 +457,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "audio.generateSfx": "ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
       "audio.transcribe": "zenvi speech setup ran (on device, free), else signed in with zenvi login",
+      shots: "onnxruntime-node is installed; the SigLIP model (about 213 MB) downloads once when the person agrees (zenvi shots setup, or embed_media_tool download=true)",
       motion: "headless Chrome is installed: zenvi motion setup",
       scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
       fx: "ffmpeg is installed (ZENVI_FX=0 turns it off)",

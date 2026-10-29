@@ -55,7 +55,6 @@ export const RVM_MOBILENETV3: ModelDescriptor = {
   },
 };
 
-/** Weights are 15 MB; anything much larger is not the file we pinned. */
 const MAX_ASSET_BYTES = 64 * 1024 * 1024;
 
 export interface ModelCacheOptions {
@@ -105,9 +104,22 @@ export function modelAssets(model: ModelDescriptor): ModelAsset[] {
   return [model.licenseText, ...(model.extra ?? []), model.weights];
 }
 
+/** Megabytes `ensureModel` downloads, for the messages that ask before downloading. */
+export function modelDownloadMb(model: ModelDescriptor): number {
+  return Math.round(modelAssets(model).reduce((sum, a) => sum + (a.bytes ?? 0), 0) / 1e6);
+}
+
+/** Whether every file of the model is in the cache and matches its checksum (downloads nothing). */
+export async function modelPresent(model: ModelDescriptor, options: Pick<ModelCacheOptions, "env" | "root"> = {}): Promise<boolean> {
+  const dir = modelDir(model, options);
+  for (const asset of modelAssets(model)) if (!(await present(path.join(dir, asset.file), asset.sha256))) return false;
+  return true;
+}
+
 /**
- * The model's weights file, downloading the weights and the licence text
- * first when they are missing or do not match their checksums.
+ * The model's weights file, downloading the weights, the licence text and
+ * the extra files first when they are missing or do not match their
+ * checksums. The extra files sit next to the weights.
  */
 export async function ensureModel(model: ModelDescriptor, options: ModelCacheOptions = {}): Promise<string> {
   const dir = modelDir(model, options);
