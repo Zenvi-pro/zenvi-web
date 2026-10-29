@@ -1,0 +1,12 @@
+.dc-stamp { position: absolute; font-family: var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
+.dc-ghost { opacity: 0.24; font-weight: 700; letter-spacing: -0.04em; line-height: 0.85; }
+.dc-badge { padding: 14px 26px; border-radius: var(--radius); background: var(--glass); backdrop-filter: blur(18px); font-size: 40px; font-weight: 600; letter-spacing: 0.02em; }
+.dc-label { position: absolute; font-size: 26px; font-weight: 500; letter-spacing: 0.02em; color: var(--muted); white-space: nowrap; }
+.dc-band { position: absolute; left: 0; right: 0; bottom: 0; background: var(--glass); backdrop-filter: blur(20px); border-top: 1.5px solid var(--line); }
+.dc-legend { position: absolute; display: flex; flex-direction: column; gap: 8px; }
+.dc-legend-label { font-size: 22px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.dc-ramp { height: 14px; border-radius: 7px; }
+.dc-ends { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 18px; color: var(--muted); }
+.dc-track { position: absolute; height: 4px; border-radius: 2px; background: var(--line); }
+.dc-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--accent); transform-origin: 0 50%; }
+.dc-knob { position: absolute; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--paper); }

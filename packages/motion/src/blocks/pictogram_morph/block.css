@@ -1,0 +1,6 @@
+.pm-backdrop { position: absolute; inset: 0; }
+.pm-svg { position: absolute; inset: 0; overflow: visible; }
+.pm-caption { position: absolute; font-family: var(--font-display); font-size: 60px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; color: var(--ink); }
+.pm-count, .pm-name { position: absolute; width: 600px; text-align: center; white-space: nowrap; }
+.pm-count { font-family: var(--font-display); font-size: 44px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.pm-name { font-size: 28px; font-weight: 500; color: var(--muted); }
