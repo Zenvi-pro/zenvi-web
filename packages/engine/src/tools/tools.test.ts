@@ -6,6 +6,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { METHOD as BRIEF_METHOD } from "./test-support/brief-fixture.js";
 import { describe, expect, it } from "vitest";
 import { createEffect } from "../effects/registry.js";
 import type { ProjectDocument } from "../history/document.js";
@@ -1222,6 +1223,43 @@ const SPECS: Record<string, Spec> = {
   unify_grade_tool: {
     happy: { args: { timeline_clip_ids: [IDS.clipA, IDS.clipB], dry_run: true }, summary: /^Dry run: \d+ of 2 clip\(s\) brought within the band/ },
     failure: { args: { timeline_clip_ids: [IDS.clipA], reference_clip_id: "NOPE" }, status: "refused", summary: /^Error: reference clip NOPE not found$/ },
+  },
+  inspect_media_bin_tool: {
+    happy: {
+      args: { measure: "false" },
+      summary: /^\d+ files in the bin \(\d+ video/,
+      check: ({ receipt, doc }) => {
+        expect((receipt.data as { files: unknown[] }).files.length).toBeGreaterThan(0);
+        expect(doc.undoLabels).toEqual([]);
+      },
+    },
+    failure: null,
+  },
+  save_brief_tool: {
+    happy: {
+      args: {
+        goal: "Sell the cafe's new cold brew",
+        platform: "Reels",
+        aspect: "16:9",
+        length_seconds: "8",
+        style: "hype-reel",
+        hook: "Ice drops into a glass on frame 1",
+        beats: JSON.stringify([{ start: "0", end: "2", name: "hook" }, { start: 2, end: 8, name: "pour" }]),
+        checklist: ["a sound on every cut"],
+        ...BRIEF_METHOD,
+      },
+      summary: /^Brief: hype-reel, 16:9 8s for Reels\./,
+      check: ({ doc }) => expect(doc.project.settings.zenvi_brief).toMatchObject({ style: "hype-reel", length_seconds: 8 }),
+    },
+    failure: {
+      args: { goal: "g", platform: "p", aspect: "9:16", length_seconds: 8, style: "s", hook: "h", beats: [{ start: 3, end: 1, name: "hook" }] },
+      status: "refused",
+      summary: /^Error: beat "hook" ends at 1 s, not after its start 3 s\.$/,
+    },
+  },
+  get_brief_tool: {
+    happy: { args: {}, status: "unchanged", summary: /^No brief saved/ },
+    failure: null,
   },
   review_edit_tool: {
     happy: {

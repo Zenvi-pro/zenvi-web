@@ -42,6 +42,9 @@ const DIRECT_TOOLS = [
   "auto_reframe_tool",
   "screen_zoom_follow_tool",
   "unify_grade_tool",
+  "inspect_media_bin_tool",
+  "save_brief_tool",
+  "get_brief_tool",
   "review_edit_tool",
   "review_render_tool",
   "watch_render_tool",
@@ -167,6 +170,7 @@ describe("tool catalog", () => {
         else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
         else if (key === "clips") args[key] = [{ clip_id: "x", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }];
         else if (key === "variants") args[key] = [{ project: "a.zvn", render: "a.mp4" }, { project: "b.zvn", render: "b.mp4" }];
+        else if (key === "beats") args[key] = [{ start: "0", end: "1", name: "hook" }];
         else if (type === "array") args[key] = ["x"];
         // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
         else if (type === "object") args[key] = key === "properties" ? { sigma: 1 } : { x: 1 };

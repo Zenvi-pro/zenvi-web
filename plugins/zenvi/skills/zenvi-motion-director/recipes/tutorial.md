@@ -1,3 +1,15 @@
+---
+id: tutorial
+kind: style
+summary: A how-to, tips list or effect breakdown - footage in cards on grid paper, numbered steps, before/after, Save this
+categories: [vfx-tutorial-breakdown, kids-education, food-recipe, tech-review]
+tools: [build_reel_tool, pop_out_tool, text_behind_subject_tool, speed_ramp_tool, auto_sound_design_tool]
+pace: medium
+mood: [helpful, friendly]
+aspect: ["9:16"]
+pairs_with: []
+avoid_with: []
+---
 # Tutorial / breakdown
 
 A how-to or effect breakdown packaged as a designed object: grid paper,
