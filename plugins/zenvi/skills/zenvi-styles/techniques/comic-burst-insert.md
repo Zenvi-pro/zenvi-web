@@ -23,7 +23,7 @@ a wink to a breakdown or a sports fail.
 ## Build it in Zenvi
 Burst lines plus a slammed word, both on the contact frame:
 ```json
-watch_clip_window_tool {"file_id": "<clip>", "start_seconds": <hit - 0.5>, "end_seconds": <hit + 0.5>}
+watch_clip_window_tool {"timeline_clip_id": "<clip>", "query": "the moment of contact", "start": <hit source s - 0.5>, "end": <hit source s + 0.5>}
 add_motion_block_tool {"block": "particle_burst", "position_seconds": <hit - 0.05>, "duration_seconds": 0.8,
   "params": {"shape": "lines", "count": 120, "origin": [{"x": <hit x>, "y": <hit y>}],
              "colors": ["#ffd400", "#ff2a2a"], "rings": false, "exit": false}}

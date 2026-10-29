@@ -85,8 +85,9 @@ mix dropped out. A line start lands on a cut.
 5. Chain: one clip per beat; `detect_subject_tool` per file at its in-point,
    keep boxes with `w ≥ 0.2`, then `align_match_cut_tool {"clips": [...],
    "fit": "position", "cover": "zoom"}`. Or `match_cut_montage_tool` with
-   `min_frames` 10-14 for a whole chain in one call (its default 3-8 frames is
-   faster than the reference rhythm).
+   `min_frames` 10-12 and `max_frames` 14-16 for a whole chain in one call (its
+   default 3-8 frames is faster than the reference rhythm; `min_frames` caps at
+   12 and above `max_frames` is refused).
 6. A white flash on the drop; pings per match.
 7. `monochrome-to-colour-hit-flash` pair (one bar grey, flash, colour).
 8. Escalation: lengths 2, 2, 1.5, 1, 1, 0.75, 0.75, 0.5, 0.5 beats; two

@@ -23,9 +23,10 @@ the footage has it, and fake when it is drawn.
 ## Build it in Zenvi
 With footage that has a real pass (the right way):
 ```json
-search_clip_scenes_tool {"query": "car passes close to the camera"}
-watch_clip_window_tool {"file_id": "<a>", "start_seconds": <pass - 0.5>, "end_seconds": <pass + 0.5>}
-add_clip_to_timeline_tool {"file_id": "<a>", "position_seconds": <t>, "start_seconds": <in>, "end_seconds": <frame of full cover>}
+add_clip_to_timeline_tool {"file_id": "<a>", "position_seconds": <t>}
+search_clip_scenes_tool {"query": "car passes close to the camera", "timeline_clip_id": "<a clip>"}
+watch_clip_window_tool {"timeline_clip_id": "<a clip>", "query": "a car fills the frame", "start": <pass - 0.5>, "end": <pass + 0.5>}
+trim_clip_tool {"clip_id": "<a clip>", "start_seconds": <in>, "end_seconds": <frame of full cover>}
 add_clip_to_timeline_tool {"file_id": "<b>", "position_seconds": <t + len>, "start_seconds": <frame the next occluder clears>}
 add_sfx_tool {"recipe": "whoosh_medium", "at_seconds": <cut>, "gain_db": -8, "pan": -0.6, "duration": 0.8}
 ```
