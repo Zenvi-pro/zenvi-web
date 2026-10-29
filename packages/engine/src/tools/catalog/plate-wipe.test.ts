@@ -74,9 +74,24 @@ describe("add_plate_wipe_tool", () => {
     const f = early.addFile("video", { duration: 10 });
     const first = early.addClip(f, { position: 0.5, end: 1 });
     early.addClip(f, { position: 1.5, start: 2, end: 4.5 });
+    early.mark();
     await early.refused("add_plate_wipe_tool", { clip1_id: first, cover_seconds: 1.8 }, "timeline starts sooner");
     await early.refused("add_plate_wipe_tool", { clip1_id: first, cover_seconds: 1.2 }, "shorter than the plate's 36 frames");
     await early.refused("add_plate_wipe_tool", { clip1_id: first, exit_seconds: 2, hold_seconds: 1 }, "shorter than the plate's 90 frames after the cut");
     expect(ed.stepsSinceMark()).toBe(0);
+    expect(early.stepsSinceMark()).toBe(0);
+  });
+
+  it("writes one point per frame when nothing holds the frame covered", async () => {
+    const { ed, a } = cutAt2();
+    const data = (await ed.receipt("add_plate_wipe_tool", { clip1_id: a, hold_seconds: 0 })) as Record<string, unknown> & { frames: { hold: number } };
+    expect(data.frames.hold).toBe(0);
+    const plate = ed.clip(String(data.plate_clip_id))! as unknown as Record<string, unknown>;
+    // libopenshot keeps only the last point on a frame (Keyframe::AddPoint), so a repeated frame would change the curve.
+    for (const prop of ["scale_x", "scale_y", "rotation", "alpha"]) {
+      const xs = kf(plate, prop).Points.map((p) => p.co.X);
+      expect(new Set(xs).size).toBe(xs.length);
+    }
+    expect(evaluate(kf(plate, "scale_x"), 7)).toBeCloseTo(Number(data.cover_scale), 3);
   });
 });

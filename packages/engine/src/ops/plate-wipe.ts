@@ -121,7 +121,10 @@ export function planPlateWipe(project: Project, input: Omit<PlateWipeInput, "fil
     if (input.direction === "left" || input.direction === "right") endX = (input.direction === "right" ? 1 : -1) * (0.5 + (S * w) / (2 * W));
     else endY = (input.direction === "down" ? 1 : -1) * (0.5 + (S * h) / (2 * H));
   }
-  const kf = (values: number[]) => keyframeThrough(frames, values, eases);
+  // With no hold the covered and held keys share a frame: libopenshot keeps only the last point on a frame
+  // (Keyframe::AddPoint replaces it), which would swap the growth's ease for the hold's, so the hold key goes.
+  const keep = (_: unknown, i: number) => i !== 2 || hold > 0;
+  const kf = (values: number[]) => keyframeThrough(frames.filter(keep), values.filter(keep), eases.filter(keep));
   const props: Record<string, unknown> = {
     scale: ScaleMode.FIT,
     gravity: Gravity.CENTER,
