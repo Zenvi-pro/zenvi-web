@@ -127,6 +127,17 @@ describe("gather_stock_footage_tool", () => {
       expect(doc.undoLabels).toEqual(["Gather stock footage (4)"]);
     });
 
+    it("lets a search no shoot of the set covers keep one shot: its closest after a few tries", async () => {
+      const doc = fixtureDoc();
+      const night = { "coffee pour": [video(1, "Ann", "coffee-pour-cafe")], "night street": [video(7, "Bo", "night-street"), video(8, "Cy", "night-street-rain"), video(9, "Di", "night-street-neon")] };
+      const h: ToolHost = { ...host(night), frames: pixelFrameHost(tinted({ 1: WARM, 7: COOL, 8: COOL, 9: COOLISH })) };
+      const result = await runTool({ doc, host: h }, "gather_stock_footage_tool", { queries: Object.keys(night), count: 2, coherence: "shoot" });
+      const data = result.data?.data as { files: { pexels_id: number }[]; skipped: Record<string, number> };
+      expect(data.files.map((f) => f.pexels_id)).toEqual([1, 9]);
+      expect(data.skipped.off_look).toBe(2);
+      expect(result.data?.warnings?.join(" ")).toMatch(/1 clip\(s\) are off the set's look/);
+    });
+
     it("matches the person's footage when match_file_id names it", async () => {
       const doc = fixtureDoc();
       const result = await runTool({ doc, host: coherentHost() }, "gather_stock_footage_tool", {

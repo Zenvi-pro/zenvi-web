@@ -27,7 +27,7 @@ import { addFile } from "../../ops/files.js";
 import { pickStockFile, sameShoot, stockRelevance, type PexelsVideo } from "../../stock/stock.js";
 import { NEAR_DUPLICATE_BITS, frameHash, hashDistance } from "../../stock/frame-hash.js";
 import { mediaFileProject, renderPixels, secondsToFrame } from "../color-frames.js";
-import { COHERENT_LOOK, coherenceOrder, creatorReach, lookDistance, lookOf, type StockLook } from "../stock-coherence.js";
+import { COHERENT_LOOK, OFF_LOOK_PER_QUERY, coherenceOrder, creatorReach, lookDistance, lookOf, type StockLook } from "../stock-coherence.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
@@ -232,6 +232,7 @@ export const stockGatherTools: CatalogTool[] = [
       let anchor: StockLook | null = matchFile ? (await probeFrame(call, matchFile, true)).look : null;
       if (matchFile && !anchor) warnings.push(`Could not measure ${args.match_file_id}'s look on this surface: the first clip taken sets it.`);
       const held: Taken[] = [];
+      let standIns = 0;
       fill(count);
       while (taken.length < count && order.length > 0) {
         const batch = order.splice(0, BATCH);
@@ -255,8 +256,14 @@ export const stockGatherTools: CatalogTool[] = [
             anchor ??= look;
             const distance = lookDistance(look, anchor);
             if (distance > COHERENT_LOOK) {
-              skipped.off_look += 1;
               held.push({ ...c, media: result, distance });
+              const own = held.filter((h) => h.query === c.query);
+              if (own.length <= OFF_LOOK_PER_QUERY) continue;
+              // This search has no clip near the look: its closest one stands in.
+              const closest = own.reduce((a, b) => (b.distance! < a.distance! ? b : a));
+              held.splice(held.indexOf(closest), 1);
+              standIns += 1;
+              taken.push(closest);
               continue;
             }
             taken.push({ ...c, media: result, distance });
@@ -266,12 +273,29 @@ export const stockGatherTools: CatalogTool[] = [
         }
         fill(count - taken.length);
       }
+      // Every search keeps a shot: one with none taken gets its closest held clip, in place of the last clip of the search with the most.
+      for (const query of queries) {
+        const mine = held.filter((h) => h.query === query);
+        if (mine.length === 0 || taken.some((t) => t.query === query)) continue;
+        if (taken.length >= count) {
+          const per = new Map<string, number>();
+          for (const t of taken) per.set(t.query, (per.get(t.query) ?? 0) + 1);
+          const [most, n] = [...per].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+          if (n < 2) break;
+          const last = taken.map((t) => t.query).lastIndexOf(most);
+          held.push(...taken.splice(last, 1));
+        }
+        const closest = mine.reduce((a, b) => (b.distance! < a.distance! ? b : a));
+        held.splice(held.indexOf(closest), 1);
+        standIns += 1;
+        taken.push(closest);
+      }
       // Clips off the look fill in only when nothing closer is left, closest first.
-      const fillers = held.sort((a, b) => a.distance! - b.distance!).slice(0, Math.max(0, count - taken.length));
-      if (fillers.length > 0) {
-        skipped.off_look -= fillers.length;
-        taken.push(...fillers);
-        warnings.push(`${fillers.length} clip(s) are off the set's look (light, grade or lens): unify_grade_tool pulls them in, or add queries a shoot of the set covers.`);
+      const fillers = held.sort((a, b) => a.distance! - b.distance!).splice(0, Math.max(0, count - taken.length));
+      taken.push(...fillers);
+      skipped.off_look = held.length;
+      if (fillers.length + standIns > 0) {
+        warnings.push(`${fillers.length + standIns} clip(s) are off the set's look (light, grade or lens): unify_grade_tool pulls them in, or add queries a shoot of the set covers.`);
       }
       if (taken.length === 0) return refused(TOOL, `Error: no clip could be imported for ${queries.map((q) => `'${q}'`).join(", ")}.${warnings.length ? ` ${warnings.join(" ")}` : ""}`);
       if (taken.length < count) warnings.push(`Imported ${taken.length} of ${count}: the queries ran out of distinct clips. Add queries (other subjects, angles, places) for more.`);

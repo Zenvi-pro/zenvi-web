@@ -24,7 +24,7 @@ describe("generate_broll_set_tool", () => {
     expect(result.data?.status, result.data?.summary).toBe("applied");
     const images = h.backendCalls.filter((c) => c.path === "/api/v1/generation/image").map((c) => c.body as Record<string, string>);
     expect(images).toHaveLength(3);
-    const line = images[0]!.prompt.slice(SHOTS[0]!.length + 2);
+    const line = images[0]!.prompt!.slice(SHOTS[0]!.length + 2);
     expect(line).toMatch(/^Style of the whole set: 35mm lens, shallow depth of field\. Match the reference: palette #[0-9a-f]{6}, mid exposure, warm light\. Every shot of this set is from the same shoot/);
     for (const [i, body] of images.entries()) {
       expect(body.prompt).toBe(`${SHOTS[i]}. ${line}`);

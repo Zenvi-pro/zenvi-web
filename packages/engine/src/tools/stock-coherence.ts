@@ -29,10 +29,18 @@ export interface StockLook {
 
 /**
  * Farthest a clip may sit from the set's look and still be taken before the
- * clips closer to it, in squared unify tolerances: one key four tolerances
- * off (a daylight shot next to tungsten), or all of them about two.
+ * clips closer to it, in squared unify tolerances: one key five tolerances
+ * off (a daylight shot next to tungsten), or all of them about two and a
+ * half. Two unrelated stock clips sit around 25 (a smoke run of four cafe
+ * searches held back 22 of 28 downloads at 16).
  */
-export const COHERENT_LOOK = 16;
+export const COHERENT_LOOK = 24;
+/**
+ * Clips of one search held back for their look before the closest of them
+ * is taken anyway: every search keeps a shot, and a search no shoot of the
+ * set covers costs a few downloads, not its whole result page.
+ */
+export const OFF_LOOK_PER_QUERY = 2;
 /** Detail ratio that counts as one tolerance: 1.8x sharper or softer. */
 const DETAIL_STEP = Math.log(1.8);
 
