@@ -144,7 +144,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
           const uri = styles === "index" ? "zenvi://styles" : `zenvi://styles/${styles}`;
           const markdown = guideText(uri);
           if (!markdown) return { receipt: refused(tool, `Error: no style or technique ${styles}; styles=index lists them.`), engine: null };
-          const text = styles === "brief" ? `${markdown}\n\n${await drawText(ctx.config.configDir)}` : markdown;
+          const text = styles === "brief" ? `${markdown}\n\n${await drawText(ctx.config.configDir, String(state.session.doc.project.id))}` : markdown;
           return { receipt: applied(tool, text, { data: { uri } }, 0), engine: null };
         }
         const uri = palette ? `zenvi://sound/${palette}` : recipe === "director" ? "zenvi://director" : `zenvi://director/${recipe}`;
@@ -153,7 +153,7 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         // Bench sk0, first pass: agents went from the card straight to the recipe and never compiled
         // the brief. A genre recipe read before any brief is saved carries the brief compiler first.
         if (recipe !== undefined && recipe !== "director" && !readBrief(state.session.doc.project)) {
-          const draw = await drawText(ctx.config.configDir);
+          const draw = await drawText(ctx.config.configDir, String(state.session.doc.project.id));
           return { receipt: applied(tool, `${BRIEF_FIRST}\n\n${guideText("zenvi://styles/brief")}\n\n${draw}\n\n--- Recipe (${uri}) ---\n\n${markdown}`, { data: { uri, brief: "zenvi://styles/brief" } }, 0), engine: null };
         }
         return { receipt: applied(tool, markdown, { data: { uri } }, 0), engine: null };

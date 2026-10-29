@@ -16,13 +16,25 @@ describe("the creative-direction history", () => {
     const dir = await mkdtemp(path.join(tmpdir(), "zenvi-directions-"));
     dirs.push(dir);
     expect(await lastDirection(dir)).toEqual({});
-    expect(await recordDirection(dir, brief("Swiss grid"))).toEqual([]);
+    expect(await recordDirection(dir, brief("Swiss grid"), "EDITONEXXX")).toEqual([]);
     expect(await lastDirection(dir)).toEqual({ "art style": "Swiss grid", rhythm: "countdown" });
-    expect(await recordDirection(dir, brief("neon night"))).toEqual(["rhythm"]);
+    expect(await recordDirection(dir, brief("neon night"), "EDITTWOXXX")).toEqual(["rhythm"]);
     expect((await readFile(path.join(dir, "brief-directions.jsonl"), "utf8")).trim().split("\n")).toHaveLength(2);
-    const text = await drawText(dir, 3);
+    const text = await drawText(dir, undefined, 3);
     expect(text).toMatch(/^Creative-direction draw for this edit/);
     expect(text).toContain("(last edit: neon night)");
     expect(text).not.toMatch(/- art style: neon night/);
+  });
+
+  it("a revised brief replaces its own edit's line and is compared with the edit before it, not with itself", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "zenvi-directions-"));
+    dirs.push(dir);
+    await recordDirection(dir, brief("Swiss grid"), "EDITONEXXX");
+    await recordDirection(dir, brief("neon night"), "EDITTWOXXX");
+    expect(await recordDirection(dir, brief("paper collage"), "EDITTWOXXX")).toEqual(["rhythm"]);
+    expect(await recordDirection(dir, brief("Swiss grid"), "EDITTWOXXX")).toEqual(["Art style", "rhythm"]);
+    expect((await readFile(path.join(dir, "brief-directions.jsonl"), "utf8")).trim().split("\n")).toHaveLength(2);
+    expect(await lastDirection(dir, "EDITTWOXXX")).toEqual({ "art style": "Swiss grid", rhythm: "countdown" });
+    expect(await drawText(dir, "EDITTWOXXX", 3)).toContain("(last edit: Swiss grid)");
   });
 });

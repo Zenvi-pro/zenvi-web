@@ -3,10 +3,12 @@
  * after Tweenkit's kinetic-cut-video brief draw, MIT): every saved brief's
  * axis picks go to `<config dir>/brief-directions.jsonl`, and the brief
  * compiler is handed a fresh seeded draw that avoids the last edit's picks,
- * so one machine's edits stop all looking alike.
+ * so one machine's edits stop all looking alike. Each line names its
+ * project: a project's later saves (a revised brief) replace its line and
+ * are compared with the edit before it, not with themselves.
  */
 
-import { appendFile, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { drawDirection, repeatedAxes, type Brief } from "@zenvi/engine";
 
@@ -20,27 +22,46 @@ function picksOf(brief: Brief): Picks {
   return Object.fromEntries(brief.direction.map((d) => [d.axis.trim().toLowerCase(), d.pick]));
 }
 
-/** The last saved edit's picks by axis ({} before the first). */
-export async function lastDirection(configDir: string): Promise<Picks> {
+interface DirectionLine {
+  at?: string;
+  project?: string;
+  style?: string;
+  picks?: Picks;
+}
+
+async function readLines(file: string): Promise<DirectionLine[]> {
   try {
-    const lines = (await readFile(path.join(configDir, FILE), "utf8")).trim().split("\n");
-    const last = JSON.parse(lines[lines.length - 1] ?? "{}") as { picks?: Picks };
-    return last.picks ?? {};
+    return (await readFile(file, "utf8"))
+      .split("\n")
+      .filter((l) => l.trim())
+      .flatMap((l) => {
+        try {
+          return [JSON.parse(l) as DirectionLine];
+        } catch {
+          return [];
+        }
+      });
   } catch {
-    return {};
+    return [];
   }
 }
 
-/** Record `brief`'s picks; returns the axes that repeat the previous edit's. */
-export async function recordDirection(configDir: string, brief: Brief): Promise<string[]> {
+/** The picks by axis of the last edit saved before this one (`project`: the edit being made, skipped); {} before the first. */
+export async function lastDirection(configDir: string, project?: string): Promise<Picks> {
+  const lines = await readLines(path.join(configDir, FILE));
+  const last = lines.filter((l) => project === undefined || l.project !== project).pop();
+  return last?.picks ?? {};
+}
+
+/** Record `brief`'s picks for `project`; returns the axes that repeat the previous edit's. */
+export async function recordDirection(configDir: string, brief: Brief, project: string): Promise<string[]> {
   if (brief.direction.length === 0) return [];
-  const last = await lastDirection(configDir);
   const file = path.join(configDir, FILE);
-  const line = `${JSON.stringify({ at: new Date().toISOString(), style: brief.style, picks: picksOf(brief) })}\n`;
+  const lines = await readLines(file);
+  const last = lines.filter((l) => l.project !== project).pop()?.picks ?? {};
+  const kept = [...lines.filter((l) => l.project !== project), { at: new Date().toISOString(), project, style: brief.style, picks: picksOf(brief) }].slice(-KEEP);
   try {
-    await appendFile(file, line, { mode: 0o600 });
-    const lines = (await readFile(file, "utf8")).trim().split("\n");
-    if (lines.length > KEEP) await writeFile(file, `${lines.slice(-KEEP).join("\n")}\n`);
+    await writeFile(file, kept.map((l) => `${JSON.stringify(l)}\n`).join(""), { mode: 0o600 });
   } catch {
     // A read-only config dir only loses the history.
   }
@@ -48,8 +69,8 @@ export async function recordDirection(configDir: string, brief: Brief): Promise<
 }
 
 /** The draw for the next brief, as text for the agent. */
-export async function drawText(configDir: string, seed = Date.now()): Promise<string> {
-  const last = await lastDirection(configDir);
+export async function drawText(configDir: string, project?: string, seed = Date.now()): Promise<string> {
+  const last = await lastDirection(configDir, project);
   const draw = drawDirection(seed, last);
   const lines = Object.entries(draw).map(([axis, pick]) => `- ${axis}: ${pick}${last[axis] ? ` (last edit: ${last[axis]})` : ""}`);
   return [

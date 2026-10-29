@@ -188,7 +188,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       if (name === "review_edit_tool" && result.ok) state.noteReview();
       if (name === "save_brief_tool" && receipt.status === "applied") {
         const saved = readBrief(state.session.doc.project);
-        const repeated = saved ? await recordDirection(ctx.config.configDir, saved) : [];
+        const repeated = saved ? await recordDirection(ctx.config.configDir, saved, String(state.session.doc.project.id)) : [];
         if (repeated.length > 0) receipt.warnings = [...receipt.warnings, `The direction repeats the last edit's picks on ${repeated.join(", ")}: draw those differently (read_director_recipe {styles: "brief"} has a fresh draw) unless the subject needs them, and say why.`];
       }
       const brief = isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
