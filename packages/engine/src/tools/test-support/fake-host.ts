@@ -800,11 +800,11 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
     // Renders nothing: names the movie after the request so equal stacks share a path, like the render cache.
     host.fx = {
       render: async (r) => {
-        const key = JSON.stringify([r.path, r.start, r.end, r.effects]);
+        const key = JSON.stringify([r.path, r.start, r.end, r.effects, r.carry]);
         let hash = 0;
         for (const ch of key) hash = (Math.imul(hash, 31) + ch.charCodeAt(0)) >>> 0;
         const fingerprint = hash.toString(16).padStart(8, "0").repeat(8);
-        calls.push(`fx ${r.path} ${r.start}-${r.end} ${r.effects.map((e) => e.effect).join("+")}`);
+        calls.push(`fx ${r.path} ${r.start}-${r.end} ${r.effects.map((e) => e.effect).join("+")}${r.carry ? ` carry ${r.carry.path}@${r.carry.at}` : ""}`);
         if (r.path.includes("unrenderable")) throw new Error("ffmpeg failed (exit 1): Invalid data found when processing input");
         const duration = (r.end - r.start) * fxStretch(r.effects);
         return { path: `/cache/fx/${fingerprint.slice(0, 16)}.mov`, codec: "prores422", width: 1920, height: 1080, fps: { num: 30, den: 1 }, frames: Math.ceil(duration * 30), duration, fingerprint, cached: false, seconds: 1.5, renderedAt: "2026-10-26T00:00:00Z", ffmpeg: "9.0.2" };

@@ -1,7 +1,7 @@
 # Zenvi FX
 
 Footage effects libopenshot 1.0 does not have, rendered with ffmpeg and
-swapped onto the timeline as linked clips. Status: v1 (13 effects, CLI and
+swapped onto the timeline as linked clips. Status: v1 (16 effects, CLI and
 local MCP server).
 
 ## Effects
@@ -21,17 +21,26 @@ local MCP server).
 | `optical_flow_slowmo` | slow down with motion-compensated frames (`minterpolate`) or blended frames (`framerate`); audio time-stretched | 0.33 (= 0.5× speed) |
 | `vignette` | smooth radial darkening, softness and depth | 0.5 |
 | `light_leak` | procedural light leaks (or a film burn) streaming in from one edge, seeded; no stock assets | 0.6 |
+| `crt` | old TV in one pass: scanlines, RGB phosphor stripes, barrel distortion, red/cyan split, glow, flicker, a rolling hum bar, optional rounded or 4:3 `tv` bezel | 0.6 |
+| `print_ink` | screenprint / risograph: flat tone plates on paper, Sobel ink lines that bleed, a second line plate printed off register, paper grain and ink dropouts (seeded) | 0.85 |
+| `datamosh_carry` | at a cut, the clip's first frames are pushed along the previous clip's motion (blocky tearing and smear, its last frame lingering), then land clean. Needs the clip before it: `datamosh_cut_tool` | 0.6 |
+
+`amount` is how much of the effect there is: below 1 it mixes the effect over the
+untouched picture (`mixed` in graph.ts; effects whose amount scales their own
+strength, like bloom or glitch, use it inside the builder).
 
 Every effect has `amount` 0-1, its own params (`list_fx_tool` returns them as
 JSON Schema) and an optional `start`/`end` window in seconds of the clip.
-Effects stack in order (at most 8 per clip). Slow motion always runs last,
+Effects stack in order (at most 8 per clip). `datamosh_carry` works on the
+first `length` seconds of the clip (the cut), so it takes no start/end window. Slow motion always runs last,
 over the whole clip, and makes the clip longer on the timeline.
 
 ## Tools
 
 `list_fx_tool`, `apply_fx_tool {clip_id, effects}`, `update_fx_tool {clip_id,
 index, amount | params | start | end | whole_clip | effects}`,
-`remove_fx_tool {clip_id, index?}`. Each call is one undo step; the render
+`remove_fx_tool {clip_id, index?}`, `datamosh_cut_tool {clip_id, previous_clip_id?,
+length?, amount?, ghost?, block?}`. Each call is one undo step; the render
 runs before the transaction, so a failed render changes nothing. Removing
 every effect needs no render and works on every surface; the others need the
 host's `fx` capability (the CLI and `zenvi mcp`; the web editor and Zenvi
@@ -55,6 +64,33 @@ Cloud refuse with "not available").
 - Pixel sizes are tuned at 1080 lines and scale with the frame's short side.
 - Clips with a speed change or time curve are refused: apply FX first, then
   retime the render.
+
+## Datamosh carry
+
+A real datamosh drops the I-frame at a cut so the next clip's motion vectors
+push the last picture around. Zenvi gets the look without a bitstream:
+
+1. `datamosh_cut_tool` finds the clip before the cut (the clip on the same
+   track that ends where this one starts, or `previous_clip_id`) and stores the
+   footage it carries in the effect: `params.carry {file_id, at}`, `at` being the
+   source second the previous clip ends on. The effect is last in the stack; a
+   second run replaces the first. Retrim or move the previous clip and run it
+   again: the render does not follow it by itself.
+2. The host (`render-node/src/fx/datamosh.ts`) decodes the last frames of that
+   footage at 320 px wide and the engine (`fx/datamosh.ts`) measures their motion
+   by block matching (`estimateFlow`: 8 px blocks, ±10 px search, sub-pixel
+   refined, later frame pairs weigh more, flat blocks stay put, 3×3 median).
+3. `moshMaps` turns that flow into one pair of ffmpeg `displace` maps per moshed
+   frame, one pixel per macroblock: each frame's map is the last frame's pushed
+   along the flow again (so blocks that disagree drag and smear), eased to
+   nothing by the last frame so the clip lands clean. The maps and the previous
+   clip's last frame go into the render as extra ffmpeg inputs; the graph pushes
+   the clip's head with them, mixes in the pushed last frame (`ghost`, fading
+   out squared) and concatenates the untouched rest.
+
+The strongest results come from a previous clip that is moving fast (a whip, a
+pan, a push-in); a still clip gives only the fading ghost. The fingerprint
+includes the footage before the cut (path, size, mtime) and `at`.
 
 ## The link
 
