@@ -334,6 +334,10 @@ export const fxTools: CatalogTool[] = [
       if (missing) return missing;
       const t = target(call.doc.project, DATAMOSH, args.clip_id);
       if ("status" in t) return t;
+      // The mosh is the render's first frames; a clip split or trimmed after its FX shows the render from later on and would miss it.
+      if (t.linked && Number(t.clip.start) > 0.01) {
+        return refused(DATAMOSH, `Error: clip ${t.clip.id} shows its FX render from ${round(Number(t.clip.start))}s in (it was split or trimmed after its FX), so a mosh at the render's start would not be at this cut; remove_fx_tool, then apply its FX and ${DATAMOSH} again.`);
+      }
       const prev = previousClip(call.doc.project, t.clip, args.previous_clip_id);
       if ("status" in prev) return prev;
       const before = prev.clip;

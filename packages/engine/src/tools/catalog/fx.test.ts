@@ -242,6 +242,21 @@ describe("datamosh_cut_tool", () => {
     expect(doc.undoLabels).toEqual([]);
   });
 
+  it("refuses a clip that shows its FX render from later on (split or trimmed after its FX)", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    await call(doc, host, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "bloom" }] });
+    expect((await call(doc, host, "trim_clip_tool", { clip_id: IDS.clipB, start_seconds: 1 })).status).toBe("applied");
+    const before = snapshotOf(doc.project);
+    const labels = [...doc.undoLabels];
+    const r = await call(doc, host, "datamosh_cut_tool", { clip_id: IDS.clipB, previous_clip_id: IDS.clipA });
+    expect(r.status).toBe("refused");
+    expect(r.summary).toMatch(/shows its FX render from 1s in/);
+    expect(snapshotOf(doc.project)).toEqual(before);
+    expect(doc.undoLabels).toEqual(labels);
+    expect(lastRender(host)).toBe("fx /media/broll.mp4 0-5 bloom");
+  });
+
   it("goes last in the stack and a second run replaces the first instead of stacking", async () => {
     const doc = fixtureDoc();
     const host = fakeHost();
