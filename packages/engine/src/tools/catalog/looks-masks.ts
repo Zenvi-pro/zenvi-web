@@ -15,7 +15,7 @@ import { idFactory } from "../../model/ids.js";
 import type { Clip, Effect, Keyframe, Project } from "../../model/types.js";
 import { setClipEffects } from "../../ops/effects.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
-import { ASSET_KEY, generatedSvg } from "../mattes.js";
+import { ASSET_KEY, generatedSvg, maskReaderOf } from "../mattes.js";
 import { applied, unchanged } from "../receipt.js";
 import { constantKeyframe, guarded, isLocked, keyframeOf, projectSize, toolError } from "../titles-text.js";
 import { clipExtent, clipFrameAt, fpsFloat } from "./effect-values.js";
@@ -73,11 +73,6 @@ function withLook(clip: Clip, look: string, effect: Effect | null): Effect[] {
   if (!effect) return effects.filter((_, i) => i !== at);
   effects[at] = { ...effect, id: effects[at]!.id };
   return effects;
-}
-
-function maskReaderOf(asset: Awaited<ReturnType<typeof generatedSvg>>): Record<string, unknown> {
-  const { media_type: _mediaType, ...reader } = asset.media.info as unknown as Record<string, unknown>;
-  return { ...reader, path: asset.media.path };
 }
 
 const round = (x: number) => Math.round(x * 1e4) / 1e4;

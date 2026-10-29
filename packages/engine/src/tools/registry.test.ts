@@ -41,6 +41,7 @@ const DIRECT_TOOLS = [
   "add_motion_template_tool",
   "kinetic_captions_tool",
   "add_kinetic_title_tool",
+  "add_type_block_tool",
   "list_sfx_tool",
   "add_sfx_tool",
   "spot_sound_tool",

@@ -1199,6 +1199,18 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { text: "one two three four five six seven eight nine ten eleven twelve thirteen" }, status: "refused", summary: /^Error: a title has at most 12 words \(got 13\)/ },
   },
 
+  add_type_block_tool: {
+    happy: {
+      args: { block: "text_on_path", text: "SPIN THE RECORD", position_seconds: "1", duration_seconds: "2", spin: "60" },
+      summary: /^Added text_on_path at 1\.00-3\.00s: 1 clip\(s\) on 1 track\(s\)\.$/,
+      check: ({ doc, host }) => {
+        expect(doc.undoLabels.at(-1)).toBe("Add type block (text on path)");
+        expect([...host.written.keys()].some((p) => p.startsWith("/generated/type-text-on-path-"))).toBe(true);
+      },
+    },
+    failure: { args: { block: "stencil", text: "HI", copies: "5" }, status: "refused", summary: /^Error: copies do not apply to stencil/ },
+  },
+
   // --- sound design --------------------------------------------------------------------
   list_sfx_tool: {
     happy: { args: { family: "impact" }, summary: /^\d+ sound effects: impact_punch, /, check: ({ doc, before }) => expect(doc.project).toEqual(before) },
