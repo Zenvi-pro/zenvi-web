@@ -217,8 +217,7 @@ export function drawShot(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: 
   }
   if (shot.layout === "split") drawSplit(g, sc, shot, u, uf, ground);
   for (const layer of shot.layers) drawLayer(g, sc, shot, u, layer, box, ground);
-  const extent = shot.layout !== "split" ? drawText(g, sc, shot, u, uf, box, ink, ground) : splitExtent(g, sc, shot);
-  drawSub(g, sc, shot, u, box, ink, extent);
+  if (shot.layout !== "split") drawSub(g, sc, shot, u, box, ink, drawText(g, sc, shot, u, uf, box, ink, ground));
   g.restore();
   if (shot.layers.includes("collapse")) {
     const q = cubicIn(prog(u, len - 0.3, 0.28));
@@ -249,7 +248,7 @@ function drawSplit(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number
     if (sc.portrait) g.rect(-sc.W, side === 0 ? -sc.H : sc.H / 2 + (1 - open) * sc.H, sc.W * 3, side === 0 ? sc.H * 1.5 + (1 - open) * sc.H : sc.H * 2);
     else g.rect(side === 0 ? -sc.W : sc.W / 2 + (1 - open) * sc.W, -sc.H, side === 0 ? sc.W * 1.5 + (1 - open) * sc.W : sc.W * 2, sc.H * 3);
     g.clip();
-    drawText(g, sc, shot, u, uf, box, sc.inks[inkOf], inkOf);
+    drawSub(g, sc, shot, u, box, sc.inks[inkOf], drawText(g, sc, shot, u, uf, box, sc.inks[inkOf], inkOf));
     g.restore();
   }
 }
@@ -325,7 +324,8 @@ function drawText(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number,
         const at = assembleAt(p, u, R, 0);
         g.globalAlpha = (1 - solid * 0.75) * (at.settled > 0 ? 0.9 : 0);
         g.fillStyle = p.pick < 0.22 ? accent : ink;
-        g.fillRect(box.cx + at.x - (at.size * sc.s) / 2, box.cy + at.y - (at.size * sc.s) / 2, at.size * sc.s, at.size * sc.s);
+        const px = at.size * 1.6 * sc.s;
+        g.fillRect(box.cx + at.x - px / 2, box.cy + at.y - px / 2, px, px);
       }
       g.globalAlpha = solid;
       lines.forEach((line, i) => letters(g, line, box.cx, lineAt(i), box.align, ink, () => ({})));
@@ -402,7 +402,7 @@ function drawText(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number,
     }
   }
   g.restore();
-  return { top: lineAt(0) - size * 0.74, bottom: lineAt(lines.length - 1) + size * 0.2 };
+  return { top: lineAt(0) - size * 0.88, bottom: lineAt(lines.length - 1) + size * 0.2 };
 }
 
 function strobeWord(sc: Scene, shot: Shot, u: number): string {
@@ -423,14 +423,6 @@ export function countText(text: string, u: number, len: number): string {
   return text.slice(0, m.index) + shown + text.slice(m.index + raw.length);
 }
 
-/** The split layout's type extent (its text is drawn twice, clipped). */
-function splitExtent(g: CanvasRenderingContext2D, sc: Scene, shot: Shot): { top: number; bottom: number } {
-  const box = layoutBox(sc, { ...shot, layout: "center" });
-  const size = fitSize(g, sc, shot.lines, box.maxW, box.maxSize, box.maxH);
-  const b = baselines(shot.lines.length, size, box.cy);
-  return { top: b[0]! - size * 0.74, bottom: b[b.length - 1]! + size * 0.2 };
-}
-
 function drawSub(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, box: Box, ink: string, extent: { top: number; bottom: number }): void {
   if (!shot.sub) return;
   const e = expoOut(prog(u, 0.22, 0.5));
@@ -442,6 +434,10 @@ function drawSub(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, 
   g.textBaseline = "middle";
   g.globalAlpha = e;
   g.fillStyle = ink;
+  // Never wider than the layout's column (or the frame).
+  const room = Math.min(box.maxW, sc.W * 0.9);
+  const wide = g.measureText(shot.sub.toUpperCase()).width * 1.25;
+  if (wide > room) g.font = `500 ${((size * room) / wide).toFixed(1)}px ${sc.mono}`;
   // Under the type, or over it when under would leave the frame.
   const under = extent.bottom + size * 1.1;
   const y = (under + size > sc.H * 0.94 ? extent.top - size * 0.9 : under) + (1 - e) * size * 0.6;

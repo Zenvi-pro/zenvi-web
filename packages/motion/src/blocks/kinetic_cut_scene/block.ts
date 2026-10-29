@@ -45,7 +45,9 @@ export function build(ctx: BlockContext): void {
   const dark = palette.dark ? palette.paper : palette.ink;
   const light = palette.dark ? palette.ink : palette.paper;
   const colors: Record<Ground, string> = { dark, light, accent: palette.accent, secondary: palette.secondary };
-  const on = (bg: string): string => (Math.abs(luminance(bg) - luminance(dark)) > Math.abs(luminance(bg) - luminance(light)) ? dark : light);
+  // The ink with the higher WCAG contrast ratio on that ground.
+  const contrast = (a: string, c: string): number => (Math.max(luminance(a), luminance(c)) + 0.05) / (Math.min(luminance(a), luminance(c)) + 0.05);
+  const on = (bg: string): string => (contrast(bg, dark) >= contrast(bg, light) ? dark : light);
   const scene: Scene = {
     W,
     H,
