@@ -135,4 +135,7 @@ match-cut chain. Owner reels in the dossier: `De4rzMGsnw6@26.3` and `Da2tCdfxI-r
 
 ## Verified
 
-VERIFIED-PENDING
+2026-10-28. Example edit (15 s): `~/zenvi-motion/fleet/artifacts/sk1-knowledge/styles/video-essay-explainer/example.mp4` (contact sheet and `calls.json` next to it), built with
+`zenvi call` on the portable CLI from Pexels stock and a macOS `say` voice (`scripts/` in the same folder).
+Watch judge (absolute, gemini-3.8-flash): 5.18/10 overall; its first note: "Typewriter graphic says 'I ENJOYED' which contradicts the narration about wiring diagrams." (at 1.5 s).
+Pairwise against the category's reference segment (same length): winner cand (passes ['cand', 'cand']) cand 5.68 vs other 4.0 $0.0086.

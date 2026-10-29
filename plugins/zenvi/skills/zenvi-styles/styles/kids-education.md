@@ -43,6 +43,8 @@ montages cut every ~2 s on audio onsets (90% onset, not the beat). Hands present
 
 ## Look & grade
 
+Vertical first: portrait footage, or landscape clips filled with `set_clip_property_tool` `scale` 0 (crop).
+
 High key: luma about 135-140 of 255, saturated (sat 100-130); warm and clean. One texture (paper, t024) over
 mixed art styles. Each unit may own a palette colour; the type style stays the same.
 
@@ -71,20 +73,22 @@ word is the caption). Optional echo: the word said again as it pops.
 
 ## Tool sequence
 
-1. Hook card: `add_kinetic_title_tool` `{"text": "What's on the table?", "style": "creator", "animation": "pop",
-   "emphasis": ["table?"], "accent": "#ffcc00", "background": "#5ec8f2", "duration_seconds": 2}` + `pop`.
+1. Hook over moving footage, not a flat card: a 2 s shot of all the objects (`scale` 0, push 1.0 to 1.1) with
+   `add_kinetic_title_tool` `{"text": "What's on the table?", "style": "creator", "animation": "pop",
+   "emphasis": ["table?"], "accent": "#ffcc00", "y": 0.3, "duration_seconds": 1.9}` + `pop`.
 2. Units (t090): `add_clip_to_timeline_tool` at `2.0 + i * L` with exactly `L` seconds of source;
    `set_keyframes_tool` scale 1.0 to 1.06 over the unit; `add_marker_tool` per unit.
 3. Spoken word per unit at +1.0 s: one `generate_tts_and_add_to_timeline_tool` per word (`voice: "shimmer"`) or
    the recording, on its own track; `set_track_role_tool` voice.
 4. Word pop (t122) at +1.6 s: `add_kinetic_title_tool` `{"text": "GRAPES", "style": "creator", "animation": "pop",
-   "emphasis": ["GRAPES"], "accent": <unit colour>, "y": 0.62, "duration_seconds": 1.4}`;
+   "emphasis": ["GRAPES"], "accent": <unit colour>, "y": 0.3, "duration_seconds": 1.4}` (upper third, clear of the hands);
    `add_motion_block_tool` `particle_burst` `{"shape": "confetti", "origin": [{"x": 0.5, "y": 0.62}], "count": 50,
    "seed": <i>}`; `add_sfx_tool` `pop` + `sparkle` (-16, seed per unit).
 5. Landing (t069): `add_motion_block_tool` `{"block": "logo_reveal_end", "placement": "full_frame",
    "duration_seconds": 3.5, "params": {"brand": "...", "cta": "One new word a day", "url": "", "palette": "sky"}}`
    + `impact_punch` on the settle + `sparkle`.
-6. Music bed -18 dB, `automate_volume_tool` `fade_out` at the end.
+6. One bright grade over every unit: `color_grade_clip_tool` `{"timeline_clip_ids": [...], "look": "bright_airy",
+   "mix": 0.7}`. Music bed -18 dB, `automate_volume_tool` `fade_out` at the end.
 7. `master_audio_tool` `{"preset": "social", "iterate": true}`, render, `review_render_tool`.
 
 ## Finish checklist
@@ -114,4 +118,7 @@ a static letter, `NatureCat-OceanCommotion@2.7` action-per-shot song montage, `@
 
 ## Verified
 
-VERIFIED-PENDING
+2026-10-28. Example edit (14 s): `~/zenvi-motion/fleet/artifacts/sk1-knowledge/styles/kids-education/example.mp4` (contact sheet and `calls.json` next to it), built with
+`zenvi call` on the portable CLI from Pexels stock and a macOS `say` voice (`scripts/` in the same folder).
+Watch judge (absolute, gemini-3.8-flash): 5.55/10 overall; its first note: "Flat color palette and low contrast on the fruit clip." (at 2.5 s).
+Pairwise against the category's reference segment (same length): winner other (passes ['other', 'other']) cand 4.82 vs other 5.91 $0.0083.

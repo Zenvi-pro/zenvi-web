@@ -35,7 +35,9 @@ turn, a short end card. Pick one per piece; mixing their cut rates is the averag
 | 60 s | 0-13 s | 13-40 s | 40-46 s (about 60-70%) | 46-55 s | 55-60 s |
 | 90 s | 0-13 s | 13-45 s | 45-51 s | 51-75 s | 75-90 s |
 
-Short-form micro-doc instead: hook claim 0-3 s, collage and captioned story, black turn card at 32-81%, end card
+Shorts (15-30 s): the title sits over the first context wide, not on a black card (a black card mid-short
+reads as a stall), and the piece ends on a closing line from the subject over them at work, held 2+ s, not on a
+fade-out over an aerial. Short-form micro-doc instead: hook claim 0-3 s, collage and captioned story, black turn card at 32-81%, end card
 0.6-4 s.
 
 ## Shot plan
@@ -71,7 +73,9 @@ into the context section. Fades to black between chapters. No whips, no flashes,
 
 ## Captions/VO
 
-Subject's own voice first (sync-sound interview), narrator only to bridge. Subtitles sentence-level (t124).
+Subject's own voice first (sync-sound interview), narrator only to bridge. A synthetic voice is this style's
+weakest link (the judge marked it down every time): use the subject's audio or a human read whenever one exists.
+Cutaways show exactly what the line describes (the repair, not a prop). Subtitles sentence-level (t124).
 Narration calm, about 140-160 wpm, pauses kept. A translated subject gets subtitles for every line.
 
 ## Tool sequence
@@ -86,14 +90,15 @@ Narration calm, about 140-160 wpm, pauses kept. A translated subject gets subtit
 4. Subtitles: `transcribe_media_tool` + `add_captions_tool` (or `cues`) `{"style": "classic", "text_size": 0.038,
    "background_opacity": 0}`.
 5. Title after the cold open (t123): `add_kinetic_title_tool` `{"text": "The Last Repairman", "style":
-   "documentary", "animation": "fade", "emphasis": "none", "background": "#000000", "text_size": 0.05,
-   "duration_seconds": 3.6}`; music starts on this frame.
+   "documentary", "animation": "fade", "emphasis": "none", "text_size": 0.08, "duration_seconds": 2.8}` over the
+   first context wide (add `"background": "#000000"` only in long-form); music starts on this frame.
 6. Context wides (t115): 2.5 s static wides on ambience, `fade_clip_tool` in/out, the place name
    `add_kinetic_title_tool` `{"style": "editorial", "animation": "fade", "text_size": 0.22, "ink": "#f2efe8"}`.
 7. Grade once: `unify_grade_tool` `{"look": "elegant_dark_cinema", "look_intensity": 0.5}`.
-8. Music bed from the title: `add_clip_to_timeline_tool`, `set_track_role_tool` music, -20 dB,
+8. Close on the subject: a last line of theirs over a working shot, held 2+ s after it ends, then a short fade.
+9. Music bed from the title: `add_clip_to_timeline_tool`, `set_track_role_tool` music, -20 dB,
    `automate_volume_tool` `fade_out` 1.8 s at the end.
-9. `master_audio_tool` (`preset: "social"` for shorts; `target_lufs: -19` for long-form), render, `review_render_tool`.
+10. `master_audio_tool` (`preset: "social"` for shorts; `target_lufs: -19` for long-form), render, `review_render_tool`.
 
 ## Finish checklist
 
@@ -124,4 +129,7 @@ collage.
 
 ## Verified
 
-VERIFIED-PENDING
+2026-10-28. Example edit (23 s): `~/zenvi-motion/fleet/artifacts/sk1-knowledge/styles/documentary-true-story/example.mp4` (contact sheet and `calls.json` next to it), built with
+`zenvi call` on the portable CLI from Pexels stock and a macOS `say` voice (`scripts/` in the same folder).
+Watch judge (absolute, gemini-3.8-flash): 3.82/10 overall; its first note: "Synthetic text-to-speech VO breaks emotional immersion and authenticity." (at 4.5 s).
+Pairwise against the category's reference segment (same length): winner other (passes ['other', 'other']) cand 4.0 vs other 5.68 $0.0107.

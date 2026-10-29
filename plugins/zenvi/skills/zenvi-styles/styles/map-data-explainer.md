@@ -124,4 +124,7 @@ use them as order, not seconds.
 
 ## Verified
 
-VERIFIED-PENDING
+2026-10-28. Example edit (19 s): `~/zenvi-motion/fleet/artifacts/sk1-knowledge/styles/map-data-explainer/example.mp4` (contact sheet and `calls.json` next to it), built with
+`zenvi call` on the portable CLI from Pexels stock and a macOS `say` voice (`scripts/` in the same folder).
+Watch judge (absolute, gemini-3.8-flash): 5.18/10 overall; its first note: "Video ends abruptly on a static chart without a proper resolving visual or outro." (at 16.5 s).
+Pairwise against the category's reference segment (same length): winner tie (passes ['other', 'cand']) cand 5.18 vs other 5.09 $0.0102.

@@ -117,4 +117,8 @@ proof (order only, Gemini clock drifts), `1969@43` data trace on a globe. Owner 
 
 ## Verified
 
-VERIFIED-PENDING
+2026-10-28. Example edit (16 s): `~/zenvi-motion/fleet/artifacts/sk1-knowledge/styles/science-curiosity/example.mp4` (contact sheet and `calls.json` next to it), built with
+`zenvi call` on the portable CLI from Pexels stock and a macOS `say` voice (`scripts/` in the same folder).
+Watch judge (absolute, gemini-3.8-flash): 4.82/10 overall; its first note: "Serif title clashes with tiny plain sans-serif captions." (at 1.0 s).
+Calls that failed on this surface: `apply_motion_transition` (Error: No cut on track 1000000 near 10.88s (cuts at 3.90, 8.37, 9.97, 11.67s).); `add_title` (Error: Invalid arguments for add_title_tool: 0 is less than the minimum of 0.01 (at durati); `add_title` (Error: Invalid arguments for add_title_tool: 0 is less than the minimum of 0.01 (at durati); `add_title` (Error: Invalid arguments for add_title_tool: 0 is less than the minimum of 0.01 (at durati).
+Pairwise against the category's reference segment (same length): winner cand (passes ['cand', 'cand']) cand 5.68 vs other 3.91 $0.0106.

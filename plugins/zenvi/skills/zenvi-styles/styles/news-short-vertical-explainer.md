@@ -47,6 +47,8 @@ plate; median shot under 1.5 s outside interviews.
 
 ## Look & grade
 
+Portrait footage only, or landscape clips filled with `set_clip_property_tool` `scale` 0; never letterboxed.
+
 Clean and contrasty; one accent colour for numbers and slams (cyan, red or gold); dark plates under type; no
 permanent channel bug or source credit in two corners (one small mark at most).
 
@@ -122,4 +124,7 @@ diagram labels (Gemini clock about 1.5x). Owner reel in the dossier: `DdB8LATJ_1
 
 ## Verified
 
-VERIFIED-PENDING
+2026-10-28. Example edit (17 s): `~/zenvi-motion/fleet/artifacts/sk1-knowledge/styles/news-short-vertical-explainer/example.mp4` (contact sheet and `calls.json` next to it), built with
+`zenvi call` on the portable CLI from Pexels stock and a macOS `say` voice (`scripts/` in the same folder).
+Watch judge (absolute, gemini-3.8-flash): 4.27/10 overall; its first note: "Hockey rink footage feels completely disconnected from Antarctic ice drilling." (at 4.8 s).
+Pairwise against the category's reference segment (same length): winner cand (passes ['cand', 'cand']) cand 5.36 vs other 3.86 $0.0087.

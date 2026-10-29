@@ -55,7 +55,8 @@ Accent colour only on the thing being explained (the number, the keyword).
 - Captions: 2-5 word phrases around 3% of frame height, changing about every 0.8 s, in the band the graphic
   leaves free (t113: `kinetic_captions_tool` `style: "documentary"` with `y` or `avoid`).
 - Keyword: 7-12% height in the accent with an overshoot (`add_kinetic_title_tool` `animation: "pop"`).
-- Numbers: `counter` block, never a static title.
+- Numbers: `counter` block, never a static title; do not also pop the same number as a keyword title (it
+  collides with the counter's digits).
 
 ## Motion & transitions
 
@@ -88,8 +89,8 @@ shows at that moment. One TTS call per line gives exact cue times for captions a
 4. Joins between full-frame scenes: `apply_motion_transition_tool` `{"preset": "zoom_through", "time": <join>}`.
 5. Pop-ins on spoken nouns (t064): `add_emoji_tool` + `set_keyframes_tool` `ease_out_back` scale 0 to 1 in 0.2 s.
 6. Captions in the free band: `kinetic_captions_tool` `{"cues": [...], "style": "documentary", "y": 0.9}`; the
-   keyword: `add_kinetic_title_tool` `{"text": "$17", "style": "creator", "animation": "pop", "accent": "#ffd23f",
-   "text_size": 0.06}`.
+   keyword (only when no counter already shows it, or it collides with the digits): `add_kinetic_title_tool`
+   `{"text": "growth", "style": "creator", "animation": "pop", "accent": "#ffd23f", "text_size": 0.06}`.
 7. Sound: `auto_sound_design_tool` `{"genre": "saas_ui", "intensity": "normal"}` or `add_sfx_tool` per event
    (`pop` -16, `whoosh_short` -14 on moves, `impact_punch` -10 on the number, `riser_tonal` into the payoff,
    `sparkle` on the end); check with `spot_sound_tool`.
@@ -125,4 +126,7 @@ order only), `261819172@0.8` held-label calm pacing (the calm variant). Owner re
 
 ## Verified
 
-VERIFIED-PENDING
+2026-10-28. Example edit (14 s): `~/zenvi-motion/fleet/artifacts/sk1-knowledge/styles/animated-explainer/example.mp4` (contact sheet and `calls.json` next to it), built with
+`zenvi call` on the portable CLI from Pexels stock and a macOS `say` voice (`scripts/` in the same folder).
+Watch judge (absolute, gemini-3.8-flash): 5.36/10 overall; its first note: "The abstract intro shape animations feel disconnected from the topic of money." (at 1.5 s).
+Pairwise against the category's reference segment (same length): winner cand (passes ['cand', 'cand']) cand 6.0 vs other 3.59 $0.0085.
