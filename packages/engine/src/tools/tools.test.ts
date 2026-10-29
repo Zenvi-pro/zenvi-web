@@ -1167,7 +1167,7 @@ const SPECS: Record<string, Spec> = {
       summary: /^Watched \/out\/reel\.mp4 \(8\.00s, with sound\) via the Zenvi backend: overall 5\/10, would not post yet\. Watched for "a reel"\./,
       check: ({ host }) => expect(host.calls).toContain("watch /out/reel.mp4"),
     },
-    failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for watch_render_tool/ },
+    failure: { args: { path: "" }, status: "refused", summary: /^Error: pass either path \(the rendered file\) or render_id/ },
   },
   swap_shot_tool: {
     happy: {
