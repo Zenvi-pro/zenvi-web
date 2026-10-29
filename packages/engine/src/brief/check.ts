@@ -78,7 +78,8 @@ export function checkBrief(project: Project, brief: Brief): BriefCheck {
 
   const end = timelineEnd(project);
   if (Math.abs(end - brief.length_seconds) > Math.max(1, brief.length_seconds * LENGTH_TOLERANCE)) {
-    misses.push({ kind: "length", hard: true, message: `The brief is ${brief.length_seconds} s and the edit runs ${end.toFixed(1)} s.` });
+    const fill = end < brief.length_seconds ? ` Fill it (fill_to_length_tool seconds=${brief.length_seconds}: a longer final hold, unseen footage, a slowed last shot) rather than ship it short.` : "";
+    misses.push({ kind: "length", hard: true, message: `The brief is ${brief.length_seconds} s and the edit runs ${end.toFixed(1)} s.${fill}` });
   }
 
   const starts = pictureStarts(project);

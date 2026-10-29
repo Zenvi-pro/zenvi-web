@@ -50,11 +50,16 @@ other (dark round → dark round, warm → warm); end on the most iconic one
    and position (read `data.cuts` reasons: `same shape and layout`,
    `subject in place`) and returns `data.file_ids` in that order.
 2. Subjects: give **every** file a box in `subjects`. Circles:
-   `detect_subject_tool` (`file_id`, `time`) and keep the candidate that is
-   the subject. Poses and heads: read the person's box off
-   `inspect_media_tool` (`fileId`, `start`, `end`, `maxFrames: 3`) frames. A
-   file without a box gets circle detection, which on a pose shot finds a
-   random round thing and zooms 10x into it.
+   `detect_subject_tool` (`file_id`, `time`, and `near` + `radius` read off
+   a frame's grid so the subject outranks a highlight) and keep the
+   candidate that is the subject (its `center`, `radius`, `confidence`).
+   Silhouettes, windows, screens: `kind: "blob"`. Poses and heads: read the
+   person's box off `inspect_media_tool` (`fileId`, `start`, `end`,
+   `maxFrames: 3`) frames. A file without a box gets circle detection, the
+   candidate closest in size to the other files'; one that would need more
+   than 4x to match is centred instead (the warning names it).
+   `align_match_cut_tool` refuses a box that needs more than `max_zoom`
+   (default 4) and says which: re-measure that one, do not raise the limit.
 3. Cut it in one call:
 
 ```json
