@@ -32,6 +32,7 @@ export * from "./mastering/loudness.js";
 export * from "./mastering/limiter.js";
 export * from "./mastering/gain-stage.js";
 export * from "./analysis/transcription.js";
+export * from "./analysis/align.js";
 export { SFX_SAMPLE_RATE } from "./sfx/dsp.js";
 export * from "./sfx/recipes.js";
 export * from "./sfx/render.js";

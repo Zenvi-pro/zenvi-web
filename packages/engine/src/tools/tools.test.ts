@@ -1233,6 +1233,49 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
   },
 
+  align_lyrics_tool: {
+    happy: {
+      args: { timeline_clip_id: IDS.clipA, text: "Hello and welcome,\ntoday we talk about cameras!" },
+      summary: /^Aligned 8 words in 2 line\(s\) to clip CLIPINTV01: 100% heard \(whisper-1\)\.$/,
+      check: ({ receipt, doc }) => {
+        const file = doc.project.files.find((f) => f.id === IDS.interview)!;
+        const asr = (file.ai_metadata as { asr: { transcriptionSource: string; words: { text: string }[] } }).asr;
+        expect(asr.transcriptionSource).toBe("aligned_text");
+        expect(asr.words.map((w) => w.text)).toContain("cameras!");
+        expect(receipt.data).toMatchObject({ lines: [{ text: "Hello and welcome,", start: 0.5, end: 2 }, { text: "today we talk about cameras!", start: 3, end: 4.6 }] });
+        expect(doc.undoLabels).toHaveLength(0);
+      },
+    },
+    failure: { args: { text: "words" }, status: "refused", summary: /^Error: pass timeline_clip_id or file_id \(one of them\)\.$/ },
+  },
+
+  place_on_word_tool: {
+    happy: {
+      args: { word: "today", what: "cut" },
+      summary: /^Placed 1 cut\(s\) on "today" at 2\.\d\ds, each on its word's frame\.$/,
+      check: ({ doc }) => {
+        expect(doc.undoLabels.at(-1)).toBe('Place cut on "today"');
+        expect(doc.project.clips.filter((c) => c.file_id === IDS.interview)).toHaveLength(3);
+      },
+    },
+    failure: { args: { word: "zebra", what: "cut" }, status: "refused", summary: /^Error: "zebra" is not said in the speech searched\./ },
+  },
+
+  insert_broll_on_words_tool: {
+    happy: {
+      args: { keywords: ["cameras"] },
+      summary: /^Inserted 1 B-roll cutaway\(s\) on track \d+, muted:\n {2}\d+\.\d\ds "cameras" 1\.2s {2}file_id=FILEBROL01/,
+      check: ({ receipt, doc }) => {
+        const id = (receipt.data as { created: string[] }).created[0]!;
+        const clip = doc.project.clips.find((c) => c.id === id)!;
+        expect(clip.start).toBe(1);
+        expect((clip.volume as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y).toBe(0);
+        expect(doc.undoLabels.at(-1)).toBe("Insert B-roll on words (1)");
+      },
+    },
+    failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
+  },
+
   add_kinetic_title_tool: {
     happy: {
       args: { text: "No lights no brakes", position_seconds: "1", duration_seconds: "2", animation: "letters" },
