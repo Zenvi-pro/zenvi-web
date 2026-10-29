@@ -167,7 +167,6 @@ function choose(input: DesignInput): { keep: Set<number>; dry: Map<number, strin
   return { keep, dry };
 }
 
-/** The design for a cue sheet. */
 /** The UI sound a block event plays (a toggle, a pop, a key per swapped letter, a click); undefined: the palette's pick. */
 function uiEventRecipe(event: HitPoint["event"]): string | undefined {
   return event === "toggle" ? "toggle" : event === "pop" ? "pop" : event === "swap" ? "keyboard_key" : event === "click" ? "mouse_click" : undefined;
@@ -196,6 +195,7 @@ export function soloRecipe(p: Pick<HitPoint, "role" | "event" | "kind">): string
   }
 }
 
+/** The design for a cue sheet. */
 export function designSound(input: DesignInput): SoundDesign {
   const { points, palette, duration } = input;
   const rng = new Rng(Math.imul(input.seed | 0, 2654435761) ^ 0x5d2);

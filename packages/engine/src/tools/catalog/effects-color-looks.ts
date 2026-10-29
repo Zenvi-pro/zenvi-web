@@ -173,18 +173,22 @@ export const NAMED_LOOKS: Readonly<Record<string, NamedLook>> = {
   },
 };
 
-/** `_grade_values`: a grade's controls and its LUT (`category/name`) as a receipt row. */
 /** Below this channel shift (0..1, at full tonal weight) a wheel's tint is not visible (sk2-product-brand: amounts of 0.05-0.1 on greyish colours). */
 const FAINT_WHEEL = 0.02;
 
-/** The largest channel shift one wheel of a `wheels` property applies, 0..1 (the kernel's own bias). */
-function wheelShift(wheels: unknown, name: string): number {
+/**
+ * A wheel of a `wheels` property that tints by less than shows: its largest
+ * channel shift (the kernel's own bias) under FAINT_WHEEL. A neutral wheel
+ * (amount and luma 0) is a reset, not a faint tint.
+ */
+function faintWheel(wheels: unknown, name: string): boolean {
   const entry = isRecord(wheels) ? wheels[name] : undefined;
-  if (!isRecord(entry)) return 0;
+  if (!isRecord(entry) || (entry.amount === 0 && entry.luma === 0)) return false;
   const bias = wheelBias({ color: entry.color, amount: entry.amount, luma: entry.luma } as Parameters<typeof wheelBias>[0]);
-  return Math.max(...bias.map(Math.abs));
+  return Math.max(...bias.map(Math.abs)) < FAINT_WHEEL;
 }
 
+/** `_grade_values`: a grade's controls and its LUT (`category/name`) as a receipt row. */
 function gradeValues(effect: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const p of GRADE_PARAMS) out[p] = roundTo(keyframeValueAt(effect[p], 1, 0.0), 4);
@@ -369,7 +373,7 @@ export const effectsColorLookTools: CatalogTool[] = [
           if (hasWheels) {
             payload.wheels = wheelsValue(wheels, payload.wheels);
             for (const name of Object.keys(wheels)) {
-              if (name !== "enabled" && wheelShift(payload.wheels, name) < FAINT_WHEEL) faintWheels.add(name);
+              if (name !== "enabled" && faintWheel(payload.wheels, name)) faintWheels.add(name);
             }
           }
           for (const [key, pts] of Object.entries(curves ?? {})) payload[`curve_${key}`] = curveValue(`curves.${key}`, pts);

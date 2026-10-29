@@ -159,6 +159,10 @@ describe("color_grade_clip_tool", () => {
     const clear = await ed.call("color_grade_clip_tool", { timeline_clip_id: c, wheels: { shadows: { color: "#2a6cff", amount: 0.15 } } });
     expect(clear.summary).toBe("Graded 1 clip(s): wheels (shadows).");
     expect(clear.warnings).toEqual([]);
+    // Turning a wheel off is a reset, not a tint too faint to see.
+    const reset = await ed.call("color_grade_clip_tool", { timeline_clip_id: c, wheels: { shadows: { amount: 0 } } });
+    expect(reset.summary).toBe("Graded 1 clip(s): wheels (shadows).");
+    expect(reset.warnings).toEqual([]);
   });
 
   it("wheels, curves, and refusals before anything changes", async () => {
