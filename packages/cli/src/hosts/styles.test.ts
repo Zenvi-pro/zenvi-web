@@ -11,9 +11,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getTool } from "@zenvi/engine/tools";
+import { briefSchema, methodProblems } from "@zenvi/engine";
 import { STYLE_FILES, STYLE_RESOURCES } from "@zenvi/engine/styles";
 import { describe, expect, it } from "vitest";
-import { generate, parseFrontMatter, readLibrary } from "../../../../plugins/zenvi/scripts/gen-styles-index.mjs";
+import { generate, indexTable, parseFrontMatter, readLibrary } from "../../../../plugins/zenvi/scripts/gen-styles-index.mjs";
 import { guideText, promptText, RESOURCES } from "./guides.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,20 @@ describe("zenvi-styles index", () => {
     const styles = entries.filter((e) => e.kind === "style").map((e) => e.id);
     expect(styles).toEqual(expect.arrayContaining(["hype-reel", "saas-ui-promo", "kinetic-captions", "match-cut-montage", "documentary"]));
     for (const e of entries) expect(e.tools.filter((t) => !getTool(t)), e.path).toEqual([]);
+  });
+
+  it("BRIEF.md's example brief passes the motif method it teaches", () => {
+    const md = readFileSync(path.join(ROOT, "plugins/zenvi/skills/zenvi-styles/BRIEF.md"), "utf8");
+    const example = /^save_brief_tool (\{.*\})$/m.exec(md)![1]!;
+    expect(methodProblems(briefSchema.parse(JSON.parse(example)))).toEqual([]);
+  });
+
+  it("serves METHOD-<name>.md files as methods and lists them in the index", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "zenvi-styles-methods-"));
+    writeFileSync(path.join(dir, "METHOD-motif.md"), "# The motif method\n");
+    const library = readLibrary(dir, path.join(dir, "recipes"));
+    expect(library.methods).toEqual([{ id: "method-motif", path: "METHOD-motif.md", markdown: "# The motif method\n" }]);
+    expect(indexTable(library)).toContain("- [method-motif](METHOD-motif.md)");
   });
 
   it("reads flow and block lists, quoted aspects and colons inside values", () => {

@@ -6,6 +6,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { METHOD as BRIEF_METHOD } from "./test-support/brief-fixture.js";
 import { describe, expect, it } from "vitest";
 import { createEffect } from "../effects/registry.js";
 import type { ProjectDocument } from "../history/document.js";
@@ -1163,6 +1164,7 @@ const SPECS: Record<string, Spec> = {
         hook: "Ice drops into a glass on frame 1",
         beats: JSON.stringify([{ start: "0", end: "2", name: "hook" }, { start: 2, end: 8, name: "pour" }]),
         checklist: ["a sound on every cut"],
+        ...BRIEF_METHOD,
       },
       summary: /^Brief: hype-reel, 16:9 8s for Reels\./,
       check: ({ doc }) => expect(doc.project.settings.zenvi_brief).toMatchObject({ style: "hype-reel", length_seconds: 8 }),

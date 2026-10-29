@@ -37,7 +37,7 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { HOST_IDS } from "@zenvi/adobe-link";
-import type { ToolImage } from "@zenvi/engine";
+import { readBrief, type ToolImage } from "@zenvi/engine";
 import { DIRECTOR_CARD, failed, parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import type { CommandContext } from "../commands/context.js";
 import { adobeToolDefinitions, callAdobeTool, hostOfTool, hostRefusal, isOkHostStatus } from "../hosts/adobe-tools.js";
@@ -47,6 +47,7 @@ import { findProject } from "../project/select.js";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { VERSION } from "../version.js";
 import { BRIEF_GATE, briefGate, briefNote } from "./brief-note.js";
+import { recordDirection } from "./directions.js";
 import { extraTools, type ExtraTool } from "./extra-tools.js";
 import { HANDOFF_TOOL_NAMES, hostTools } from "./host-tools.js";
 import { McpState, type McpStateOptions } from "./state.js";
@@ -185,6 +186,11 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text);
       if (!receipt) return { content: [{ type: "text", text: result.text }], ...(result.ok ? {} : { isError: true }) };
       if (name === "review_edit_tool" && result.ok) state.noteReview();
+      if (name === "save_brief_tool" && receipt.status === "applied") {
+        const saved = readBrief(state.session.doc.project);
+        const repeated = saved ? await recordDirection(ctx.config.configDir, saved) : [];
+        if (repeated.length > 0) receipt.warnings = [...receipt.warnings, `The direction repeats the last edit's picks on ${repeated.join(", ")}: draw those differently (read_director_recipe {styles: "brief"} has a fresh draw) unless the subject needs them, and say why.`];
+      }
       const brief = isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
       if (brief) receipt.notes = [...receipt.notes, brief];
       if (!state.session.file && receipt.undoSteps > 0) {

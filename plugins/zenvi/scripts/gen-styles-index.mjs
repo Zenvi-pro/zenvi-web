@@ -148,7 +148,14 @@ export function readLibrary(styles = STYLES, recipes = RECIPES) {
     markdown: readFileSync(file, "utf8"),
   }));
   for (const f of families) if (seen.has(f.id)) errors.push(`${f.path}: id ${f.id} is also ${seen.get(f.id)}`);
-  return { entries, families, errors };
+  // Methods (METHOD-<name>.md: how to plan, not a look) are served as zenvi://styles/method-<name>.
+  const methods = existsSync(styles)
+    ? readdirSync(styles)
+        .filter((name) => /^METHOD-[A-Za-z0-9-]+\.md$/.test(name))
+        .sort()
+        .map((name) => ({ id: name.slice(0, -3).toLowerCase(), path: name, markdown: readFileSync(path.join(styles, name), "utf8") }))
+    : [];
+  return { entries, families, methods, errors };
 }
 
 function cell(text) {
@@ -156,7 +163,7 @@ function cell(text) {
 }
 
 /** The generated block: a table of styles, a table of techniques, the families. */
-export function indexTable({ entries, families }) {
+export function indexTable({ entries, families, methods = [] }) {
   const styles = entries.filter((e) => e.kind === "style").sort((a, b) => a.id.localeCompare(b.id));
   const techniques = entries.filter((e) => e.kind === "technique").sort((a, b) => a.id.localeCompare(b.id));
   const lines = [START, "", `### Styles (${styles.length})`, "", "| style | pace | aspect | use when |", "| --- | --- | --- | --- |"];
@@ -172,6 +179,9 @@ export function indexTable({ entries, families }) {
   }
   if (families.length > 0) {
     lines.push("", "### Families", "", ...families.map((f) => `- [${f.id}](${f.path})`));
+  }
+  if (methods.length > 0) {
+    lines.push("", "### Methods", "", ...methods.map((m) => `- [${m.id}](${m.path})`));
   }
   lines.push("", END);
   return lines.join("\n");
@@ -190,10 +200,11 @@ function stripFrontMatter(markdown) {
 }
 
 /** library.gen.ts: what the MCP servers serve as zenvi://styles resources. */
-export function libraryModule(skill, brief, { entries, families }) {
+export function libraryModule(skill, brief, { entries, families, methods = [] }) {
   const files = [
     ...entries.map((e) => ({ id: e.id, kind: e.kind, path: e.path, summary: e.summary, markdown: e.markdown })),
     ...families.map((f) => ({ id: f.id, kind: "family", path: f.path, summary: `How the ${f.id} techniques combine.`, markdown: f.markdown })),
+    ...methods.map((m) => ({ id: m.id, kind: "method", path: m.path, summary: `How to plan with the ${m.id.slice("method-".length)} method.`, markdown: m.markdown })),
   ];
   return [
     "// Generated from plugins/zenvi/skills/zenvi-styles by plugins/zenvi/scripts/gen-styles-index.mjs. Do not edit.",
@@ -204,8 +215,8 @@ export function libraryModule(skill, brief, { entries, families }) {
     "/** BRIEF.md: the brief compiler, step 0 of every edit (zenvi://styles/brief). */",
     `export const STYLES_BRIEF: string = ${JSON.stringify(stripFrontMatter(brief))};`,
     "",
-    "/** Every style, technique and family (zenvi://styles/<id>), by id. */",
-    `export const STYLE_FILES: readonly { id: string; kind: "style" | "technique" | "family"; path: string; summary: string; markdown: string }[] = ${JSON.stringify(files, null, 2)};`,
+    "/** Every style, technique, family and method (zenvi://styles/<id>), by id. */",
+    `export const STYLE_FILES: readonly { id: string; kind: "style" | "technique" | "family" | "method"; path: string; summary: string; markdown: string }[] = ${JSON.stringify(files, null, 2)};`,
     "",
   ].join("\n");
 }

@@ -48,6 +48,28 @@ export const briefShotSchema = z.strictObject({
   note: line(240).describe("The shot: framing, action, query or prompt."),
 });
 
+/** One storyboard row; the last four columns exist to make repetition visible before the edit (Tweenkit kinetic-cut-video, MIT). */
+export const briefStoryRowSchema = z.strictObject({
+  start: seconds.describe("Timeline seconds the shot starts."),
+  beats: z.coerce.number().positive().max(64).describe("Its length in beats (1, 2, 4, 8...): mix them."),
+  picture: line(240).describe("What is on screen."),
+  motif: line(80).describe("The motif it grows from (one of motifs)."),
+  source: z.enum(BRIEF_SOURCES),
+  file_id: line(40).optional().describe("The media-bin file id when source is media."),
+  composition: line(60).describe("centred, object left / type right, full bleed, type cropped by the frame, split, diagonal, empty space..."),
+  text_entrance: line(60).describe("slam, typed, built from the motif, mask wipe, flip, stretch, none..."),
+  tone: line(80).describe("Brightness and main colour: dark navy, bright paper, inverted, accent fill..."),
+  transition: line(80).optional().describe("How it hands over to the next shot (a motif match cut first)."),
+  climax: z.boolean().optional().describe("The one heaviest moment: its tone breaks the system the rest set up."),
+});
+
+/** One axis of the creative-direction draw. */
+export const briefDirectionSchema = z.strictObject({
+  axis: line(40).describe("art style, palette, type, rhythm, camera, transitions, finish, copy tone, opening, ending..."),
+  pick: line(100),
+  why: line(200).describe("Why this pick for this subject, and how it differs from the last edit's."),
+});
+
 export const briefShape = {
   goal: line(300).describe("What the video must make the viewer do or feel, in one sentence."),
   audience: line(200).optional(),
@@ -58,7 +80,18 @@ export const briefShape = {
   techniques: z.array(briefTechniqueSchema).max(4).default([]).describe("Up to 4 borrowed techniques, each with its reason."),
   hook: line(300).describe("The first 2 seconds: what is on screen and heard at 0.0 s."),
   beats: z.array(briefBeatSchema).min(1).max(24).describe("The structure with timings, in order."),
-  shots: z.array(briefShotSchema).max(60).default([]).describe("The shot plan mapped to the media; what to fetch or generate where media is missing."),
+  shots: z.array(briefShotSchema).max(60).default([]).describe("Older briefs' shot plan; new briefs plan shots in storyboard."),
+  motifs: z.array(line(80)).max(12).default([]).describe("8-12 visual elements only this subject has: tools, materials, signs, screens, places, the one gesture of the trade."),
+  through_line: line(80).optional().describe("The motif that recurs and opens and closes the piece (one of motifs)."),
+  storyboard: z.array(briefStoryRowSchema).max(40).default([]).describe("The shot plan, one row per shot, mapped to the media or to what to fetch / generate."),
+  reskin: z
+    .strictObject({
+      generic: z.coerce.number().int().min(0).describe("Storyboard rows whose picture would still work if the copy named another subject."),
+      note: line(300).optional(),
+    })
+    .optional()
+    .describe("The reskin test: more than a third generic means the plan is a template; redo it."),
+  direction: z.array(briefDirectionSchema).max(16).default([]).describe("The creative-direction draw: at least 3 axes picked on purpose, differently from the last edit."),
   type: line(300).optional().describe("Type system: families, sizes, how type moves."),
   palette: line(300).optional().describe("Palette and grade: the look, the accent colour."),
   music: line(300).optional().describe("Music: tempo, energy curve, where the drop lands."),

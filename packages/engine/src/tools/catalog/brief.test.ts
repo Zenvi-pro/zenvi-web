@@ -10,6 +10,7 @@ import { runTool } from "../registry.js";
 import type { ToolHost, ToolImage } from "../types.js";
 import { fakeHost } from "../test-support/fake-host.js";
 import { audioInfo, imageInfo, media, videoInfo } from "../test-support/fixture.js";
+import { METHOD } from "../test-support/brief-fixture.js";
 import { encodePng } from "../test-support/pixel-host.js";
 
 const L1 = 1_000_000;
@@ -57,6 +58,7 @@ const BRIEF = {
     { beat: "drop", source: "stock", note: "track sprint, side on" },
   ],
   checklist: ["a sound on every cut", "ends on a held logo"],
+  ...METHOD,
 };
 
 describe("inspect_media_bin_tool", () => {
@@ -132,10 +134,20 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(doc.undoLabels).toEqual(["fixture"]);
   });
 
+  it("refuses a whole-video brief that breaks the motif method, with every fix listed, and records nothing", async () => {
+    const doc = bin();
+    const out = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, motifs: ["sole"], reskin: { generic: 4 } });
+    expect(out.data!.status).toBe("refused");
+    expect(out.data!.summary).toMatch(/^Error: not a plan yet, nothing saved/);
+    expect(out.data!.summary).toContain("motifs: 1 of the 8-12");
+    expect(out.data!.summary).toContain("4 of 5 shots would work for any subject");
+    expect(doc.undoLabels).toEqual(["fixture"]);
+  });
+
   it("warns about a thin brief: no shots, no technique, no critique", async () => {
     const doc = bin();
     const thin = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, shots: [], techniques: [] });
-    expect(thin.data!.warnings.join(" ")).toContain("A thin brief (no shot plan, no borrowed technique, no self-critique)");
+    expect(thin.data!.warnings.join(" ")).toContain("A thin brief (no borrowed technique, no self-critique)");
     const full = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, critique: "Moved the logo off the hook" });
     expect(full.data!.warnings.join(" ")).not.toContain("thin brief");
   });

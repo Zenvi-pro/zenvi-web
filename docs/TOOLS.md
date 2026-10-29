@@ -3527,7 +3527,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 ### save_brief_tool
 
-**Save the creative brief** (direct tool). Save the creative brief compiled from the person's prompt and the media inventory (zenvi-styles BRIEF.md): goal, platform, aspect, length, ONE style id from the styles index, up to 4 borrowed techniques with reasons and tools, the hook, the beats with timings, the shot plan (media / stock / generate / motion / 3d / title), type, palette, music, sound, captions, end card, the style's finish checklist, and what the self-critique changed.
+**Save the creative brief** (direct tool). Save the creative brief compiled from the person's prompt and the media inventory (zenvi-styles BRIEF.md): goal, platform, aspect, length, ONE style id from the styles index, up to 4 borrowed techniques with reasons and tools, the hook, the beats with timings, 8-12 motifs with one through-line, a storyboard (start, beats, picture, motif, source, composition, text_entrance, tone, transition, one climax) that does not repeat itself, the reskin test, a creative-direction draw of 3+ axes, type, palette, music, sound, captions, end card, the style's checklist and what the self-critique changed.
 
 Surfaces: mcp, cli, editor. edits.
 
@@ -3544,7 +3544,12 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `techniques` | object[] |  | Up to 4 borrowed techniques, each with its reason. (default []) |
 | `hook` | string | yes | The first 2 seconds: what is on screen and heard at 0.0 s. |
 | `beats` | object[] | yes | The structure with timings, in order. |
-| `shots` | object[] |  | The shot plan mapped to the media; what to fetch or generate where media is missing. (default []) |
+| `shots` | object[] |  | Older briefs' shot plan; new briefs plan shots in storyboard. (default []) |
+| `motifs` | string[] |  | 8-12 visual elements only this subject has: tools, materials, signs, screens, places, the one gesture of the trade. (default []) |
+| `through_line` | string |  | The motif that recurs and opens and closes the piece (one of motifs). |
+| `storyboard` | object[] |  | The shot plan, one row per shot, mapped to the media or to what to fetch / generate. (default []) |
+| `reskin` | object |  | The reskin test: more than a third generic means the plan is a template; redo it. |
+| `direction` | object[] |  | The creative-direction draw: at least 3 axes picked on purpose, differently from the last edit. (default []) |
 | `type` | string |  | Type system: families, sizes, how type moves. |
 | `palette` | string |  | Palette and grade: the look, the accent colour. |
 | `music` | string |  | Music: tempo, energy curve, where the drop lands. |

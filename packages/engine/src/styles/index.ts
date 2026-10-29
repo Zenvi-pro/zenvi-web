@@ -20,7 +20,7 @@ export interface StyleResource {
   text: string;
 }
 
-const KIND_LABEL = { style: "Style", technique: "Technique", family: "Technique family" } as const;
+const KIND_LABEL = { style: "Style", technique: "Technique", family: "Technique family", method: "Method" } as const;
 
 export const STYLE_RESOURCES: readonly StyleResource[] = [
   {

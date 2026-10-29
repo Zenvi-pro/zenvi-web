@@ -8,8 +8,11 @@ description: Load this FIRST, before any other Zenvi skill or tool call, wheneve
 Every whole video starts here, before the first edit:
 
 1. **Compile the brief.** Read `BRIEF.md` (this folder) now and follow it:
-   `inspect_media_bin_tool`, then the brief, the self-critique against the
-   style's checklist, the fixes, and `save_brief_tool`. A few minutes here is
+   `inspect_media_bin_tool`, the creative-direction draw, 8-12 motifs with
+   a through-line, a storyboard that does not repeat itself, the reskin test
+   and the self-critique against the style's checklist, then
+   `save_brief_tool` (it refuses a whole video planned without them). The
+   motif method is `METHOD-motif.md`; credits in `NOTICE`. A few minutes here is
    the difference between a reel and a slideshow.
 2. **Pick ONE style** from the table below: the row whose "use when" matches
    what the first five seconds must be. Read only that style's file.
