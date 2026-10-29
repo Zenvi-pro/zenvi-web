@@ -12,7 +12,8 @@ import { expect, test, type Page } from "@playwright/test";
  * the only writes are to this test browser's storage.
  */
 
-const API = process.env.ZENVI_LIVE_API || "https://api.zenvi.pro";
+/** The editor's backend; another editor (ZENVI_LIVE_URL) skips the health check unless this is set too. */
+const API = process.env.ZENVI_LIVE_API || (process.env.ZENVI_LIVE_URL ? "" : "https://api.zenvi.pro");
 /** Requests that may fail without the editor being broken (analytics, aborted media previews). */
 const NOISE = /sentry|google-analytics|googletagmanager|favicon|videos\.pexels\.com|cdn\.freesound\.org/;
 const HANG_MS = 20_000;
@@ -63,9 +64,11 @@ const library = (page: Page) => page.getByRole("navigation", { name: "Library se
 test("the live editor works for a signed-out visitor", async ({ page, request }) => {
   const seen = watch(page);
 
-  await test.step("backend is up", async () => {
-    expect((await request.get(`${API}/health`)).status()).toBe(200);
-  });
+  if (API) {
+    await test.step("backend is up", async () => {
+      expect((await request.get(`${API}/health`)).status()).toBe(200);
+    });
+  }
 
   await test.step("editor opens a new vertical project", async () => {
     await page.goto("", { waitUntil: "networkidle" });
@@ -99,24 +102,26 @@ test("the live editor works for a signed-out visitor", async ({ page, request })
     await page.getByText("Music & sound", { exact: true }).click();
     const search = page.getByLabel("Search stock media");
     await search.fill("piano");
+    // The editor's own search (direct or through its same-origin proxy), so its CORS is the editor's.
+    const searched = page.waitForResponse((r) => r.url().includes("/freesound/search") && r.url().includes("piano"));
     await search.press("Enter");
+    const url: unknown = (await (await searched).json()).sounds?.[0]?.previews?.hq_mp3;
+    expect(url, "a preview URL in the search results").toEqual(expect.any(String));
     await expect(page.getByRole("button", { name: /^Play / }).first()).toBeVisible();
     // What a stock import downloads first (apps/editor/src/lib/download.ts): a CORS ranged GET.
-    const probe = await page.evaluate(async (api) => {
-      const found = await (await fetch(`${api}/api/v1/freesound/search?query=piano&page_size=1&page=1`)).json();
-      const url = found.sounds?.[0]?.previews?.hq_mp3;
-      if (!url) return "no preview url";
-      const response = await fetch(url, { headers: { Range: "bytes=0-1023" } });
+    const probe = await page.evaluate(async (preview) => {
+      const response = await fetch(preview, { headers: { Range: "bytes=0-1023" } });
       return `${response.status} ${(await response.arrayBuffer()).byteLength}`;
-    }, API);
+    }, url as string);
     expect(probe).toBe("206 1024");
   });
 
+  // Without ffmpeg only this step is skipped (test.skip would skip the checks after it too).
   const media = fixture();
-  await test.step("local media imports and Make it snappy runs", async () => {
-    test.skip(!media, "ffmpeg is not installed");
+  if (!media) test.info().annotations.push({ type: "skipped step", description: "local media import: ffmpeg is not installed" });
+  else await test.step("local media imports and Make it snappy runs", async () => {
     await library(page).getByRole("button", { name: /Project files/ }).click();
-    await page.locator("input[type=file]").first().setInputFiles(media!.video);
+    await page.locator("input[type=file]").first().setInputFiles(media.video);
     const card = page.locator("[role=button][aria-pressed]").first();
     await expect(card).toBeVisible();
     await card.dblclick();
