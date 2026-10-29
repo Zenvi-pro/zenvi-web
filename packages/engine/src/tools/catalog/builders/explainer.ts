@@ -124,9 +124,13 @@ export const explainerTools: CatalogTool[] = [
         const limit = args.duration_seconds - 0.4;
         let keep = words.findLastIndex((w, i) => w.end <= limit && (i + 1 === words.length || words[i + 1]!.start - w.end >= 0.25));
         if (keep < 0) keep = words.findLastIndex((w) => w.end <= limit);
-        if (keep >= 0 && keep + 1 < words.length) {
+        if (keep >= 0 && words[keep]!.end >= args.duration_seconds * 0.75 && keep + 1 < words.length) {
           notes.push(`The voice is cut after "${words[keep]!.text || "a phrase"}" at ${round3(words[keep]!.end)} s, the last pause before ${args.duration_seconds} s.`);
           words = words.slice(0, keep + 1);
+        } else if (words[words.length - 1]!.end > args.duration_seconds) {
+          // No pause late enough (a long phrase, or loudness-only phrases): cut at the length asked, mid-phrase.
+          notes.push(`No pause in the voice near ${args.duration_seconds} s: it is cut there, mid-phrase.`);
+          words = words.filter((w) => w.start < args.duration_seconds! - 0.2).map((w) => ({ ...w, end: Math.min(w.end, args.duration_seconds!) }));
         }
       }
       const duration = Math.round(Math.min(voice ? voiceLength : Infinity, words[words.length - 1]!.end + 0.8, args.duration_seconds ?? Infinity) * fps) / fps;
