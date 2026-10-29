@@ -1493,7 +1493,7 @@ const SPECS: Record<string, Spec> = {
 
   // --- motion transitions ------------------------------------------------------------------
   list_motion_transitions_tool: {
-    happy: { args: {}, summary: /^13 motion transitions; 0 on the timeline\.$/ },
+    happy: { args: {}, summary: /^14 motion transitions; 0 on the timeline\.$/ },
     failure: null,
   },
   apply_motion_transition_tool: {
