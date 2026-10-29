@@ -43,6 +43,7 @@ import { placeMusicBed } from "./music-bed.js";
 import { aspectOf, displayName, musicFromBeats, usableRange, visualKind, writeCard } from "./reels.js";
 import { FINISH_HINT } from "../director-card.js";
 import { inBinOrder, sequenceFiles } from "./sequence.js";
+import { lookOrder } from "../shots.js";
 
 const ALIGN = "align_match_cut_tool";
 const DETECT = "detect_subject_tool";
@@ -149,6 +150,10 @@ const montageInput = z.strictObject({
     .describe(`Refuse (nothing changes) when the files are too few for the pace and a file comes back within ${REUSE_GAP_SECONDS} s; the error says how many more to import. Default false: a warning.`),
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (in the same undo step)."),
   keep_order: z.boolean().optional().describe("Keep file_ids as given when they are the bin's own order (by default such a list is first chained by shape continuity, like sequence_shots_tool)."),
+  order: z
+    .enum(["given", "look"])
+    .optional()
+    .describe("given (default): file_ids is the chain. look: keep the first and last file and order the others so each shot looks most like the one before (shape and pose continuity, from the shot model; embed_media_tool)."),
 });
 
 type AlignArgs = z.infer<typeof alignInput>;
@@ -430,6 +435,12 @@ const montageTool = directTool({
       } else if (ordered) warnings.push(ordered.warning);
     }
 
+    if (args.order === "look" && ids.length > 3) {
+      const order = await lookOrder(call, ids.map((id) => files.get(id)!), ids.map((id) => given.get(id)?.time));
+      if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
+      else ids = order.map((i) => ids[i]!);
+    }
+
     const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);
     const frameRate = Number.isFinite(fps) && fps > 0 ? fps : 30;
     let plan: MontagePlan;
@@ -617,6 +628,7 @@ const montageTool = directTool({
           bpm: round(plan.bpm, 2),
           music_file_id: music ? String(music.id) : null,
           music_start: plan.musicStart,
+          ...(args.order === "look" ? { file_order: ids } : {}),
           target: fromTarget(built.alignment.target),
           shots,
           flashes,

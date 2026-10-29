@@ -11,6 +11,7 @@ import { ProjectDocument } from "../../history/document.js";
 import { repeatedCut } from "../test-support/repeated-cut.js";
 import { runTool } from "../registry.js";
 import { EditHarness } from "../test-support/edit-harness.js";
+import { fakeShotHost } from "../test-support/fake-shots.js";
 import { pixelFrameHost } from "../test-support/pixel-host.js";
 import type { RenderInspection, RenderInspectOptions } from "../types.js";
 
@@ -87,6 +88,19 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
     expect(tiles.map((t) => t.flag)).toEqual([null, null, "REPEAT of #1", null, "BLACK", "ENDS ON BLACK"]);
     expect(result.images).toHaveLength(1);
     expect(result.images![0]!.mimeType).toBe("image/png");
+  });
+
+  it("warns about back-to-back shots that look the same when the shot model is installed", async () => {
+    const ed = painted();
+    ed.host.media!.inspectRender = async (path) => inspection(path);
+    const shots = fakeShotHost({ "/renders/out.mp4": [[0, "face"], [2, "city"], [6, "dog"], [9.2, "moon"]] });
+    ed.host.shots = shots;
+    const receipt = (await runTool({ doc: ed.doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
+    const problems = (receipt.data as Row).problems as { kind: string; at: number; message: string }[];
+    expect(problems.filter((p) => p.kind === "near_duplicate_shots")).toEqual([
+      expect.objectContaining({ at: 4, message: expect.stringMatching(/^shots 2 and 3 look almost the same \(similarity 1\.00\)/) }),
+    ]);
+    expect(shots.calls).toEqual(["frames /renders/out.mp4 1.00,3.00,5.00,7.60,9.60"]);
   });
 
   it("hands back the swap that fixes a repeated shot when the render is of the open timeline", async () => {
