@@ -42,6 +42,7 @@ const dataSlot = z.strictObject({
 const input = z.strictObject({
   voice_file_id: z.string().min(1).optional().describe("The voice-over in the media bin (audio, or footage whose sound is the voice). Default: the audio named like a voice (vo, voiceover, narration, tts), else the only audio that is not the music."),
   script: z.string().max(6000).optional().describe("No voice-over yet: the script; the edit is timed at reading pace (about 150 words a minute) and the captions show it."),
+  duration_seconds: z.number().min(4).max(600).optional().describe("Use only the start of the voice: it ends at the last pause before this many seconds (default: the whole voice)."),
   broll_file_ids: z.array(z.string().min(1)).max(60).optional().describe("Bin videos and images for the picture, in story order. Default: every video and image in the bin but the voice's."),
   keywords: keywordsArg,
   pace: z
@@ -118,7 +119,17 @@ export const explainerTools: CatalogTool[] = [
         const per = voice && voiceLength > 0 ? voiceLength / tokens.length : SCRIPT_WORD_SECONDS;
         words = tokens.map((text, i) => ({ text, start: round3(i * per), end: round3(i * per + per * 0.9) }));
       }
-      const duration = Math.round(Math.min(voice ? voiceLength : Infinity, words[words.length - 1]!.end + 0.8) * fps) / fps;
+      if (args.duration_seconds !== undefined) {
+        // The voice ends on a pause: the last word that ends before the limit with a gap (or the end) after it.
+        const limit = args.duration_seconds - 0.4;
+        let keep = words.findLastIndex((w, i) => w.end <= limit && (i + 1 === words.length || words[i + 1]!.start - w.end >= 0.25));
+        if (keep < 0) keep = words.findLastIndex((w) => w.end <= limit);
+        if (keep >= 0 && keep + 1 < words.length) {
+          notes.push(`The voice is cut after "${words[keep]!.text || "a phrase"}" at ${round3(words[keep]!.end)} s, the last pause before ${args.duration_seconds} s.`);
+          words = words.slice(0, keep + 1);
+        }
+      }
+      const duration = Math.round(Math.min(voice ? voiceLength : Infinity, words[words.length - 1]!.end + 0.8, args.duration_seconds ?? Infinity) * fps) / fps;
 
       const pictures = brollIds.map((id) => files.get(id)!);
       const pace = EXPLAINER_PACES[args.pace ?? "documentary"];

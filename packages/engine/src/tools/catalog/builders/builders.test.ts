@@ -125,6 +125,16 @@ describe("build_explainer_tool", () => {
     expect(data.fallbacks).toBeGreaterThanOrEqual(2);
   });
 
+  it("uses only the start of the voice when asked, ending on a pause", async () => {
+    const doc = project();
+    const result = await runTool({ doc, host: fakeHost() }, "build_explainer_tool", { voice_file_id: "VOICE00001", broll_file_ids: ["ROCKET0001", "OCEAN00001"], duration_seconds: 6, captions: "none", grade: "none" });
+    const receipt = result.data as { notes: string[]; data: Built };
+    // "ocean" ends at 5.45 s with a long pause after it: the last pause before 6 s.
+    expect(receipt.data.duration).toBeLessThanOrEqual(6);
+    expect(receipt.data.duration).toBeGreaterThan(5.4);
+    expect(receipt.notes.join(" ")).toMatch(/cut after "ocean"/);
+  });
+
   it("refuses with nothing to lead it", async () => {
     const doc = project();
     const result = await runTool({ doc, host: fakeHost() }, "build_explainer_tool", { voice_file_id: "ROCKET0001" });

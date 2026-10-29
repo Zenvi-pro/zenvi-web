@@ -3442,6 +3442,7 @@ Availability: editor partial (without speech recognition the voice's words come 
 | --- | --- | --- | --- |
 | `voice_file_id` | string |  | The voice-over in the media bin (audio, or footage whose sound is the voice). Default: the audio named like a voice (vo, voiceover, narration, tts), else the only audio that is not the music. |
 | `script` | string |  | No voice-over yet: the script; the edit is timed at reading pace (about 150 words a minute) and the captions show it. |
+| `duration_seconds` | number |  | Use only the start of the voice: it ends at the last pause before this many seconds (default: the whole voice). (min 4, max 600) |
 | `broll_file_ids` | string[] |  | Bin videos and images for the picture, in story order. Default: every video and image in the bin but the voice's. |
 | `keywords` | string \| object[] |  | Spoken words that cut to B-roll: a word (its picture is the bin file whose name or description has it) or {word, file_id} to choose the picture. Default: every spoken word that names a bin picture. |
 | `pace` | "documentary" \| "essay" |  | documentary (default): a new shot every 0.6-1.6 s on the phrases (the documentary references); essay: 2-4.5 s holds for a calmer video essay. |
