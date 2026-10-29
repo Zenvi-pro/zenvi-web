@@ -70,6 +70,8 @@ const SELECTORS: Readonly<Record<string, string>> = {
   transition_id: "the transition to change",
   marker_id: "the marker whose time is the moment",
   trackIndex: "the caption track",
+  previous_clip_id: "the outgoing clip",
+  footage_clip_id: "the footage whose track to follow",
 };
 
 /** Argument names that change nothing on their own, in every tool. */
@@ -157,6 +159,11 @@ export const OFFSCREEN: Readonly<Record<string, string>> = {
   setup_motion_runtime_tool: "installs the motion runtime",
   fetch_motion_graphics_video_tool: "downloads a render the backend made",
   remove_files_from_project_tool: "Project Files (its clips go too; delete_from_timeline_tool covers removing clips)",
+  fork_project_tool: "writes a copy of the project file and stays on the open one",
+  pick_best_variant_tool: "opens the winning variant's project (like open_project_tool)",
+  align_lyrics_tool: "word timings on the file's transcript, read by the caption and word tools",
+  detect_music_structure_tool: "the song's sections as snap points and timeline markers",
+  make_transition_mask_tool: "adds a mask image to Project Files, not the timeline",
 };
 
 export interface BacklogEntry {
@@ -211,11 +218,11 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   update_transition_tool: { reason: "not proven yet", params: ["at_seconds", "contrast_keyframes", "mask_file_id"] },
   master_audio_tool: { reason: "not proven yet: a loudness plan over a whole mix (mastering tests cover the plan)", params: ["balance", "duck", "genre", "score", "iterate"] },
   duck_tool: { reason: "not proven yet", params: ["bed", "under", "target_vbr_db"] },
-  build_reel_tool: { reason: "not proven yet: builds a whole reel (many tools at once)", params: ["style", "music_file_id", "duration_seconds", "hook", "end_card", "end_card_subtitle", "labels", "words", "beats", "bpm", "offset_seconds", "strict_variety", "grade"] },
+  build_reel_tool: { reason: "not proven yet: builds a whole reel (many tools at once)", params: ["style", "music_file_id", "duration_seconds", "hook", "end_card", "end_card_subtitle", "labels", "words", "beats", "bpm", "offset_seconds", "strict_variety", "grade", "keep_order"] },
   align_match_cut_tool: { reason: "not proven yet: render-node/src/render/match-cut.test.ts proves the alignment end to end", params: "*" },
-  match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety"] },
+  match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety", "keep_order", "order"] },
   unify_grade_tool: { reason: "not proven yet: iterative grade matching across clips", params: ["reference_clip_id", "reference_file_id", "strength", "look", "look_intensity", "samples", "max_iterations"] },
-  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety"] },
+  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety", "sound", "replay", "states"] },
   kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["behind_subject", "placement", "language"] },
   add_sfx_tool: { reason: "not proven yet", params: ["provider", "sound_id", "title", "max_seconds", "allow_noncommercial", "kit"] },
   auto_sound_design_tool: { reason: "not proven yet: density and beats need a music bed with several cuts; genre ids to look up", params: ["sources", "kit", "density", "genre", "beats"] },
@@ -232,6 +239,22 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   replace_background_tool: { reason: "needs a subject matte (RVM model)", params: ["background", "color", "color2", "blur", "subject"] },
   subject_glow_tool: { reason: "needs a subject matte (RVM model)", params: ["look", "color", "glow_color", "glow", "background", "subject"] },
   pop_out_tool: { reason: "needs a subject matte (RVM model)", params: ["band_aspect", "bar_color", "subject"] },
+  sequence_shots_tool: { reason: "not proven yet: reorders shots (sequence tests cover the order)", params: "*" },
+  snap_cuts_to_onsets_tool: { reason: "not proven yet: needs a fixture with audible onsets off the cuts", params: "*" },
+  shot_length_ramp_tool: { reason: "not proven yet: builds a montage of ramping shot lengths", params: "*" },
+  spot_action_foley_tool: { reason: "not proven yet: needs footage with visible impacts and taps", params: "*" },
+  track_point_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
+  pin_to_track_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
+  add_guide_overlay_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
+  hold_point_reframe_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
+  auto_reframe_tool: { reason: "not proven yet: needs footage with a detectable subject", params: "*" },
+  screen_zoom_follow_tool: { reason: "not proven yet: needs a screen recording with activity", params: "*" },
+  add_plate_wipe_tool: { reason: "not proven yet", params: "*" },
+  add_shape_mask_tool: { reason: "not proven yet: polygon points", params: ["points"] },
+  add_type_block_tool: { reason: "not proven yet: one type block per case (text_on_path, write_on, stencil ...)", params: "*" },
+  datamosh_cut_tool: { reason: "not proven yet: datamosh_carry needs two clips with motion at the cut", params: "*" },
+  place_on_word_tool: { reason: "needs word timings (speech recognition)", params: "*" },
+  insert_broll_on_words_tool: { reason: "needs word timings (speech recognition)", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {
