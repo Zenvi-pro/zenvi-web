@@ -33,7 +33,7 @@ import { createSfxGenerator } from "./sfx-generate.js";
 import { cacheDir } from "../svg/fonts.js";
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
-import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
+import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile, writeProjectCopy } from "./files-out.js";
 import { createNodeScenes3d } from "./scenes3d.js";
 import { createNodeFx } from "./fx.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
@@ -224,6 +224,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         return file;
       },
       writeBytes: (p, bytes, _contentType, opts) => writeBytesFile(inProject(p), bytes, opts?.overwrite),
+      saveCopy: (project, p, opts) => writeProjectCopy(inProject(p), project, { engineAssetsDir: assets, overwrite: opts?.overwrite }),
       exportMedia: (file, name, folder, render) =>
         exportMediaFile({
           source: resolveMedia(String(file.path ?? "")),
