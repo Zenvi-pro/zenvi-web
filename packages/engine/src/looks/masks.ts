@@ -22,6 +22,13 @@ export interface ShapeSpec {
   shape: MaskShape;
   /** polygon: its corners in order (either winding), 0..1 of the frame; x, y, width and height are ignored. */
   points?: readonly MaskPoint[];
+  /**
+   * polygon: how far the field runs each side of the edge, a share of the
+   * short side (default 0.5, maskRange). Shorter is steeper: a crisper
+   * narrowest feather, a shorter linear grow (past it the edge jumps to all
+   * or nothing at brightness ±1). Pass the same to shapeMaskSettings.
+   */
+  range?: number;
   /** Centre, 0..1 of the frame. */
   x: number;
   y: number;
@@ -77,7 +84,7 @@ export function shapeMaskSvg(w: number, h: number, spec: ShapeSpec): string {
   const cy = spec.y * h;
   const hw = Math.max(0.5, (spec.width * w) / 2);
   const hh = Math.max(0.5, (spec.height * h) / 2);
-  if (spec.shape === "polygon") return polygonMaskSvg(w, h, (spec.points ?? []).map((p) => [p.x * w, p.y * h]));
+  if (spec.shape === "polygon") return polygonMaskSvg(w, h, (spec.points ?? []).map((p) => [p.x * w, p.y * h]), (spec.range ?? 0.5) * Math.min(w, h));
   if (spec.shape === "ellipse") {
     // Distance from the edge is (1 - ρ)·min(a, b) in the ellipse's own units: exact for a circle, close for an ellipse.
     const m = Math.min(hw, hh);
@@ -245,10 +252,10 @@ export function polygonRegions(w: number, h: number, pts: readonly Vec[], range:
   });
 }
 
-function polygonMaskSvg(w: number, h: number, pts: readonly Vec[]): string {
+function polygonMaskSvg(w: number, h: number, pts: readonly Vec[], range: number): string {
   const problem = polygonProblem(pts);
   if (problem) throw new Error(`polygon mask: ${problem}`);
-  const regions = polygonRegions(w, h, pts, maskRange(w, h));
+  const regions = polygonRegions(w, h, pts, range);
   const poly = (ps: readonly Vec[]) => ps.map(([x, y]) => `${f(x)},${f(y)}`).join(" ");
   const defs = regions
     .map(
@@ -266,13 +273,13 @@ function polygonMaskSvg(w: number, h: number, pts: readonly Vec[]): string {
 
 /**
  * Mask effect settings for a shape mask (mask_invert on, so the inside
- * shows): `feather` and `grow` as fractions of the frame's short side.
+ * shows): `feather`, `grow` and the field's `range` as fractions of the
+ * frame's short side.
  * With the field's slope 127/range per pixel, an edge `feather` wide needs
  * contrast factor 255·range/(127·feather), and brightness b moves the edge
  * out by 255·b·range/127 pixels.
  */
-export function shapeMaskSettings(feather: number, grow: number): { contrast: number; brightness: number } {
-  const range = 0.5;
+export function shapeMaskSettings(feather: number, grow: number, range = 0.5): { contrast: number; brightness: number } {
   const factor = Math.min(40, Math.max(1, (255 * range) / (127 * Math.max(1e-3, feather))));
   return { contrast: Math.round((20 - 20 / factor) * 1e4) / 1e4, brightness: Math.round(Math.max(-1, Math.min(1, (grow * 127) / (255 * range))) * 1e4) / 1e4 };
 }
