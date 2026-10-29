@@ -81,7 +81,9 @@ export function build(ctx: BlockContext): void {
 
   // Views: the whole world (or `start`) to the focus.
   const world = (lon: number, lat: number): View => worldView(kind, region.w, region.h, lon, lat, 0.84);
-  const fit = (pts: readonly LonLat[]): View => fitView(kind, pts, region.w, region.h, 0.84, 6);
+  // Labelled markers need room beside them at the frame's edges.
+  const fill = plan.markers.some((m) => m.label) ? 0.7 : 0.84;
+  const fit = (pts: readonly LonLat[]): View => fitView(kind, pts, region.w, region.h, fill, 6);
   const focusPts = plan.focus && !(plan.focus.kind === "area" && plan.focus.world)
     ? a.outline(plan.focus)
     : [...plan.markers.map((m) => m.at), ...[...plan.highlight, ...plan.values.keys()].flatMap((i) => a.countries[i]!.core.flat())];
@@ -166,7 +168,8 @@ export function build(ctx: BlockContext): void {
     return { from, to, samples, at, duration: 0.45 + 0.35 * k, height, line, head };
   });
 
-  const finalProject = projector(kind, end);
+  // Labels are placed for the last frame, where the drift has carried the pins furthest out.
+  const finalProject = projector(kind, viewAt(ctx.seconds));
   const markers = plan.markers.map((m, i) => marker(ctx, m, popAt[i]!, finalProject, cx, cy));
   placeLabels(markers, W);
   // Text reads over land: scrims, then the title, above the map and the pins.
@@ -260,7 +263,7 @@ interface MarkerEl {
   el: HTMLElement;
   at: LonLat;
   label: HTMLElement | null;
-  /** Where the marker lands in the final view (labels are placed for it). */
+  /** Where the marker is on the last frame (labels are placed for it). */
   x: number;
   y: number;
 }
@@ -294,7 +297,9 @@ function placeLabels(markers: readonly MarkerEl[], width: number): void {
     const below = { x0: m.x - w / 2, x1: m.x + w / 2, y0: m.y + 26, y1: m.y + 26 + h };
     const above = { x0: m.x - w / 2, x1: m.x + w / 2, y0: m.y - 26 - h, y1: m.y - 26 };
     const prefer = m.x + 26 + w > width - 40 ? [left, right, above, below] : [right, left, above, below];
-    const box = prefer.find((b) => !overlaps(b)) ?? prefer[0]!;
+    // Inside the frame, then clear of pins and earlier labels.
+    const inside = prefer.filter((b) => b.x0 >= 48 && b.x1 <= width - 48);
+    const box = inside.find((b) => !overlaps(b)) ?? prefer.find((b) => !overlaps(b)) ?? inside[0] ?? prefer[0]!;
     boxes.push(box);
     const side = box === right ? "right" : box === left ? "left" : box === above ? "above" : "below";
     m.label.classList.add(`is-${side}`);
