@@ -30,7 +30,7 @@ describe("motion transition tools", () => {
     expect(result.ok, result.text).toBe(true);
     const data = dataOf(result) as { presets: { preset: string; default_frames: number }[]; styles: Record<string, string[]>; on_timeline: unknown[] };
     expect(data.presets.find((p) => p.preset === "whip")?.default_frames).toBe(8);
-    expect(Object.keys(data.styles)).toEqual(["hype", "cinematic"]);
+    expect(Object.keys(data.styles)).toEqual(["hype", "cinematic", "sport", "flash", "brand", "editorial", "punch", "travel", "gentle"]);
     expect(data.on_timeline).toEqual([]);
     expect(doc.undoLabels).toEqual([]);
   });
@@ -117,6 +117,43 @@ describe("motion transition tools", () => {
     const nothing = await call(doc, "remove_motion_transition_tool", { clip_id: "CLIP1" });
     expect(summaryOf(nothing)).toMatch(/nothing to remove/);
     expect(doc.undoLabels).toHaveLength(3);
+  });
+
+  it("varies the moves by style, leaving most cuts hard, and warns on one preset everywhere", async () => {
+    const long = (): ProjectDocument => {
+      const doc = makeDoc();
+      doc.transaction("clips", (tx) => {
+        for (let i = 0; i < 9; i += 1) addClip(tx, { fileId: "VIDEO00001", position: i, layer: 1, start: 0, end: 1, id: `SHOT${i}` });
+      });
+      doc.clearHistory();
+      return doc;
+    };
+    const brand = long();
+    const result = await call(brand, "apply_motion_transitions_tool", { track: "1", style: "brand" });
+    expect(result.ok, result.text).toBe(true);
+    const data = dataOf(result) as { transitions: { preset: string; cut: number }[]; hard_cuts: number };
+    expect(data.transitions.map((t) => [t.preset, t.cut])).toEqual([
+      ["slide", 3],
+      ["blur_dissolve", 6],
+      ["zoom_through", 8],
+    ]);
+    expect(data.hard_cuts).toBe(5);
+    expect(summaryOf(result)).toMatch(/5 cut\(s\) stay hard/);
+
+    const auto = long();
+    const fallback = await call(auto, "apply_motion_transitions_tool", { track: "1", focus_x: 0.2, focus_y: 0.3 });
+    expect(fallback.ok, fallback.text).toBe(true);
+    expect(summaryOf(fallback)).toMatch(/cinematic, from the brief's style \(none saved\)/);
+    const last = listProjectMotionTransitions(auto.project).find((r) => r.preset === "zoom_through")!;
+    const out = auto.project.clips.find((c) => c.id === last.outClipId)!;
+    // Flying into (0.2, 0.3): the picture moves right and down as it scales, keeping that point still.
+    const lx = (out as unknown as { location_x: { Points: { co: { Y: number } }[] } }).location_x.Points.map((p) => p.co.Y);
+    expect(Math.max(...lx)).toBeGreaterThan(0);
+
+    const same = long();
+    const whips = await call(same, "apply_motion_transitions_tool", { track: "1", preset: "whip" });
+    expect(whips.ok, whips.text).toBe(true);
+    expect(JSON.stringify(whips.data)).toMatch(/whip on all 8 cuts reads as a template/);
   });
 
   it("says which track has the cuts when the named one has none", async () => {
