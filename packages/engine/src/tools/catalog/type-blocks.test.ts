@@ -130,6 +130,45 @@ describe("add_type_block_tool", () => {
     expect(few.text).toMatch(/Error: strobe needs 4 beats/);
   });
 
+  it("turns a drum of words to each in turn, squashing and blurring the lines as they turn away", async () => {
+    const d = doc();
+    const r = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "wheel", words: ["APPS", "SITES", "BRANDS"], hold_frames: 15 });
+    expect(r.ok, r.text).toBe(true);
+    const clips = tagged(d);
+    expect(clips).toHaveLength(3);
+    const first = clips.find((c) => String(c.title).endsWith("line-0"))!;
+    const last = clips.find((c) => String(c.title).endsWith("line-2"))!;
+    // The first word starts upright at the centre and ends turned up and away; the last ends upright.
+    const sy = (c: Clip) => values(c.scale_y as Keyframe);
+    expect(sy(first)[0]! / Math.max(...sy(first))).toBeCloseTo(1, 6);
+    expect(sy(first).at(-1)!).toBeLessThan(sy(first)[0]! * 0.6);
+    expect(sy(last).at(-1)! / Math.max(...sy(last))).toBeCloseTo(1, 2);
+    const blur = (last.effects ?? []).find((e) => e.type === "Blur") as Record<string, unknown> | undefined;
+    expect(values(blur?.vertical_radius as Keyframe).at(-1)).toBe(0);
+    // Turns on 15 and 15 + 15 + a turn; a hit as each one lands.
+    expect((dataOf(r).hits as number[]).length).toBe(2);
+    const few = await runTool({ doc: doc(), host: fakeHost() }, "add_type_block_tool", { block: "wheel", words: ["ONLY"] });
+    expect(few.text).toContain("Error: wheel takes 2-12 words");
+  });
+
+  it("boils paper-cut type on twos, the same boil for the same seed", async () => {
+    const run = async (seed: number) => {
+      const d = doc();
+      const h = fakeHost();
+      const r = await runTool({ doc: d, host: h }, "add_type_block_tool", { block: "paper", text: "BUY IT", duration_seconds: 1, seed });
+      expect(r.ok, r.text).toBe(true);
+      return { d, svgs: [...h.written.values()].map(text) };
+    };
+    const a = await run(7);
+    const clips = tagged(a.d);
+    // 30 frames on twos: 15 poses back to back on one track.
+    expect(clips).toHaveLength(15);
+    expect(new Set(clips.map((c) => c.layer)).size).toBe(1);
+    expect(new Set(a.svgs).size).toBe(15);
+    expect((await run(7)).svgs).toEqual(a.svgs);
+    expect((await run(8)).svgs).not.toEqual(a.svgs);
+  });
+
   it("refuses arguments another block reads, without touching the project", async () => {
     const d = doc();
     const before = snapshotOf(d.project);

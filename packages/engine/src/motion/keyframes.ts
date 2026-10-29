@@ -123,6 +123,8 @@ const MIN_SCALE = 0.001;
 
 const sxOf = (p: Pose): number => Math.max(MIN_SCALE, p.sx ?? 1);
 const sOf = (p: Pose): number => Math.max(MIN_SCALE, p.s);
+// A squash never draws a drawing taller than its largest pose, so it needs no check like sx.
+const syOf = (p: Pose): number => Math.max(MIN_SCALE, Math.min(1, p.sy ?? 1));
 
 function svgLayer(el: Element, source: SvgSource, keys: Key[], frame: MotionFrame): MotionLayer {
   const top = Math.max(...keys.map((k) => sOf(k.pose)));
@@ -142,9 +144,9 @@ function svgLayer(el: Element, source: SvgSource, keys: Key[], frame: MotionFram
     gravity: Gravity.TOP_LEFT,
     ...keyframeProps(frames, eases, {
       scale_x: pose((p) => (sOf(p) * sxOf(p)) / top / fit),
-      scale_y: pose((p) => sOf(p) / top / fit),
+      scale_y: pose((p) => (sOf(p) * syOf(p)) / top / fit),
       location_x: pose((p) => (p.x - source.cx * sOf(p) * sxOf(p)) / frame.width),
-      location_y: pose((p) => (p.y - source.cy * sOf(p)) / frame.height),
+      location_y: pose((p) => (p.y - source.cy * sOf(p) * syOf(p)) / frame.height),
       alpha: pose((p) => p.alpha),
       rotation: pose((p) => p.rotation),
     }),
@@ -173,6 +175,7 @@ function cropEffect(crop: NonNullable<MediaSource["crop"]>): Omit<Effect, "id"> 
 }
 
 function mediaLayer(el: Element, source: MediaSource, keys: Key[], frame: MotionFrame): MotionLayer {
+  if (keys.some((k) => (k.pose.sy ?? 1) !== 1)) throw new Error(`element ${el.name}: only drawings can be squashed (sy)`);
   // libopenshot evaluates a clip's keyframes at its source frame: round(start × fps) + 1 on its first frame
   // (timeline/windows.ts). The in-point goes on the frame grid so that offset is exact.
   const inFrames = Math.round(source.start * frame.fps);

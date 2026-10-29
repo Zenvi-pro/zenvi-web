@@ -67,7 +67,7 @@ export function buildStencil(o: StencilOptions): TypeBlockOutput {
   const fps = frame.fps;
   const text = o.text.trim();
   if (!text) refuseBlock("stencil needs text");
-  const block = fitSize(o, text, W * 0.9, H * 0.72, o.size ?? shortSide(frame) * 0.6, { lines: 2, lineHeight: 0.92 });
+  const block = fitSize(o, text, W * 0.9, H * 0.78, o.size ?? shortSide(frame) * 0.85, { lines: 2, lineHeight: 0.92 });
   const glyphs = inked(block.glyphs);
   if (glyphs.length === 0) refuseBlock("no bundled face draws this text");
   const warnings: string[] = [];

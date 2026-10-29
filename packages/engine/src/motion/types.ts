@@ -76,6 +76,8 @@ export interface Pose {
   alpha: number;
   rotation: number;
   sx?: number;
+  /** A vertical squash, 0-1 (a line of type turning on a drum); drawings only. */
+  sy?: number;
   radius?: number;
 }
 
