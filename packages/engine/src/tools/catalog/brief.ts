@@ -23,8 +23,11 @@ import {
   type InventoryEntry,
 } from "../../brief/inventory.js";
 import { decodePngBase64 } from "../../io/png.js";
+import { isAudioOnlyMedia } from "../../model/media.js";
 import type { ProjectFile } from "../../model/types.js";
 import type { RgbaImage } from "../../render/types.js";
+import { musicSearchFromText } from "../../stock/music.js";
+import { MUSIC_MIN_DURATION } from "../audio-mix.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { fitSize, singleFileProject } from "../media-frames.js";
 import { applied, refused, unchanged } from "../receipt.js";
@@ -187,7 +190,11 @@ export const briefTools: CatalogTool[] = [
       call.commit((tx) => tx.update(["settings"], { [BRIEF_KEY]: brief }), "Save brief");
       const { lines } = checkLines(call, brief);
       const footage = footageCoverage(call.doc.project, brief);
-      return applied(SAVE, [briefSummary(brief), ...lines, ...coverageLines(footage, call.doc.project)].join("\n"), { data: { brief, footage }, warnings });
+      // No music yet: the search that measures tempo and energy (round 7: agents searched by words and took the first drone).
+      const hasMusic = call.doc.project.files.some((f) => isAudioOnlyMedia(f) && (Number(f.duration) || 0) >= MUSIC_MIN_DURATION);
+      const musicSearch = !hasMusic && brief.music ? musicSearchFromText(brief.music, brief.length_seconds) : null;
+      const musicLine = musicSearch ? [`No music in the bin: fetch it measured, search_freesound_music_tool ${JSON.stringify(musicSearch)}, and pick by bpm and curve.`] : [];
+      return applied(SAVE, [briefSummary(brief), ...lines, ...coverageLines(footage, call.doc.project), ...musicLine].join("\n"), { data: { brief, footage, ...(musicSearch ? { music_search: musicSearch } : {}) }, warnings });
     },
   }),
   directTool({

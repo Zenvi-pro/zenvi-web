@@ -102,3 +102,105 @@ export function classifyEnergy(loudnessDb: number, beatStrength: number): Energy
   const score = 0.65 * level + 0.35 * hit;
   return score < 0.4 ? "low" : score < 0.65 ? "medium" : "high";
 }
+
+export const ENERGY_SHAPES = ["build", "drop", "steady", "fade"] as const;
+export type EnergyShape = (typeof ENERGY_SHAPES)[number];
+
+export interface EnergyCurve {
+  /**
+   * build: it grows (the last third at least BUILD_DB louder than the first);
+   * drop: a sudden lift of DROP_DB or more that holds (a quiet intro, then the
+   * beat comes in); fade: it falls away; steady: none of these.
+   */
+  shape: EnergyShape;
+  /** Level of each eighth of the measured stretch, dBFS. */
+  levels: number[];
+  /** Where the drop lands, seconds into the track (shape drop). */
+  dropSeconds?: number;
+}
+
+/** Louder by this much from the first third to the last is a build (or quieter, a fade). */
+const BUILD_DB = 4;
+/** A lift of this much between the 3 s before and after a moment is a drop. */
+const DROP_DB = 6;
+const DROP_WINDOW = 3;
+
+const mean = (values: readonly number[]) => values.reduce((s, v) => s + v, 0) / Math.max(1, values.length);
+const median = (values: readonly number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0;
+
+/**
+ * The shape of a track's level over time, from its RMS level per second
+ * (dBFS): so a search can pick the track whose energy does what the edit
+ * does (a hype reel wants a drop it can put its climax on, a brand film a build).
+ */
+export function energyCurve(secondsDb: readonly number[]): EnergyCurve {
+  const n = secondsDb.length;
+  const levels = Array.from({ length: Math.min(8, n) }, (_, i) => {
+    const part = secondsDb.slice(Math.floor((i * n) / Math.min(8, n)), Math.floor(((i + 1) * n) / Math.min(8, n)));
+    return Math.round(mean(part) * 10) / 10;
+  });
+  if (n < 2 * DROP_WINDOW) return { shape: "steady", levels };
+  let lift = -Infinity;
+  let at = 0;
+  for (let t = DROP_WINDOW; t + DROP_WINDOW <= n; t += 1) {
+    const rise = mean(secondsDb.slice(t, t + DROP_WINDOW)) - mean(secondsDb.slice(t - DROP_WINDOW, t));
+    if (rise > lift) [lift, at] = [rise, t];
+  }
+  // The lift holds: what follows mostly stays well above what came before (one loud hit is no drop).
+  if (lift >= DROP_DB && median(secondsDb.slice(at)) - median(secondsDb.slice(0, at)) >= BUILD_DB) return { shape: "drop", levels, dropSeconds: at };
+  const third = Math.max(1, Math.floor(n / 3));
+  const change = mean(secondsDb.slice(n - third)) - mean(secondsDb.slice(0, third));
+  return { shape: change >= BUILD_DB ? "build" : change <= -BUILD_DB ? "fade" : "steady", levels };
+}
+
+export interface MusicSearch {
+  query: string;
+  bpm_range?: [number, number];
+  energy?: Energy;
+  energy_curve?: EnergyShape;
+  min_seconds: number;
+}
+
+/** A music-bed search asks for at least this long a track. */
+const BED_MIN = 10;
+const HIGH = /\b(hype|high|driving|intense|energetic|aggressive|hard|punchy|upbeat|fast)\b/i;
+const LOW = /\b(calm|soft|gentle|ambient|chill|low|mellow|quiet|slow|warm)\b/i;
+const CURVES: readonly [RegExp, EnergyShape][] = [
+  [/\bdrops?\b/i, "drop"],
+  [/\b(builds?|building|rising|rises|swell|swells|crescendo)\b/i, "build"],
+  [/\b(fades?|fading|winds? down)\b/i, "fade"],
+  [/\b(steady|constant|even|flat)\b/i, "steady"],
+];
+/** Words that say how the music moves, not what it is: kept out of the search text. */
+const NOT_GENRE = /\b(energy|curve|tempo|the|a|an|and|with|at|on|where|lands?|then|into|of|to|in|drops?|builds?|building|rising|swells?|fades?|steady|bpm|beat|beats|bar|bars|climax|s|sec|seconds)\b/gi;
+
+/**
+ * search_freesound_music_tool arguments from a brief's music line ("dark
+ * synthwave, 128 bpm, high energy, builds to a drop at 9 s"): the tempo, energy
+ * and curve as filters so the previews are measured, the rest as the query.
+ */
+export function musicSearchFromText(text: string, seconds: number): MusicSearch {
+  const typed = splitTempoFromQuery(text);
+  const curve = CURVES.find(([re]) => re.test(text))?.[1];
+  const energy: Energy | undefined = HIGH.test(text) ? "high" : LOW.test(text) ? "low" : undefined;
+  // The genre leads a music line ("dark trap, 140 bpm, drop on the hook"): the first clause with words left in it.
+  const clauses = typed.query.split(/[,;.:]/).map((part) =>
+    part
+      .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+      .replace(NOT_GENRE, " ")
+      .replace(new RegExp(HIGH.source, "gi"), " ")
+      .replace(new RegExp(LOW.source, "gi"), " ")
+      .replace(/\b\d+(\.\d+)?\b/g, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 5)
+      .join(" "),
+  );
+  return {
+    query: clauses.find(Boolean) ?? "music",
+    ...(typed.range ? { bpm_range: [Math.round(typed.range[0]), Math.round(typed.range[1])] as [number, number] } : {}),
+    ...(energy ? { energy } : {}),
+    ...(curve ? { energy_curve: curve } : {}),
+    min_seconds: Math.max(BED_MIN, Math.ceil(seconds)),
+  };
+}

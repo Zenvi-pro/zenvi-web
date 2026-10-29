@@ -124,6 +124,19 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(doc.project.settings[BRIEF_KEY]).toBeUndefined();
   });
 
+  it("hands over a measured music search when the bin has no music, built from the brief's music line", async () => {
+    const doc = bin();
+    doc.transaction("no song", (tx) => tx.replace(["files"], doc.project.files.filter((f) => f.id !== "SONGXXXXXX")));
+    const saved = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, music: "dark trap, 140 bpm, high energy, drop on the hook" });
+    expect(saved.data?.status, saved.text).toBe("applied");
+    const search = (saved.data?.data as { music_search?: Record<string, unknown> }).music_search;
+    expect(search).toEqual({ query: "dark trap", bpm_range: [133, 147], energy: "high", energy_curve: "drop", min_seconds: 10 });
+    expect(saved.data?.summary).toMatch(/No music in the bin: fetch it measured, search_freesound_music_tool \{"query":"dark trap"/);
+    // With a song in the bin there is nothing to fetch.
+    const withSong = await runTool({ doc: bin(), host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, music: "dark trap, 140 bpm" });
+    expect((withSong.data?.data as { music_search?: unknown }).music_search).toBeUndefined();
+  });
+
   it("takes the Assistant's string arguments", async () => {
     const doc = bin();
     const args = { ...BRIEF, length_seconds: "6", techniques: JSON.stringify(BRIEF.techniques), beats: JSON.stringify(BRIEF.beats.map((b) => ({ ...b, start: String(b.start) }))) };
