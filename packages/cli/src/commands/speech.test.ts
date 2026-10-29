@@ -28,6 +28,13 @@ describe("zenvi speech", () => {
     expect(status.ready).toBe(false);
   });
 
+  it("status with ZENVI_SPEECH=local and nothing set up says to run setup, not that the backend transcribes", async () => {
+    const env = testEnv(home, { ZENVI_CACHE_DIR: path.join(home, "cache"), ZENVI_SPEECH: "local" });
+    const run = await zenvi(["speech", "status"], { cwd: home, env });
+    expect(run.code, run.stderr).toBe(0);
+    expect(run.stdout).toContain("ZENVI_SPEECH=local, but on-device speech is not set up: run `zenvi speech setup`.");
+  });
+
   it("transcribe refuses before setup, naming the command to run", async () => {
     const env = testEnv(home, { ZENVI_CACHE_DIR: path.join(home, "cache"), ZENVI_SPEECH_MODEL: "small" });
     const run = await zenvi(["speech", "transcribe", "talk.wav"], { cwd: home, env });

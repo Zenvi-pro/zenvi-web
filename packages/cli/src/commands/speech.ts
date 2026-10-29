@@ -56,7 +56,13 @@ export function registerSpeechCommands(program: Command, ctx: CommandContext): v
         ctx.out.data({ runtime: entry, model: id, weights: path.dirname(path.dirname(weights)), license: model.license });
         return;
       }
-      ctx.out.info(`Speech recognition is ready on this machine (${model.name}). Tools now transcribe here, free and offline.`);
+      // Tools hear with the model ZENVI_SPEECH_MODEL selects, which may not be the one just set up.
+      const selected = speechModelId(ctx.env);
+      if (selected !== id && !speechModelPresent(SPEECH_MODELS[selected], { env: ctx.env })) {
+        ctx.out.info(`${model.name} is downloaded. Set ZENVI_SPEECH_MODEL=${id} so tools transcribe with it (they use ${selected}, which is not downloaded).`);
+        return;
+      }
+      ctx.out.info(`Speech recognition is ready on this machine (${SPEECH_MODELS[selected].name}). Tools now transcribe here, free and offline.`);
     });
 
   speech
@@ -79,7 +85,9 @@ export function registerSpeechCommands(program: Command, ctx: CommandContext): v
           ? "Tools transcribe on this machine."
           : mode === "off"
             ? "Speech recognition is off (ZENVI_SPEECH=off)."
-            : "Tools transcribe through the Zenvi backend when signed in (zenvi login); run `zenvi speech setup` to transcribe here instead.",
+            : mode === "local"
+              ? `ZENVI_SPEECH=local, but on-device speech is not set up: run \`zenvi speech setup${id === "small" ? " --model small" : ""}\`.`
+              : "Tools transcribe through the Zenvi backend when signed in (zenvi login); run `zenvi speech setup` to transcribe here instead.",
       );
     });
 
