@@ -269,7 +269,7 @@ describe("list_looks_tool", () => {
     const all = await json(ed, "list_looks_tool", {});
     expect(all.data).toMatchObject({ ok: true, query: "" });
     // 7 presets, 50 LUTs, 16 stylised looks (3 + 6 duotones + 7 accents), 7 grains.
-    expect(all.data.count).toBe(7 + 50 + 16 + 7);
+    expect(all.data.count).toBe(7 + 50 + 17 + 7);
     const sunny = await json(ed, "list_looks_tool", { query: "sunny" });
     expect((sunny.data.looks as Row[]).map((e) => e.id)).toContain("sunny");
     const both = await json(ed, "list_looks_tool", { query: "teal", vibe: "horror" });

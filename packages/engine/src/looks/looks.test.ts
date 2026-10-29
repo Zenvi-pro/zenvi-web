@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseCubeLut } from "../render/kernels/cube-lut.js";
-import { accentLut, bleachBypassLut, chromeLut, duotoneLut, hueOf, solarizeLut } from "./luts.js";
+import { accentLut, bleachBypassLut, chromeLut, duotoneLut, hueOf, invertLut, solarizeLut } from "./luts.js";
+import { stylizedLook } from "./stylized.js";
 import { SHAPE_FEATHER_RANGE, polygonProblem, polygonRegions, shapeMaskSettings, shapeMaskSvg, vignetteSvg } from "./masks.js";
 
 /** The LUT's entry nearest an input colour (red fastest). */
@@ -22,6 +23,16 @@ describe("look LUTs", () => {
     expect(at(cube, [1, 1, 1])[0]).toBeLessThan(0.25);
     expect(at(cube, [0.45, 0.45, 0.45])[0]).toBeGreaterThan(0.97);
     expect(at(cube, [0.75, 0.75, 0.75])[0]).toBeLessThan(at(cube, [0.5, 0.5, 0.5])[0]!);
+  });
+
+  it("invert is a negative, and the spellings agents use resolve", () => {
+    const cube = invertLut();
+    expect(parseCubeLut(cube)).not.toBeNull();
+    expect(at(cube, [0, 0, 0])).toEqual([1, 1, 1]);
+    expect(at(cube, [1, 0, 0])).toEqual([0, 1, 1]);
+    expect(stylizedLook("Negative")?.id).toBe("invert");
+    expect(stylizedLook("solarise")?.id).toBe("solarize");
+    expect(stylizedLook("bleach bypass")?.id).toBe("bleach_bypass");
   });
 
   it("chrome is monochrome with a cold cast and folded highlights", () => {

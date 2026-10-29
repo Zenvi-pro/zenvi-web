@@ -24,6 +24,11 @@ function fold(x: number, peak: number, floor: number): number {
   return t <= peak ? Math.pow(t / peak, 0.85) : 1 - (1 - floor) * ((t - peak) / (1 - peak));
 }
 
+/** A photographic negative: every channel reversed (the inverted flash frame of flash montages, on one clip). */
+export function invertLut(): string {
+  return cubeLut("Zenvi invert", 17, (r, g, b) => [1 - clamp01(r), 1 - clamp01(g), 1 - clamp01(b)]);
+}
+
 /**
  * Sabattier solarisation: each channel rises to white just under mid-grey
  * and folds back down above it, so everything brighter than a shadow prints
