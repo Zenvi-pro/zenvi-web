@@ -158,7 +158,7 @@ export function footageCoverage(project: Project, brief: Brief): FootageCoverage
   const used = new Set(project.clips.map((c) => String(c.file_id ?? "")));
   const unused = own.filter((f) => !assigned.has(String(f.id)) && !used.has(String(f.id))).map((f) => String(f.id));
 
-  // The look the fetched and generated shots should match: the person's footage the plan uses most.
+  // The look the fetched and generated shots should match: the first of the person's files the plan uses, else their first file.
   const anchor = shots.find((s) => s.status === "covered" && s.origin === "media")?.file_id ?? own[0]?.id;
   const next: NextCall[] = [];
   const toFetch = shots.filter((s) => s.status === "fetch").map((s) => s.picture.slice(0, 200));
