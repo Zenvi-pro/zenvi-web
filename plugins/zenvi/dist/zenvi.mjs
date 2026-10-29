@@ -184537,9 +184537,12 @@ var init_explainer2 = __esm({
             const limit = args.duration_seconds - 0.4;
             let keep2 = words8.findLastIndex((w2, i) => w2.end <= limit && (i + 1 === words8.length || words8[i + 1].start - w2.end >= 0.25));
             if (keep2 < 0) keep2 = words8.findLastIndex((w2) => w2.end <= limit);
-            if (keep2 >= 0 && keep2 + 1 < words8.length) {
+            if (keep2 >= 0 && words8[keep2].end >= args.duration_seconds * 0.75 && keep2 + 1 < words8.length) {
               notes.push(`The voice is cut after "${words8[keep2].text || "a phrase"}" at ${round35(words8[keep2].end)} s, the last pause before ${args.duration_seconds} s.`);
               words8 = words8.slice(0, keep2 + 1);
+            } else if (words8[words8.length - 1].end > args.duration_seconds) {
+              notes.push(`No pause in the voice near ${args.duration_seconds} s: it is cut there, mid-phrase.`);
+              words8 = words8.filter((w2) => w2.start < args.duration_seconds - 0.2).map((w2) => ({ ...w2, end: Math.min(w2.end, args.duration_seconds) }));
             }
           }
           const duration3 = Math.round(Math.min(voice ? voiceLength : Infinity, words8[words8.length - 1].end + 0.8, args.duration_seconds ?? Infinity) * fps3) / fps3;
@@ -184659,18 +184662,25 @@ function planLaunch(input32) {
     ...input32.hasProof ? [{ kind: "proof" }] : [],
     { kind: "end" }
   ];
-  const bars2 = kinds.reduce((n, k) => n + BARS2[k.kind], 0);
   const lines2 = [...input32.downbeats].filter((t2) => t2 >= 0).sort((a2, b2) => a2 - b2);
   if (lines2.length === 0 || lines2[0] > 1e-6) lines2.unshift(0);
   const bar = lines2.length > 1 ? lines2[lines2.length - 1] - lines2[lines2.length - 2] : 2;
-  while (lines2.length < bars2 + 1) lines2.push(lines2[lines2.length - 1] + bar);
+  const bars2 = new Map(kinds.map((k) => [k, BARS2[k.kind]]));
+  const total = () => [...bars2.values()].reduce((a2, b2) => a2 + b2, 0);
+  const at = (n2) => lines2[n2] ?? lines2[lines2.length - 1] + (n2 - lines2.length + 1) * bar;
+  if (input32.maxSeconds !== void 0) {
+    for (const kind of ["proof", "reveal", "end", "problem"]) {
+      for (const k of kinds) if (k.kind === kind && at(total()) > input32.maxSeconds + 0.05 && bars2.get(k) > 1) bars2.set(k, 1);
+    }
+  }
+  while (lines2.length < total() + 1) lines2.push(lines2[lines2.length - 1] + bar);
   const snap3 = (t2) => Math.round(t2 * input32.fps) / input32.fps;
   const sections = [];
-  let at = 0;
+  let n = 0;
   for (const k of kinds) {
-    const next = at + BARS2[k.kind];
-    sections.push({ ...k, start: snap3(lines2[at]), end: snap3(lines2[next]) });
-    at = next;
+    const next = n + bars2.get(k);
+    sections.push({ ...k, start: snap3(lines2[n]), end: snap3(lines2[next]) });
+    n = next;
   }
   return { sections, duration: sections[sections.length - 1].end };
 }
@@ -184717,6 +184727,7 @@ var init_product_launch = __esm({
       url: external_exports.string().max(60).optional().describe("End card URL."),
       file_ids: external_exports.array(external_exports.string().min(1)).max(30).optional().describe("Product footage, screens and photos in order: the problem, the reveal, then one per feature (the proof and the end card draw their own backgrounds). Default: every video and image in the bin."),
       logo_file_id: external_exports.string().min(1).optional().describe("The logo (a bin image) for the end card."),
+      duration_seconds: external_exports.number().min(6).max(120).optional().describe("The longest the film may run: sections give up their second bar (proof, reveal, end card, problem) until it fits. Default: two bars each, one per feature."),
       three_d: external_exports.enum(["auto", "title_3d", "logo_extrude", "device_mockup", "none"]).optional().describe("The reveal in 3D (Zenvi 3D, needs Blender): auto = title_3d with the product name; device_mockup shows the reveal's footage on a phone; none = no 3D."),
       music_file_id: external_exports.string().min(1).optional().describe("Music to cut to. Default: the longest audio file in the bin; without music the sections follow 120 BPM."),
       replace: replaceArg
@@ -184743,8 +184754,9 @@ var init_product_launch = __esm({
           const fps3 = Number(project.fps?.num) / Number(project.fps?.den || 1) || 30;
           const features2 = args.features.map(featureParts);
           const grid = await musicGrid(call, music, 120, 60);
-          const plan2 = planLaunch({ features: features2.length, hasProblem: Boolean(args.problem?.trim()), hasProof: Boolean(args.proof?.stat || args.proof?.quote), downbeats: grid.downbeats, fps: fps3 });
+          const plan2 = planLaunch({ features: features2.length, hasProblem: Boolean(args.problem?.trim()), hasProof: Boolean(args.proof?.stat || args.proof?.quote), downbeats: grid.downbeats, fps: fps3, ...args.duration_seconds ? { maxSeconds: args.duration_seconds } : {} });
           const notes = [];
+          if (args.duration_seconds && plan2.duration > args.duration_seconds + 0.05) notes.push(`${plan2.sections.length} sections need ${plan2.duration} s on these bars, more than the ${args.duration_seconds} s asked: pass fewer features or a faster song.`);
           if (ids3.length === 0) notes.push("No footage in the bin: every section is type and motion on a dark card.");
           const shown = /* @__PURE__ */ new Map();
           let next = 0;
@@ -184815,12 +184827,13 @@ var init_product_launch = __esm({
             "add_motion_block_tool",
             {
               block: "glass_cards",
-              params: { ...background2 ? { background: background2 } : {}, headline: `*${args.product}*`, cards: features2.map((f4) => f4.title).slice(0, 4), details: features2.map((f4) => f4.detail).slice(0, 4) },
+              // Over the footage, which keeps cutting a shot per feature under the cards (a held still behind them reads as a slide).
+              params: { headline: `*${args.product}*`, cards: features2.map((f4) => f4.title).slice(0, 4), details: features2.map((f4) => f4.detail).slice(0, 4) },
               position_seconds: round35(first3.start),
               duration_seconds: round35(last2.end - first3.start),
-              placement: "full_frame"
+              placement: background2 ? "over_video" : "full_frame"
             },
-            `${features2.length} feature(s) as glass cards over the product, one entrance per bar`
+            `${features2.length} feature(s) as glass cards over the product shots, one entrance per bar`
           );
           if (!cards || features2.length > 4) {
             for (const s of cards ? featureSections.slice(4) : featureSections) {
@@ -185121,7 +185134,7 @@ function cutSpan(start, end2, lengthAt, grid, fps3, minShot) {
   const reach = halfGap(grid);
   let at = start;
   for (let i = 0; i < 400; i += 1) {
-    let next = snapTo(onGrid(at + lengthAt(at), grid, reach), fps3);
+    let next = snapTo(onGrid(at + lengthAt(at, i), grid, reach), fps3);
     if (next - at < minShot) next = snapTo(at + minShot, fps3);
     if (end2 - next < minShot * 0.8) break;
     cuts.push(next);
@@ -185132,6 +185145,11 @@ function cutSpan(start, end2, lengthAt, grid, fps3, minShot) {
 }
 function planTrailer(input32) {
   const fps3 = input32.fps;
+  const count2 = Math.max(1, input32.media);
+  const own2 = (index, lo, hi, fallback) => {
+    const len = input32.lengths?.[index % count2];
+    return len !== void 0 && len > 0 && len <= hi ? Math.max(lo, len) : fallback;
+  };
   const [billing, second] = input32.actCards.map((t2) => t2.trim());
   const fixed = (billing ? CARD : 0) + (second ? CARD : 0) + SILENCE + TITLE + (input32.endCard ? END : 0);
   const footage = Math.max(8, input32.seconds - fixed);
@@ -185157,13 +185175,13 @@ function planTrailer(input32) {
   };
   const coldStart = 0;
   const coldEnd = snapTo(cold, fps3);
-  const coldCuts = cutSpan(coldStart, coldEnd, () => COLD_SHOT, [], fps3, 1.6);
+  const coldCuts = cutSpan(coldStart, coldEnd, (_2, i) => own2(media + i, 1.6, 4, COLD_SHOT), [], fps3, 1.6);
   for (let i = 0; i + 1 < coldCuts.length; i += 1) take2(1, coldCuts[i], coldCuts[i + 1]);
   at = coldEnd;
   if (billing) card("act", billing, CARD);
   const worldStart = at;
   const worldEnd = snapTo(worldStart + world, fps3);
-  const worldCuts = cutSpan(worldStart, worldEnd, () => WORLD_SHOT, grid, fps3, 1.2);
+  const worldCuts = cutSpan(worldStart, worldEnd, (_2, i) => own2(media + i, 1.2, 3, WORLD_SHOT), grid, fps3, 1.2);
   for (let i = 0; i + 1 < worldCuts.length; i += 1) take2(2, worldCuts[i], worldCuts[i + 1]);
   at = worldEnd;
   if (second) card("act", second, CARD);
@@ -185240,7 +185258,7 @@ var init_trailer2 = __esm({
       duration_seconds: external_exports.number().min(15).max(120).optional().describe("Target length, seconds (default 40)."),
       music_file_id: external_exports.string().min(1).optional().describe("Score in the bin. Default: the longest audio file; none when there is none."),
       braams: external_exports.boolean().optional().describe("Braams on act two, the climax and the title, a riser into the silence (default true)."),
-      look: external_exports.enum(["cinematic", "none"]).optional().describe("cinematic (default): lifted shadows, 35mm grain and slow push-ins on every shot; none: the footage as it is."),
+      look: external_exports.enum(["push", "cinematic", "none"]).optional().describe("push (default): a slow push-in on every shot, the footage's own colour (unify_grade_tool in the finish sets one look); cinematic: lifted shadows and 35mm grain as well; none: the footage as it is."),
       replace: replaceArg
     });
     trailerTools = [
@@ -185265,7 +185283,8 @@ var init_trailer2 = __esm({
           const fps3 = Number(project.fps?.num) / Number(project.fps?.den || 1) || 30;
           const seconds3 = args.duration_seconds ?? 40;
           const grid = await musicGrid(call, music, 100, seconds3);
-          const plan2 = planTrailer({ media: ids3.length, seconds: seconds3, fps: fps3, title: args.title, actCards: args.act_cards ?? [], ...args.end_card ? { endCard: args.end_card } : {}, beats: music && grid.source.startsWith("the music") ? grid.beats : [] });
+          const lengths2 = ids3.map((id) => visualKind(files.get(id)) === "video" ? Number(files.get(id).duration) || 0 : 0);
+          const plan2 = planTrailer({ media: ids3.length, seconds: seconds3, fps: fps3, title: args.title, actCards: args.act_cards ?? [], ...args.end_card ? { endCard: args.end_card } : {}, beats: music && grid.source.startsWith("the music") ? grid.beats : [], lengths: lengths2 });
           const notes = [];
           if (music && Number(music.duration) < plan2.duration) notes.push(`The score (${round35(Number(music.duration))} s) is shorter than the trailer (${round35(plan2.duration)} s): the end plays without it.`);
           if (ids3.length < plan2.shots.length / 2) notes.push(`${plan2.shots.length} shots from ${ids3.length} file(s): files come back with later footage each time; import more for a richer climax.`);
@@ -185284,10 +185303,8 @@ var init_trailer2 = __esm({
               const span5 = Math.max(0, hi - lo - length);
               const from2 = span5 > 0 ? lo + (n * 1.7 + s.act * 0.9) % span5 : lo;
               const id = placeShot(tx, file4, { position: s.start, length: visualKind(file4) === "video" ? Math.min(length, Math.max(1 / fps3, hi - from2)) : length, sourceStart: from2, layer: pictureTrack });
-              if (args.look !== "none") {
-                applyClipPreset(tx, id, visualKind(file4) === "image" ? style.motion.image : style.motion.video);
-                for (const preset of style.looks) applyLookPreset(tx, id, preset);
-              }
+              if (args.look !== "none") applyClipPreset(tx, id, visualKind(file4) === "image" ? style.motion.image : style.motion.video);
+              if (args.look === "cinematic") for (const preset of style.looks) applyLookPreset(tx, id, preset);
               if (s.act === 1) {
                 const dip = Math.min(ACT1_DIP, length / 4);
                 setClipKeyframes(
