@@ -43,7 +43,9 @@ master_audio_tool {"preset": "social", "iterate": true}
   continues, `duck_under_speech_tool`.
 
 ## Timing & taste rules
-- Withhold 10-30 s in a 60 s piece; 5-7 s in a 15-25 s reel.
+- Withhold 10-30 s in a 60 s piece; 5-7 s in a 15-25 s 16:9 piece; only
+  2-4 s on a vertical short, opened on motion (a 6.8 s silent open read as a
+  dead hook in the sports example).
 - The drop cut lands on the hero action at its peak frame (a jump take-off,
   the first push), never on an empty plate (pass 1 cut to an empty slope).
 - After the drop, the next 3-4 cuts are on beats, then let the music phrase
