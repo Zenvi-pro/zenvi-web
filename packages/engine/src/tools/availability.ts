@@ -249,6 +249,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   // Zenvi FX renders with ffmpeg next to the media (the CLI and local MCP server offer fx).
   apply_fx_tool: { methods: ["media.importPath"] },
   update_fx_tool: { methods: ["media.importPath"] },
+  datamosh_cut_tool: { methods: ["media.importPath"] },
   remove_fx_tool: {
     optional: ["fx", "media.importPath"],
     partialNote: "removing every effect (back to the original clip) works anywhere; removing one of several re-renders the rest, which needs Zenvi FX",

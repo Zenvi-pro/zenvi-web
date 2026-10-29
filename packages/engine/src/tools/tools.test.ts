@@ -1328,7 +1328,7 @@ const SPECS: Record<string, Spec> = {
   },
 
   // --- Zenvi FX (catalog/fx.test.ts covers stacks, windows, slow motion, restoring) ------
-  list_fx_tool: { happy: { summary: /^13 FX\.$/ }, failure: null },
+  list_fx_tool: { happy: { summary: /^16 FX\.$/ }, failure: null },
   apply_fx_tool: {
     happy: {
       args: { clip_id: IDS.clipB, effects: JSON.stringify([{ effect: "bloom", amount: 0.6 }]) },
@@ -1357,6 +1357,15 @@ const SPECS: Record<string, Spec> = {
       check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipB)?.file_id).toBe(IDS.broll),
     },
     failure: { args: { clip_id: "NOPE000000" }, status: "refused", summary: /^Error: unknown timeline clip NOPE000000\.$/ },
+  },
+
+  datamosh_cut_tool: {
+    happy: {
+      args: { clip_id: IDS.clipB, length: "0.4" },
+      summary: /^Clip CLIPBROL01 now plays datamosh_carry \(rendered in 1\.5s\)\.$/,
+      check: ({ host }) => expect(host.calls).toContain("fx /media/broll.mp4 0-5 datamosh_carry carry /media/interview.mp4@10"),
+    },
+    failure: { args: { clip_id: IDS.clipA }, status: "refused", summary: /^Error: no clip ends at the start of CLIPINTV01 on its track; give previous_clip_id\.$/ },
   },
 
   search_sfx_tool: {

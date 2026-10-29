@@ -54,6 +54,7 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   rerender_3d_scene_tool: { file_id: IDS.broll },
   apply_fx_tool: { clip_id: IDS.clipB, effects: [{ effect: "bloom" }] },
   update_fx_tool: { clip_id: IDS.clipB, amount: 0.8 },
+  datamosh_cut_tool: { clip_id: IDS.clipB },
   review_render_tool: { path: "/out/reel.mp4" },
 };
 

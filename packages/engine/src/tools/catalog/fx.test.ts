@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectDocument } from "../../history/document.js";
+import { FX_IDS } from "../../fx/catalog.js";
 import type { Clip } from "../../model/types.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
@@ -199,6 +200,74 @@ describe("list_fx_tool", () => {
     const r = await call(fixtureDoc(), fakeHost(), "list_fx_tool", { effect: "glitch" });
     expect(r.data).toMatchObject({ available: true, effects: [{ id: "glitch", params: { type: "object", properties: { rate: { type: "number", default: 2.5 } } } }] });
     const web = await call(fixtureDoc(), fakeHost({ without: ["fx"] }), "list_fx_tool", {});
-    expect(web.summary).toMatch(/^13 FX; this surface cannot render them/);
+    expect(web.summary).toMatch(new RegExp(`^${FX_IDS.length} FX; this surface cannot render them`));
+  });
+});
+
+const lastRender = (host: FakeHost) => host.calls.filter((c) => c.startsWith("fx ")).at(-1);
+
+describe("datamosh_cut_tool", () => {
+  it("carries the previous clip's motion into the clip after the cut, in one undo step", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    const r = await call(doc, host, "datamosh_cut_tool", { clip_id: IDS.clipB, length: 0.5 });
+    expect(r.status).toBe("applied");
+    // The interview clip before it plays source seconds 0-10, so its motion is read where it ends: 10 s.
+    expect(host.calls).toContain("fx /media/broll.mp4 0-5 datamosh_carry carry /media/interview.mp4@10");
+    const file = fileOf(doc, String(clipOf(doc, IDS.clipB).file_id))!;
+    expect(file.zenvi_link).toMatchObject({ kind: "zenvi-fx", props: { effects: [{ effect: "datamosh_carry", params: { length: 0.5, carry: { file_id: IDS.interview, at: 10 } } }] } });
+    expect(r.data).toMatchObject({ previous_clip_id: IDS.clipA, carry: { file_id: IDS.interview, at: 10 }, original_file_id: IDS.broll });
+    expect(doc.undoLabels).toEqual(["Datamosh cut"]);
+  });
+
+  it("takes the clip that ends at the cut, or the one you name", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    await call(doc, host, "datamosh_cut_tool", { clip_id: IDS.clipTail });
+    expect(lastRender(host)).toBe("fx /media/interview.mp4 10-14 datamosh_carry carry /media/broll.mp4@5");
+    // The tail now plays its FX render, so that is the footage (and the second of it) the next clip carries.
+    const named = await call(doc, host, "datamosh_cut_tool", { clip_id: IDS.clipB, previous_clip_id: IDS.clipTail });
+    expect(named.status).toBe("applied");
+    expect(lastRender(host)).toMatch(/^fx \/media\/broll.mp4 0-5 datamosh_carry carry \/cache\/fx\/\w+\.mov@4$/);
+  });
+
+  it("refuses without a clip before the cut, and changes nothing", async () => {
+    const doc = fixtureDoc();
+    const before = snapshotOf(doc.project);
+    const r = await call(doc, fakeHost(), "datamosh_cut_tool", { clip_id: IDS.clipA });
+    expect(r.status).toBe("refused");
+    expect(r.summary).toMatch(/no clip ends at the start of CLIPINTV01 on its track; give previous_clip_id/);
+    expect((await call(doc, fakeHost(), "datamosh_cut_tool", { clip_id: IDS.clipB, previous_clip_id: "NOPE" })).summary).toMatch(/unknown timeline clip NOPE/);
+    expect(snapshotOf(doc.project)).toEqual(before);
+    expect(doc.undoLabels).toEqual([]);
+  });
+
+  it("goes last in the stack and a second run replaces the first instead of stacking", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    await call(doc, host, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "datamosh_carry", params: { carry: { file_id: IDS.interview, at: 9 } } }, { effect: "bloom" }] });
+    const r = await call(doc, host, "datamosh_cut_tool", { clip_id: IDS.clipB, ghost: 0 });
+    expect((r.data as { effects: { effect: string }[] }).effects.map((e) => e.effect)).toEqual(["bloom", "datamosh_carry"]);
+    expect(lastRender(host)).toBe("fx /media/broll.mp4 0-5 bloom+datamosh_carry carry /media/interview.mp4@10");
+  });
+
+  it("is refused by apply_fx_tool without the footage before the cut, and takes no window", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    const bare = await call(doc, host, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "datamosh_carry" }] });
+    expect(bare.status).toBe("refused");
+    expect(bare.summary).toMatch(/needs the footage before the cut; use datamosh_cut_tool/);
+    const windowed = await call(doc, host, "apply_fx_tool", { clip_id: IDS.clipB, effects: [{ effect: "datamosh_carry", start: 1, end: 2, params: { carry: { file_id: IDS.interview, at: 9 } } }] });
+    expect(windowed.summary).toMatch(/set params.length, not start\/end/);
+    expect(host.calls.filter((c) => c.startsWith("fx "))).toEqual([]);
+  });
+
+  it("keeps the carry when update_fx_tool changes the amount", async () => {
+    const doc = fixtureDoc();
+    const host = fakeHost();
+    await call(doc, host, "datamosh_cut_tool", { clip_id: IDS.clipB });
+    const r = await call(doc, host, "update_fx_tool", { clip_id: IDS.clipB, amount: 0.9 });
+    expect(r.status).toBe("applied");
+    expect(lastRender(host)).toBe("fx /media/broll.mp4 0-5 datamosh_carry carry /media/interview.mp4@10");
   });
 });
