@@ -642,11 +642,13 @@ function drawLayer(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number
       const bw = (span / n) * 0.62;
       const baseY = box.ry + box.rr * 0.9;
       const hi = 2 + Math.floor(r() * (n - 4));
+      // On the accent ground the accent is the ink: the tall bar takes the other ink, or it swallows the type crossing it.
+      const pop = ground === "accent" ? (ink === sc.colors.dark ? sc.colors.light : sc.colors.dark) : accent;
       for (let i = 0; i < n; i += 1) {
         const target = (0.25 + 0.75 * r()) * box.rr * 1.6 * (i === hi ? 1.25 : 1);
         const grow = springIn(prog(u - i * 0.05, 0, 0.6), 5, 7);
         const h = Math.max(0, target * grow * (1 + 0.05 * Math.sin(u * 4 + i)));
-        g.fillStyle = i === hi ? accent : ink;
+        g.fillStyle = i === hi ? pop : ink;
         g.globalAlpha = i === hi ? 1 : 0.35;
         g.fillRect(box.rx - span / 2 + (i * span) / n, baseY - h, bw, h);
       }
