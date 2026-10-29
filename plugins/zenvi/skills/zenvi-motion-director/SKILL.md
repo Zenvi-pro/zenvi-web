@@ -92,7 +92,10 @@ unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
    (word by word, emphasis words big; a TTS voice-over keeps its script's word
    timings, so pass its clip in `timeline_clip_ids`; `cues` when there is no
    voice to time to, or the TTS receipt says it has no word timings (then say
-   the captions are hand-timed), `text_size`, `animation`); it places each caption in the shot's
+   the captions are hand-timed), `text_size`, `animation`); song lyrics on
+   screen: `align_lyrics_tool` (`text`: the lyrics, one line per sung line;
+   `timeline_clip_id`: the song) first, then the captions and
+   `place_on_word_tool` use the lyrics at their sung times; it places each caption in the shot's
    negative space and, after `generate_subject_matte_tool` on the footage,
    puts emphasis words behind the head. Title cards and word cards:
    `add_kinetic_title_tool` (`animation`: pop, slam, tilt, scramble,
