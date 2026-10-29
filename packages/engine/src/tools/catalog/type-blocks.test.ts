@@ -154,6 +154,12 @@ describe("add_type_block_tool", () => {
     expect(values(blur?.vertical_radius as Keyframe).at(-1)).toBe(0);
     // Turns on 15 and 15 + 15 + a turn; a hit as each one lands.
     expect((dataOf(r).hits as number[]).length).toBe(2);
+    // Lines half a turn apart are never in sight together: twelve words take six tracks.
+    const long = doc();
+    const twelve = await runTool({ doc: long, host: fakeHost() }, "add_type_block_tool", { block: "wheel", words: "A B C D E F G H I J K L".split(" "), hold_frames: 1 });
+    expect(twelve.ok, twelve.text).toBe(true);
+    expect(tagged(long)).toHaveLength(12);
+    expect(new Set(tagged(long).map((c) => c.layer)).size).toBe(6);
     const few = await runTool({ doc: doc(), host: fakeHost() }, "add_type_block_tool", { block: "wheel", words: ["ONLY"] });
     expect(few.text).toContain("Error: wheel takes 2-12 words");
   });

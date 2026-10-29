@@ -3,7 +3,8 @@
  * flipper). The drum steps from one word to the next with a snap that
  * overshoots and settles; each line sits where the drum's angle puts it,
  * squashed by the angle's cosine, dimmer and blurred (a keyframed Blur)
- * as it turns away. Every line is its own clip moved by keyframes.
+ * as it turns away. Every line is its own clip moved by keyframes; lines
+ * half a turn apart share a track.
  */
 
 import { defaultEffectJson } from "../../effects/registry.js";
@@ -30,6 +31,8 @@ export interface WheelOptions extends TypeBlockBase {
 const PITCH = 30;
 /** Past this angle a line has turned out of sight. */
 const VISIBLE = 80;
+/** Lines this many apart (180°) are never in sight together (the snap overshoots ~0.1 of a step), so they share a track. */
+const TRACKS = Math.ceil((2 * VISIBLE) / PITCH);
 
 /** The out-back ease (keyframes.ts handles) as a function of 0-1, for sampling the snap. */
 function outBack(u: number): number {
@@ -109,7 +112,7 @@ export function buildWheel(o: WheelOptions): TypeBlockOutput {
     }
     elements.push({
       name: `line-${i}`,
-      track: i,
+      track: i % TRACKS,
       from,
       to,
       source: { kind: "svg", name: `line-${i}`, width, height, cx: width / 2, cy: height / 2, draw: (k) => new Drawing(width, height, k).path(shapes, { fill: o.ink }) },
