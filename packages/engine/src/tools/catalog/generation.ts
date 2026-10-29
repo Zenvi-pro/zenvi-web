@@ -96,7 +96,7 @@ function base64ToBytes(b64: string): Uint8Array {
 }
 
 /** Bytes of strict base64 (Python `b64decode(validate=True)`), empty when it is not. */
-function strictBase64(b64: string): Uint8Array {
+export function strictBase64(b64: string): Uint8Array {
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64) || b64.length % 4 !== 0) return new Uint8Array();
   try {
     return base64ToBytes(b64);
