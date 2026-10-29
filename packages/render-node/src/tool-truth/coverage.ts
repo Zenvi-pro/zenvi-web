@@ -257,6 +257,10 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   place_on_word_tool: { reason: "needs word timings (speech recognition)", params: "*" },
   insert_broll_on_words_tool: { reason: "needs word timings (speech recognition)", params: "*" },
   generate_broll_set_tool: { reason: "generates footage through the Zenvi backend (account, credits)", params: "*" },
+  build_trailer_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  build_explainer_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  build_talking_head_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  build_product_launch_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {
