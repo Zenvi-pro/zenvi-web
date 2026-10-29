@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { ProjectDocument } from "../../history/document.js";
 import type { Project } from "../../model/types.js";
+import { clipsAt } from "../../timeline/queries.js";
 import { getCloseMatches } from "../difflib.js";
 import { directTool, type CatalogTool } from "../define.js";
 import { projectFps, toFrame, toSeconds } from "../frame-time.js";
@@ -69,6 +70,13 @@ function landedAt(before: Project, after: Project): number | null {
   return added.length > 0 ? Math.min(...added) : null;
 }
 
+/** The part of clip `clipId` playing at `seconds`: an earlier cut on the word moved its later words to a new clip. */
+function clipUnder(project: Project, clipId: string, seconds: number): string {
+  const clip = project.clips.find((c) => c.id === clipId);
+  if (!clip) return clipId;
+  return clipsAt(project, seconds, { layer: clip.layer }).find((c) => c.file_id === clip.file_id)?.id ?? clipId;
+}
+
 export const placeOnWordTools: CatalogTool[] = [
   directTool({
     name: TOOL,
@@ -110,7 +118,8 @@ export const placeOnWordTools: CatalogTool[] = [
       }
 
       const fps = projectFps(project);
-      const scratch = new ProjectDocument(structuredClone(project));
+      // From the project as it is now: transcribing kept the words heard on their files (outside the history).
+      const scratch = new ProjectDocument(structuredClone(call.doc.project));
       const placements: Placement[] = [];
       const warnings = [...new Set(heard.warnings)];
       for (const [n, hit] of wanted.entries()) {
@@ -118,7 +127,7 @@ export const placeOnWordTools: CatalogTool[] = [
         const target = Math.max(0, toSeconds(toFrame(anchorSec, fps) + (args.offset_frames ?? 0), fps));
         const step: Record<string, unknown> = { ...extra, [placer.time]: target };
         if (args.what === "title" && step.text === undefined) step.text = hit.text.replace(/[^\p{L}\p{N}'’ -]/gu, "");
-        if (args.what === "cut" && step.clip_id === undefined) step.clip_id = hit.clipId;
+        if (args.what === "cut" && step.clip_id === undefined) step.clip_id = clipUnder(scratch.project, hit.clipId, target);
         const before = structuredClone(scratch.project);
         const result = await runTool({ doc: scratch, host: call.host, signal: call.signal }, placer.tool, step);
         const receipt = result.data;

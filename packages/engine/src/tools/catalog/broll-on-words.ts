@@ -143,7 +143,8 @@ export const brollOnWordsTools: CatalogTool[] = [
       }
       if (words.length === 0) return refused(TOOL, "Error: no word to cut away on; pass keywords.");
 
-      const scratch = new ProjectDocument(structuredClone(project));
+      // From the project as it is now: transcribing kept the words heard on their files (outside the history).
+      const scratch = new ProjectDocument(structuredClone(call.doc.project));
       // Stock: one search per word, each word gets its own clip.
       const byWord = new Map<TimelineWord, ProjectFile>();
       if (args.stock) {

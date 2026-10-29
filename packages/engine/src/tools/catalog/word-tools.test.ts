@@ -90,6 +90,24 @@ describe("place_on_word_tool", () => {
     expect(placement).toMatchObject({ target: 3, missFrames: 0 });
   });
 
+  it("keeps the transcript it heard the word in after placing, and undo leaves it", async () => {
+    const { ed, file } = harness(spoken("and then boom it happened", 2, 0.5));
+    const receipt = await ed.call("place_on_word_tool", { word: "boom", what: "title" });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    const asr = () => (ed.doc.project.files.find((f) => f.id === file)!.ai_metadata as { asr?: { words: unknown[] } } | undefined)?.asr;
+    expect(asr()?.words).toHaveLength(5);
+    ed.doc.undo();
+    expect(asr()?.words).toHaveLength(5);
+  });
+
+  it("cuts on every time a word is said, each split in the clip playing there", async () => {
+    const { ed } = harness([...spoken("one cut here", 1), ...spoken("another cut there", 8), ...spoken("last cut now", 15)]);
+    const receipt = await ed.call("place_on_word_tool", { word: "cut", every: true, what: "cut" });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    expect((receipt.data as { placements: { status: string }[] }).placements.map((p) => p.status)).toEqual(["applied", "applied", "applied"]);
+    expect(ed.doc.project.clips).toHaveLength(4);
+  });
+
   it("refuses a missing occurrence and says which words are close", async () => {
     const { ed } = harness(spoken("cameras and lenses", 1));
     const steps = ed.doc.undoLabels.length;
@@ -156,6 +174,14 @@ describe("insert_broll_on_words_tool", () => {
     // The imports and the inserts are one undo step.
     ed.doc.undo();
     expect(ed.doc.project.files).toHaveLength(1);
+  });
+
+  it("keeps the transcript it heard the words in", async () => {
+    const { ed, clip, file } = harness(spoken(talk, 0.5, 0.45));
+    for (const name of ["glacier.mp4", "beach.mp4", "puffin.mp4"]) ed.addFile("video", { name, duration: 8 });
+    const receipt = await ed.call("insert_broll_on_words_tool", { timeline_clip_ids: [clip] });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    expect((ed.doc.project.files.find((f) => f.id === file)!.ai_metadata as { asr?: unknown } | undefined)?.asr).toBeDefined();
   });
 
   it("refuses when there is no B-roll to cut to", async () => {
