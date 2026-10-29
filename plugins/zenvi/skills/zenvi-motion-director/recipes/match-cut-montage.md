@@ -56,7 +56,7 @@ other (dark round → dark round, warm → warm); end on the most iconic one
    Silhouettes, windows, screens: `kind: "blob"`. Poses and heads: read the
    person's box off `inspect_media_tool` (`fileId`, `start`, `end`,
    `maxFrames: 3`) frames. A file without a box gets circle detection, the
-   candidate closest in size to the other files'; one that would need more
+   strongest candidate weighed by size; one that would need more
    than 4x to match is centred instead (the warning names it).
    `align_match_cut_tool` refuses a box that needs more than `max_zoom`
    (default 4) and says which: re-measure that one, do not raise the limit.

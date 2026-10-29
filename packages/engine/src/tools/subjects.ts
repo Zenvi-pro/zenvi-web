@@ -104,6 +104,22 @@ export function rankByHint(subjects: readonly DetectedSubject[], hint: SubjectHi
   return hint.near || hint.radius !== undefined ? ranked.sort((a, b) => b.confidence - a.confidence) : ranked;
 }
 
+/** Radius (of the frame height) from which a candidate counts fully big in `pickSubject`. */
+const FULL_SUBJECT = 0.15;
+
+/**
+ * The candidate an automatic match cut aligns on: with boxes the caller
+ * measured, the one closest in size to them; otherwise the strongest weighed
+ * by size, since a chain's subject fills the shot and a highlight does not.
+ * (Chaining to the first file's pick instead carried a wrong first pick into
+ * every shot: round 7 matchcut fixture, 2026-10-29.)
+ */
+export function pickSubject(subjects: readonly DetectedSubject[], referenceRadius?: number): DetectedSubject | undefined {
+  if (referenceRadius !== undefined) return rankByHint(subjects, { radius: referenceRadius })[0];
+  const weight = (s: DetectedSubject) => s.score * Math.min(1, s.radius / FULL_SUBJECT);
+  return [...subjects].sort((a, b) => weight(b) - weight(a))[0];
+}
+
 /** Subjects of `kind` in `file` at `seconds` (source time), best first, or an "Error: …" string. */
 export async function detectSubjects(call: ToolCall, file: ProjectFile, seconds: number, kind: SubjectKind, options: DetectOptions = {}): Promise<FrameSubjects | string> {
   const frames = call.host.frames;

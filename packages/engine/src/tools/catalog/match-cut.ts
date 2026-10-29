@@ -39,7 +39,7 @@ import { beatsOfFile, canTrackBeats } from "../beats.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
 import { varietyProblem } from "../variety.js";
-import { detectSubjects, SUBJECT_KINDS, type DetectedSubject, type FrameSubjects } from "../subjects.js";
+import { detectSubjects, pickSubject, SUBJECT_KINDS, type DetectedSubject, type FrameSubjects } from "../subjects.js";
 import type { ImportedMedia } from "../types.js";
 import { placeMusicBed } from "./music-bed.js";
 import { aspectOf, displayName, musicFromBeats, usableRange, visualKind, writeCard } from "./reels.js";
@@ -254,8 +254,7 @@ const alignTool = directTool({
 /**
  * Boxes for the clips given without one: each clip's frame at its box time is
  * measured and the candidate kept is the one closest in size to the given
- * boxes (or, with none given, to the first measured clip's best), since the
- * chain's subjects are meant to match.
+ * boxes, or with none given the strongest weighed by size (`pickSubject`).
  */
 async function measureMissingBoxes(call: ToolCall, args: AlignArgs): Promise<Map<string, DetectedSubject> | string> {
   const out = new Map<string, DetectedSubject>();
@@ -264,7 +263,7 @@ async function measureMissingBoxes(call: ToolCall, args: AlignArgs): Promise<Map
   if (!call.host.frames) return `Error: ${missing.map((c) => c.clip_id).join(", ")} ha${missing.length === 1 ? "s" : "ve"} no box and this surface cannot read frames to measure one: give each clip its box.`;
   const project = call.doc.project;
   const given = args.clips.flatMap((c) => (c.box ? [c.box.h / 2] : [])).sort((a, b) => a - b);
-  let reference: number | undefined = given.length > 0 ? given[Math.floor(given.length / 2)] : undefined;
+  const reference: number | undefined = given.length > 0 ? given[Math.floor(given.length / 2)] : undefined;
   const kind = args.kind ?? "circle";
   for (const c of missing) {
     const clip = project.clips.find((k) => String(k.id) === c.clip_id);
@@ -272,13 +271,11 @@ async function measureMissingBoxes(call: ToolCall, args: AlignArgs): Promise<Map
     const file = project.files.find((f) => String(f.id) === String(clip.file_id));
     if (!file || visualKind(file) === null) return `Error: ${c.clip_id} has no picture to measure: give its box.`;
     const time = c.time ?? (visualKind(file) === "image" ? 0 : Number(clip.start) || 0);
-    const found = await detectSubjects(call, file, time, kind, { limit: 5, ...(reference !== undefined ? { radius: reference } : {}) });
+    const found = await detectSubjects(call, file, time, kind, { limit: 10 });
     if (typeof found === "string") return found;
-    // Without a reference yet, the larger of the strong candidates: a chain's subject fills the shot, a highlight does not.
-    const best = reference !== undefined ? found.subjects[0] : [...found.subjects].sort((a, b) => b.score * Math.min(1, b.radius / 0.12) - a.score * Math.min(1, a.radius / 0.12))[0];
+    const best = pickSubject(found.subjects, reference);
     if (!best) return `Error: no ${kind} found in ${c.clip_id} at ${round(time, 3)} s: give its box (read it off a frame's grid, inspect_media_tool) or try kind=${kind === "circle" ? "blob" : "circle"}.`;
     out.set(c.clip_id, best);
-    reference ??= best.radius;
   }
   return out;
 }
@@ -550,8 +547,8 @@ const montageTool = directTool({
     // Each file is looked at once, at its first shot: its circle (unless given) and whether its edges are black.
     const looked = new Map<string, FrameSubjects | null>();
     let cannotLook = false;
-    // The chain's subjects are meant to match: after the first, each file's candidate closest in size wins (a highlight does not).
-    let reference = [...given.values()].map((g) => g.box.h / 2).sort((a, b) => a - b)[Math.floor(given.size / 2)];
+    // With boxes given, each file's candidate closest in size to them; else the strongest weighed by size (pickSubject).
+    const reference = [...given.values()].map((g) => g.box.h / 2).sort((a, b) => a - b)[Math.floor(given.size / 2)];
     const sources: ShotSource[] = [];
     for (const [i, shot] of plan.shots.entries()) {
       const id = ids[shot.clip]!;
@@ -559,7 +556,7 @@ const montageTool = directTool({
       const w = windows[i]!;
       const kind = visualKind(file)!;
       if (!looked.has(id) && call.host.frames && !cannotLook) {
-        const found = await detectSubjects(call, file, kind === "image" ? 0 : w.start, "circle", { limit: 5, ...(reference !== undefined ? { radius: reference } : {}) });
+        const found = await detectSubjects(call, file, kind === "image" ? 0 : w.start, "circle", { limit: 10 });
         if (typeof found === "string") {
           cannotLook = true;
           warnings.push(`${found} Shots without a subject box are kept centred.`);
@@ -576,9 +573,7 @@ const montageTool = directTool({
         continue;
       }
       const subjects = looked.get(id)?.subjects ?? [];
-      const best = reference !== undefined ? subjects[0] : [...subjects].sort((a, b) => b.score * Math.min(1, b.radius / 0.12) - a.score * Math.min(1, a.radius / 0.12))[0];
-      reference ??= best?.radius;
-      const box = best?.box;
+      const box = pickSubject(subjects, reference)?.box;
       if (box) sources.push({ fileId: id, kind, ...w, box, from: "detected", darkEdges });
       else {
         if (looked.has(id) && shot.use === 0) warnings.push(`No circle found in ${displayName(file)}: its shots are centred, not aligned.`);

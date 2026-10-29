@@ -10,7 +10,7 @@ import { clipKeyframe } from "../render/plan/transform.js";
 import type { RgbaImage } from "../render/types.js";
 import { frameWindow } from "../timeline/windows.js";
 import { runTool } from "./registry.js";
-import { hasDarkEdges } from "./subjects.js";
+import { hasDarkEdges, pickSubject } from "./subjects.js";
 import { fakeShotHost } from "./test-support/fake-shots.js";
 import { fakeHost } from "./test-support/fake-host.js";
 import { audioInfo, media, videoInfo } from "./test-support/fixture.js";
@@ -490,6 +490,14 @@ describe("measuring subjects for match cuts", () => {
     expect(eyeRows[0]!.confidence).toBeGreaterThan(0.5);
     const unhinted = await runTool({ doc, host }, "detect_subject_tool", { file_id: "F0", min_radius: 0.02, max_radius: 0.05 });
     expect(unhinted.data?.warnings?.join(" ")).toMatch(/small \(radius 0\.03/);
+  });
+
+  it("pickSubject weighs size: a large circle beats a slightly crisper highlight, and given boxes set the size", () => {
+    const at = (radius: number, score: number) => ({ kind: "circle" as const, box: { x: 0.5 - radius, y: 0.5 - radius, w: 2 * radius, h: 2 * radius }, score, radius, confidence: score });
+    const highlight = at(0.04, 0.9);
+    const moon = at(0.2, 0.7);
+    expect(pickSubject([highlight, moon])).toBe(moon);
+    expect(pickSubject([highlight, moon], 0.05)!.radius).toBe(0.04);
   });
 
   it("detect_subject_tool kind=blob measures a non-round region: centroid, box and tone", async () => {
