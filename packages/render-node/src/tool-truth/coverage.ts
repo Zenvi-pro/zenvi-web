@@ -242,6 +242,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   pop_out_tool: { reason: "needs a subject matte (RVM model)", params: ["band_aspect", "bar_color", "subject"] },
   sequence_shots_tool: { reason: "not proven yet: reorders shots (sequence tests cover the order)", params: "*" },
   snap_cuts_to_onsets_tool: { reason: "not proven yet: needs a fixture with audible onsets off the cuts", params: "*" },
+  fill_to_length_tool: { reason: "not proven yet: appends shots and music to an edit that runs short (fill-length tests cover the plan)", params: "*" },
   snap_cuts_to_beats_tool: { reason: "not proven yet: needs a fixture with music whose beat falls off the cuts", params: "*" },
   shot_length_ramp_tool: { reason: "not proven yet: builds a montage of ramping shot lengths", params: "*" },
   spot_action_foley_tool: { reason: "not proven yet: needs footage with visible impacts and taps", params: "*" },

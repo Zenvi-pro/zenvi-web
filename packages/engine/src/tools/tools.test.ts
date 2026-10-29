@@ -590,6 +590,10 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { track: "1" }, status: "refused", summary: /not available in this Zenvi surface/ },
     failure: { args: { onsets_from: "clip" }, status: "refused", summary: /^Error: onsets_from=clip needs onset_clip_id\.$/ },
   },
+  fill_to_length_tool: {
+    happy: { args: { seconds: 25 }, summary: /^Filled 19 s to 25 s: held the last shot 3 s longer; added/ },
+    failure: { args: { seconds: 25, file_ids: ["NOPE"] }, status: "refused", summary: /^Error: Unknown file_id 'NOPE'\.$/ },
+  },
   snap_cuts_to_beats_tool: {
     happy: { args: { track: "1", bpm: 120, offset_seconds: 0.1 }, summary: /^Snapped 2 of 2 cut\(s\) onto the beats of 120 BPM from 0\.1 s/ },
     failure: { args: { track: "1" }, status: "refused", summary: /^Error: this surface cannot decode audio/ },
