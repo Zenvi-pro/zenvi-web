@@ -72,4 +72,12 @@ describe("onsetRatios", () => {
     expect(between).toBeLessThan(4);
     expect(onsetRatios(new Float32Array(sr), sr, [0.5])).toEqual([0]);
   });
+
+  it("finds a late click at a rate whose 10 ms hop is not whole", () => {
+    // 22050 Hz: a 221-sample hop is 10.02 ms, 0.11 s adrift by 50 s if frames were read as hundredths.
+    const sr = 22050;
+    const x = new Float32Array(sr * 51);
+    for (let i = 0; i < x.length; i += 1) x[i] = 0.01 * Math.sin(i * 0.3) + (i >= sr * 50 && i < sr * 50 + 1000 ? 0.8 : 0);
+    expect(onsetRatios(x, sr, [50])[0]).toBeGreaterThan(4);
+  });
 });

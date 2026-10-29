@@ -93,7 +93,7 @@ export function onsetRatios(samples: Float32Array, sampleRate: number, times: re
   const positive = Array.from(rise).filter((x) => x > 0).sort((a, b) => a - b);
   const median = (positive[Math.floor(positive.length / 2)] ?? 0) + 1e-9;
   return times.map((t) => {
-    const at = Math.round(t * 100);
+    const at = Math.round((t * sampleRate) / hop);
     let peak = 0;
     for (let f = Math.max(0, at - 4); f < Math.min(n, at + 5); f += 1) peak = Math.max(peak, rise[f]!);
     return positive.length === 0 ? 0 : r2(peak / median);
