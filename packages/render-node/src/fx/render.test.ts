@@ -163,6 +163,18 @@ describe("Zenvi FX renderer", () => {
       expect(await frameDiff(ghost.path, clip, 0.7)).toBeLessThan(2.5);
     }, 60_000);
 
+    it("moves alpha with the picture, and the ghost does not fill in transparent pixels", async () => {
+      const fx = renderer("mosh-alpha");
+      const alphaAt = async (file: string) => (await decodeRgba(file, { seconds: 0.1, width: 160, height: 90 })).filter((_, i) => i % 4 === 3);
+      const meanDiff = (a: Uint8Array, b: Uint8Array) => a.reduce((s, v, i) => s + Math.abs(v - b[i]!), 0) / a.length;
+      const source = await alphaAt(alphaClip);
+      for (const ghost of [0, 1]) {
+        const r = await fx.render({ path: alphaClip, start: 0, end: 1, effects: stack([{ effect: "datamosh_carry", params: { length: 0.5, ghost, carry: { file_id: "A", at: 1.5 } } }], 1), carry: { path: still, at: 1.5 } });
+        expect(r.codec).toBe("prores4444");
+        expect(meanDiff(await alphaAt(r.path), source), `ghost ${ghost}`).toBeLessThan(3);
+      }
+    }, 60_000);
+
     it("caches by the footage before the cut and where it ends", async () => {
       const fx = renderer("mosh-cache");
       const first = await fx.render({ path: clip, start: 0, end: 1, effects: mosh({}), carry: { path: moving, at: 1.5 } });

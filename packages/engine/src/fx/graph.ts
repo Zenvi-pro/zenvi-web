@@ -752,7 +752,9 @@ function datamosh(g: Graph, input: string, e: FxEffect<"datamosh_carry">): strin
     head2 = g.label();
     // The last frame's share starts at `ghost` and falls away squared.
     const share = `(${num(ghost)}*pow(1-N/${n},2))`;
-    g.add(`[${pushed}][${lastPushed}]blend=all_expr='A*(1-${share})+B*${share}':shortest=1[${head2}]`);
+    // With alpha, the clip's own (pushed) alpha stays: the ghost shows only where the clip does.
+    const keepAlpha = g.ctx.alpha ? ":c3_expr=A" : "";
+    g.add(`[${pushed}][${lastPushed}]blend=all_expr='A*(1-${share})+B*${share}'${keepAlpha}:shortest=1[${head2}]`);
   } else {
     // Unused maps still need a consumer.
     g.add(`[${xb}]nullsink`);
@@ -763,10 +765,25 @@ function datamosh(g: Graph, input: string, e: FxEffect<"datamosh_carry">): strin
   return out;
 }
 
-/** Extra input `index` (an image sequence of displace maps), blocky-scaled to the frame, `frames` long. */
+/**
+ * Extra input `index` (an image sequence of displace maps), blocky-scaled to
+ * the frame, `frames` long. displace moves every plane by the map's matching
+ * plane, so with alpha the map's alpha plane is the map too (gray to gbrap
+ * would make it 255, a 127 px shift that throws the clip's alpha away).
+ */
 function mapStream(g: Graph, index: number, frames: number): string {
   const out = g.label("m");
-  g.add(`[${index}:v]format=gray,scale=${g.ctx.width}:${g.ctx.height}:flags=neighbor,format=${g.work},setpts=PTS-STARTPTS,trim=end_frame=${frames}[${out}]`);
+  const scaled = `[${index}:v]format=gray,scale=${g.ctx.width}:${g.ctx.height}:flags=neighbor,setpts=PTS-STARTPTS,trim=end_frame=${frames}`;
+  if (!g.ctx.alpha) {
+    g.add(`${scaled},format=gbrp[${out}]`);
+    return out;
+  }
+  const map = g.label("m");
+  g.add(`${scaled}[${map}]`);
+  const [colour, alpha] = g.split(map, 2);
+  const rgb = g.label("m");
+  g.add(`[${colour}]format=gbrp[${rgb}]`);
+  g.add(`[${rgb}][${alpha}]alphamerge[${out}]`);
   return out;
 }
 
