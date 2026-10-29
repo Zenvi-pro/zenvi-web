@@ -62,15 +62,29 @@ describe("detectActions", () => {
   });
 
   it("turns steady stops low in the frame into steps", () => {
-    // A foot comes down every 15 frames (0.5 s) at the bottom of the frame.
+    // A foot comes down every 15 frames (0.5 s) at the bottom of the frame: down in 4 frames, a rest, then lifted over 6.
     const clip = film(80, (f, box) => {
       const phase = f % 15;
-      box(20 + f * 0.5, 34 + Math.min(phase, 4) * 3, 10, 6);
+      const drop = phase <= 4 ? phase * 3 : phase <= 8 ? 12 : 12 - (phase - 8) * 2;
+      box(20 + Math.floor(f / 15) * 12, 34 + drop, 10, 6);
     });
     const events = detectActions(clip, { sensitivity: "normal" });
     const steps = events.filter((e) => e.kind === "step");
     expect(steps.length).toBeGreaterThanOrEqual(3);
     for (let i = 1; i < steps.length; i += 1) expect(steps[i]!.frame - steps[i - 1]!.frame).toBe(15);
+  });
+
+  it("calls an object that slows into its resting place a contact, not an impact", () => {
+    // A cup set down: 6, 5, 4, 3, 2 px a frame, still from frame 6.
+    const ys = [10, 16, 21, 25, 28, 30, 30];
+    const clip = film(20, (f, box) => box(40, ys[Math.min(f, 6)]!, 16, 14));
+    expect(detectActions(clip).map((e) => [e.frame, e.kind])).toEqual([[5, "contact"]]);
+  });
+
+  it("does not take a lift pausing at its top for a contact", () => {
+    // The box rises 4 px a frame and stops at frame 10 at the top, then holds.
+    const clip = film(30, (f, box) => box(40, 40 - 3 * Math.min(f, 10), 14, 12));
+    expect(detectActions(clip)).toEqual([]);
   });
 
   it("finds nothing in a still picture", () => {

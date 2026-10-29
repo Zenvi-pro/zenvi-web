@@ -28,7 +28,7 @@ const TOOL = "spot_action_foley_tool";
 /** Longest stretch of a clip analysed in one call, seconds. */
 const MAX_SECONDS = 120;
 /** Width the frames are analysed at: enough for a fingertip, cheap for two minutes. */
-const ANALYSIS_WIDTH = 96;
+const ANALYSIS_WIDTH = 160;
 /** A hit already in the clip's sound this close (frames) is the same event. */
 const HEARD_FRAMES = 2;
 

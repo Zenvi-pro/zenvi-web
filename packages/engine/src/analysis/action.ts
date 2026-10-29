@@ -5,15 +5,19 @@
  * from small greyscale frames. Pure (no DOM, no Node).
  *
  *   motion     per frame, the mean change from the frame before in each tile of
- *              an 8 x 6 grid (a sensor-noise floor taken off); the action is the
- *              mean of the four busiest tiles, so a hand in one corner counts as
- *              much as a body filling the frame
+ *              an 8 x 6 grid (a sensor-noise floor taken off); a region is a tile
+ *              and its neighbours, and its motion the mean of its four busiest
+ *              tiles (or most of the busiest one), so a fingertip in one corner
+ *              counts while a hand moves in another
  *   cuts       a frame where most of the picture changes at once is a cut, not
  *              an action (spot_sound_tool sounds cuts)
- *   stops      motion that dies within two frames: the last moving frame is the
- *              contact (a knife on the board, a cup set down, a key pressed);
- *              a brief, small one is a tap, a large or hard one an impact,
- *              otherwise a contact; three or more stops low in the frame at a
+ *   stops      a region whose motion dies within two frames: the last moving frame is the
+ *              contact (a knife on the board, a cup set down, a key pressed),
+ *              unless the motion was heading up (a lift pausing at its top) or
+ *              goes on next door (a fast object leaving the region); a brief one
+ *              moving under 0.6 % of the frame is a tap, one still at full speed
+ *              when it stops (or moving 3 % of the frame or more) an impact,
+ *              one that slowed into it a contact; three or more stops low in the frame at a
  *              steady 0.3-0.9 s are steps
  *   swipes     a burst of fast motion over a quarter of the frame or more that
  *              does not stop dead: the whoosh peaks on its fastest frame
@@ -70,66 +74,91 @@ const TILE_ACTIVE = 4;
 const CUT_AREA = 0.75;
 const CUT_LEVEL = 40;
 /** Weakest action kept, as a share of the biggest motion in the frames. */
-const THRESHOLD: Record<ActionSensitivity, number> = { low: 0.4, normal: 0.25, high: 0.12 };
+const THRESHOLD: Record<ActionSensitivity, number> = { low: 0.3, normal: 0.15, high: 0.05 };
+/** A tap changes at most this share of the frame (a fingertip, a key); an impact at least the second. */
+const TAP_AREA = 0.006;
+const IMPACT_AREA = 0.03;
 /** Weakest action kept at all (mean tile change, 0-255): below it nothing really moved. */
 const FLOOR = 3;
+const TILES = GX * GY;
 
 interface Motion {
-  /** Mean of the four busiest tiles, per frame (frame 0: 0). */
+  /** Mean change per tile, per frame (frame 0: all 0). */
+  tiles: Float64Array[];
+  /** Per tile and frame: change-weighted sums of pixel column and row, and the weight. */
+  sx: Float64Array[];
+  sy: Float64Array[];
+  sw: Float64Array[];
+  /** Per tile and frame: pixels that changed. */
+  moved: Float64Array[];
+  /** Whole picture: the mean of the four busiest tiles, and the share of tiles that moved. */
   action: Float64Array;
-  /** Share of tiles that moved. */
   area: Float64Array;
-  /** Energy-weighted centre of the motion, -1..1. */
-  x: Float64Array;
-  y: Float64Array;
   cut: Uint8Array;
 }
 
 function motion(input: LumaFrames): Motion {
   const n = input.frames.length;
   const { width, height } = input;
-  const action = new Float64Array(n);
-  const area = new Float64Array(n);
-  const x = new Float64Array(n);
-  const y = new Float64Array(n);
-  const cut = new Uint8Array(n);
-  const tiles = new Float64Array(GX * GY);
   const tileOf = (col: number, row: number) => Math.min(GY - 1, Math.floor((row * GY) / height)) * GX + Math.min(GX - 1, Math.floor((col * GX) / width));
-  const counts = new Float64Array(GX * GY);
+  const counts = new Float64Array(TILES);
   for (let row = 0; row < height; row += 1) for (let col = 0; col < width; col += 1) counts[tileOf(col, row)]! += 1;
-  for (let f = 1; f < n; f += 1) {
-    tiles.fill(0);
+  const m: Motion = { tiles: [], sx: [], sy: [], sw: [], moved: [], action: new Float64Array(n), area: new Float64Array(n), cut: new Uint8Array(n) };
+  for (let f = 0; f < n; f += 1) {
+    const tiles = new Float64Array(TILES);
+    const sx = new Float64Array(TILES);
+    const sy = new Float64Array(TILES);
+    const sw = new Float64Array(TILES);
+    const moved = new Float64Array(TILES);
+    m.moved.push(moved);
+    m.tiles.push(tiles);
+    m.sx.push(sx);
+    m.sy.push(sy);
+    m.sw.push(sw);
+    if (f === 0) continue;
     const a = input.frames[f - 1]!;
     const b = input.frames[f]!;
     for (let row = 0; row < height; row += 1) {
       for (let col = 0; col < width; col += 1) {
         const p = row * width + col;
         const d = Math.abs(b[p]! - a[p]!) - NOISE;
-        if (d > 0) tiles[tileOf(col, row)]! += d;
+        if (d <= 0) continue;
+        const t = tileOf(col, row);
+        tiles[t]! += d;
+        moved[t]! += 1;
+        sw[t]! += d;
+        sx[t]! += d * (col + 0.5);
+        sy[t]! += d * (row + 0.5);
       }
     }
     let active = 0;
     let loud = 0;
-    let sum = 0;
-    let cx = 0;
-    let cy = 0;
-    for (let t = 0; t < GX * GY; t += 1) {
+    for (let t = 0; t < TILES; t += 1) {
       tiles[t] = tiles[t]! / Math.max(1, counts[t]!);
       if (tiles[t]! > TILE_ACTIVE) active += 1;
       if (tiles[t]! > CUT_LEVEL) loud += 1;
-      sum += tiles[t]!;
-      cx += tiles[t]! * (((t % GX) + 0.5) / GX * 2 - 1);
-      cy += tiles[t]! * ((Math.floor(t / GX) + 0.5) / GY * 2 - 1);
     }
     const top = [...tiles].sort((p, q) => q - p);
-    action[f] = (top[0]! + top[1]! + top[2]! + top[3]!) / 4;
-    area[f] = active / (GX * GY);
-    x[f] = sum > 0 ? cx / sum : 0;
-    y[f] = sum > 0 ? cy / sum : 0;
-    cut[f] = loud / (GX * GY) >= CUT_AREA ? 1 : 0;
+    m.action[f] = (top[0]! + top[1]! + top[2]! + top[3]!) / 4;
+    m.area[f] = active / TILES;
+    m.cut[f] = loud / TILES >= CUT_AREA ? 1 : 0;
   }
-  return { action, area, x, y, cut };
+  return m;
 }
+
+/** Tiles within `reach` of each tile (3 x 3 for 1, 5 x 5 for 2; fewer at the edges). */
+function around(reach: number): number[][] {
+  return Array.from({ length: TILES }, (_, t) => {
+    const tx = t % GX;
+    const ty = Math.floor(t / GX);
+    const out: number[] = [];
+    for (let dy = -reach; dy <= reach; dy += 1) for (let dx = -reach; dx <= reach; dx += 1) if (tx + dx >= 0 && tx + dx < GX && ty + dy >= 0 && ty + dy < GY) out.push((ty + dy) * GX + tx + dx);
+    return out;
+  });
+}
+const NEIGHBOURS = around(1);
+/** Where a fast object can be one frame later: a stop needs this much of the picture still. */
+const WIDE = around(2);
 
 const round = (v: number, places = 3) => Math.round(v * 10 ** places) / 10 ** places;
 
@@ -140,55 +169,87 @@ export function detectActions(input: LumaFrames, options: ActionOptions = {}): A
   const m = motion(input);
   // A cut's frames, and the one on each side, are not motion.
   const nearCut = (f: number) => m.cut[f] === 1 || m.cut[f - 1] === 1 || m.cut[f + 1] === 1;
+  // A region's motion: the mean of its four busiest tiles, or most of the busiest.
+  const region = (f: number, t: number, tiles = NEIGHBOURS) => {
+    if (f < 1 || f >= n || nearCut(f)) return 0;
+    const e = tiles[t]!.map((k) => m.tiles[f]![k]!).sort((p, q) => q - p);
+    return Math.max(((e[0] ?? 0) + (e[1] ?? 0) + (e[2] ?? 0) + (e[3] ?? 0)) / 4, 0.6 * (e[0] ?? 0));
+  };
+  // Where in the region the change is, -1..1 (null: nothing changed there).
+  const centre = (f: number, t: number): [number, number] | null => {
+    let w = 0;
+    let x = 0;
+    let y = 0;
+    for (const k of NEIGHBOURS[t]!) {
+      w += m.sw[f]![k]!;
+      x += m.sx[f]![k]!;
+      y += m.sy[f]![k]!;
+    }
+    return w > 0 ? [(x / w / input.width) * 2 - 1, (y / w / input.height) * 2 - 1] : null;
+  };
   let peak = 0;
-  for (let f = 1; f < n; f += 1) if (!nearCut(f) && m.action[f]! > peak) peak = m.action[f]!;
+  for (let f = 1; f < n; f += 1) for (let t = 0; t < TILES; t += 1) peak = Math.max(peak, region(f, t));
   if (peak < FLOOR) return [];
   const threshold = Math.max(FLOOR, THRESHOLD[options.sensitivity ?? "normal"] * peak);
-  const at = (f: number) => (f >= 0 && f < n && !nearCut(f) ? m.action[f]! : 0);
-  const events: ActionEvent[] = [];
-  const event = (f: number, kind: ActionKind, strength: number, area: number): ActionEvent => ({
-    frame: f,
-    timeSec: round(input.startSeconds + f / input.fps),
-    kind,
-    strength: round(Math.min(1, strength), 2),
-    x: round(m.x[f]!, 2),
-    y: round(m.y[f]!, 2),
-    area: round(area, 2),
-  });
+  const events: (ActionEvent & { tile: number })[] = [];
+  const event = (f: number, t: number, kind: ActionKind, strength: number, area: number) => {
+    const [x, y] = centre(f, t) ?? [0, 0];
+    events.push({ frame: f, timeSec: round(input.startSeconds + f / input.fps), kind, strength: round(Math.min(1, strength), 2), x: round(x, 2), y: round(y, 2), area: round(area, 2), tile: t });
+  };
 
-  // The last two frames cannot show a stop: the frames after them are not there.
+  // Stops, region by region; the last two frames cannot show one (the frames after them are not there).
   for (let f = 1; f < n - 2; f += 1) {
-    const v = at(f);
-    if (v < threshold || nearCut(f)) continue;
-    const stops = at(f + 1) <= 0.45 * v && at(f + 2) <= 0.5 * v;
-    if (stops && v >= at(f - 1) * 0.8) {
-      // How long it moved before it stopped, and how much of the frame.
+    for (let t = 0; t < TILES; t += 1) {
+      // One region per moving thing: the busiest tile among its neighbours speaks for it.
+      if (NEIGHBOURS[t]!.some((k) => m.tiles[f]![k]! > m.tiles[f]![t]!)) continue;
+      const v = region(f, t);
+      // Still afterwards around it too: an object that only left the region (it moves fast) has not stopped.
+      if (v < threshold || region(f + 1, t, WIDE) > 0.45 * v || region(f + 2, t, WIDE) > 0.5 * v || v < 0.5 * region(f - 1, t)) continue;
+      // Where the motion was heading over the last two frames: a lift that pauses at its top is not a contact.
+      const from = (f >= 3 ? centre(f - 2, t) : null) ?? (f >= 2 ? centre(f - 1, t) : null);
+      const to = centre(f, t);
+      if (from && to && to[1] - from[1] < 0 && Math.abs(to[1] - from[1]) > Math.abs(to[0] - from[0])) continue;
       let start = f;
-      while (start > 1 && at(start - 1) >= 0.3 * v) start -= 1;
+      while (start > 1 && region(start - 1, t) >= 0.3 * v) start -= 1;
       const frames = f - start + 1;
-      const area = Math.max(...Array.from({ length: frames }, (_, k) => m.area[start + k]!));
-      const hard = (v - at(f + 2)) / peak;
-      const kind: ActionKind = area <= 0.1 && frames <= 6 ? "tap" : area >= 0.25 || hard >= 0.7 ? "impact" : "contact";
-      events.push(event(f, kind, hard, area));
-      continue;
-    }
-    // A burst of fast, wide motion that does not stop dead: the whoosh peaks on its fastest frame.
-    if (m.area[f]! >= 0.25 && v >= at(f - 1) && v > at(f + 1)) {
-      let a = f;
-      let b = f;
-      while (a > 1 && at(a - 1) >= 0.5 * v) a -= 1;
-      while (b < n - 1 && at(b + 1) >= 0.5 * v) b += 1;
-      if (b - a + 1 >= 3 && b - a + 1 <= Math.round(0.6 * input.fps)) events.push(event(f, "swipe", v / peak, m.area[f]!));
+      // How much of the frame it moved at most.
+      let area = 0;
+      for (let k = start; k <= f; k += 1) area = Math.max(area, NEIGHBOURS[t]!.reduce((sum, j) => sum + m.moved[k]![j]!, 0) / (input.width * input.height));
+      // Hit at full speed (an impact) or slowed into the contact (set down): the speed at the stop against this action's fastest frame.
+      let fastest = v;
+      for (let k = start; k < f; k += 1) fastest = Math.max(fastest, region(k, t));
+      const after = region(f + 2, t);
+      const kind: ActionKind = area <= TAP_AREA && frames <= 6 ? "tap" : (v - after) / fastest >= 0.7 || area >= IMPACT_AREA ? "impact" : "contact";
+      event(f, t, kind, (v - after) / peak, area);
     }
   }
 
+  // Swipes: a burst of fast motion over a quarter of the frame or more that does not stop dead; the whoosh peaks on its fastest frame.
+  const whole = (f: number) => (f >= 1 && f < n && !nearCut(f) ? m.action[f]! : 0);
+  let wholePeak = 0;
+  for (let f = 1; f < n; f += 1) wholePeak = Math.max(wholePeak, whole(f));
+  for (let f = 1; f < n - 1; f += 1) {
+    const v = whole(f);
+    if (v < threshold || m.area[f]! < 0.25 || v < whole(f - 1) || v <= whole(f + 1)) continue;
+    let a = f;
+    let b = f;
+    while (a > 1 && whole(a - 1) >= 0.5 * v) a -= 1;
+    while (b < n - 1 && whole(b + 1) >= 0.5 * v) b += 1;
+    // A wide motion that ends in a stop is an impact (already found), not a swipe.
+    if (whole(b + 1) <= 0.45 * whole(b) && whole(b + 2) <= 0.5 * whole(b) && b + 2 < n) continue;
+    if (b - a + 1 < 3 || b - a + 1 > Math.round(0.6 * input.fps)) continue;
+    const top = m.tiles[f]!.indexOf(Math.max(...m.tiles[f]!));
+    event(f, top, "swipe", v / Math.max(wholePeak, 1e-9), m.area[f]!);
+  }
+
   // Steps: three or more stops in the lower part of the frame at a steady pace.
-  const low = events.filter((e) => e.kind !== "swipe" && e.y > 0.2);
+  const low = events.filter((e) => e.kind !== "swipe" && e.y > 0.2).sort((p, q) => p.frame - q.frame);
   for (let i = 0; i + 2 < low.length; i += 1) {
     const run = [low[i]!];
     for (let j = i + 1; j < low.length; j += 1) {
       const gap = low[j]!.timeSec - run[run.length - 1]!.timeSec;
-      if (gap < 0.3 || gap > 0.9) break;
+      if (gap < 0.3) continue;
+      if (gap > 0.9) break;
       run.push(low[j]!);
     }
     if (run.length < 3) continue;
@@ -196,12 +257,12 @@ export function detectActions(input: LumaFrames, options: ActionOptions = {}): A
     const mean = gaps.reduce((s, g) => s + g, 0) / gaps.length;
     const spread = Math.sqrt(gaps.reduce((s, g) => s + (g - mean) ** 2, 0) / gaps.length) / mean;
     if (spread <= 0.25) for (const e of run) e.kind = "step";
-    i += run.length - 1;
   }
 
-  // One event per moment: the stronger of two closer than the gap stays.
+  // One event per moment and place: of two closer than the gap within two tiles of each other, the stronger stays.
   const gap = options.minGapSeconds ?? 0.12;
-  const kept: ActionEvent[] = [];
-  for (const e of [...events].sort((p, q) => q.strength - p.strength)) if (kept.every((k) => Math.abs(k.timeSec - e.timeSec) >= gap)) kept.push(e);
-  return kept.sort((p, q) => p.frame - q.frame);
+  const near = (p: number, q: number) => Math.abs((p % GX) - (q % GX)) <= 2 && Math.abs(Math.floor(p / GX) - Math.floor(q / GX)) <= 2;
+  const kept: (ActionEvent & { tile: number })[] = [];
+  for (const e of [...events].sort((p, q) => q.strength - p.strength)) if (kept.every((k) => Math.abs(k.timeSec - e.timeSec) >= gap || !near(k.tile, e.tile))) kept.push(e);
+  return kept.sort((p, q) => p.frame - q.frame || p.x - q.x).map(({ tile: _tile, ...e }) => e);
 }
