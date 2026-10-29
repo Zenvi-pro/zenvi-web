@@ -111,6 +111,30 @@ export interface CropWindow {
 }
 
 /**
+ * A key of a window's edge: moved out (+) or in (-) by `grow`, a share of the
+ * picture's short side, linear up to 0.06 (keyframes.ts WINDOW_RANGE); 1
+ * shows the whole picture, -1 none of it.
+ */
+export interface WindowKey {
+  frame: number;
+  grow: number;
+  ease: Ease;
+}
+
+/**
+ * A media element seen through a window: a convex polygon on the picture
+ * (0..1 of its display size, after its crop), drawn as a distance field
+ * (looks/masks.ts) that a Mask effect reads, its brightness keyed by `keys`
+ * so the window opens, closes or grows to the whole picture with no new image.
+ */
+export interface MediaWindowShape {
+  points: readonly { x: number; y: number }[];
+  /** Edge softness, a share of the picture's short side. */
+  feather: number;
+  keys: WindowKey[];
+}
+
+/**
  * A media-bin file. `fit`: the picture (or its `crop` window) at `width` px
  * wide, moved by poses, corners rounded by `radius` px. `fill`: it covers the
  * frame (scale mode Crop); poses may only scale and fade it.
@@ -128,8 +152,12 @@ export interface MediaSource {
   speed: number;
   /** Keep the clip's own sound (default: muted under the music). */
   sound?: boolean;
+  /** With `sound`: the template frame its sound has faded out by (the next card took over). */
+  soundTo?: number;
   /** Mirrored left-right (x) or top-bottom (y): a negative scale, centred (a kaleidoscope segment). */
   flip?: { x: boolean; y: boolean };
+  /** Seen through a polygon window (a skewed pane, one side of a diagonal split). */
+  window?: MediaWindowShape;
 }
 
 /** One clip of a template while it is being designed: what it shows, when, and how it moves. */
@@ -183,6 +211,8 @@ export interface MotionLayer {
   /** Clip keys to set: scale mode, gravity, keyframes (libopenshot JSON), corner_radius. */
   props: Record<string, unknown>;
   effects: Omit<Effect, "id">[];
+  /** A window's mask image and the Mask effect that reads it (its `mask_reader` set when the image is written). */
+  mask?: { svg: string; effect: Omit<Effect, "id"> };
   /** Frame of the beat (or the template's start) this layer's entrance belongs to. */
   cue: number;
   /** It runs past the frame by design. */
