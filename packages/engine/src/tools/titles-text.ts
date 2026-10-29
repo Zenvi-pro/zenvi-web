@@ -231,7 +231,8 @@ function shortest(names: readonly string[]): string {
 /**
  * `resolve_font`: the installed family `name` means (same name ignoring
  * case, else the shortest family starting with it, else the shortest
- * containing it), or a refusal naming installed fonts like it. Any name is
+ * containing it, else the installed bundled face of its kind: fallbackFamily),
+ * or a refusal naming installed fonts like it. Any name is
  * taken as given when the host cannot list its fonts (`families` null).
  */
 export function resolveFont(name: unknown, families: readonly string[] | null): string {

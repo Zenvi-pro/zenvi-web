@@ -179,8 +179,9 @@ export class TitleStyle {
 
   /**
    * `resolve_font`: the requested family matched against the host's fonts
-   * (refused when it is not installed); taken as given when the host cannot
-   * list them (`families` null, the browser).
+   * (a bundled face of its kind when it is not installed, else refused);
+   * taken as given when the host cannot list them (`families` null, the
+   * browser).
    */
   resolveFont(families: readonly string[] | null): void {
     if (this.font) this.font = resolveFont(this.font, families);
