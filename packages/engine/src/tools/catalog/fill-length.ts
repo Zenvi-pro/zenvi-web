@@ -271,7 +271,7 @@ export const fillLengthTools: CatalogTool[] = [
         return !file || visualKind(file) !== "video" || (Number(file.duration) || 0) - c.end >= newEnd - oldEnd - g.tol;
       });
       // Shots you hear under the music are muted (as the builders place them); without music they keep their sound.
-      const underMusic = mixEntries(project).some((e) => e.mixRole === "music" && !isMuted(e));
+      const underMusic = mixEntries(project).some((e) => e.mixRole === "music" && !isMuted(e) && isAudioOnlyMedia(e.file));
       const summary = [
         plan.hold > 0 ? `held the last shot ${r3(plan.hold)} s longer` : "",
         fresh.length > 0 ? `added ${fresh.length} shot(s) of ${r3(shotLength)} s${beat ? " (whole beats)" : ""} from ${[...new Set(fresh.map((s) => displayName(fileById(project, s.fileId)!)))].join(", ")}` : "",
@@ -282,7 +282,8 @@ export const fillLengthTools: CatalogTool[] = [
       if (repeats.length > 0) warnings.push(`${repeats.length} shot(s) at the end repeat earlier footage: import more (gather_stock_footage_tool) and swap them (swap_shot_tool) for a stronger edit.`);
       if (plan.short > g.tol) warnings.push(`Still ${r3(plan.short)} s short: no footage left to fill with. Import more (gather_stock_footage_tool) or allow a slower max_slow.`);
       for (const m of music) if (m.loop) warnings.push(`${clipTitle(m.clip)} runs out: its last ${LOOP_BARS} bar(s) from ${r3(m.loop.from)} s repeat on a bar line.`);
-      const musicStops = mixEntries(project).filter((e) => e.mixRole === "music" && !isMuted(e) && endOf(e.clip) >= oldEnd - 1 && endOf(e.clip) < newEnd - g.frame && !music.some((m) => m.clip.id === e.clip.id));
+      // A bed is a music file: footage whose own sound reads as music is picture, not a bed that stops.
+      const musicStops = mixEntries(project).filter((e) => e.mixRole === "music" && !isMuted(e) && isAudioOnlyMedia(e.file) && endOf(e.clip) >= oldEnd - 1 && endOf(e.clip) < newEnd - g.frame && !music.some((m) => m.clip.id === e.clip.id));
       for (const e of musicStops) warnings.push(`${clipTitle(e.clip)} stops at ${r3(endOf(e.clip))} s, before the new end: extend or replace it.`);
       for (const c of ending) if (!cards.includes(c) && !overlays.includes(c)) warnings.push(`${clipTitle(c)} ends at the old end, ${r3(oldEnd)} s: its media cannot run on to the new end.`);
       const data = {

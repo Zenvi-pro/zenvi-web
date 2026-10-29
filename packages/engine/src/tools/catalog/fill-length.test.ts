@@ -95,6 +95,8 @@ describe("fill_to_length_tool", () => {
     expect([grain.position, grain.end]).toEqual([0, 20]);
     expect(data.extended_overlays).toEqual(["CLIPGRAIN1"]);
     expect(data.moved_cards).toEqual(["CLIPCARD01"]);
+    // The last shot's own sound is footage, not a music bed that stops early.
+    expect((receipt.warnings ?? []).join(" ")).not.toMatch(/stops at/);
     for (const id of data.createdClipIds as string[]) expect(doc.project.clips.find((c) => c.id === id)!.volume.Points[0]!.co.Y).toBe(0);
   });
 
