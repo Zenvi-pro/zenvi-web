@@ -4428,13 +4428,14 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `beats` | number[] |  | Beat times of the music in seconds (e.g. from detect_beats_tool), used as they are instead of detecting the beat. |
 | `bpm` | number |  | Tempo to use instead of the detected one. Alone: the music is tracked at this tempo (detect_beats_tool's alternatives lists the half/double readings). With offset_seconds: no detection, the grid is exact. (min 40, max 400) |
 | `offset_seconds` | number |  | With bpm: where the first beat falls in the music, seconds. The grid runs from there at that tempo. (min 0, max 3600) |
-| `tolerance_frames` | integer |  | Farthest a cut moves, frames. Default: half a grid step, so every cut can reach its nearest line. (min 1, max 60) |
+| `tolerance_frames` | integer |  | Farthest a cut moves, frames. Default: half a grid step, so every cut can reach its nearest line (a whole step back when it ripples). (min 1, max 60) |
+| `mode` | "auto" \| "roll" \| "ripple" |  | auto (default): a roll edit where both clips have media to move into, else the outgoing shot ends on the beat before the cut and the rest of its track moves up (whole files cut end to end have no handles). roll: never change the length. ripple: always end shots on the beat before. |
 | `lead_frames` | integer |  | Cut this many frames before the beat (default 0: the first frame of the new shot is on the beat). (min 0, max 5) |
 | `dry_run` | boolean |  | true: only propose the moves (nothing changes). |
 
 ### fill_to_length_tool
 
-**Fill to length** (direct tool). Make an edit that runs short reach the asked length instead of shipping short: the last shot holds longer into its unused media (up to 3 s), then new shots go after it from unused footage (bin files not on the timeline, then unseen moments of the timeline's own files; each the track's median shot length, in whole beats when the music's beat is known), then the last shot slows (not below max_slow).
+**Fill to length** (direct tool). Make an edit that runs short reach the asked length instead of shipping short: the last shot holds longer into its unused media (up to 3 s), then new shots go after it from unused footage (bin files not on the timeline, then unseen moments of the timeline's own files; each the track's median shot length, in whole beats when the music's beat is known), then the last shots slow (not below max_slow).
 
 Surfaces: mcp, cli, editor. edits.
 
@@ -4444,9 +4445,9 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | --- | --- | --- | --- |
 | `seconds` | number | yes | The length the edit should run, seconds (e.g. the brief's length). (min 1, max 3600) |
 | `track` | string |  | The picture track to extend (UI track number, name or layer number). Default: the track with the most video clips. |
-| `steps` | ("hold" \| "broll" \| "slow")[] |  | Which fills to use, tried in this order: hold (the last shot runs on into its media, up to 3 s), broll (new shots after it from unused footage), slow (the last shot slowed, not below max_slow). Default all three. |
+| `steps` | ("hold" \| "broll" \| "slow")[] |  | Which fills to use, tried in this order: hold (the last shot runs on into its media, up to 3 s), broll (new shots after it from unused footage), slow (the last new shot, or the track's last few shots, slowed, not below max_slow). Default all three. |
 | `file_ids` | string[] |  | Footage the broll step may use, in order. Default: bin videos and photos not on the timeline, then unseen moments of the timeline's own files. |
-| `max_slow` | number |  | Slowest speed the slow step plays the last shot at (default 0.75). (min 0.25, max 1) |
+| `max_slow` | number |  | Slowest speed the slow step plays a shot at (default 0.75). (min 0.25, max 1) |
 | `dry_run` | boolean |  | true: only say what would be added (nothing changes). |
 
 ### shot_length_ramp_tool

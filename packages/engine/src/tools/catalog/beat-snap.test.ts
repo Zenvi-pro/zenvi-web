@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { BEAT_SAMPLE_RATE } from "../../analysis/beats.js";
 import { findClip } from "../../model/query.js";
-import { deleteClips } from "../../ops/clips.js";
+import { ProjectDocument } from "../../history/document.js";
+import { createProject } from "../../model/defaults.js";
+import { addClip, deleteClips } from "../../ops/clips.js";
+import { addFile } from "../../ops/files.js";
+import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
 import type { ToolReceipt } from "../receipt.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
@@ -82,5 +86,40 @@ describe("snap_cuts_to_beats_tool", () => {
     expect(none.receipt.summary).toMatch(/^Error: no music on the timeline/);
     const bad = await run(doc, { track: "1", offset_seconds: 1 });
     expect(bad.receipt.summary).toMatch(/^Error: offset_seconds goes with bpm/);
+  });
+
+  it("ripples where whole files are cut end to end: the outgoing shot ends on the beat before and the rest of the track moves up", async () => {
+    const doc = new ProjectDocument(createProject({ id: "BEATSNAP01" }));
+    doc.transaction("fixture", (tx) => {
+      const [music, video] = tx.project.layers.map((l) => l.number).sort((a, b) => a - b);
+      addFile(tx, media("/m/song.mp3", audioInfo("/m/song.mp3", 30)), { id: "SONGXXXXXX" });
+      for (const [i, seconds] of [3.3, 2.2, 4].entries()) addFile(tx, media(`/m/s${i}.mp4`, videoInfo(`/m/s${i}.mp4`, seconds)), { id: `SHOT${i}XXXXX` });
+      addClip(tx, { fileId: "SONGXXXXXX", position: 0, layer: music!, start: 0, end: 30, id: "CLIPSONGXX" });
+      addClip(tx, { fileId: "SHOT0XXXXX", position: 0, layer: video!, start: 0, end: 3.3, id: "CLIPSHOT0X" });
+      addClip(tx, { fileId: "SHOT1XXXXX", position: 3.3, layer: video!, start: 0, end: 2.2, id: "CLIPSHOT1X" });
+      addClip(tx, { fileId: "SHOT2XXXXX", position: 5.5, layer: video!, start: 0, end: 4, id: "CLIPSHOT2X" });
+    });
+    const roll = await run(doc as unknown as ReturnType<typeof fixtureDoc>, { bpm: 120, offset_seconds: 0, mode: "roll" });
+    expect(roll.receipt.status).toBe("unchanged");
+    const { receipt, data } = await run(doc as unknown as ReturnType<typeof fixtureDoc>, { bpm: 120, offset_seconds: 0 });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    expect(receipt.undoSteps).toBe(1);
+    // 3.3 -> 3.0, then the next cut (5.5, pulled up to 5.2) -> 5.0.
+    expect(data.moved.map((m: { from: number; to: number; edit: string }) => [m.from, m.to, m.edit])).toEqual([
+      [3.3, 3, "ripple"],
+      [5.2, 5, "ripple"],
+    ]);
+    expect(data.shortened_seconds).toBeCloseTo(0.5, 6);
+    expect(receipt.warnings?.join(" ")).toMatch(/no media to roll into/);
+    const timing = (id: string) => {
+      const c = findClip(doc.project, id)!;
+      return [Math.round(c.position * 1000) / 1000, Math.round(c.start * 1000) / 1000, Math.round(c.end * 1000) / 1000];
+    };
+    expect([timing("CLIPSHOT0X"), timing("CLIPSHOT1X"), timing("CLIPSHOT2X")]).toEqual([
+      [0, 0, 3],
+      [3, 0, 2],
+      [5, 0, 4],
+    ]);
+    expect(timing("CLIPSONGXX")).toEqual([0, 0, 30]);
   });
 });

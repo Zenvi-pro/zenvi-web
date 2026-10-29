@@ -98,14 +98,22 @@ describe("fill_to_length_tool", () => {
     expect(Math.max(...bed.map((c) => c.position + c.end - c.start))).toBeCloseTo(20, 2);
   });
 
-  it("slows the last shot when no footage is left, says what is still short, and proposes only on a dry run", async () => {
+  it("slows the track's last shots when no footage is left, says what is still short, and proposes only on a dry run", async () => {
     const doc = shortEdit();
     const dry = await fill(doc, { seconds: 30, steps: ["slow"], max_slow: 0.5, dry_run: true });
     expect(dry.receipt.undoSteps).toBe(0);
     expect(dry.data.slow).toBe(0.5);
-    expect(dry.data.short_seconds).toBeCloseTo(18, 2);
-    expect(dry.receipt.warnings?.join(" ")).toMatch(/Still 18 s short/);
+    expect(dry.data.slowed_clip_ids).toEqual(["CLIPAAAAAA", "CLIPBBBBBB"]);
+    expect(dry.data.short_seconds).toBeCloseTo(14, 2);
+    expect(dry.receipt.warnings?.join(" ")).toMatch(/Still 14 s short/);
     expect(doc.undoLabels).toEqual([]);
+    // Only as many shots as cover it: 1 s more is the last shot at 80 %.
+    const done2 = await fill(doc, { seconds: 9, steps: ["slow"] });
+    expect(done2.data.slowed_clip_ids).toEqual(["CLIPBBBBBB"]);
+    const b = doc.project.clips.find((c) => c.id === "CLIPBBBBBB")!;
+    expect(b.position).toBeCloseTo(4, 6);
+    expect(b.position + b.end - b.start).toBeCloseTo(9, 2);
+    doc.undo();
     const done = await fill(doc, { seconds: 7 });
     expect(done.receipt.status).toBe("unchanged");
   });

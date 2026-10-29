@@ -11,7 +11,8 @@
  *          whole beats when the music's beat is known): bin footage not on
  *          the timeline first, then moments of the timeline's own files that
  *          are not shown yet;
- *   slow   the last shot slowed (not below max_slow) to cover the rest.
+ *   slow   the last new shot, or else the track's last few shots, slowed (not
+ *          below max_slow) to cover the rest.
  *
  * Everything is appended at the end, so no cut, title or sound already placed
  * moves. A title or card that ended with the picture moves to the new end;
@@ -40,6 +41,8 @@ type Step = (typeof STEPS)[number];
 const MAX_HOLD = 3;
 /** Appended shots are at least this long. */
 const MIN_SHOT = 0.8;
+/** The slow step slows at most this many of the track's last shots. */
+const SLOW_SHOTS = 4;
 /** Bars of music repeated at a time when it has to loop. */
 const LOOP_BARS = 4;
 
@@ -51,9 +54,9 @@ const input = z.strictObject({
     .min(1)
     .max(3)
     .optional()
-    .describe("Which fills to use, tried in this order: hold (the last shot runs on into its media, up to 3 s), broll (new shots after it from unused footage), slow (the last shot slowed, not below max_slow). Default all three."),
+    .describe("Which fills to use, tried in this order: hold (the last shot runs on into its media, up to 3 s), broll (new shots after it from unused footage), slow (the last new shot, or the track's last few shots, slowed, not below max_slow). Default all three."),
   file_ids: z.array(z.string().min(1)).max(100).optional().describe("Footage the broll step may use, in order. Default: bin videos and photos not on the timeline, then unseen moments of the timeline's own files."),
-  max_slow: z.number().min(0.25).max(1).optional().describe("Slowest speed the slow step plays the last shot at (default 0.75)."),
+  max_slow: z.number().min(0.25).max(1).optional().describe("Slowest speed the slow step plays a shot at (default 0.75)."),
   dry_run: z.boolean().optional().describe("true: only say what would be added (nothing changes)."),
 });
 
@@ -87,11 +90,12 @@ function unseen(from: number, to: number, seconds: number, shown: readonly [numb
 interface Plan {
   hold: number;
   shots: { fileId: string; kind: "video" | "image"; start: number; end: number }[];
-  slow: number | null;
+  /** The speed, and the track's own clips it applies to (none: the last new shot). */
+  slow: { speed: number; clipIds: string[] } | null;
   short: number;
 }
 
-function planFill(project: Project, last: Clip, missing: number, steps: ReadonlySet<Step>, candidates: ProjectFile[], shotLength: number, maxSlow: number, frame: number): Plan {
+function planFill(project: Project, track: readonly Clip[], last: Clip, missing: number, steps: ReadonlySet<Step>, candidates: ProjectFile[], shotLength: number, maxSlow: number, frame: number): Plan {
   let left = missing;
   const plan: Plan = { hold: 0, shots: [], slow: null, short: 0 };
   const lastFile = fileById(project, String(last.file_id ?? ""));
@@ -131,11 +135,24 @@ function planFill(project: Project, last: Clip, missing: number, steps: Readonly
       if (!placed) break;
     }
   }
-  if (steps.has("slow") && left > frame && !retimed) {
-    const base = plan.shots.length > 0 ? plan.shots[plan.shots.length - 1]!.end - plan.shots[plan.shots.length - 1]!.start : lengthOf(last) + plan.hold;
-    const speed = Math.max(maxSlow, base / (base + left));
-    plan.slow = speed;
-    left -= base / speed - base;
+  if (steps.has("slow") && left > frame && plan.shots.length > 0) {
+    // The last new shot plays slower.
+    const base = plan.shots[plan.shots.length - 1]!.end - plan.shots[plan.shots.length - 1]!.start;
+    plan.slow = { speed: Math.max(maxSlow, base / (base + left)), clipIds: [] };
+    left -= base / plan.slow.speed - base;
+  } else if (steps.has("slow") && left > frame) {
+    // No new shot: the last few shots on the track play slower, as few as cover the rest.
+    const tail: Clip[] = [];
+    let base = 0;
+    for (const c of [...track].reverse()) {
+      if (tail.length >= SLOW_SHOTS || isRetimed(c as unknown as Record<string, unknown>) || base * (1 / maxSlow - 1) >= left) break;
+      tail.unshift(c);
+      base += lengthOf(c) + (c.id === last.id ? plan.hold : 0);
+    }
+    if (tail.length > 0) {
+      plan.slow = { speed: Math.max(maxSlow, base / (base + left)), clipIds: tail.map((c) => c.id) };
+      left -= base / plan.slow.speed - base;
+    }
   }
   plan.short = Math.max(0, left);
   return plan;
@@ -176,7 +193,7 @@ export const fillLengthTools: CatalogTool[] = [
     title: "Fill to length",
     description:
       "Make an edit that runs short reach the asked length instead of shipping short: the last shot holds longer into its unused media (up to 3 s), then new shots go after it from unused footage (bin files not on the timeline, then unseen moments of the timeline's own files; " +
-      "each the track's median shot length, in whole beats when the music's beat is known), then the last shot slows (not below max_slow). Everything is added at the end, so no cut, title or sound already placed moves; " +
+      "each the track's median shot length, in whole beats when the music's beat is known), then the last shots slow (not below max_slow). Everything is added at the end, so no cut, title or sound already placed moves (slowed tail shots excepted); " +
       "a title or card that ended with the picture moves to the new end, and music that stops early runs on into its file or repeats its last 4 bars on a bar line. dry_run=true only proposes. One undo step; the receipt lists what was added and anything still short.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
@@ -224,13 +241,13 @@ export const fillLengthTools: CatalogTool[] = [
       shotLength = g.snap(shotLength);
 
       const steps = new Set<Step>(args.steps ?? STEPS);
-      const plan = planFill(project, last, missing, steps, candidates, shotLength, args.max_slow ?? 0.75, g.frame);
+      const plan = planFill(project, track, last, missing, steps, candidates, shotLength, args.max_slow ?? 0.75, g.frame);
       const newEnd = oldEnd + missing - plan.short;
       const cards = project.clips.filter((c) => c.layer !== layer && Math.abs(endOf(c) - oldEnd) <= g.tol && !isAudioOnlyMedia(fileById(project, String(c.file_id ?? ""))));
       const summary = [
         plan.hold > 0 ? `held the last shot ${r3(plan.hold)} s longer` : "",
         plan.shots.length > 0 ? `added ${plan.shots.length} shot(s) of ${r3(shotLength)} s${beat ? " (whole beats)" : ""} from ${[...new Set(plan.shots.map((s) => displayName(fileById(project, s.fileId)!)))].join(", ")}` : "",
-        plan.slow !== null ? `slowed the last shot to ${Math.round(plan.slow * 100)} %` : "",
+        plan.slow !== null ? `slowed the last ${plan.slow.clipIds.length > 1 ? `${plan.slow.clipIds.length} shots` : "shot"} to ${Math.round(plan.slow.speed * 100)} %` : "",
       ].filter(Boolean);
       const warnings: string[] = [];
       if (plan.short > g.tol) warnings.push(`Still ${r3(plan.short)} s short: no footage left to fill with. Import more (gather_stock_footage_tool) or allow a slower max_slow.`);
@@ -242,7 +259,7 @@ export const fillLengthTools: CatalogTool[] = [
         to_seconds: r3(newEnd),
         hold_seconds: r3(plan.hold),
         shots: plan.shots.map((s) => ({ file_id: s.fileId, start: r3(s.start), end: r3(s.end) })),
-        ...(plan.slow !== null ? { slow: r3(plan.slow) } : {}),
+        ...(plan.slow !== null ? { slow: r3(plan.slow.speed), slowed_clip_ids: plan.slow.clipIds } : {}),
         short_seconds: r3(plan.short),
         moved_cards: cards.map((c) => c.id),
         music: music.map((m) => ({ clip_id: m.clip.id, ...(m.extendTo !== undefined ? { runs_on: true } : { loops_from: r3(m.loop!.from) }) })),
@@ -267,10 +284,22 @@ export const fillLengthTools: CatalogTool[] = [
           created.push(tail.id);
           cursor += s.end - s.start;
         }
-        if (plan.slow !== null) {
-          const length = lengthOf(tail) / plan.slow;
+        if (plan.slow !== null && plan.slow.clipIds.length === 0) {
+          const length = lengthOf(tail) / plan.slow.speed;
           retimeClipTo(tx, tail.id, { duration: length });
           cursor = tail.position + length;
+        } else if (plan.slow !== null) {
+          // Each slowed shot starts later by what the ones before it grew; the last moves first, into free room.
+          const speed = plan.slow.speed;
+          const slowed = plan.slow.clipIds.map((id) => tx.project.clips.find((c) => c.id === id)!);
+          let shift = 0;
+          const placed = slowed.map((c) => {
+            const row = { id: c.id, position: c.position + shift, duration: lengthOf(c) / speed };
+            shift += row.duration - lengthOf(c);
+            return row;
+          });
+          for (const row of [...placed].reverse()) retimeClipTo(tx, row.id, { duration: row.duration, position: row.position });
+          cursor = placed[placed.length - 1]!.position + placed[placed.length - 1]!.duration;
         }
         for (const c of cards) setClipTiming(tx, c.id, { position: c.position + (cursor - oldEnd) });
         for (const m of music) placeMoreMusic(tx, m, cursor, created);

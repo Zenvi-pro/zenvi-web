@@ -13,7 +13,8 @@
 import { z } from "zod";
 import type { Onset } from "../../analysis/beats.js";
 import type { Clip } from "../../model/types.js";
-import { chooseOnset, onsetsOnTimeline, rollCut, rollRange, type Cut } from "../../ops/onset-snap.js";
+import { setClipTiming } from "../../ops/clips.js";
+import { chooseOnset, onsetsOnTimeline, rollRange, type Cut } from "../../ops/onset-snap.js";
 import { hasVideoStream } from "../audio-mix.js";
 import { beatOverrideProblem, beatOverrideShape, explicitBeats } from "../beat-override.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
@@ -37,7 +38,11 @@ const input = z.strictObject({
   music_clip_id: z.string().min(1).optional().describe("The timeline clip whose beat sets the grid. Default: the longest music clip on the timeline."),
   grid: z.enum(GRIDS).optional().describe("Where cuts may land: beats (default), downbeats (bar lines, for slower cutting) or half_beats (eighths, for fast montage runs)."),
   ...beatOverrideShape,
-  tolerance_frames: z.number().int().min(1).max(60).optional().describe("Farthest a cut moves, frames. Default: half a grid step, so every cut can reach its nearest line."),
+  tolerance_frames: z.number().int().min(1).max(60).optional().describe("Farthest a cut moves, frames. Default: half a grid step, so every cut can reach its nearest line (a whole step back when it ripples)."),
+  mode: z
+    .enum(["auto", "roll", "ripple"])
+    .optional()
+    .describe("auto (default): a roll edit where both clips have media to move into, else the outgoing shot ends on the beat before the cut and the rest of its track moves up (whole files cut end to end have no handles). roll: never change the length. ripple: always end shots on the beat before."),
   lead_frames: z.number().int().min(0).max(5).optional().describe("Cut this many frames before the beat (default 0: the first frame of the new shot is on the beat)."),
   dry_run: z.boolean().optional().describe("true: only propose the moves (nothing changes)."),
 });
@@ -64,8 +69,8 @@ export const beatSnapTools: CatalogTool[] = [
     name: SNAP,
     title: "Snap cuts to the beat",
     description:
-      "Move existing cuts onto the music's beat grid: re-edits, hand edits, or a build after trims. Each cut moves to the nearest beat (grid: beats, downbeats, half_beats) within tolerance_frames (default half a grid step), by a roll edit: " +
-      "the outgoing out point and the incoming in point move together, nothing else on the timeline moves and the sequence keeps its length; a cut moves only as far as both clips' media allows. " +
+      "Move existing cuts onto the music's beat grid: re-edits, hand edits, or a build after trims. Each cut moves to the nearest beat (grid: beats, downbeats, half_beats) within tolerance_frames (default half a grid step), by a roll edit where the media allows: " +
+      "the outgoing out point and the incoming in point move together, nothing else moves and the sequence keeps its length. Where a clip has no media to roll into (whole files end to end), mode=auto ends the outgoing shot on the beat before and pulls the rest of that track up (the receipt says how much shorter; other tracks stay). " +
       "The grid is the music clip's tracked beat (music_clip_id, default the longest music clip), or yours: beats (seconds in the music file), or bpm + offset_seconds. Cuts on a transition, a locked track, between retimed clips or after the music are kept and named. " +
       "dry_run=true only proposes. One undo step; the receipt lists every cut moved (from, to, frames) and every cut kept with the reason. For in-world hits (a knife, a footstep) use snap_cuts_to_onsets_tool.",
     input,
@@ -125,42 +130,68 @@ export const beatSnapTools: CatalogTool[] = [
       const step = (lines[lines.length - 1]!.timeSec - lines[0]!.timeSec) / (lines.length - 1);
       const toleranceFrames = args.tolerance_frames ?? Math.max(1, Math.floor((step * g.fps) / 2));
       const options = { tolerance: toleranceFrames / g.fps, minStrength: 0, lead: (args.lead_frames ?? 0) / g.fps };
+      // Back to the beat before can be up to a whole grid step away.
+      const rippleOptions = { ...options, tolerance: Math.max(options.tolerance, args.tolerance_frames !== undefined ? 0 : step + g.tol) };
 
-      const moves: { cut: Cut; delta: number }[] = [];
+      // Cuts are planned on a live copy of the clips' timing, in order: a ripple moves every later clip on its track.
+      const live = new Map(project.clips.map((c) => [c.id, { position: c.position, start: c.start, end: c.end }]));
+      const at = (c: Clip): Clip => ({ ...c, ...live.get(c.id)! });
+      const mode = args.mode ?? "auto";
+      const moves: { cut: Cut; from: number; delta: number; edit: "roll" | "ripple" }[] = [];
       const kept: { outgoing: string; incoming: string; at: number; reason: string }[] = [];
-      // A clip between two snapped cuts loses length at both ends: the second roll sees what the first one took.
-      const trimmedIn = new Map<string, number>();
-      for (const cut of cuts) {
+      for (const original of cuts) {
+        const cut: Cut = { ...original, outgoing: at(original.outgoing), incoming: at(original.incoming), at: live.get(original.incoming.id)!.position };
         const keep = (reason: string) => kept.push({ outgoing: cut.outgoing.id, incoming: cut.incoming.id, at: r3(cut.at), reason });
         if (cut.at < plays.from - g.tol || cut.at > plays.to + g.tol) {
           keep("outside the music");
           continue;
         }
-        const range = rollRange(project, cut, Math.max(0, trimmedIn.get(cut.outgoing.id) ?? 0));
+        const range = rollRange(project, cut);
         if ("blocked" in range) {
           keep(range.blocked);
           continue;
         }
-        const choice = chooseOnset(project, cut, lines, range, options);
-        if (!choice) keep(`no ${grid === "half_beats" ? "half beat" : grid.slice(0, -1)} within ${toleranceFrames} frame(s) the media can reach`);
-        else if (Math.abs(choice.delta) < g.tol) keep("already on the beat");
-        else {
-          moves.push({ cut, delta: choice.delta });
-          trimmedIn.set(cut.incoming.id, choice.delta);
+        const choice = mode === "ripple" ? null : chooseOnset(project, cut, lines, range, options);
+        if (choice && Math.abs(choice.delta) < g.tol) {
+          keep("already on the beat");
+          continue;
         }
+        if (choice) {
+          moves.push({ cut: original, from: cut.at, delta: choice.delta, edit: "roll" });
+          live.get(cut.outgoing.id)!.end += choice.delta;
+          Object.assign(live.get(cut.incoming.id)!, { position: cut.incoming.position + choice.delta, start: cut.incoming.start + choice.delta });
+          continue;
+        }
+        // No media to roll into (whole files cut end to end, as a re-edit places them): end the outgoing shot on
+        // the beat before the cut and pull the rest of the track up.
+        const earlier = mode === "roll" ? null : chooseOnset(project, cut, lines, { earliest: -(cut.outgoing.end - cut.outgoing.start - 2 * g.frame), latest: 0 }, rippleOptions);
+        if (earlier && Math.abs(earlier.delta) < g.tol) keep("already on the beat");
+        else if (earlier) {
+          moves.push({ cut: original, from: cut.at, delta: earlier.delta, edit: "ripple" });
+          live.get(cut.outgoing.id)!.end += earlier.delta;
+          for (const c of project.clips) if (c.layer === cut.layer && live.get(c.id)!.position >= cut.at - g.tol) live.get(c.id)!.position += earlier.delta;
+        } else keep(`no ${grid === "half_beats" ? "half beat" : grid.slice(0, -1)} within ${toleranceFrames} frame(s) the media can reach${mode === "roll" ? " (mode=auto may ripple)" : ""}`);
       }
 
-      const rows = moves.map((m) => ({ outgoing: m.cut.outgoing.id, incoming: m.cut.incoming.id, from: r3(m.cut.at), to: r3(m.cut.at + m.delta), frames: Math.round(m.delta * g.fps) }));
+      const rows = moves.map((m) => ({ outgoing: m.cut.outgoing.id, incoming: m.cut.incoming.id, from: r3(m.from), to: r3(m.from + m.delta), frames: Math.round(m.delta * g.fps), edit: m.edit }));
+      const rippled = moves.filter((m) => m.edit === "ripple");
+      const shortenedBy = -rippled.reduce((sum, m) => sum + m.delta, 0);
+      const changed = project.clips.filter((c) => {
+        const t = live.get(c.id)!;
+        return Math.abs(t.position - c.position) > 1e-9 || Math.abs(t.start - c.start) > 1e-9 || Math.abs(t.end - c.end) > 1e-9;
+      });
+      const warnings = rippled.length > 0 ? [`${rippled.length} cut(s) had no media to roll into: their outgoing shots end on the beat before and the rest of the track moves up, ${r3(shortenedBy)} s in all (other tracks stay; fill_to_length_tool restores the length).`] : [];
       const onBeat = kept.filter((k) => k.reason === "already on the beat").length;
-      const data = { grid, source, tolerance_frames: toleranceFrames, ...(music ? { music_clip_id: music.id } : {}), moved: rows, kept, changedClipIds: [...new Set(moves.flatMap((m) => [m.cut.outgoing.id, m.cut.incoming.id]))] };
+      const data = { grid, source, tolerance_frames: toleranceFrames, ...(music ? { music_clip_id: music.id } : {}), moved: rows, kept, ...(rippled.length > 0 ? { shortened_seconds: r3(shortenedBy) } : {}), changedClipIds: changed.map((c) => c.id) };
       const counts = `${moves.length} of ${cuts.length} cut(s)`;
-      if (args.dry_run) return applied(SNAP, `Would snap ${counts} onto the ${grid.replace("_", " ")} of ${source} (dry run, nothing changed).`, { data }, 0);
+      if (args.dry_run) return applied(SNAP, `Would snap ${counts} onto the ${grid.replace("_", " ")} of ${source} (dry run, nothing changed).`, { warnings, data }, 0);
       if (moves.length === 0) return unchanged(SNAP, `No cut moved: ${onBeat === cuts.length ? "every cut is on the beat already" : kept.length === 1 ? kept[0]!.reason : `${kept.length} cut(s) kept (see kept)`}.`, { data });
       call.commit((tx) => {
-        for (const m of moves) rollCut(tx, m.cut, m.delta);
+        // Earliest first: a clip pulled up moves into room the one before it has already left.
+        for (const c of [...changed].sort((a, b) => a.position - b.position)) setClipTiming(tx, c.id, live.get(c.id)!);
       }, "Snap cuts to the beat");
       const mean = rows.reduce((s, r) => s + Math.abs(r.frames), 0) / rows.length;
-      return applied(SNAP, `Snapped ${counts} onto the ${grid.replace("_", " ")} of ${source} (mean move ${mean.toFixed(1)} frame(s)); ${onBeat} already on it, ${kept.length - onBeat} kept.`, { data });
+      return applied(SNAP, `Snapped ${counts} onto the ${grid.replace("_", " ")} of ${source} (mean move ${mean.toFixed(1)} frame(s)); ${onBeat} already on it, ${kept.length - onBeat} kept.`, { warnings, data });
     },
   }),
 ];
