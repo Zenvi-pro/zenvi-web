@@ -165,7 +165,7 @@ export function inBinOrder(project: Project, ids: readonly string[]): boolean {
 export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal: SequenceGoal, keepFlag: string): Promise<{ ids: string[]; note: string } | { warning: string } | null> {
   const project = call.doc.project;
   if (!call.host.frames) return null;
-  const unordered = (why: string) => ({ warning: `file_ids are in bin order and could not be ordered (${why}): order them with sequence_shots_tool, or pass ${keepFlag}: true.` });
+  const unordered = (why: string) => ({ warning: `The files are in bin order and could not be ordered (${why}): order them with sequence_shots_tool, or pass ${keepFlag}: true.` });
   const fps = fpsFloat(project.fps);
   const shots: SequenceShotInput[] = [];
   for (const id of ids) {
@@ -182,7 +182,7 @@ export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal
   const out = plan.order.map((k) => ids[k]!);
   return {
     ids: out,
-    note: `file_ids were in bin order: ordered by continuity first (sequence_shots_tool's planner; mean cut match ${plan.meanMatch} vs ${plan.givenMatch} in bin order). Pass ${keepFlag}: true to keep the order given.`,
+    note: `The files were in bin order: ordered by continuity first (sequence_shots_tool's planner; mean cut match ${plan.meanMatch} vs ${plan.givenMatch} in bin order). Pass ${keepFlag}: true to keep the order given.`,
   };
 }
 

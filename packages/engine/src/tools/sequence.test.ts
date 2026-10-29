@@ -151,7 +151,7 @@ describe("sequence_shots_tool", () => {
     expect((result.data?.data as Data).order.map((r) => r.source_in)).toEqual([0, 0.5, 1, 1.5]);
   });
 
-  it("has the genre tools order a file list that is just the bin's own order, unless keep_order", async () => {
+  it("has the genre tools order a file list that is just the bin's own order (a montage's file_ids, a reel's default), unless keep_order", async () => {
     const doc = new ProjectDocument(project(false));
     doc.transaction("more files", (tx) => {
       for (const k of [1, 2, 3]) addFile(tx, media(`/m/take${k}.mp4`, videoInfo(`/m/take${k}.mp4`, 2, { width: W, height: H, fps: { num: FPS, den: 1 } })), { id: `TAKE${k}` });
@@ -160,7 +160,7 @@ describe("sequence_shots_tool", () => {
     const host: ToolHost = { ...fakeHost(), frames: sampler() };
     const montage = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 4, flash: false, transitions: "none" });
     expect(montage.data?.status, montage.data?.summary).toBe("applied");
-    expect(montage.data?.notes?.join(" ")).toMatch(/^file_ids were in bin order: ordered by continuity first .* Pass keep_order: true/);
+    expect(montage.data?.notes?.join(" ")).toMatch(/^The files were in bin order: ordered by continuity first .* Pass keep_order: true/);
     const kept = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 4, flash: false, transitions: "none", replace: true, keep_order: true });
     expect(kept.data?.notes ?? []).toEqual([]);
     // A chosen order is left alone.
@@ -169,9 +169,12 @@ describe("sequence_shots_tool", () => {
     // Frames that cannot be read (ffmpeg could not start) keep the order given, with a warning that says so.
     const broken: ToolHost = { ...host, frames: { renderFrame: () => Promise.reject(new Error("spawn ffmpeg EAGAIN")), sampleFrames: () => Promise.reject(new Error("spawn ffmpeg EAGAIN")) } };
     const unordered = await runTool({ doc, host: broken }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 4, flash: false, transitions: "none", replace: true, subjects: ids.map((file_id) => ({ file_id, box: { x: 0, y: 0, w: 1, h: 1 } })) });
-    expect(unordered.data?.warnings?.join(" ")).toMatch(/file_ids are in bin order and could not be ordered \(could not read the frames of TAKE: spawn ffmpeg EAGAIN\)/);
-    const reel = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: ids, duration_seconds: 4, replace: true });
+    expect(unordered.data?.warnings?.join(" ")).toMatch(/The files are in bin order and could not be ordered \(could not read the frames of TAKE: spawn ffmpeg EAGAIN\)/);
+    // build_reel_tool orders the bin it defaults to; file_ids it is given are a story order, even the bin's.
+    const reel = await runTool({ doc, host }, "build_reel_tool", { style: "hype", duration_seconds: 4, replace: true });
     expect(reel.data?.status, reel.data?.summary).toBe("applied");
-    expect(reel.data?.notes?.[0]).toMatch(/^file_ids were in bin order: ordered by continuity first/);
+    expect(reel.data?.notes?.[0]).toMatch(/^The files were in bin order: ordered by continuity first/);
+    const story = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: ids, duration_seconds: 4, replace: true });
+    expect(story.data?.notes?.join(" ")).not.toMatch(/bin order/);
   });
 });

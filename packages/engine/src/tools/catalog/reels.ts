@@ -106,7 +106,7 @@ const input = z.strictObject({
     .describe("Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial)."),
   ...beatOverrideShape,
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (they are removed in the same undo step)."),
-  keep_order: z.boolean().optional().describe("Cut styles: keep file_ids as given when they are the bin's own order (by default such a list is ordered by continuity first, like sequence_shots_tool)."),
+  keep_order: z.boolean().optional().describe("Cut styles without file_ids: keep the bin's own order (by default the bin is ordered by continuity first, like sequence_shots_tool)."),
   strict_variety: z
     .boolean()
     .optional()
@@ -407,15 +407,16 @@ export const reelTools: CatalogTool[] = [
       const look = measured && gradeMode !== "none" ? await resolveReelLook(call, gradeMode, texts, [...measured.profiles.values()]) : null;
       let ordered = media;
       const orderNotes: string[] = [];
-      // file_ids in the bin's own order are no story either: ordered by continuity first (re-edit bench, 2026-10-28).
-      if (args.file_ids && !args.keep_order && inBinOrder(project, args.file_ids)) {
-        const sequenced = await sequenceFiles(call, args.file_ids, { arc: styleId === "hype" ? "build" : "peak" }, "keep_order");
+      // The default list is the bin's own order, no story: ordered by continuity first (re-edit bench,
+      // 2026-10-28), else by fit to the look below. file_ids given are a story order, even when it is the bin's.
+      if (!args.file_ids && !args.keep_order && inBinOrder(project, ids)) {
+        const sequenced = await sequenceFiles(call, ids, { arc: styleId === "hype" ? "build" : "peak" }, "keep_order");
         if (sequenced && "ids" in sequenced) {
           ordered = sequenced.ids.map((id) => media.find((m) => m.fileId === id)!);
           orderNotes.push(sequenced.note);
         } else if (sequenced) warnings.push(sequenced.warning);
       }
-      if (measured && look && !args.file_ids) {
+      if (orderNotes.length === 0 && measured && look && !args.file_ids) {
         // Bin order has no story: the clips that already fit the look open the reel and close it.
         const order = orderByFit(media.map((m) => m.fileId), measured.profiles, lookTarget(look.choice.look, [...measured.profiles.values()]));
         ordered = order.map((id) => media.find((m) => m.fileId === id)!);
