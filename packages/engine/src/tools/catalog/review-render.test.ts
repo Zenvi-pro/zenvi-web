@@ -17,13 +17,14 @@ import type { RenderInspection, RenderInspectOptions } from "../types.js";
 
 type Row = Record<string, unknown>;
 
-/** Vertical stripes `period` pixels wide: different periods hash apart. */
+/** Vertical stripes `period` pixels wide with footage's grain: different periods hash apart. */
 function stripes(width: number, height: number, period: number): RgbaImage {
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const on = Math.floor((x * 64) / width / period) % 2 === 0;
-      data.set([on ? 230 : 20, on ? 200 : 30, on ? 180 : 40, 255], (y * width + x) * 4);
+      const grain = ((x * 7 + y * 13) % 5) * 6 - 12;
+      data.set([(on ? 230 : 20) + grain, (on ? 200 : 30) + grain, (on ? 180 : 40) + grain, 255], (y * width + x) * 4);
     }
   }
   return { width, height, data };

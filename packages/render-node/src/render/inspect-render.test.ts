@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { INSPECT_THRESHOLDS } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { makeTempDir, removeDir } from "../test-support/fixtures.js";
-import { inspectRender, parseInspectLog } from "./inspect-render.js";
+import { inspectRender, parseInspectLog, parsePictureSeries, PICTURE_FPS } from "./inspect-render.js";
 
 const exec = promisify(execFile);
 
@@ -41,6 +41,24 @@ describe("parseInspectLog", () => {
   });
 });
 
+describe("parsePictureSeries", () => {
+  it("joins each sample's four keys and maps studio range to 0-1 and -1..1", () => {
+    const sample = (t: number, y: number, u: number, v: number, d: number): string[] => [
+      `[Parsed_metadata_5 @ 0x1] frame:0    pts:0       pts_time:${t}`,
+      `[Parsed_metadata_5 @ 0x1] lavfi.signalstats.YAVG=${y}`,
+      `[Parsed_metadata_6 @ 0x2] frame:0    pts:0       pts_time:${t}`,
+      `[Parsed_metadata_6 @ 0x2] lavfi.signalstats.UAVG=${u}`,
+      `[Parsed_metadata_7 @ 0x3] frame:0    pts:0       pts_time:${t}`,
+      `[Parsed_metadata_7 @ 0x3] lavfi.signalstats.VAVG=${v}`,
+      `[Parsed_metadata_8 @ 0x4] frame:0    pts:0       pts_time:${t}`,
+      `[Parsed_metadata_8 @ 0x4] lavfi.signalstats.YDIF=${d}`,
+    ];
+    const log = [...sample(0, 16, 128, 128, 0), ...sample(0.0667, 235, 240, 16, 21.9), "[Parsed_metadata_5 @ 0x1] frame:2 pts:2 pts_time:0.1333"].join("\n");
+    expect(parsePictureSeries(log)).toEqual({ fps: PICTURE_FPS, t: [0, 0.067], luma: [0, 1], u: [0, 1], v: [0, -1], motion: [0, 0.1] });
+    expect(parsePictureSeries("nothing here")).toBeNull();
+  });
+});
+
 describe("inspectRender", { timeout: 60_000 }, () => {
   let dir: string;
   beforeAll(async () => {
@@ -64,5 +82,13 @@ describe("inspectRender", { timeout: 60_000 }, () => {
     expect(found.black[0]!.end).toBeGreaterThan(2.9);
     expect(found.loudness!.integratedLufs).toBeLessThan(-10);
     expect(found.loudness!.truePeakDb).toBeLessThan(0);
+    // The sampled picture: the test card is bright and moving, then black and still.
+    const pic = found.picture!;
+    expect(pic.t.length).toBeGreaterThan(40);
+    const at = (s: number): number => pic.t.findIndex((t) => t >= s);
+    expect(pic.luma[at(1)]!).toBeGreaterThan(0.2);
+    expect(pic.motion[at(1)]!).toBeGreaterThan(0.001);
+    expect(pic.luma[at(2.6)]!).toBeLessThan(0.02);
+    expect(pic.motion[at(2.6)]!).toBe(0);
   });
 });
