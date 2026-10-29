@@ -8,7 +8,8 @@
 
 import { isAudioOnlyMedia } from "../model/media.js";
 import type { ProjectFile } from "../model/types.js";
-import { meanDirection, type Vector } from "../shots/vectors.js";
+import { chainOrder } from "../shots/order.js";
+import { cosine, meanDirection, type Vector } from "../shots/vectors.js";
 import type { ToolCall } from "./define.js";
 import { fileLabel, matteRecord } from "./mattes.js";
 import type { ShotEmbeddings, ShotHost } from "./types.js";
@@ -93,4 +94,26 @@ export async function shotVectors(call: ToolCall, host: ShotHost, shots: readonl
     }
   }
   return out;
+}
+
+/**
+ * The order of `files` in which each looks most like the one before (the
+ * first and last stay in place: the opener and the payoff), each file seen
+ * at `times[i]` (default a third into it, where a montage takes its shots).
+ * A sentence instead when this host cannot see the files.
+ */
+export async function lookOrder(call: ToolCall, files: readonly ProjectFile[], times: readonly (number | undefined)[]): Promise<number[] | string> {
+  const host = call.host.shots;
+  if (!host) return "this surface has no shot model";
+  const status = await host.status();
+  if (!status.ready) return status.detail;
+  const windows = files.map((file, i) => {
+    const t = isStill(file) ? 0 : (times[i] ?? (Number(file.duration) || 0) / 3);
+    return { file, start: t, end: t };
+  });
+  const vectors = await shotVectors(call, host, windows, true);
+  const unread = files.filter((_, i) => !vectors[i]).map((f) => f.id);
+  if (unread.length > 0) return `could not read the picture of ${unread.join(", ")}`;
+  const sim = (vectors as Vector[]).map((a) => (vectors as Vector[]).map((b) => cosine(a, b)));
+  return chainOrder(sim, { fixFirst: true, fixLast: true });
 }
