@@ -273,13 +273,14 @@ export const variantTools: CatalogTool[] = [
       if (!storage.readCopy) return unavailable(PICK, "picking a variant needs project storage that can read another project, which this host does not provide.");
       const variants: Variant[] = args.variants.map((v) => ({ name: v.name ?? (v.project.split(/[\\/]/).pop() ?? v.project), project: v.project, render: v.render }));
       if (new Set(variants.map((v) => v.render)).size < variants.length) return refused(PICK, "Error: two variants share a render; give each variant its own render.");
+      if (new Set(variants.map((v) => v.name)).size < variants.length) return refused(PICK, "Error: two variants share a name; give each its own name.");
       const apply = args.apply !== false;
       // Everything is read before the first watch: a variant that cannot be opened must not cost a tournament.
-      const projects = new Map<string, Project>();
+      const projects = new Map<Variant, Project>();
       if (apply) {
         for (const v of variants) {
           try {
-            projects.set(v.name, await storage.readCopy(v.project));
+            projects.set(v, await storage.readCopy(v.project));
           } catch (error) {
             return refused(PICK, `Error: could not open variant ${v.name} (${v.project}): ${message(error)}`);
           }
@@ -320,7 +321,7 @@ export const variantTools: CatalogTool[] = [
       let changedKeys = 0;
       if (apply) {
         try {
-          changedKeys = adoptVariant(call, projects.get(champion.name)!, `Pick best variant: ${champion.name}`);
+          changedKeys = adoptVariant(call, projects.get(champion)!, `Pick best variant: ${champion.name}`);
         } catch (error) {
           return failed(PICK, `Error: could not make ${champion.name} the open project: ${message(error)}`);
         }

@@ -186,6 +186,8 @@ describe("pick_best_variant_tool", () => {
     const calls = judging(ed, {}, { "renders/c.mp4": 90 });
     const missing = (await runTool({ doc, host: ed.host }, "pick_best_variant_tool", { variants: [THREE[0], { name: "x", project: "variants/x.zvn", render: "renders/x.mp4" }] })).data!;
     expect(missing.summary).toMatch(/^Error: could not open variant x/);
+    const twins = (await runTool({ doc, host: ed.host }, "pick_best_variant_tool", { variants: [THREE[0], { ...THREE[1], name: "a" }] })).data!;
+    expect(twins.summary).toBe("Error: two variants share a name; give each its own name.");
     const long = (await runTool({ doc, host: ed.host }, "pick_best_variant_tool", { variants: THREE })).data!;
     expect(long.summary).toContain("renders/c.mp4 is 90.00s long");
     expect(calls).toEqual([]);
