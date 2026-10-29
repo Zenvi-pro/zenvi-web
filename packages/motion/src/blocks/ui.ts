@@ -131,3 +131,11 @@ export function onColor(bg: string): string {
   // Contrast against white (1.05 / (l + 0.05)) vs black ((l + 0.05) / 0.05).
   return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
 }
+
+/** Two #rrggbb colours mixed, `k` of the way from a to b, as #rrggbb. */
+export function mixHex(a: string, b: string, k: number): string {
+  const pa = parseInt(a.slice(1, 7), 16);
+  const pb = parseInt(b.slice(1, 7), 16);
+  const ch = (s: number): number => Math.round(((pa >> s) & 255) * (1 - k) + ((pb >> s) & 255) * k);
+  return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, "0")).join("")}`;
+}
