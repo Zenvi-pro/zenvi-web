@@ -6,6 +6,7 @@
  */
 
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,7 +17,6 @@ import { resolveBinary } from "../ffmpeg/binaries.js";
 const exec = promisify(execFile);
 
 /** Bump when a recipe changes so stale caches are not reused. */
-const CACHE_VERSION = 2;
 export const FIXTURE_WIDTH = 320;
 export const FIXTURE_HEIGHT = 180;
 export const FIXTURE_SECONDS = 1;
@@ -74,10 +74,12 @@ const RECIPES = {
 } as const satisfies Record<string, readonly string[]>;
 
 export type FixtureName = keyof typeof RECIPES;
+/** Names the cache folder: editing a recipe can never reuse a fixture made by the old one. */
+const RECIPES_HASH = createHash("sha256").update(JSON.stringify(RECIPES)).digest("hex").slice(0, 12);
 export const FIXTURE_NAMES = Object.keys(RECIPES) as FixtureName[];
 
 export function fixtureCacheDir(): string {
-  return process.env.ZENVI_TOOL_TRUTH_CACHE ?? path.join(tmpdir(), `zenvi-tool-truth-v${CACHE_VERSION}`);
+  return process.env.ZENVI_TOOL_TRUTH_CACHE ?? path.join(tmpdir(), `zenvi-tool-truth-${RECIPES_HASH}`);
 }
 
 /** Where a fixture lives once generated (arguments that name a file, like an effect's mask reader). */
