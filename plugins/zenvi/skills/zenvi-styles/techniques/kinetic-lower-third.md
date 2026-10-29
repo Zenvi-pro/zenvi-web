@@ -20,9 +20,9 @@ the role drops under; on exit both keep travelling the way they came while the r
 
 ## Build it in Zenvi
 ```json
-add_motion_block_tool {"block": "lower_third", "position_seconds": 0.4, "duration_seconds": 4.2,
+add_motion_block_tool {"block": "lower_third", "position_seconds": 0.8, "duration_seconds": 4.2,
   "params": {"name": "Rae Okafor", "role": "Product designer", "style": "rule", "align": "left", "palette": "dark", "accent": "#f2c14e"}}
-add_sfx_tool {"recipe": "swish_airy", "at_seconds": 0.6, "gain_db": -18}
+add_sfx_tool {"recipe": "swish_airy", "at_seconds": 1.0, "gain_db": -18}
 ```
 `style: "bar"` wipes a solid accent bar behind the name (news, podcast). Native/desktop: `add_title_tool` with a
 lower-third template (`list_title_templates_tool`), `text: "Name\nRole"`.

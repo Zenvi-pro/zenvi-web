@@ -44,6 +44,8 @@ No sequencer for mirrored/cropped full-bleed layout variants yet (`needs: type-s
   the system).
 - Changes on percussive hits (kick/snare/vocal) — 64 % of the best type cuts land on onsets, not the bare grid.
 - 2-3 grounds total (ink, paper, one accent) with one inversion rule.
+- Photosensitivity: at most 3 full-bleed ground flips per second (WCAG 2.3.1; a black/white flip is the worst case).
+  Words may change faster than that; the ground then stays the same for the fast repeats.
 - End with a lockup held ≥ 1.5 s, or a hard stop with the music.
 
 ## Sound for it

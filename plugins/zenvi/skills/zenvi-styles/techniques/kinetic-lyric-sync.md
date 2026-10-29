@@ -30,7 +30,9 @@ first mattes the footage to keep words off the subject (on 2026-10-28, under hea
 footage) — lyric layout is decided by hand anyway. `style: "editorial"` for a serif block, `"stack"` for a shout.
 
 ## Timing & taste rules
-- Text onset within 2 frames of the sung onset; hand-timed cues are checked by ear on a render.
+- Cue onset within 2 frames of the sung onset; hand-timed cues are checked by ear on a render. `detect_beats_tool`
+  gives music beats, not sung words, so use it only to find candidate onsets. Words inside a phrase cue are spread by
+  length, not by the voice: when each word must land on its own onset, give each word its own cue.
 - One face, one size (≤ 1.2x variance); only the shout line may be bigger/caps.
 - Reset the canvas in the vocal rests (on the breath), not mid-line.
 - Keep the lyric off the focal subject (bottom band, above the horizon, or beside the singer), on a calm dark area:

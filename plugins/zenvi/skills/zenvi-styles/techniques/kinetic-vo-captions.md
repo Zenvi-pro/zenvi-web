@@ -22,7 +22,7 @@ subject matte). The talking-head caption look; the type *is* the caption.
 ## Build it in Zenvi
 ```json
 generate_subject_matte_tool {"clip_id": "<speaker clip>"}
-kinetic_captions_tool {"style": "creator", "emphasis": "deadline,idea,time", "behind_subject": "auto"}
+kinetic_captions_tool {"timeline_clip_ids": ["<speaker clip>"], "style": "creator", "emphasis": "deadline,idea,time", "behind_subject": "auto"}
 add_sfx_tool {"recipe": "pop", "at_seconds": 1.45, "gain_db": -16}   (one per emphasis word, varied seed)
 ```
 Words come from the transcript (`transcribe_media_tool`, or the TTS voice's own word timings). With no transcription

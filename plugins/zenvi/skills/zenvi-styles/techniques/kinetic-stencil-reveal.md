@@ -26,7 +26,7 @@ add_title_tool {"template": "Standard_1", "text": "BLOOM", "font": "Arial Black"
   "text_color": "#ffffff", "background_color": "#000000", "position_seconds": 0, "duration_seconds": 2.6}
 set_clip_properties_tool {"timeline_clip_ids": ["<title clip>"], "properties": {"composite": "multiply"}}
 set_keyframes_tool {"timeline_clip_id": "<title clip>", "property": "scale_x", "points": [{"seconds": 0, "value": 1}, {"seconds": 2.6, "value": 1.12}]}
-set_keyframes_tool … same points for scale_y
+set_keyframes_tool {"timeline_clip_id": "<title clip>", "property": "scale_y", "points": [{"seconds": 0, "value": 1}, {"seconds": 2.6, "value": 1.12}]}
 add_sfx_tool {"recipe": "impact_punch", "at_seconds": 2.6}
 ```
 It must be **one** title image (add_title_tool with `background_color`): add_kinetic_title_tool's `background` is a

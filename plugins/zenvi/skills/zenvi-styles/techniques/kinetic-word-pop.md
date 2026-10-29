@@ -26,8 +26,10 @@ add_kinetic_title_tool {"text": "stop chasing the deadline", "style": "creator",
 add_sfx_tool {"recipe": "pop", "at_seconds": 1.0}
 ```
 Over speech: `kinetic_captions_tool {"style": "creator", "animation": "pop"}` (words timed to the voice, see
-kinetic-vo-captions). `avoid` is the speaker's face/body box (0-1, centre and size); without it the tool keeps off the
-subject matte when the clip has one.
+kinetic-vo-captions). `avoid` is the speaker's face/body box (0-1, centre and size) and is fixed for the whole title: use it only when the
+speaker stays put (the verification test shows a walking subject running into the hero word). Without it the tool keeps
+off the subject matte when the clip has one; for a moving speaker, place the line where they never go or cut to a held
+framing.
 
 ## Timing & taste rules
 - Stagger 0.12-0.2 s per word (≈ speech rate 140-170 wpm); never all at once unless it is a slam.

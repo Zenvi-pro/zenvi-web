@@ -26,9 +26,12 @@ add_kinetic_title_tool {"text": "LED · 2400 LM", "style": "documentary", "anima
   "position_seconds": 0.2, "duration_seconds": 3.2, "y": 0.36}
 set_keyframes_tool {"timeline_clip_id": "<title clip>", "property": "location_x",
   "points": [{"seconds": 0.2, "value": 0.3}, {"seconds": 1.7, "value": 0.26}, {"seconds": 3.2, "value": 0.25}]}
-set_keyframes_tool … location_y the same way
+set_keyframes_tool {"timeline_clip_id": "<title clip>", "property": "location_y",
+  "points": [{"seconds": 0.2, "value": 0.33}, {"seconds": 1.7, "value": 0.33}, {"seconds": 3.2, "value": 0.31}]}
+add_sfx_tool {"recipe": "ui_tap", "at_seconds": 0.2, "gain_db": -18}
 ```
-(0.3 = the title's `data.box` left edge at the start; later keys add the point's movement in frame fractions.) Static callouts with leader
+(0.3 / 0.33 = the title's `data.box` left and top edges at the start; later keys add the point's movement in frame
+fractions.) Static callouts with leader
 lines on a held shot: `add_motion_block_tool {"block": "hud_callouts", "params": {"points": [...]}}`.
 
 ## Timing & taste rules

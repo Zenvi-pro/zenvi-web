@@ -106,7 +106,9 @@ file keeps the type rules and the `kcut-*` file keeps the hit/FX timing.
 ## Size and timing numbers (all techniques)
 
 - Hero:connector 3-6x over footage (captions), 2-3x in type-only and VO type; hero:label 9-30x in spec layouts.
-- Hold ≥ 0.4 s per short word before it changes; typing ≤ 40 % of a hold.
+- Hold ≥ 0.4 s per short word before it changes; typing ≤ 40 % of a hold. Captions on fast speech follow the voice
+  instead (words can change every 0.3 s there; chunk 2-3 words so each chunk holds).
+- Never more than 3 full-bleed light/dark flips per second (photosensitivity, WCAG 2.3.1), however fast the cutting.
 - Overshoot ≤ 115 %; exits are cuts or the next element replacing the type.
 - Type changes on percussive onsets or spoken onsets (±2 frames), not on the bare beat grid; holds are 1, 2, 4 or 8
   beats (a word ≥ 1 beat, a held lockup 4-8).

@@ -20,18 +20,19 @@ drum transients and collapsing back to the single centre line in under 1 s.
 
 ## Build it in Zenvi
 No one-call tool yet (`needs: text-echo-stack`). Fallback that verifies: 7 `add_kinetic_title_tool` copies of the line at
-y 0.5, 0.38/0.62, 0.26/0.74, 0.14/0.86, the accent getting darker outward, each starting 0.067 s after the previous and
+y 0.5, 0.38/0.62, 0.26/0.74, 0.14/0.86, the ink getting darker outward, each starting 0.067 s after the previous and
 the outer pairs ending first so the stack collapses to the centre:
 ```json
-add_kinetic_title_tool {"text": "NO DAYS OFF", "style": "creator", "emphasis": "NO,DAYS,OFF", "accent": "#ffffff", "text_size": 0.016,
+add_kinetic_title_tool {"text": "NO DAYS OFF", "style": "documentary", "emphasis": "none", "ink": "#ffffff", "text_size": 0.085,
   "animation": "slam", "stagger_seconds": 0, "y": 0.5, "position_seconds": 0.2, "duration_seconds": 2.6}
-add_kinetic_title_tool {"text": "NO DAYS OFF", "style": "creator", "emphasis": "NO,DAYS,OFF", "accent": "#b8b8b8", "text_size": 0.016,
+add_kinetic_title_tool {"text": "NO DAYS OFF", "style": "documentary", "emphasis": "none", "ink": "#b8b8b8", "text_size": 0.085,
   "animation": "slam", "stagger_seconds": 0, "y": 0.38, "position_seconds": 0.267, "duration_seconds": 1.433}
 … (y 0.62 #b8b8b8, 0.26/0.74 #7a7a7a, 0.14/0.86 #4a4a4a; start +0.067 s each, duration shrinking)
-add_sfx_tool {"recipe": "hit_transient", "at_seconds": 0.2}   (one per other copy, -16 dB) and impact_punch on the collapse
+add_sfx_tool {"recipe": "hit_transient", "at_seconds": 0.2, "gain_db": -16, "seed": 0}
+add_sfx_tool {"recipe": "impact_punch", "at_seconds": 1.75}
 ```
-Emphasising every word in the creator style is the trick that keeps the condensed caps (connectors would be lowercase
-Inter). The full script is `scripts/kinetic-echo-stack.sh` in the verification artifacts. Outlined echoes need an
+One `hit_transient` per other copy (new `seed`), the punch on the collapse. Use `documentary` (one Inter line):
+`creator` with every word emphasised (for the condensed caps) stacks the words vertically. The full script is `scripts/kinetic-echo-stack.sh` in the verification artifacts. Outlined echoes need an
 outline title preset (not in add_kinetic_title_tool); `type_morph` `style: "outline"` is the only outlined type today.
 
 ## Timing & taste rules

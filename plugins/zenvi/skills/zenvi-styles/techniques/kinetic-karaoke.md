@@ -15,7 +15,7 @@ needs: []
 # Karaoke word highlight
 
 ## What it is
-1-4 word centred bold-caps chunks (4.5-6.5 % of frame height), white with a stroke, the word being said lit in an accent
+1-4 word centred bold-caps chunks (`text_size` 0.045-0.065 of the frame's short side), white with a stroke, the word being said lit in an accent
 pill or colour; snap in, no drift. The podcast-clip default: readable with the sound off.
 
 ## Build it in Zenvi
