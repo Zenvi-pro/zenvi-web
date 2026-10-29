@@ -89,6 +89,18 @@ kinetic-cut-video, see NOTICE); in short:
   - exactly one `climax` row, whose tone no other shot has: the heaviest
     moment breaks the system the rest set up.
   Get 1.5x the media the storyboard needs; the style gives the source count.
+- **footage from one film**: the save and `get_brief_tool` receipts list the
+  shot plan against the bin ("Footage: 3/7 shots covered ... missing: 2 to
+  fetch, 2 to generate") with the one call for each kind. Use the person's
+  media first (it belongs to the film; the receipt names files no shot
+  uses). Fetch the stock rows in ONE `gather_stock_footage_tool` call with
+  `coherence: "shoot"` and `match_file_id` (the person's footage): one
+  contributor's shoot across the queries, matching light, grade and lens.
+  Generate the `generate` rows as ONE `generate_broll_set_tool` set (one style
+  line, one reference image, stills animated; cached), never one generate
+  call per shot. After the cut, `unify_grade_tool` on the assembled set.
+  Product, brand and explainer pieces cut from stock of unrelated shoots read
+  as a slideshow however good the cutting.
 
 ## 5. Write the rest of the brief
 

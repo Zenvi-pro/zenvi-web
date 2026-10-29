@@ -169,16 +169,46 @@ export async function generateImage(
   call: ToolCall,
   prompt: string,
   size: { width: number; height: number },
-): Promise<{ imageBase64: string; mimeType: string } | { error: string }> {
-  const res = await backendRequest<Record<string, unknown>>(call.host.backend, "/api/v1/generation/image", {
-    method: "POST",
-    body: { prompt, width: size.width, height: size.height },
-    signal: call.signal,
-  });
+  options: { provider?: string; referenceImageUrl?: string } = {},
+): Promise<{ imageBase64: string; mimeType: string; provider?: string } | { error: string }> {
+  // provider and reference_image_url are zenvi-backend #69's (OpenAI / Gemini image-to-image); older backends ignore them and answer no provider.
+  const body: Record<string, unknown> = { prompt, width: size.width, height: size.height };
+  if (options.provider) body.provider = options.provider;
+  if (options.referenceImageUrl) body.reference_image_url = options.referenceImageUrl;
+  const res = await backendRequest<Record<string, unknown>>(call.host.backend, "/api/v1/generation/image", { method: "POST", body, signal: call.signal });
   if (!res.ok) return { error: res.error };
   if (!isRecord(res.data)) return { error: "Unexpected response from the Zenvi backend" };
   if (typeof res.data.error === "string" && res.data.error) return { error: res.data.error };
-  return { imageBase64: String(res.data.image_base64 ?? ""), mimeType: String(res.data.mime_type ?? "") };
+  const provider = typeof res.data.provider === "string" && res.data.provider ? res.data.provider : undefined;
+  return { imageBase64: String(res.data.image_base64 ?? ""), mimeType: String(res.data.mime_type ?? ""), ...(provider ? { provider } : {}) };
+}
+
+/**
+ * POST /api/v1/generation/morph: a video that starts on one still and ends
+ * on another (data URIs), charged by the backend. The same still at both
+ * ends is image-to-video over JSON: the /video route takes stills only as
+ * multipart uploads.
+ */
+export async function generateMorph(
+  call: ToolCall,
+  input: { prompt: string; startImageUrl: string; endImageUrl: string; durationSeconds: number; width: number; height: number },
+): Promise<{ videoUrl: string } | { error: string }> {
+  const res = await backendRequest<Record<string, unknown>>(call.host.backend, "/api/v1/generation/morph", {
+    method: "POST",
+    body: {
+      prompt: input.prompt,
+      start_image_url: input.startImageUrl,
+      end_image_url: input.endImageUrl,
+      duration_seconds: input.durationSeconds,
+      width: input.width,
+      height: input.height,
+    },
+    signal: call.signal,
+  });
+  if (!res.ok) return { error: res.error };
+  if (typeof res.data.error === "string" && res.data.error) return { error: bareError(res.data.error, "Video generation failed") };
+  const url = String(res.data.video_url ?? "");
+  return url ? { videoUrl: url } : { error: "No video URL returned from generation." };
 }
 
 /** POST /api/v1/generation/tts (api_client.generate_tts): MP3 bytes as base64. */
