@@ -152,14 +152,14 @@ export function failed(tool: string, message: string, fields: ReceiptFields = {}
 /** Phrases that mark a legacy informational no-op (receipt.py from_handler_str). */
 const UNCHANGED_PHRASES = ["nothing to", "no speech", "already", "no timeline", "no clips", "no files"];
 
+/** Stock failures the desktop words without "Error" (zenvi-backend core/workflows/parse.py is_error_result). */
+const STOCK_FAILURE = /^(pexels|freesound) (search|download) error/i;
+
 /**
  * Wrap a legacy prose / "Error:" handler string as a receipt, exactly like
  * receipt.py `from_handler_str`: errors by prefix, empty text as "No
  * changes.", informational no-ops as unchanged, everything else applied.
  */
-/** Stock failures the desktop words without "Error" (zenvi-backend core/workflows/parse.py is_error_result). */
-const STOCK_FAILURE = /^(pexels|freesound) (search|download) error/i;
-
 export function fromHandlerText(tool: string, text: string, mutated: boolean): ToolReceipt {
   const raw = text ?? "";
   if (raw.startsWith("Error") || STOCK_FAILURE.test(raw)) return failed(tool, raw);
