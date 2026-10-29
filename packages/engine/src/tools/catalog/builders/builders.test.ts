@@ -44,9 +44,9 @@ interface Built {
   [key: string]: unknown;
 }
 
-async function build(doc: ProjectDocument, tool: string, args: Record<string, unknown>): Promise<Built> {
+async function build(doc: ProjectDocument, tool: string, args: Record<string, unknown>, host = fakeHost()): Promise<Built> {
   const before = doc.undoLabels.length;
-  const result = await runTool({ doc, host: fakeHost() }, tool, args);
+  const result = await runTool({ doc, host }, tool, args);
   expect(result.ok, result.text).toBe(true);
   // The whole video is ONE undo step.
   expect(doc.undoLabels.length).toBe(before + 1);
@@ -271,5 +271,22 @@ describe("build_explainer_tool picks its voice", () => {
     const data = await build(new ProjectDocument(p), "build_explainer_tool", { captions: "none", grade: "none" });
     expect(data.voice_file_id).toBe("RECORD0001");
     expect(data.music_file_id).toBeNull();
+  });
+});
+
+describe("build_product_launch_tool with five features", () => {
+  it("ends the glass cards on the fourth feature's bar, so the fifth's title does not sit over them", async () => {
+    const doc = project();
+    const host = fakeHost();
+    const motion = host.motion!;
+    // A motion host that renders every block the builder asks for.
+    const blocks = motion.blocks!().flatMap((b) => ["glass_cards", "gradient_field", "logo_reveal_end"].map((id) => ({ ...b, id })));
+    host.motion = { ...motion, blocks: () => blocks, check: (_id, params) => ({ ok: true, params }) };
+    const data = await build(doc, "build_product_launch_tool", { product: "Oarlight", features: ["A", "B", "C", "D", "E"], file_ids: ["CITY000001"], three_d: "none" }, host);
+    const sections = (data.sections as { kind: string; start: number; end: number }[]).filter((s) => s.kind === "feature");
+    const cards = step(data, "features")!;
+    expect(cards, cards.why).toMatchObject({ outcome: "applied" });
+    expect(Number(cards.args!.position_seconds) + Number(cards.args!.duration_seconds)).toBeCloseTo(sections[3]!.end, 3);
+    expect(step(data, "feature 5")).toMatchObject({ outcome: "fallback", args: expect.objectContaining({ position_seconds: sections[4]!.start }) });
   });
 });

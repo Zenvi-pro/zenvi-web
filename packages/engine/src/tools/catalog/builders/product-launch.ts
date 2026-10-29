@@ -151,10 +151,10 @@ export const productLaunchTools: CatalogTool[] = [
         }
       }
 
-      // The features: one glass-cards block over all of them, else a title per feature.
+      // The features: one glass-cards block over the first four (the block's most), else a title per feature; a fifth gets its own title after the cards.
       const featureSections = plan.sections.filter((s) => s.kind === "feature");
       const first = featureSections[0]!;
-      const last = featureSections[featureSections.length - 1]!;
+      const last = featureSections[Math.min(4, featureSections.length) - 1]!;
       const background = shown.get(first);
       const cards = await c.run(
         "features",
