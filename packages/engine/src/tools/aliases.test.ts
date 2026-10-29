@@ -72,6 +72,12 @@ describe("aliasArguments on items and enum values", () => {
     expect(r.notes).toHaveLength(2);
   });
 
+  it("leaves an item's at_seconds alone: a point's seconds count from its clip, not the timeline", () => {
+    const keyframes = { properties: { points: { type: "array", items: { properties: { seconds: {}, timeline_seconds: {}, value: {} } } } } };
+    const args = { points: [{ at_seconds: 3, value: 1 }] };
+    expect(aliasArguments(keyframes, args)).toEqual({ args, notes: [] });
+  });
+
   it("reads one id as the list of one where the tool takes only the list", () => {
     expect(aliasArguments(schema("timeline_clip_ids", "x"), { timeline_clip_id: "A" }).args).toEqual({ timeline_clip_ids: "A" });
     expect(aliasArguments(schema("clip_id", "timeline_clip_ids"), { timeline_clip_id: "A" }).args).toEqual({ clip_id: "A" });

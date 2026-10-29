@@ -8,21 +8,31 @@
  * returns nothing, and the caller keeps its refusal.
  */
 
-/** Argument names agents use for another tool's argument; each maps to the schema names it may mean, in order. */
-const ARGUMENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
+/** Clip id names; each maps to the schema names it may mean, in order. */
+const ID_ALIASES: Readonly<Record<string, readonly string[]>> = {
   clip_id: ["timeline_clip_id"],
   clip_ids: ["timeline_clip_ids"],
   // trim_clip_tool and the FX tools name the same thing clip_id.
   timeline_clip_id: ["clip_id"],
   timeline_clip_ids: ["clip_ids"],
+};
+
+/** Argument names agents use for another tool's argument. */
+const ARGUMENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  ...ID_ALIASES,
   max_results: ["count", "limit"],
   // The moment, by the name add_sfx_tool gives it (analyze_frame_colors_tool calls it time).
   at_seconds: ["time", "seconds", "time_seconds", "position_seconds"],
 };
 
-/** The same inside the objects of an array argument: list_fx_tool lists effects by `id`, apply_fx_tool's items name them `effect`. */
+/**
+ * The same inside the objects of an array argument, ids only: an item's
+ * `seconds` counts from its clip or transition (set_keyframes_tool's points),
+ * so a timeline `at_seconds` has no one reading there. list_fx_tool lists
+ * effects by `id`, apply_fx_tool's items name them `effect`.
+ */
 const ITEM_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  ...ARGUMENT_ALIASES,
+  ...ID_ALIASES,
   id: ["effect"],
 };
 
