@@ -183,3 +183,25 @@ export async function shotLooks(call: ToolCall, shots: readonly ShotWindow[]): P
     return null;
   }
 }
+
+/**
+ * Keyframe embeddings of `files` (embedded now when not cached), when this
+ * host has the shot model installed (never a download); null otherwise.
+ * Files that cannot be embedded are left out.
+ */
+export async function installedEmbeddings(call: ToolCall, files: readonly ProjectFile[]): Promise<Map<string, ShotEmbeddings> | null> {
+  const host = call.host.shots;
+  if (!host) return null;
+  try {
+    if (!(await host.status()).ready) return null;
+  } catch {
+    return null;
+  }
+  const out = new Map<string, ShotEmbeddings>();
+  for (const file of files) {
+    if (embeddableProblem(file)) continue;
+    const e = await embeddingsOf(host, file, true, call.signal).catch(() => null);
+    if (e) out.set(file.id, e);
+  }
+  return out;
+}

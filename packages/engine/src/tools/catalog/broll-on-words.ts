@@ -2,8 +2,9 @@
  * insert_broll_on_words_tool: transcript-keyed B-roll. Cutaways of 0.8-1.5 s
  * land on the words a viewer wants to see (broll-words.ts, or the keywords
  * given), one every 5-8 s, each from a different source: media-bin footage
- * (a file whose name, tags or summary mention the word first), or stock
- * found for each word (gather_stock_footage_tool). The inserts go on a free
+ * (a file whose name, tags or summary mention the word first, then, with
+ * the shot model installed, the file whose picture best shows it, from that
+ * moment), or stock found for each word (gather_stock_footage_tool). The inserts go on a free
  * track above the speaker, muted, so the speaker's sound runs under them.
  * One undo step for the imports and the inserts.
  */
@@ -16,6 +17,7 @@ import { addClip } from "../../ops/clips.js";
 import { patchClip } from "../../ops/internal.js";
 import { addTrack } from "../../ops/tracks.js";
 import { pickBrollWords } from "../broll-words.js";
+import { findShotMoments, installedEmbeddings, type ShotMoment } from "../shots.js";
 import { directTool, type CatalogTool } from "../define.js";
 import { projectFps, toFrame, toSeconds } from "../frame-time.js";
 import { applied, refused, type ToolReceipt } from "../receipt.js";
@@ -80,7 +82,7 @@ export const brollOnWordsTools: CatalogTool[] = [
     title: "Insert B-roll on words",
     description:
       "Cut away from a speaker to B-roll on the words a viewer wants to see (names, places, things, numbers; or the keywords you give), one cutaway every 5-8 s, 0.8-1.5 s each, never the same source twice: " +
-      "footage from the media bin (a file whose name or tags mention the word goes there), or stock found for each word (stock=true). " +
+      "footage from the media bin (a file whose name or tags mention the word goes there; with the shot model installed, the file whose picture shows it best, from that moment), or stock found for each word (stock=true). " +
       "The inserts go muted on a free track above the speaker, so the speaker keeps talking under them. Transcribes footage that has no transcript. One undo step.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
@@ -147,6 +149,8 @@ export const brollOnWordsTools: CatalogTool[] = [
       const scratch = new ProjectDocument(structuredClone(call.doc.project));
       // Stock: one search per word, each word gets its own clip.
       const byWord = new Map<TimelineWord, ProjectFile>();
+      // The moment of a file that shows the word (shot model): the cutaway plays from there.
+      const shown = new Map<TimelineWord, ShotMoment>();
       if (args.stock) {
         const queries = words.map((w) => w.text.replace(/[^\p{L}\p{N}' -]/gu, ""));
         const got = (await runTool({ doc: scratch, host: call.host, signal: call.signal }, "gather_stock_footage_tool", { queries, count: words.length, min_seconds: duration + SOURCE_LEAD })).data;
@@ -160,10 +164,18 @@ export const brollOnWordsTools: CatalogTool[] = [
         }
       } else {
         const left = [...pool];
+        const seen = await installedEmbeddings(call, pool);
         for (const w of words) {
-          // A file that mentions the word, else the next unused one.
-          const named = left.findIndex((f) => fileWords(f).has(w.key));
-          const file = left.splice(named >= 0 ? named : 0, 1)[0];
+          // A file that mentions the word, else the one whose picture shows it best (shot model), else the next unused one.
+          let at = left.findIndex((f) => fileWords(f).has(w.key));
+          if (at < 0 && seen && seen.size > 0) {
+            const [best] = await findShotMoments(call, call.host.shots!, left, seen, `a photo of ${w.text}`, { limit: 1, perFile: 1 });
+            if (best) {
+              at = left.indexOf(best.file);
+              shown.set(w, best);
+            }
+          }
+          const file = left.splice(at >= 0 ? at : 0, 1)[0];
           if (file) byWord.set(w, file);
         }
       }
@@ -174,8 +186,14 @@ export const brollOnWordsTools: CatalogTool[] = [
         const speaker = aroll.find((c) => c.id === w.clipId)!;
         const speakerEnd = (Number(speaker.position) || 0) + (Number(speaker.end) || 0) - (Number(speaker.start) || 0);
         const start = toSeconds(toFrame(w.start, fps), fps);
-        const lead = fileSeconds(file) >= duration + SOURCE_LEAD ? SOURCE_LEAD : 0;
-        const length = Math.min(duration, speakerEnd - start, fileSeconds(file) - lead);
+        const moment = shown.get(w);
+        let lead = fileSeconds(file) >= duration + SOURCE_LEAD ? SOURCE_LEAD : 0;
+        let length = Math.min(duration, speakerEnd - start, fileSeconds(file) - lead);
+        if (moment) {
+          // Centred on the moment that shows the word, inside the file.
+          length = Math.min(duration, speakerEnd - start, fileSeconds(file));
+          lead = Math.max(0, Math.min(moment.peak - length / 2, fileSeconds(file) - length));
+        }
         if (!(length >= 0.2)) return [];
         return [{ word: w, file, start, length: toSeconds(toFrame(length, fps), fps), lead, layer: speaker.layer }];
       });
@@ -200,6 +218,8 @@ export const brollOnWordsTools: CatalogTool[] = [
         seconds: Math.round(p.length * 1000) / 1000,
         file_id: String(p.file.id),
         source: p.file.name ?? p.file.path,
+        source_in: Math.round(p.lead * 1000) / 1000,
+        ...(shown.has(p.word) ? { picked_by: "picture", match: Math.round(shown.get(p.word)!.match * 1000) / 1000 } : {}),
       }));
       return applied(
         TOOL,

@@ -3915,7 +3915,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 ### insert_broll_on_words_tool
 
-**Insert B-roll on words** (direct tool). Cut away from a speaker to B-roll on the words a viewer wants to see (names, places, things, numbers; or the keywords you give), one cutaway every 5-8 s, 0.8-1.5 s each, never the same source twice: footage from the media bin (a file whose name or tags mention the word goes there), or stock found for each word (stock=true).
+**Insert B-roll on words** (direct tool). Cut away from a speaker to B-roll on the words a viewer wants to see (names, places, things, numbers; or the keywords you give), one cutaway every 5-8 s, 0.8-1.5 s each, never the same source twice: footage from the media bin (a file whose name or tags mention the word goes there; with the shot model installed, the file whose picture shows it best, from that moment), or stock found for each word (stock=true).
 
 Surfaces: mcp, cli, editor. edits, open world.
 
