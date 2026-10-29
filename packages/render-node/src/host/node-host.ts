@@ -27,6 +27,7 @@ import { installedFontFamilies } from "../svg/fonts.js";
 import { createNodeMatteHost } from "../matte/host.js";
 import { onnxRuntimeAvailable, rvmModel, type MatteModel } from "../matte/rvm.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
+import { createNodeWatchHost } from "./watch.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createSfxGenerator } from "./sfx-generate.js";
 import { cacheDir } from "../svg/fonts.js";
@@ -278,5 +279,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     const upload = backendSpeechUpload(options.backend);
     host.audio!.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });
   }
+  // Watching a render with sound: the backend as the person `zenvi login` signed in, or a developer Gemini key.
+  const watch = createNodeWatchHost({ env: options.env, backend: options.backend, resolvePath: exportPath, signal: options.signal });
+  if (watch) host.watch = watch;
   return host;
 }

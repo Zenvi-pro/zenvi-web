@@ -60,6 +60,7 @@ import { reelTools } from "./catalog/reels.js";
 import { colorUnifyTools } from "./catalog/color-unify.js";
 import { reviewTools } from "./catalog/review.js";
 import { reviewRenderTools } from "./catalog/review-render.js";
+import { watchRenderTools } from "./catalog/watch-render.js";
 import { swapShotTools } from "./catalog/swap-shot.js";
 import { searchTools } from "./catalog/search.js";
 import { soundDesignTools } from "./catalog/sound-design.js";
@@ -129,7 +130,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools]) {
+  for (const tool of [...implemented, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -153,7 +154,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools];
+  return [...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */

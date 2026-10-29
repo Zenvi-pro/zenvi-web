@@ -152,7 +152,7 @@ describe("render jobs", () => {
     await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} });
     // A second service over the same tables (the other instance) recovers the queued job too.
     const { createServices } = await import("../container.js");
-    const other = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, mixPcm: undefined, resolveAsset: undefined, transcribeMedia: undefined, fontFamilies: undefined, motion: undefined, mattes: undefined, supabase: { verify: async () => null }, renderer });
+    const other = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, mixPcm: undefined, resolveAsset: undefined, transcribeMedia: undefined, watchProxy: undefined, fontFamilies: undefined, motion: undefined, mattes: undefined, supabase: { verify: async () => null }, renderer });
     await other.renders.recover();
     await Promise.all([h.services.renders.drain(), other.renders.drain()]);
     expect(renderer.renders).toBe(1);
@@ -198,7 +198,7 @@ describe("render jobs", () => {
     const first = (await h.request("POST", `/v1/projects/${id}/renders`, { token, json: {} })).json.renderId as string;
     // A worker: its own render service over the same stores, as render-job.ts builds it.
     const { createServices } = await import("../container.js");
-    const worker = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, mixPcm: undefined, resolveAsset: undefined, transcribeMedia: undefined, fontFamilies: undefined, motion: undefined, mattes: undefined, supabase: { verify: async () => null }, renderer });
+    const worker = createServices({ ...h.services, assets: undefined, analyzeAudio: undefined, decodePcm: undefined, mixPcm: undefined, resolveAsset: undefined, transcribeMedia: undefined, watchProxy: undefined, fontFamilies: undefined, motion: undefined, mattes: undefined, supabase: { verify: async () => null }, renderer });
     await worker.renders.runOne(USER_A, first);
     expect(renderer.renders).toBe(1);
     expect((await h.request("GET", `/v1/projects/${id}/renders/${first}`, { token })).json.status).toBe("done");

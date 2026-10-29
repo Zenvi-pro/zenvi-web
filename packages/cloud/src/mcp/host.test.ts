@@ -7,7 +7,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { FILLER_PROMPT, isTranscriptionError, parseTranscription, type AudioEnvelope, type MotionBlockInfo, type ReaderInfo } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
-import type { AssetSource, MatteHostFactory, MediaProber, MixRenderer, MotionHostFactory, RenderInput, SpeechTranscriber } from "../render/renderer.js";
+import type { AssetSource, MatteHostFactory, MediaProber, MixRenderer, MotionHostFactory, RenderInput, SpeechTranscriber, WatchProxyMaker } from "../render/renderer.js";
 import { fakeRenderer } from "../testing/fakes.js";
 import { type Harness, harness, sampleProject, USER_A } from "../testing/helpers.js";
 import { loadEngineRegistry } from "./engine.js";
@@ -433,6 +433,53 @@ describe("speech recognition in the cloud", () => {
     const h = await harness({ prober, analyzeAudio: async () => ({ sampleRate: 16000, frameSize: 480, rms: [] }), transcribeMedia });
     const { host } = createCloudHost(context(h), "c_x", () => sampleProject() as never);
     expect(host.audio?.transcribe).toBeUndefined();
+  });
+});
+
+describe("watching a render in the cloud", () => {
+  const SECRET = "s".repeat(40);
+  /** The "proxy" is the local copy's bytes (render-node makes a real one). */
+  const watchProxy: WatchProxyMaker = async (file) => ({ bytes: new Uint8Array(await readFile(file)), duration: 6, hasAudio: true });
+  const ANSWER = {
+    model: "gemini-3.8-flash",
+    duration: 6,
+    has_audio: true,
+    verdict: "Fine.",
+    overall: 6,
+    would_post: false,
+    scores: { hook: 6 },
+    issues: [{ start: 1, end: 1.5, dimension: "mix", severity: "high", problem: "Music buries the voice.", fix: "Duck the music 8 dB." }],
+    strengths: [],
+    usage: { input_tokens: 900, output_tokens: 400, credits: 1 },
+  };
+
+  it("sends a render in the bin to the backend as the connected person", async () => {
+    const sent: { url: string; auth: string | null; form: FormData }[] = [];
+    const h = await harness({ prober, watchProxy, config: { backendAuth: { kind: "assertion", secret: SECRET } } });
+    h.services.backendSessions.fetchImpl = async (url, init) => {
+      sent.push({ url: String(url), auth: new Headers(init?.headers).get("authorization"), form: init?.body as FormData });
+      return new Response(JSON.stringify(ANSWER), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const bytes = Buffer.from("render bytes");
+    const hash = sha(bytes);
+    await h.services.media.storeBytes(USER_A, { sha256: hash, bytes, name: "reel.mp4", contentType: "video/mp4" });
+    const project = sampleProject({ files: [{ id: "F1", path: "/renders/reel.mp4", media_type: "video", has_audio: true, cloud: { sha256: hash, size: bytes.length, name: "reel.mp4" } }] }) as never;
+    const { host, dispose } = createCloudHost(context(h), "c_x", () => project);
+    const critique = await host.watch!.watch("/renders/reel.mp4", { brief: "a reel", focus: ["mix"] });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.url).toBe("https://api.zenvi.pro/api/v1/watch");
+    expect(sent[0]!.auth).toMatch(/^Bearer ey/);
+    expect(await (sent[0]!.form.get("video") as File).text()).toBe("render bytes");
+    expect([sent[0]!.form.get("brief"), sent[0]!.form.get("focus")]).toEqual(["a reel", "mix"]);
+    expect(critique).toMatchObject({ via: "backend", overall: 6, usage: { credits: 1 } });
+    expect(critique.issues[0]!.fix).toBe("Duck the music 8 dB.");
+    await dispose();
+  });
+
+  it("cannot watch without the backend", async () => {
+    const h = await harness({ prober, watchProxy });
+    const { host } = createCloudHost(context(h), "c_x", () => sampleProject() as never);
+    expect(host.watch).toBeUndefined();
   });
 });
 

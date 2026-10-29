@@ -37,9 +37,9 @@ Mixed asks: take the structure from the genre of the *first five seconds*
 and borrow single techniques from the others.
 
 Every recipe ends with **Finish**: sound on every cut, `master_audio_tool`,
-`render_video`, `review_render_tool`, one fix pass. A run that stops before
-it is not done, however good the picture: unmastered edits arrive 9-17 dB
-too quiet and nobody has looked at the file.
+`render_video`, `review_render_tool`, `watch_render_tool` once, one fix
+pass. A run that stops before it is not done, however good the picture:
+unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
 
 ## The director loop
 
@@ -134,8 +134,11 @@ too quiet and nobody has looked at the file.
 11. **Master always last.** Any later audio edit means mastering again. An
     unmastered edit arrives 2-5 LU quiet and clips on the platforms.
 12. **Verify** (below), fix, verify again. Then `render_video` and
-    **review the file**: `review_render_tool` with the path it wrote. One
-    fix pass: every `PROBLEM` line, render again, review again, report.
+    **review the file**: `review_render_tool` with the path it wrote, then
+    **watch it**: `watch_render_tool` once, with the brief. One fix pass:
+    every `PROBLEM` line and every `HIGH` watch issue (each names its shots
+    and tools), render again, review again, watch again at most once, report
+    both watch scores.
 
 Order matters: speed ramps change clip lengths (`ripple: true`), transitions
 read the cuts, sound design reads cuts, transitions and titles. Anything that
@@ -231,12 +234,22 @@ past the last picture and render again; true peak → `master_audio_tool`;
 repeated shot → the `swap_shot_tool` calls it lists (one per repeat; none
 listed means import more footage). Report the final review's numbers.
 
+**Then watch it, once.** Frames and meters cannot hear a silent whip or feel
+a sagging middle. `watch_render_tool` with the path and the brief has an
+editor watch the file with its sound: a 1-10 score per dimension and 3-6
+timestamped issues, each with the shots it falls on and the tools that fix
+it. Fix the `HIGH` ones (and any `MEDIUM` that is one call), render, and
+watch again at most once; report the score before and after. It costs a few
+credits and needs a Zenvi sign-in: refused (signed out, no credits) means
+skip it and say so under gaps, never retry.
+
 The finishing calls, in order (after the picture and the sound are locked):
 
 ```json
 unify_grade_tool {"look": "teal_punch", "look_intensity": 0.6}
 master_audio_tool {"preset": "social", "genre": "hype", "iterate": true}
 review_render_tool {"path": "reel.mp4"}
+watch_render_tool {"path": "reel.mp4", "brief": "15 s hype reel for a sneaker drop"}
 ```
 
 ## When a tool is missing

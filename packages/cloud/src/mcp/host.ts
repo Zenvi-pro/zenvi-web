@@ -32,6 +32,8 @@ import { join } from "node:path";
 import {
   TRANSCRIPTION_PATH,
   transcriptionHttpError,
+  WATCH_PATH,
+  watchHttpError,
   type BackendHost,
   type CloudMediaRef,
   type HostCapability,
@@ -41,7 +43,7 @@ import {
   type ToolHost,
 } from "@zenvi/engine";
 import { backendStock } from "@zenvi/engine/tools";
-import { ffmpegCanWrite } from "@zenvi/render-node";
+import { critiqueFromBackend, ffmpegCanWrite, watchForm } from "@zenvi/render-node";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
 import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
@@ -95,6 +97,8 @@ export function cloudCapabilities(services: Services): Set<HostCapability> {
   // Both keep what they render as project media, which needs probing.
   if (services.motion && caps.has("media")) caps.add("motion");
   if (services.mattes && caps.has("media")) caps.add("mattes");
+  // A render the person put in the bin, watched through the backend as them.
+  if (services.watchProxy && services.backendSessions.enabled && caps.has("media")) caps.add("watch");
   return caps;
 }
 
@@ -272,6 +276,19 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
   }
 
   if (caps.has("backend")) host.backend = backendFor(services, userId, ctx.signal);
+
+  const watchProxy = services.watchProxy;
+  if (watchProxy && caps.has("watch")) {
+    host.watch = {
+      watch: async (path, request = {}) => {
+        const signal = request.signal ?? ctx.signal;
+        const proxy = await watchProxy(await localCopy(path), signal);
+        const answer = await services.backendSessions.send(userId, WATCH_PATH, { form: watchForm(proxy, request), signal });
+        if (answer.status < 200 || answer.status >= 300) throw watchHttpError(answer.status, answer.body);
+        return critiqueFromBackend(answer.body, proxy);
+      },
+    };
+  }
   host.stock = stockSearch(services, userId, ctx.signal);
 
   /** An export blob of this project and its download link (24 h). */
