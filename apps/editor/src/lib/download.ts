@@ -34,7 +34,7 @@ export interface Downloaded {
 }
 
 /** The first range; files this small take one request. */
-export const FIRST_RANGE_BYTES = 1024 * 1024;
+export const FIRST_RANGE_BYTES = 256 * 1024;
 const MIN_PART_BYTES = 256 * 1024;
 const MAX_PARTS = 6;
 const STALL_MS = 30_000;
@@ -112,7 +112,8 @@ export async function downloadFile(url: string, options: DownloadOptions = {}): 
   };
   const get = async (range?: string): Promise<Response> => {
     const response = await doFetch(url, { signal: controller.signal, ...(range ? { headers: { Range: range } } : {}) });
-    if (!response.ok) throw new DownloadError(`Download failed (${response.status}).`);
+    // 416: nothing past the first range (a file of exactly that size, its total hidden).
+    if (!response.ok && response.status !== 416) throw new DownloadError(`Download failed (${response.status}).`);
     return response;
   };
   const read = (response: Response) => readBody(response, count, stallMs, () => controller.abort());
@@ -127,6 +128,7 @@ export async function downloadFile(url: string, options: DownloadOptions = {}): 
       if (outer?.aborted || error instanceof DownloadError) throw error;
       first = await get();
     }
+    if (first.status === 416) throw new DownloadError("The file is empty.");
     const type = first.headers.get("content-type") ?? "";
     const length = Number(first.headers.get("content-length") ?? NaN);
     if (first.status !== 206) {
@@ -136,27 +138,32 @@ export async function downloadFile(url: string, options: DownloadOptions = {}): 
     }
     total = totalFromContentRange(first.headers.get("content-range"));
     if (tooLarge(total)) throw new DownloadError("That file is too large to import in the browser.");
-    const head = await read(first);
-    const headBytes = loaded;
-    if (headBytes < FIRST_RANGE_BYTES) return { blob: new Blob(head as BlobPart[], { type }), type };
-    let parts: Uint8Array[][];
-    if (total === null) {
-      // Content-Range not exposed to scripts (Pexels): the rest in one request, its length gives the size.
-      const rest = await get(`bytes=${headBytes}-`);
-      const restLength = Number(rest.headers.get("content-length") ?? NaN);
-      if (rest.status !== 206) throw new DownloadError("The server stopped serving byte ranges mid-download.");
-      if (Number.isFinite(restLength)) total = headBytes + restLength;
-      if (tooLarge(total)) throw new DownloadError("That file is too large to import in the browser.");
-      parts = [await read(rest)];
-    } else {
-      parts = await Promise.all(
-        splitRanges(headBytes, total).map(async ([start, end]) => {
-          const part = await get(`bytes=${start}-${end}`);
-          if (part.status !== 206) throw new DownloadError("The server stopped serving byte ranges mid-download.");
-          return read(part);
-        }),
-      );
+    const firstLength = Number.isFinite(length) ? length : FIRST_RANGE_BYTES;
+    if ((total ?? firstLength) < FIRST_RANGE_BYTES || total === firstLength) {
+      const whole = await read(first);
+      return { blob: new Blob(whole as BlobPart[], { type }), type };
     }
+    // The rest starts with the first range's headers, not after its body: each request is slow on its own.
+    const rest: Promise<Uint8Array[][]> =
+      total === null
+        ? (async () => {
+            // Content-Range not exposed to scripts (Pexels): the rest in one request, its length gives the size.
+            const tail = await get(`bytes=${FIRST_RANGE_BYTES}-`);
+            if (tail.status === 416) return [];
+            if (tail.status !== 206) throw new DownloadError("The server stopped serving byte ranges mid-download.");
+            const tailLength = Number(tail.headers.get("content-length") ?? NaN);
+            if (Number.isFinite(tailLength)) total = FIRST_RANGE_BYTES + tailLength;
+            if (tooLarge(total)) throw new DownloadError("That file is too large to import in the browser.");
+            return [await read(tail)];
+          })()
+        : Promise.all(
+            splitRanges(FIRST_RANGE_BYTES, total).map(async ([start, end]) => {
+              const part = await get(`bytes=${start}-${end}`);
+              if (part.status !== 206) throw new DownloadError("The server stopped serving byte ranges mid-download.");
+              return read(part);
+            }),
+          );
+    const [head, parts] = await Promise.all([read(first), rest]);
     if (total !== null && loaded !== total) throw new DownloadError(`The download was cut short (${loaded} of ${total} bytes).`);
     return { blob: new Blob([...head, ...parts.flat()] as BlobPart[], { type }), type };
   } catch (error) {

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DownloadError, FIRST_RANGE_BYTES, downloadFile, splitRanges, totalFromContentRange, type DownloadProgress } from "./download";
 
-const bytes = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 7) % 251);
+function bytes(n: number): Uint8Array {
+  const out = new Uint8Array(n);
+  for (let i = 0; i < n; i++) out[i] = (i * 7) % 251;
+  return out;
+}
 
 interface Server {
   ranges?: boolean;
@@ -44,7 +48,8 @@ function server(file: Uint8Array, opts: Server = {}) {
 }
 
 async function same(blob: Blob, file: Uint8Array) {
-  expect(new Uint8Array(await blob.arrayBuffer())).toEqual(file);
+  // Byte-wise in one call: a deep equal of megabytes takes seconds.
+  expect(Buffer.from(await blob.arrayBuffer()).equals(file)).toBe(true);
 }
 
 describe("downloadFile", () => {
@@ -59,6 +64,33 @@ describe("downloadFile", () => {
     expect(s.requests.length).toBe(7);
     expect(progress.at(-1)).toEqual({ loaded: file.length, total: file.length });
     expect(progress.every((p, i) => i === 0 || p.loaded >= progress[i - 1]!.loaded)).toBe(true);
+  });
+
+  it("asks for the rest with the first range's headers, before its body has arrived", async () => {
+    const file = bytes(3_069_708);
+    const s = server(file);
+    let releaseFirst: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (releaseFirst = resolve));
+    const gated = (async (url: string, init?: RequestInit) => {
+      const response = await s.fetch(url, init);
+      const range = (init?.headers as Record<string, string> | undefined)?.Range ?? "";
+      if (!range.startsWith("bytes=0-")) return response;
+      // The first range's body waits until every other range has been asked for.
+      const reader = response.body!.getReader();
+      const body = new ReadableStream<Uint8Array>({
+        async pull(c) {
+          await gate;
+          const { done, value } = await reader.read();
+          if (done) c.close();
+          else c.enqueue(value);
+        },
+      });
+      return new Response(body, { status: response.status, headers: response.headers });
+    }) as unknown as typeof fetch;
+    const done = downloadFile("https://x/a", { fetch: gated });
+    await expect.poll(() => s.requests.length).toBe(7);
+    releaseFirst();
+    await same((await done).blob, file);
   });
 
   it("takes one request for a file smaller than the first range", async () => {
