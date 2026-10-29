@@ -27,7 +27,7 @@ Related shot card: `shot-trailer-grammar-moves`.
 
 Per moment, with `add_sfx_tool` (every recipe peaks on `at_seconds`):
 - Bed: `{"recipe": "room_tone", "at_seconds": 0, "align": "start", "duration": 8, "gain_db": -24}` plus a rumble:
-  `{"recipe": "riser_noise", "pitch": -12, "brightness": 0.05, "duration": <build>, "gain_db": -12}`.
+  `{"recipe": "riser_noise", "pitch": -12, "brightness": 0.05, "duration": <build>, "gain_db": -12}` (one cue is at most 8 s: chain two for a longer build).
 - Title card / braam stand-in: `{"recipe": "impact_boom", "pitch": -6 .. -9, "intensity": 0.9}` +
   `{"recipe": "sub_drop", "gain_db": -8 .. -12}` on the same frame.
 - Into a hit: `{"recipe": "reverse_swell", "duration": 1.2}` ending on the hit, or
