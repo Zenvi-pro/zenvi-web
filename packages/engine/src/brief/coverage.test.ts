@@ -96,6 +96,16 @@ describe("footageCoverage", () => {
     expect(coverageLines(sparse, doc.project)[1]).toMatch(/^Thin: 1 footage shot\(s\) for the whole piece, one every 6 s\./);
   });
 
+  it("counts stock imported without its query for a stock row, once", () => {
+    const doc = fixtureDoc();
+    doc.transaction("import", (tx) => addFile(tx, { path: "/downloads/pexels_77.mp4", info: videoInfo("/downloads/pexels_77.mp4", 6) }, { id: "FILESTOCK7" }));
+    const coverage = footageCoverage(doc.project, brief([row(0, "storm clouds over the sea", "stock"), row(2, "lightning strike", "stock")]));
+    expect(coverage.shots.map((s) => [s.status, s.file_id ?? null])).toEqual([
+      ["covered", "FILESTOCK7"],
+      ["fetch", null],
+    ]);
+  });
+
   it("names a file the plan points at that is not in the bin", () => {
     const coverage = footageCoverage(fixtureDoc().project, brief([row(0, "the sole", "stock", "GONEXXXXXX")]));
     expect(coverage.shots[0]).toMatchObject({ status: "fetch", reason: "file GONEXXXXXX is not in the bin" });

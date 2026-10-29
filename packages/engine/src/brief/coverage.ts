@@ -144,11 +144,13 @@ export function footageCoverage(project: Project, brief: Brief): FootageCoverage
       shots.push({ ...base, status: "covered", file_id: String(match.id), origin: footageOrigin(match) });
       continue;
     }
-    // Bench P5: agents plan "media" rows without file ids over unindexed files (shot_01.mp4): no words to match, so the next file of theirs no row has taken stands in.
-    const next = row.source === "media" ? own.find((f) => !assigned.has(String(f.id))) : undefined;
+    // Bench P5: agents plan rows without file ids over files with no words to match (unindexed shot_01.mp4,
+    // import_stock_media_tool's pexels_<id>.mp4 without its query): the next file of that origin no row has taken stands in.
+    const origin: FootageOrigin = row.source === "media" ? "media" : row.source === "stock" ? "stock" : "generate";
+    const next = files.find((f) => footageOrigin(f) === origin && !assigned.has(String(f.id)));
     if (next) {
       assigned.add(String(next.id));
-      shots.push({ ...base, status: "covered", file_id: String(next.id), origin: "media", reason: "assumed: name its file_id in the storyboard" });
+      shots.push({ ...base, status: "covered", file_id: String(next.id), origin, reason: "assumed: name its file_id in the storyboard" });
       continue;
     }
     if (row.source === "media") shots.push({ ...base, status: "ask", reason: own.length > 0 ? "no file of yours shows it: name its file_id, or fetch / generate it" : "the bin has no footage of yours" });
