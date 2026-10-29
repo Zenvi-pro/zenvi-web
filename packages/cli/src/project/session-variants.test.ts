@@ -58,7 +58,7 @@ describe("variants in a CLI session", () => {
       ],
     });
     expect(pick.result.ok).toBe(true);
-    expect(pick.result.data?.summary).toMatch(/^Best of 2: marker/);
+    expect(pick.result.text).toContain("\"summary\":\"Best of 2: marker");
     expect(session.file).toBe(base);
     expect(pick.savedTo).toBe(base);
     expect((await readProjectFile(base)).markers).toHaveLength(1);
