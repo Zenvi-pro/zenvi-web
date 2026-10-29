@@ -42,7 +42,7 @@ export interface WriteOnOptions extends TypeBlockBase {
   stroke?: number;
   /** Fill the shapes once they are drawn (default: on for text, off for paths). */
   fill?: boolean;
-  /** Seconds the strokes take (default 70 % of the length, at most 3 s per line). */
+  /** Seconds the strokes take (default 60 % of the length with a fill, 80 % without; at most 95 %). */
   draw?: number;
 }
 
