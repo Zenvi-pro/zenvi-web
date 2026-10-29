@@ -144,6 +144,23 @@ describe("color_grade_clip_tool", () => {
     expect(kf(effectsOf(ed, c, "ColorGrade")[0]!, "exposure")).toBe(0.0);
   });
 
+  it("names wheels and curves in the summary, and warns when a wheel is too faint to see", async () => {
+    // Regression (sk2-product-brand): wheels were left out of "Graded ...", and greyish colours at 0.05-0.1 tinted nothing visible.
+    const ed = new EditHarness();
+    const c = ed.addClip(ed.addFile("video"));
+    const faint = await ed.call("color_grade_clip_tool", {
+      timeline_clip_id: c,
+      contrast: 0.2,
+      wheels: { shadows: { color: "#3a3a40", amount: 0.1 }, highlights: { color: "#ffb36b", amount: 0.3 } },
+      curves: { all: [[0, 0.03], [1, 1]] },
+    });
+    expect(faint.summary).toBe("Graded 1 clip(s): contrast, wheels (shadows, highlights), curves.");
+    expect(faint.warnings).toEqual([expect.stringMatching(/^The shadows wheel moves colour by under 5\/255: too faint to see\./)]);
+    const clear = await ed.call("color_grade_clip_tool", { timeline_clip_id: c, wheels: { shadows: { color: "#2a6cff", amount: 0.15 } } });
+    expect(clear.summary).toBe("Graded 1 clip(s): wheels (shadows).");
+    expect(clear.warnings).toEqual([]);
+  });
+
   it("wheels, curves, and refusals before anything changes", async () => {
     const ed = new EditHarness();
     const c = ed.addClip(ed.addFile("video"));
