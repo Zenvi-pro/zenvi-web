@@ -13,6 +13,16 @@ describe("launch plan", () => {
   });
 });
 
+describe("launch plan to a length", () => {
+  it("gives up second bars, proof first, until it fits", () => {
+    const downbeats = Array.from({ length: 20 }, (_, i) => i * 2.6);
+    const plan = planLaunch({ features: 3, hasProblem: false, hasProof: false, downbeats, fps: 30, maxSeconds: 15 });
+    // reveal 2 + 3 features + end 2 = 7 bars = 18.2 s; the reveal gives up a bar: 6 bars = 15.6 s; the end card: 5 bars = 13 s.
+    expect(plan.sections.map((s) => Math.round((s.end - s.start) / 2.6))).toEqual([1, 1, 1, 1, 1]);
+    expect(plan.duration).toBeLessThanOrEqual(15);
+  });
+});
+
 describe("explainer plan", () => {
   const words = [
     { text: "Every", start: 0.2, end: 0.5 },

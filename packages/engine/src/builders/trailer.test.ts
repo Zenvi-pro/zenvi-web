@@ -46,4 +46,15 @@ describe("trailer plan", () => {
     const onBeat = planTrailer({ media: 4, seconds: 40, fps: 30, title: "T", actCards: [], beats });
     for (const s of onBeat.shots.filter((x) => x.act === 2 && !x.held).slice(1)) expect(Math.min(...beats.map((b) => Math.abs(b - s.start)))).toBeLessThanOrEqual(1 / 30 + 1e-6);
   });
+
+  it("keeps a pre-cut shot's own length inside the act's range", () => {
+    const precut = planTrailer({ media: 3, seconds: 30, fps: 25, title: "T", actCards: [], lengths: [3.6, 0.5, 2.4] });
+    const world = precut.shots.filter((s) => s.act === 2 && !s.held).slice(0, -1);
+    for (const s of world) {
+      const own = [3.6, 0.5, 2.4][s.media]!;
+      // 3.6 s is longer than the world's 3 s: the default 2 s; 0.5 s is raised to the 1.2 s floor.
+      expect(s.end - s.start).toBeCloseTo(own > 3 ? 2 : Math.max(1.2, own), 1);
+    }
+  });
 });
+

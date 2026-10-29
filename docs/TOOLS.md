@@ -3506,6 +3506,7 @@ Availability: editor partial (without Zenvi 3D the reveal is a kinetic headline 
 | `url` | string |  | End card URL. |
 | `file_ids` | string[] |  | Product footage, screens and photos in order: the problem, the reveal, then one per feature (the proof and the end card draw their own backgrounds). Default: every video and image in the bin. |
 | `logo_file_id` | string |  | The logo (a bin image) for the end card. |
+| `duration_seconds` | number |  | The longest the film may run: sections give up their second bar (proof, reveal, end card, problem) until it fits. Default: two bars each, one per feature. (min 6, max 120) |
 | `three_d` | "auto" \| "title_3d" \| "logo_extrude" \| "device_mockup" \| "none" |  | The reveal in 3D (Zenvi 3D, needs Blender): auto = title_3d with the product name; device_mockup shows the reveal's footage on a phone; none = no 3D. |
 | `music_file_id` | string |  | Music to cut to. Default: the longest audio file in the bin; without music the sections follow 120 BPM. |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (in the same undo step). |
@@ -3550,7 +3551,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `duration_seconds` | number |  | Target length, seconds (default 40). (min 15, max 120) |
 | `music_file_id` | string |  | Score in the bin. Default: the longest audio file; none when there is none. |
 | `braams` | boolean |  | Braams on act two, the climax and the title, a riser into the silence (default true). |
-| `look` | "cinematic" \| "none" |  | cinematic (default): lifted shadows, 35mm grain and slow push-ins on every shot; none: the footage as it is. |
+| `look` | "push" \| "cinematic" \| "none" |  | push (default): a slow push-in on every shot, the footage's own colour (unify_grade_tool in the finish sets one look); cinematic: lifted shadows and 35mm grain as well; none: the footage as it is. |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (in the same undo step). |
 
 ### align_match_cut_tool

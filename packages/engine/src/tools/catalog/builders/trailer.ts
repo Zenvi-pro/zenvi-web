@@ -4,9 +4,10 @@
  * 2 s shots, one held hit with a riser under it, black and dead silence, an
  * escalation whose every shot is shorter than the last (one white flash),
  * the title on a braam, the end card. Braams (a low boom and a sub drop
- * together) land on the held hit, the escalation and the title. The
- * cinematic look and slow push-ins of build_reel_tool's cinematic style on
- * every shot. One undo step; the receipt lists every decision.
+ * together) land on the held hit, the escalation and the title. The slow
+ * push-ins of build_reel_tool's cinematic style on every shot (and, with
+ * look=cinematic, its grain and lifted shadows). One undo step; the receipt
+ * lists every decision.
  */
 
 import { z } from "zod";
@@ -35,7 +36,7 @@ const input = z.strictObject({
   duration_seconds: z.number().min(15).max(120).optional().describe("Target length, seconds (default 40)."),
   music_file_id: z.string().min(1).optional().describe("Score in the bin. Default: the longest audio file; none when there is none."),
   braams: z.boolean().optional().describe("Braams on act two, the climax and the title, a riser into the silence (default true)."),
-  look: z.enum(["cinematic", "none"]).optional().describe("cinematic (default): lifted shadows, 35mm grain and slow push-ins on every shot; none: the footage as it is."),
+  look: z.enum(["push", "cinematic", "none"]).optional().describe("push (default): a slow push-in on every shot, the footage's own colour (unify_grade_tool in the finish sets one look); cinematic: lifted shadows and 35mm grain as well; none: the footage as it is."),
   replace: replaceArg,
 });
 type Input = z.infer<typeof input>;
@@ -67,7 +68,9 @@ export const trailerTools: CatalogTool[] = [
       const seconds = args.duration_seconds ?? 40;
       const grid = await musicGrid(call, music, 100, seconds);
 
-      const plan = planTrailer({ media: ids.length, seconds, fps, title: args.title, actCards: args.act_cards ?? [], ...(args.end_card ? { endCard: args.end_card } : {}), beats: music && grid.source.startsWith("the music") ? grid.beats : [] });
+      // Pre-cut shots (a re-edit's bin) keep their own lengths inside each act's range.
+      const lengths = ids.map((id) => (visualKind(files.get(id)!) === "video" ? Number(files.get(id)!.duration) || 0 : 0));
+      const plan = planTrailer({ media: ids.length, seconds, fps, title: args.title, actCards: args.act_cards ?? [], ...(args.end_card ? { endCard: args.end_card } : {}), beats: music && grid.source.startsWith("the music") ? grid.beats : [], lengths });
       const notes: string[] = [];
       if (music && Number(music.duration) < plan.duration) notes.push(`The score (${round3(Number(music.duration))} s) is shorter than the trailer (${round3(plan.duration)} s): the end plays without it.`);
       if (ids.length < plan.shots.length / 2) notes.push(`${plan.shots.length} shots from ${ids.length} file(s): files come back with later footage each time; import more for a richer climax.`);
@@ -88,10 +91,8 @@ export const trailerTools: CatalogTool[] = [
           const span = Math.max(0, hi - lo - length);
           const from = span > 0 ? lo + ((n * 1.7 + s.act * 0.9) % span) : lo;
           const id = placeShot(tx, file, { position: s.start, length: visualKind(file) === "video" ? Math.min(length, Math.max(1 / fps, hi - from)) : length, sourceStart: from, layer: pictureTrack });
-          if (args.look !== "none") {
-            applyClipPreset(tx, id, visualKind(file) === "image" ? style.motion.image! : style.motion.video!);
-            for (const preset of style.looks) applyLookPreset(tx, id, preset);
-          }
+          if (args.look !== "none") applyClipPreset(tx, id, visualKind(file) === "image" ? style.motion.image! : style.motion.video!);
+          if (args.look === "cinematic") for (const preset of style.looks) applyLookPreset(tx, id, preset);
           if (s.act === 1) {
             const dip = Math.min(ACT1_DIP, length / 4);
             setClipKeyframes(

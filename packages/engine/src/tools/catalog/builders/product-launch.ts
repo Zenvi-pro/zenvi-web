@@ -41,6 +41,7 @@ const input = z.strictObject({
   url: z.string().max(60).optional().describe("End card URL."),
   file_ids: z.array(z.string().min(1)).max(30).optional().describe("Product footage, screens and photos in order: the problem, the reveal, then one per feature (the proof and the end card draw their own backgrounds). Default: every video and image in the bin."),
   logo_file_id: z.string().min(1).optional().describe("The logo (a bin image) for the end card."),
+  duration_seconds: z.number().min(6).max(120).optional().describe("The longest the film may run: sections give up their second bar (proof, reveal, end card, problem) until it fits. Default: two bars each, one per feature."),
   three_d: z.enum(["auto", "title_3d", "logo_extrude", "device_mockup", "none"]).optional().describe("The reveal in 3D (Zenvi 3D, needs Blender): auto = title_3d with the product name; device_mockup shows the reveal's footage on a phone; none = no 3D."),
   music_file_id: z.string().min(1).optional().describe("Music to cut to. Default: the longest audio file in the bin; without music the sections follow 120 BPM."),
   replace: replaceArg,
@@ -78,8 +79,9 @@ export const productLaunchTools: CatalogTool[] = [
       const fps = Number(project.fps?.num) / Number(project.fps?.den || 1) || 30;
       const features = args.features.map(featureParts);
       const grid = await musicGrid(call, music, 120, 60);
-      const plan = planLaunch({ features: features.length, hasProblem: Boolean(args.problem?.trim()), hasProof: Boolean(args.proof?.stat || args.proof?.quote), downbeats: grid.downbeats, fps });
+      const plan = planLaunch({ features: features.length, hasProblem: Boolean(args.problem?.trim()), hasProof: Boolean(args.proof?.stat || args.proof?.quote), downbeats: grid.downbeats, fps, ...(args.duration_seconds ? { maxSeconds: args.duration_seconds } : {}) });
       const notes: string[] = [];
+      if (args.duration_seconds && plan.duration > args.duration_seconds + 0.05) notes.push(`${plan.sections.length} sections need ${plan.duration} s on these bars, more than the ${args.duration_seconds} s asked: pass fewer features or a faster song.`);
       if (ids.length === 0) notes.push("No footage in the bin: every section is type and motion on a dark card.");
 
       // Which picture each section shows: the files in order. The proof counts over a light field and the end card draws its own (the SaaS references: a number never sits on a busy photo).
@@ -159,12 +161,13 @@ export const productLaunchTools: CatalogTool[] = [
         "add_motion_block_tool",
         {
           block: "glass_cards",
-          params: { ...(background ? { background } : {}), headline: `*${args.product}*`, cards: features.map((f) => f.title).slice(0, 4), details: features.map((f) => f.detail).slice(0, 4) },
+          // Over the footage, which keeps cutting a shot per feature under the cards (a held still behind them reads as a slide).
+          params: { headline: `*${args.product}*`, cards: features.map((f) => f.title).slice(0, 4), details: features.map((f) => f.detail).slice(0, 4) },
           position_seconds: round3(first.start),
           duration_seconds: round3(last.end - first.start),
-          placement: "full_frame",
+          placement: background ? "over_video" : "full_frame",
         },
-        `${features.length} feature(s) as glass cards over the product, one entrance per bar`,
+        `${features.length} feature(s) as glass cards over the product shots, one entrance per bar`,
       );
       if (!cards || features.length > 4) {
         for (const s of cards ? featureSections.slice(4) : featureSections) {
