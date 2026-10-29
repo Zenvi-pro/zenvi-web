@@ -46,8 +46,8 @@ describe("aliasArguments on items and enum values", () => {
     const r = aliasArguments(keyframes, { ease: "linear", points: [{ value: 1, ease: "linear" }, { value: 2, ease: "ease_in" }] });
     expect(r.args).toEqual({ interpolation: "linear", points: [{ value: 1, interpolation: "linear" }, { value: 2, ease: "ease_in" }] });
     expect(r.notes).toEqual([
-      "'linear' is not a ease; used it as interpolation='linear'. Pass interpolation next time.",
-      "'linear' is not a points[0].ease; used it as points[0].interpolation='linear'. Pass interpolation next time.",
+      "'linear' is not a value of ease; used it as interpolation='linear'. Pass interpolation next time.",
+      "'linear' is not a value of points[0].ease; used it as points[0].interpolation='linear'. Pass interpolation next time.",
     ]);
     // Both given: the call means something we cannot guess.
     const both = { ease: "linear", interpolation: "constant" };

@@ -119,7 +119,7 @@ function aliasObject(properties: Record<string, unknown>, args: Record<string, u
     if (sibling === undefined || Object.hasOwn(current, sibling) || !enumOf(properties[sibling])?.includes(value)) continue;
     edit()[sibling] = value;
     delete edit()[key];
-    notes.push(`'${value}' is not a ${where}${key}; used it as ${where}${sibling}='${value}'. Pass ${sibling} next time.`);
+    notes.push(`'${value}' is not a value of ${where}${key}; used it as ${where}${sibling}='${value}'. Pass ${sibling} next time.`);
   }
   for (const [key, value] of Object.entries(out ?? args)) {
     const items = itemsOf(properties[key]);
