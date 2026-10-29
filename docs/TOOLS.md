@@ -3987,7 +3987,7 @@ Availability: editor partial (removing every effect (back to the original clip) 
 
 Surfaces: mcp, cli, editor. edits. Needs: fx, media.
 
-Availability: editor — (needs Zenvi FX (ffmpeg renders on this computer)); cli yes (only when ffmpeg is installed (ZENVI_FX=0 turns it off)); cloud — (needs Zenvi FX (ffmpeg renders on this computer)); desktop — (web-only direct tool).
+Availability: editor — (needs Zenvi FX (ffmpeg renders on this computer) and local file access); cli yes (only when ffmpeg is installed (ZENVI_FX=0 turns it off)); cloud — (needs Zenvi FX (ffmpeg renders on this computer) and local file access); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
