@@ -156,6 +156,17 @@ export function recordedMaxSeconds(group: RecordedGroup, cueSeconds: number | un
   return SUSTAINED.has(group) && cueSeconds !== undefined ? Math.max(0.1, Math.min(max, cueSeconds)) : max;
 }
 
+/**
+ * Longest the recording may run when an add_sfx_tool call asks for `seconds`:
+ * the asked length (a 0.4 s punch, not the group's 1.5 s), never more than the
+ * group's longest, and never cut before the sound's peak.
+ */
+export function askedMaxSeconds(sample: RecordedSample, seconds: number | undefined): number {
+  if (seconds === undefined || SUSTAINED.has(sample.group)) return recordedMaxSeconds(sample.group, seconds);
+  const peak = Math.max(0, (sample.peakMs - sample.onsetMs) / 1000);
+  return Math.min(RECORDED_GROUP_SPECS[sample.group].maxSeconds, Math.max(seconds, peak + 0.05));
+}
+
 /** Groups whose sound peaks mid-file, so a long one cannot be cut to a short cue (a hit keeps its start, a riser its end). */
 const PEAKING: ReadonlySet<RecordedGroup> = new Set(["whoosh", "swish", "whip", "paper", "cloth"]);
 
@@ -189,6 +200,10 @@ function groupSeed(seed: number, group: RecordedGroup): number {
 const MAX_ATTACK_MS = 30;
 /** Peaking recipes that may build for longer before their peak. */
 const LONG_PEAK_RECIPES: ReadonlySet<string> = new Set(["whoosh_long", "whoosh_rise"]);
+/** Names and tags of the sparkle group's recordings that sound like one: magic, a glint, glass. */
+const SPARKLE_WORDS = /sparkl|twinkl|magic|shiny|glitter|fairy|crystal|glass/i;
+/** Shortest recording that plays as a sub drop. */
+const SUB_DROP_MIN_SECONDS = 0.9;
 /** Recipes that play a hero hit: never from the softest third of their group. */
 const HERO_RECIPES: ReadonlySet<string> = new Set(["impact_punch", "impact_slam", "impact_boom", "impact_thud", "sub_drop"]);
 
@@ -210,6 +225,10 @@ function suited(group: RecordedGroup, recipe: string, samples: readonly Recorded
   // A whoosh's peak lands on the cut, so its pre-roll plays before it: 150-400 ms for a short one, up to 800 for a long one (DEPLOY S4.2).
   if (hit === "peak") keep((s) => s.peakMs - s.onsetMs <= (LONG_PEAK_RECIPES.has(recipe) ? 800 : 400));
   if (HERO_RECIPES.has(recipe)) keep((s) => kitTraits(s, kit).energy !== "soft");
+  // A sub drop is a long low tail; the group's dry kicks (under 0.9 s) read as a kick drum.
+  if (recipe === "sub_drop") keep((s) => soundSeconds(s) >= SUB_DROP_MIN_SECONDS);
+  // The sparkle group also holds bells, a watch chime and notification pings (sk3-creator-social heard a phone ping).
+  if (recipe === "sparkle") keep((s) => SPARKLE_WORDS.test(`${s.name} ${s.tags.join(" ")}`));
   return pool;
 }
 

@@ -28,6 +28,7 @@ import {
   type ColorGradePreset,
   type FilmGrainPreset,
 } from "../../ops/look.js";
+import { wheelBias } from "../../render/kernels/color-grade.js";
 import { editedWhileRendering } from "../color-frames.js";
 import { roundTo } from "../color-stats.js";
 import { contractTool, type CatalogTool } from "../define.js";
@@ -171,6 +172,21 @@ export const NAMED_LOOKS: Readonly<Record<string, NamedLook>> = {
     about: "light, soft, lifted",
   },
 };
+
+/** Below this channel shift (0..1, at full tonal weight) a wheel's tint is not visible (sk2-product-brand: amounts of 0.05-0.1 on greyish colours). */
+const FAINT_WHEEL = 0.02;
+
+/**
+ * A wheel of a `wheels` property that tints by less than shows: its largest
+ * channel shift (the kernel's own bias) under FAINT_WHEEL. A neutral wheel
+ * (amount and luma 0) is a reset, not a faint tint.
+ */
+function faintWheel(wheels: unknown, name: string): boolean {
+  const entry = isRecord(wheels) ? wheels[name] : undefined;
+  if (!isRecord(entry) || (entry.amount === 0 && entry.luma === 0)) return false;
+  const bias = wheelBias({ color: entry.color, amount: entry.amount, luma: entry.luma } as Parameters<typeof wheelBias>[0]);
+  return Math.max(...bias.map(Math.abs)) < FAINT_WHEEL;
+}
 
 /** `_grade_values`: a grade's controls and its LUT (`category/name`) as a receipt row. */
 function gradeValues(effect: Record<string, unknown>): Record<string, unknown> {
@@ -326,6 +342,7 @@ export const effectsColorLookTools: CatalogTool[] = [
         const create = newEffectFactory(call);
         const changes: [string, Effect[]][] = [];
         const rows: Record<string, unknown>[] = [];
+        const faintWheels = new Set<string>();
         for (const clip of clips) {
           const effects = clipEffects(clip).map((e) => structuredClone(e));
           const idxs = effects.flatMap((e, i) => (e.class_name === "ColorGrade" ? [i] : []));
@@ -353,7 +370,12 @@ export const effectsColorLookTools: CatalogTool[] = [
           if (lutIntensity !== null) values.lut_intensity = lutIntensity;
           Object.assign(payload, prepareProperties(ctx, "ColorGrade", values, payload, clip));
           if (lutPath !== null) payload.lut_path = lutPath;
-          if (hasWheels) payload.wheels = wheelsValue(wheels, payload.wheels);
+          if (hasWheels) {
+            payload.wheels = wheelsValue(wheels, payload.wheels);
+            for (const name of Object.keys(wheels)) {
+              if (name !== "enabled" && faintWheel(payload.wheels, name)) faintWheels.add(name);
+            }
+          }
           for (const [key, pts] of Object.entries(curves ?? {})) payload[`curve_${key}`] = curveValue(`curves.${key}`, pts);
           if (existing !== null && sameJson(payload, existing)) {
             rows.push({ timeline_clip_id: clip.id, effect_id: existing.id ?? null, changed: false, grade: gradeValues(payload) });
@@ -372,8 +394,18 @@ export const effectsColorLookTools: CatalogTool[] = [
         call.commit((tx) => {
           for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
         });
-        const what = look ? `look ${look}` : [...Object.keys(explicitParams).sort(), ...(lut ? ["lut"] : [])].join(", ") || "grade";
-        return ok(call, `Graded ${changes.length} clip(s): ${what}.`, { look, changed: true, clips: rows, skipped });
+        const wheelNames = hasWheels ? Object.keys(wheels).filter((n) => n !== "enabled") : [];
+        const changed = [...Object.keys(explicitParams).sort(), ...(lut ? ["lut"] : []), ...(wheelNames.length > 0 ? [`wheels (${wheelNames.join(", ")})`] : []), ...(hasCurves ? ["curves"] : [])];
+        const what = look ? `look ${look}` : changed.join(", ") || "grade";
+        const receipt = ok(call, `Graded ${changes.length} clip(s): ${what}.`, { look, changed: true, clips: rows, skipped });
+        if (faintWheels.size > 0) {
+          const names = [...faintWheels].join(", ");
+          receipt.warnings.push(
+            `The ${names} wheel${faintWheels.size === 1 ? " moves" : "s move"} colour by under ${Math.round(FAINT_WHEEL * 255)}/255: too faint to see. ` +
+              "A wheel tints by how far its colour is from grey times amount: pick a saturated colour (#2a6cff, #ffb36b) or raise amount (0.2-0.5).",
+          );
+        }
+        return receipt;
       }),
   }),
 
