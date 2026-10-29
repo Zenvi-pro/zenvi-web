@@ -59,7 +59,7 @@ All built only with `zenvi` CLI calls from stock footage; scripts and renders un
   tone + grain + halation on the hero objects, alternate `push-in`, `j-l-cut` of the turntable's own
   sound, every clip's own sound plus placed micro-sounds (paper, shutter, typing), an ambient drone
   bed at half level, cream end card.
-- **Documentary open** (30 s): cold open of diegetic detail shots (`shot-scale-grammar` ECU -> WS:
+- **Documentary open** (28 s): cold open of diegetic detail shots (`shot-scale-grammar` ECU -> WS:
   clock, calendar, sleeper, room) with an `j-l-cut` (the clock ticks on under the next shots), one
   blur dissolve at the structural joint, drone bed entering early, wides with `push-in`, restrained
   `title-sequence` after the cold open, natural grade (saturation 0.8) + `grain:16mm_classic`, no whooshes.

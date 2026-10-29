@@ -34,7 +34,7 @@ weddings and anything that sells colour.
 - Use it on the whole piece or a whole act, never on one shot (one bleached shot reads as an error).
 - Faces: if skin goes grey-green, lower `mix` to 0.6-0.7; keep the eyes readable.
 - Grain: gritty on 1080p+, classic on soft or upscaled footage (gritty on soft footage looks like noise).
-- Vignette 0.25-0.35 with feather 0.8+; at 0.5 the oval edge shows.
+- Vignette 0.2-0.3 with feather 0.85+; above that the oval edge shows.
 
 ## Sound for it
 

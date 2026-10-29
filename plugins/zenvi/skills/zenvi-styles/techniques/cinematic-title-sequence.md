@@ -3,7 +3,7 @@ id: cinematic-title-sequence
 kind: technique
 summary: When a film needs its name on screen - a restrained title over a slow dark shot or black, faded in whole, held.
 categories: [movie-game-trailer, documentary-true-story, travel-cinematic-montage, brand-story-corporate, wedding-event-film, music-lyric-video]
-tools: [add_kinetic_title_tool, fade_clip_tool, add_sfx_tool, add_clip_to_timeline_tool]
+tools: [add_kinetic_title_tool, fade_clip_tool, add_sfx_tool, add_clip_to_timeline_tool, automate_volume_tool]
 pace: calm
 mood: [restrained, elegant, ominous, reflective]
 aspect: ["16:9", "2.39:1", "9:16"]

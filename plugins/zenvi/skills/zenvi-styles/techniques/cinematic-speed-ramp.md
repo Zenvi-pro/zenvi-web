@@ -3,7 +3,7 @@ id: cinematic-speed-ramp
 kind: technique
 summary: When one moment of an action shot is the hero - rush in, near-freeze on the apex, rush out, on the beat.
 categories: [sports-hype-edit, automotive-ad, movie-game-trailer, travel-cinematic-montage, fitness-lifestyle, gaming-montage]
-tools: [speed_ramp_tool, apply_fx_tool, add_sfx_tool, detect_beats_tool]
+tools: [speed_ramp_tool, apply_fx_tool, add_sfx_tool, detect_beats_tool, watch_clip_tool, freeze_frame_tool, apply_motion_transition_tool]
 pace: fast
 mood: [epic, kinetic, heroic]
 aspect: ["16:9", "9:16", "2.39:1"]
@@ -44,7 +44,7 @@ athletes at the top of a jump, water, hair, dancers.
 - Land the slowest frame on a beat or the drop (`hit_at` = a `detect_beats_tool` time).
 - One ramp per 8-10 s; every shot ramped is a template look.
 - Sources at 50-60 fps survive 0.25x; 24-30 fps footage stutters below 0.4x without optical flow.
-- Freeze variant (merged from `shot-speed-ramp-freeze`, video-shotcraft, Apache-2.0): hold the freeze >= 1.5 s (45 f at 30 fps) or the look does not register; enter it instantly (no ease - a freeze is a cut in time) with a 3-frame white flash as the "pause" signal (`apply_motion_transition_tool` `flash_white`, `duration` 0.1, or `freeze_frame_tool` for footage); leave it with a smootherstep ramp of ~0.73 s (22 f) that runs faster than 1x to win the time back; at most 2 freezes per 30 s.
+- Freeze variant (merged from `shot-speed-ramp-freeze`, video-shotcraft, Apache-2.0): hold the freeze >= 1.5 s (45 f at 30 fps) or the look does not register; enter it instantly (no ease - a freeze is a cut in time) with a 3-frame white flash as the "pause" signal (the hold: `freeze_frame_tool` `{"timeline_clip_id", "at_seconds", "hold_seconds": 1.5, "ripple": true}`; the flash: `apply_motion_transition_tool` `flash_white`, `duration` 0.1, on the cut into the hold); leave it with a smootherstep ramp of ~0.73 s (22 f) that runs faster than 1x to win the time back; at most 2 freezes per 30 s.
 
 ## Sound for it
 

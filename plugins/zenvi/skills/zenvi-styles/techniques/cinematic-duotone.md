@@ -26,7 +26,7 @@ chapter openers, music videos and brand films that own two colours.
    `duotone_navy_red`, `duotone_purple_lime`, `duotone_ink_cream`, `duotone`.
 2. `apply_look_tool` `{"clip_ids": "<ids or all>", "look_id": "duotone_teal_peach"}`.
    A brand pair: `"look_id": "duotone #0b1638 #ff3b3b"` (shadow ink first).
-3. Optional: `apply_look_tool` with `grain_preset: "35mm_fine"` for a print texture.
+3. Optional print texture: add `"stack_grain": true, "grain_preset": "35mm_fine"` to the step 2 call.
 
 ## Timing & taste rules
 

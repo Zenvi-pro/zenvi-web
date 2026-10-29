@@ -31,8 +31,8 @@ Burn as a transition (only on the tail of the outgoing shot):
 3. `apply_motion_transition_tool` `{"preset": "flash_white", "clip1_id": "<tail>", "duration": 0.25,
    "intensity": 0.6}`.
 4. `add_sfx_tool` `{"recipe": "swish_airy", "at_seconds": <cut>, "gain_db": -16}`.
-Leak as texture on a whole shot: `apply_fx_tool` with `{"style": "leak", "amount": 0.35-0.45,
-"color": "#ffb36b"}`. A real anamorphic/spherical lens-flare element tracked to a light source is
+Leak as texture on a whole shot: `apply_fx_tool` `{"clip_id", "effects": [{"effect": "light_leak", "amount": 0.35-0.45,
+"params": {"style": "leak", "color": "#ffb36b"}}]}`. A real anamorphic/spherical lens-flare element tracked to a light source is
 missing (`lens-flare-element`).
 
 ## Timing & taste rules

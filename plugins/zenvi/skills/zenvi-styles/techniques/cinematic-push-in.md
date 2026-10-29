@@ -3,7 +3,7 @@ id: cinematic-push-in
 kind: technique
 summary: When a held shot needs tension or intimacy - a slow dolly push-in (5-12 % over the shot) instead of a static frame.
 categories: [movie-game-trailer, documentary-true-story, brand-story-corporate, travel-cinematic-montage, wedding-event-film, real-estate-tour]
-tools: [set_keyframes_tool, align_match_cut_tool]
+tools: [set_keyframes_tool, align_match_cut_tool, add_sfx_tool]
 pace: calm
 mood: [tense, intimate, cinematic, reflective]
 aspect: ["16:9", "9:16", "2.39:1", "1:1"]

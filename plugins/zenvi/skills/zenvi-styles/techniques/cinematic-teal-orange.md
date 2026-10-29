@@ -3,7 +3,7 @@ id: cinematic-teal-orange
 kind: technique
 summary: When footage should read as blockbuster or car film - warm skin and lights against teal shadows, on every shot.
 categories: [movie-game-trailer, automotive-ad, sports-hype-edit, travel-cinematic-montage, gaming-montage]
-tools: [unify_grade_tool, color_grade_clip_tool, list_looks_tool, inspect_color_tool]
+tools: [unify_grade_tool, color_grade_clip_tool, list_looks_tool, set_clip_property_tool]
 pace: medium
 mood: [epic, glossy, heroic, night]
 aspect: ["16:9", "2.39:1", "9:16"]

@@ -3,7 +3,7 @@ id: cinematic-warm-nostalgia
 kind: technique
 summary: When the edit is memory (weddings, family, travel diaries, origin stories) - golden film colour, Super 8 grain.
 categories: [wedding-event-film, travel-cinematic-montage, brand-story-corporate, music-lyric-video, documentary-true-story]
-tools: [apply_look_tool, apply_fx_tool, add_vignette_tool, unify_grade_tool]
+tools: [add_sfx_tool, add_shape_mask_tool, apply_look_tool, apply_fx_tool, add_vignette_tool, unify_grade_tool]
 pace: calm
 mood: [nostalgic, warm, tender, hopeful]
 aspect: ["16:9", "4:3", "9:16"]
@@ -22,14 +22,14 @@ an occasional warm light leak. Shines for memories, weddings, summer travel and
 
 ## Build it in Zenvi
 
-1. `unify_grade_tool` `{"strength": 0.7}` (mixed sources warm up unevenly otherwise).
+1. Mixed cameras only: `unify_grade_tool` `{"strength": 0.7}` first (they warm up unevenly otherwise).
 2. `apply_look_tool` `{"clip_ids": "all", "look_id": "golden_years_film", "lut_intensity": 0.8,
    "stack_grain": true, "grain_preset": "super_8"}`. Alternatives: `faded_memories`,
    `vintage_400_film`, `warm_roast_film`; grain `16mm_classic` for a cleaner memory.
 3. One leak every 6-10 s, on a shot with sky or window light:
    `apply_fx_tool` `{"clip_id": "<id>", "effects": [{"effect": "light_leak", "amount": 0.45,
    "params": {"style": "leak", "color": "#ff9a3c", "seed": 3}}]}` (vary `seed`).
-4. `add_vignette_tool` `{"amount": 0.35, "feather": 0.7}`.
+4. `add_vignette_tool` `{"amount": 0.25, "feather": 0.9}` (over 0.3 or under 0.85 feather the oval shows).
 
 ## Timing & taste rules
 

@@ -28,7 +28,8 @@ Related shot cards: `shot-circle-match-iris` (shape match through an iris), `sho
 Two angles of one take (stock rarely has both): play the wide, then cut to a digital punch-in
 of the moment right after.
 1. Wide: `add_clip_to_timeline_tool` `{"file_id", "position_seconds": 0, "start_seconds": 0.6, "end_seconds": 3.0}`.
-2. Tight: the same file from the cut frame, `{"position_seconds": 2.4, "start_seconds": 3.0, "end_seconds": 4.0}`,
+2. Tight: the same file from the cut frame, `{"position_seconds": 2.4, "start_seconds": 2.92, "end_seconds": 4.0}`
+   (2 frames at 24 fps before the wide's out point: the overlap rule below),
    then `set_keyframes_tool` `scale_x`/`scale_y` `[{"seconds": 0, "value": 1.7}]` and `location_x`
    `[{"seconds": 0, "value": -0.05}, {"seconds": 1.0, "value": -0.32}]` so the frame pans with the subject
    (keep |location| <= (scale - 1) / 2 or the edge shows).

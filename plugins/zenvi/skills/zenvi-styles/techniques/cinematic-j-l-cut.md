@@ -3,7 +3,7 @@ id: cinematic-j-l-cut
 kind: technique
 summary: When scenes should flow like film, not slides - the next shot's sound starts early (J) or this shot's sound runs on (L).
 categories: [documentary-true-story, brand-story-corporate, wedding-event-film, travel-cinematic-montage, video-essay-explainer, movie-game-trailer]
-tools: [separate_clip_audio_tool, trim_clip_tool, fade_clip_tool, set_clip_property_tool]
+tools: [separate_clip_audio_tool, trim_clip_tool, fade_clip_tool, list_clips_tool]
 pace: calm
 mood: [immersive, natural, storytelling]
 aspect: ["16:9", "9:16", "2.39:1", "1:1"]
