@@ -12,6 +12,7 @@ import type { ProjectDocument } from "../history/document.js";
 import type { Project } from "../model/types.js";
 import type { ReceiptStatus, ToolReceipt } from "./receipt.js";
 import { allTools, runTool } from "./registry.js";
+import { fakeShotHost } from "./test-support/fake-shots.js";
 import { fakeHost, type FakeHost, type FakeHostOptions } from "./test-support/fake-host.js";
 import { IDS, L1, L2, L3, fixtureDoc, imageInfo, media, snapshotOf, videoInfo } from "./test-support/fixture.js";
 import { createProject } from "../model/defaults.js";
@@ -104,6 +105,10 @@ function withMattes(_doc: ProjectDocument, host: FakeHost): void {
     subjects: ["person"],
     generate: async (path) => ({ media: media(`/assets/mattes/${path.split("/").pop()}`, videoInfo(path, 30, { has_audio: false })), model: "fake", version: "0", license: "MIT", frames: 900, fps: 30 }),
   };
+}
+
+function withShots(_doc: ProjectDocument, host: FakeHost): void {
+  host.shots = fakeShotHost({});
 }
 
 const SPECS: Record<string, Spec> = {
@@ -979,6 +984,18 @@ const SPECS: Record<string, Spec> = {
   pop_out_tool: {
     happy: { args: { clip_id: IDS.clipA }, setup: withMattes, summary: /^Letterboxed clip CLIPINTV01 at 2\.39:1 with the subject popping out/ },
     failure: { args: { clip_id: IDS.clipA, band_aspect: "1.2" }, setup: withMattes, summary: /no bars/ },
+  },
+  embed_media_tool: {
+    happy: { setup: withShots, summary: /^3 of 3 file\(s\) embedded \(\d+ keyframes; 3 new, 0 from the cache\)\.$/ },
+    failure: { args: { file_ids: [IDS.music] }, setup: withShots, summary: /^Error: music\.mp3 has no picture$/ },
+  },
+  find_shots_tool: {
+    happy: { args: { query: "a dog" }, setup: withShots, status: "unchanged", summary: /^Best moments for "a dog": / },
+    failure: { args: { query: "a dog", file_ids: ["NOPE"] }, setup: withShots, summary: /^Error: no project file with id='NOPE'$/ },
+  },
+  shot_similarity_tool: {
+    happy: { args: { clip_ids: [IDS.clipA, IDS.clipB] }, setup: withShots, status: "unchanged", summary: /^2 shots; mean neighbour similarity/ },
+    failure: { args: { clip_ids: [IDS.clipA, IDS.clipB], file_ids: [IDS.interview, IDS.broll] }, setup: withShots, summary: /one of them/ },
   },
   add_vignette_tool: {
     happy: { args: { clip_ids: [IDS.clipA], amount: 0.5 }, summary: /^Vignette \(amount 0\.5, feather 0\.5\) on 1 clip\(s\)\.$/ },
