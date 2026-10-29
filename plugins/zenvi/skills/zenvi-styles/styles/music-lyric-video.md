@@ -117,16 +117,23 @@ add_marker_tool {"position_seconds": 7.7, "name": "rest"}
 add_clip_to_timeline_tool {"file_id": "<night sea>", "position_seconds": 0, "start_seconds": 3, "end_seconds": 10.75, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<silhouette>", "position_seconds": 7.75, "start_seconds": 0, "end_seconds": 7.25, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<waves>", "position_seconds": 17, "start_seconds": 2, "end_seconds": 13, "track": "1"}
-set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volume": 0}}
+set_clip_properties_tool {"timeline_clip_ids": ["<night sea>", "<silhouette>", "<waves>"], "properties": {"scale": "Crop", "volume": 0}}
+add_clip_to_timeline_tool {"file_id": "<bed>", "position_seconds": 0, "start_seconds": 3.2, "end_seconds": 31.2, "track": "5"}
+fade_clip_tool {"clip_id": "<bed>", "fade_in_seconds": 1.0, "fade_out_seconds": 2.0}
 apply_look_tool {"clipIds": "all", "look_id": "duotone #02060f #9cc3ff"}
 fade_clip_tool {"clip_id": "<silhouette>", "fade_out_seconds": 0.4}
 fade_clip_tool {"clip_id": "<waves>", "fade_in_seconds": 0.3, "fade_out_seconds": 1.5}
+set_keyframes_tool {"timeline_clip_id": "<waves>", "property": "scale_x", "points": [{"timeline_seconds": 17, "value": 1}, {"timeline_seconds": 28, "value": 1.08}]}
+set_keyframes_tool {"timeline_clip_id": "<waves>", "property": "scale_y", "points": [{"timeline_seconds": 17, "value": 1}, {"timeline_seconds": 28, "value": 1.08}]}
 add_kinetic_title_tool {"text": "<line 1>", "position_seconds": 0.6, "duration_seconds": 6.3, "style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.065, "y": 0.38, "stagger_seconds": 0}
 add_kinetic_title_tool {"text": "<line 2>", "position_seconds": 2.4, "duration_seconds": 4.5, "style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.065, "y": 0.5, "stagger_seconds": 0}
 add_kinetic_title_tool {"text": "<line 3>", "position_seconds": 4.3, "duration_seconds": 2.6, "style": "editorial", "animation": "fade", "emphasis": "none", "text_size": 0.065, "y": 0.62, "stagger_seconds": 0}
 master_audio_tool {"preset": "social", "speech_clip_ids": "<vocal>", "music_clip_ids": "<bed>"}
 review_edit_tool {}
 ```
+
+The vocal goes on first so the rests can be measured, so mute only the
+footage: a `scope` `all` mute would silence the vocal too.
 
 Render and `review_render_tool`; check every text onset against the vocal
 in the render (frame-step the contact sheet at each line start).
