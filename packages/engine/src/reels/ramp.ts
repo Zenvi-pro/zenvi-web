@@ -112,14 +112,16 @@ export function snapCutTimes(times: readonly number[], hits: readonly number[], 
   const direction = rampShots >= 2 ? Math.sign(planned(rampShots - 1) - planned(0)) : 0;
   // Whether shot i-1, ending at `t`, keeps the ramp's direction.
   const keepsShape = (i: number, t: number) => {
-    if (direction === 0 || i >= rampShots) return true;
+    if (direction === 0 || i > rampShots) return true;
     const length = t - out[i - 1]!;
     const before = i >= 2 ? out[i - 1]! - out[i - 2]! : undefined;
+    const slack = frame + 1e-9;
+    // The cut into the settle shot: the ramp's last shot still stays in line with the one before it.
+    if (i === rampShots) return before === undefined || (direction < 0 ? length <= before + slack : length >= before - slack);
     // The shot the cut starts, until the next cut where it is now.
     const after = out[i + 1]! - t;
     // The shot after that, as planned: the next cut may not move.
     const next = i + 1 < rampShots ? out[i + 2]! - out[i + 1]! : undefined;
-    const slack = frame + 1e-9;
     if (direction < 0) return (before === undefined || length <= before + slack) && length >= after - slack && (next === undefined || after >= next - slack);
     return (before === undefined || length >= before - slack) && length <= after + slack && (next === undefined || after <= next + slack);
   };
@@ -160,10 +162,16 @@ export interface RampShot {
  * Fill each shot: the sources in order, round and round, each video
  * continuing where it was last cut (from its start again once used up); a
  * video too short for a shot gives its turn to the next one that fits. With
- * a motif, every `motifEvery`-th shot is the motif from the same moment. Or the
- * first shot no source is long enough for.
+ * a motif, every `motifEvery`-th shot of the ramp (the first `rampShots`;
+ * never the settle shot after them) is the motif from the same moment. Or
+ * the first shot no source is long enough for.
  */
-export function fillShots(times: readonly number[], sources: readonly RampSource[], motif?: { source: RampSource; every: number }): RampShot[] | { unfilled: number; length: number } {
+export function fillShots(
+  times: readonly number[],
+  sources: readonly RampSource[],
+  motif?: { source: RampSource; every: number },
+  rampShots = times.length - 1,
+): RampShot[] | { unfilled: number; length: number } {
   const cursor = sources.map((s) => s.start);
   const shots: RampShot[] = [];
   let next = 0;
@@ -171,7 +179,7 @@ export function fillShots(times: readonly number[], sources: readonly RampSource
     const at = times[i]!;
     const length = times[i + 1]! - at;
     const fits = (s: RampSource) => s.kind === "image" || s.end - s.start >= length - 1e-9;
-    if (motif && (i + 1) % motif.every === 0 && fits(motif.source)) {
+    if (motif && i < rampShots && (i + 1) % motif.every === 0 && fits(motif.source)) {
       shots.push({ fileId: motif.source.fileId, kind: motif.source.kind, at, length, sourceStart: motif.source.kind === "video" ? motif.source.start : 0, motif: true });
       continue;
     }

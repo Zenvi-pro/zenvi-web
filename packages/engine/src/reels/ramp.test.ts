@@ -45,7 +45,7 @@ describe("cutTimes and snapCutTimes", () => {
 });
 
 describe("snapCutTimes keeps a ramp's shape", () => {
-  it("never lets a shortening ramp lengthen to reach a beat, and leaves the settle cut to the plain rule", () => {
+  it("never lets a shortening ramp lengthen to reach a beat", () => {
     const lengths = rampLengths({ first: 1.5, last: 0.25, curve: "exponential", shots: 14, settle: 2 });
     const times = cutTimes(lengths, 30);
     const beats = Array.from({ length: 40 }, (_, k) => k * 0.5);
@@ -53,6 +53,17 @@ describe("snapCutTimes keeps a ramp's shape", () => {
     const shots = out.slice(1).map((t, i) => t - out[i]!);
     for (let i = 1; i < 14; i += 1) expect(shots[i]!).toBeLessThanOrEqual(shots[i - 1]! + 1 / 30 + 1e-9);
     expect(snapped.filter(Boolean).length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("snapCutTimes at the settle cut", () => {
+  it("does not lengthen the ramp's last shot past the one before it to reach a hit", () => {
+    // Shots 1, 0.35, 0.3, then a 2 s settle; a hit 0.1 s after the settle cut would make the last ramp shot 0.4 s.
+    const { times: out, snapped } = snapCutTimes([0, 1, 1.35, 1.65, 3.65], [1.75], 100, 3);
+    expect(out).toEqual([0, 1, 1.35, 1.65, 3.65]);
+    expect(snapped).toEqual([false, false, false]);
+    // A hit that shortens it is fine.
+    expect(snapCutTimes([0, 1, 1.35, 1.65, 3.65], [1.6], 100, 3).times).toEqual([0, 1, 1.35, 1.6, 3.65]);
   });
 });
 
@@ -73,6 +84,12 @@ describe("fillShots", () => {
     const shots = fillShots([0, 1, 2, 3, 4, 5, 6], [a], { source: { ...still, fileId: "M" }, every: 3 });
     const list = shots as Exclude<typeof shots, { unfilled: number }>;
     expect(list.map((s) => (s.motif ? "M" : s.fileId))).toEqual(["A", "A", "M", "A", "A", "M"]);
+  });
+
+  it("never makes the settle shot the motif", () => {
+    const shots = fillShots([0, 1, 2, 3, 5], [a], { source: { ...still, fileId: "M" }, every: 2 }, 3);
+    const list = shots as Exclude<typeof shots, { unfilled: number }>;
+    expect(list.map((s) => (s.motif ? "M" : s.fileId))).toEqual(["A", "M", "A", "A"]);
   });
 
   it("names the first shot nothing can fill", () => {

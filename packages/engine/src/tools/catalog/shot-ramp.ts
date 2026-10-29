@@ -137,6 +137,7 @@ export const shotRampTools: CatalogTool[] = [
       const position = g.snap(args.position ?? trackEnd(project, layer));
 
       const lengths = rampLengths({ first, last, curve: args.curve ?? "exponential", ...(args.duration_seconds !== undefined ? { duration: args.duration_seconds } : { shots: args.shots ?? 12 }), settle: args.settle_seconds });
+      const rampCount = lengths.length - ((args.settle_seconds ?? 0) > 0 ? 1 : 0);
       let times = cutTimes(lengths, g.fps);
       let snapped: boolean[] = [];
       const warnings: string[] = [];
@@ -144,9 +145,9 @@ export const shotRampTools: CatalogTool[] = [
         const hits = await snapHits(call, snapClip, snap, position);
         if (typeof hits === "string") return failed(TOOL, hits);
         if (hits.length === 0) warnings.push(`${clipTitle(snapClip)} has no ${snap} under the ramp: the cuts follow the curve alone.`);
-        ({ times, snapped } = snapCutTimes(times, hits, g.fps, lengths.length - ((args.settle_seconds ?? 0) > 0 ? 1 : 0)));
+        ({ times, snapped } = snapCutTimes(times, hits, g.fps, rampCount));
       }
-      const filled = fillShots(settle ? times.slice(0, -1) : times, sources, motif ? { source: motif, every: args.motif_every ?? 4 } : undefined);
+      const filled = fillShots(settle ? times.slice(0, -1) : times, sources, motif ? { source: motif, every: args.motif_every ?? 4 } : undefined, rampCount);
       if (!Array.isArray(filled)) return refused(TOOL, `Error: no source is long enough for shot ${filled.unfilled + 1} (${filled.length.toFixed(2)} s): add longer footage or shorten first_shot_seconds.`);
       const shots: RampShot[] = [...filled];
       if (settle) {
@@ -186,10 +187,9 @@ export const shotRampTools: CatalogTool[] = [
         throw error;
       }
 
-      const rampShots = shots.length - ((args.settle_seconds ?? 0) > 0 ? 1 : 0);
       const snappedCount = snapped.filter(Boolean).length;
       const summary =
-        `Cut a ${rampShots}-shot ramp from ${shots[0]!.length.toFixed(2)} s to ${shots[rampShots - 1]!.length.toFixed(2)} s` +
+        `Cut a ${rampCount}-shot ramp from ${shots[0]!.length.toFixed(2)} s to ${shots[rampCount - 1]!.length.toFixed(2)} s` +
         ((args.settle_seconds ?? 0) > 0 ? `, settling on a ${shots[shots.length - 1]!.length.toFixed(2)} s shot` : "") +
         ` on ${resolved.newTracks ? `a new track (${trackName(call.doc.project, layer)})` : trackName(call.doc.project, layer)}, ${position.toFixed(2)}-${(position + total).toFixed(2)} s` +
         (snapClip ? `; ${snappedCount} of ${snapped.length} cut(s) on ${snap}` : "") +
