@@ -137,12 +137,12 @@ const MIN_SPEED = 0.5;
  * on a rack focus), slowed down to half speed for short ones. `seconds` comes
  * back shorter when even that cannot fill it.
  */
-export function mediaWindow(media: MotionMedia, seconds: number): { start: number; speed: number; seconds: number } {
+export function mediaWindow(media: MotionMedia, seconds: number, minSpeed = MIN_SPEED): { start: number; speed: number; seconds: number } {
   if (media.kind === "image") return { start: 0, speed: 1, seconds };
   const usable = media.duration > 3 ? [0.2, media.duration - 0.1] : [0, media.duration];
   const length = usable[1]! - usable[0]!;
   if (length >= seconds) return { start: usable[0]! + (length - seconds) * 0.3, speed: 1, seconds };
-  const speed = Math.max(MIN_SPEED, length / seconds);
+  const speed = Math.max(minSpeed, length / seconds);
   return { start: usable[0]!, speed, seconds: Math.min(seconds, length / speed) };
 }
 
@@ -158,10 +158,10 @@ export function mediaCard(
   to: number,
   media: MotionMedia,
   fps: number,
-  o: { width: number; radius: number; crop?: MediaSource["crop"]; start?: number; speed?: number },
+  o: { width: number; radius: number; crop?: MediaSource["crop"]; start?: number; speed?: number; minSpeed?: number },
   keys: Key[],
 ): Element {
-  const win = o.start !== undefined && media.kind === "video" ? pinnedWindow(media, o.start, (to - from) / fps, o.speed ?? 1) : mediaWindow(media, (to - from) / fps);
+  const win = o.start !== undefined && media.kind === "video" ? pinnedWindow(media, o.start, (to - from) / fps, o.speed ?? 1) : mediaWindow(media, (to - from) / fps, o.minSpeed);
   const end = Math.min(to, from + Math.max(1, Math.floor(win.seconds * fps + 1e-6)));
   return {
     name,

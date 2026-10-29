@@ -54,6 +54,10 @@ export type GridReveal = (typeof GRID_REVEALS)[number];
 export const GRID_DRIFTS = ["in", "out", "left", "right", "up", "down"] as const;
 export type GridDrift = (typeof GRID_DRIFTS)[number];
 
+/** How the grid uses a length longer than its build: `fill` shares it between the layout steps (each held longer before its re-cut), `beat` re-cuts as soon as a layout is full and holds the last one. */
+export const GRID_PACES = ["fill", "beat"] as const;
+export type GridPace = (typeof GRID_PACES)[number];
+
 /**
  * The grid template's options (layout names and tile counts: tiles.ts). Sizes
  * are px on a frame whose short side is 1080 (they scale with the frame).
@@ -79,6 +83,8 @@ export interface GridOptions {
   mirror?: boolean;
   /** A slow camera move over the whole field for the template's length. */
   drift?: GridDrift;
+  /** Default fill. */
+  pace?: GridPace;
 }
 
 /**

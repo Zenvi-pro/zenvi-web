@@ -46,6 +46,8 @@ import type { Layout } from "../layout.js";
 import {
   refuse,
   GRID_DRIFTS,
+  GRID_PACES,
+  type GridPace,
   GRID_REVEALS,
   type GridDrift,
   type GridOptions,
@@ -91,6 +93,13 @@ const DRIFT = 0.12;
 const MIN_FIELD_SPEED = 0.5;
 /** How far each tile of a gapless field reaches under its neighbours, px at 1080. */
 const OVERLAP = 1;
+/**
+ * Slowest a montage tile's clip plays to stay up as long as its tile (the
+ * slowest set_clip_speed takes): a 0.2 s flash shot holds a tile for 3 s
+ * rather than leaving a hole (bench round 7, hypereel).
+ */
+const TILE_MIN_SPEED = 1 / 16;
+
 
 interface Resolved {
   layout: GridLayoutId;
@@ -113,6 +122,7 @@ interface Resolved {
   drift: GridDrift | null;
   /** The kaleidoscope's mirror centre on the shot. */
   centre: NormPoint;
+  pace: GridPace;
 }
 
 function countsOf(options: GridOptions | undefined): { layout: GridLayoutId; counts: number[] } {
@@ -158,6 +168,8 @@ function resolve(content: MotionContent, layout: Layout): Resolved {
     if (band !== null) refuse("grid drift fills the frame; it takes no band");
     if (kind === "film_strip") refuse("a film strip does not drift (its strips are drawn on the backdrop)");
   }
+  const pace = o?.pace ?? "fill";
+  if (!GRID_PACES.includes(pace)) refuse(`grid pace must be one of ${GRID_PACES.join(", ")} (got ${String(pace)})`);
   const point = content.points?.[0];
   if (point && kind !== "kaleidoscope") refuse("grid points only apply to the kaleidoscope layout (its mirror centre)");
   const last = counts[counts.length - 1]!;
@@ -178,6 +190,7 @@ function resolve(content: MotionContent, layout: Layout): Resolved {
     phase,
     drift,
     centre: point ?? { x: 0.5, y: 0.5 },
+    pace,
   };
 }
 
@@ -201,7 +214,8 @@ function togetherOf(layout: GridLayoutId, stages: number): boolean[] {
   return Array.from({ length: stages }, (_, s) => layout === "kaleidoscope" || (layout === "repeat" && s > 0));
 }
 
-export function slotsOf(counts: readonly number[], finish: boolean, together: readonly boolean[] = []): Slots {
+/** `hold`: extra slots every stage holds after its reveals (`fill` spreading layout steps over a long length). */
+export function slotsOf(counts: readonly number[], finish: boolean, together: readonly boolean[] = [], hold = 0): Slots {
   const stage: number[] = [];
   const reveal: number[][] = [];
   let slot = 0;
@@ -211,12 +225,12 @@ export function slotsOf(counts: readonly number[], finish: boolean, together: re
     if (together[s]) {
       // Every tile of the stage on its beat, then a slot of hold.
       reveal.push(Array.from({ length: count }, () => slot));
-      slot += 2;
+      slot += 2 + hold;
       return;
     }
     const first = slot + (s > 0 ? 1 : 0);
     reveal.push(Array.from({ length: count }, (_, i) => (i < kept ? slot : first + (i - kept))));
-    slot = first + (count - kept) - 1 + 2;
+    slot = first + (count - kept) - 1 + 2 + hold;
   });
   return { stage, reveal, action: slot, end: finish ? slot + 2 : slot };
 }
@@ -445,10 +459,14 @@ export const montageGrid: TemplateSpec = {
       }
     });
 
-    const need = slotsOf(r.counts, finish, r.together);
-    // Spare length goes to holding the full grid before the finish, never more than a few slots.
-    let fit = need.end;
+    const tight = slotsOf(r.counts, finish, r.together);
+    let fit = tight.end;
     while (beats.frame((fit + 1) * unit) <= frames) fit += 1;
+    // fill: spare length is shared by the layout steps, each held longer before the next re-cut, so a
+    // 3 → 4 → 6 build spans the length asked instead of ending at a third of it (bench round 7, gridmontage).
+    const hold = r.pace === "fill" && r.counts.length > 1 ? Math.floor((fit - tight.end) / r.counts.length) : 0;
+    const need = hold > 0 ? slotsOf(r.counts, finish, r.together, hold) : tight;
+    // Spare length goes to holding the full grid before the finish, never more than a few slots.
     const action = finish ? Math.max(need.action, Math.min(need.action + MAX_HOLD, fit - 2)) : need.action;
     const slotFrame = (slot: number) => beats.frame(slot * unit);
     const travelOf = (slot: number) => Math.max(3, Math.min(10, slotFrame(slot + 1) - slotFrame(slot) - 1));
@@ -464,6 +482,8 @@ export const montageGrid: TemplateSpec = {
       cursor[s]!.slice(kept).forEach((f) => uses.set(files[f]!, (uses.get(files[f]!) ?? 0) + 1));
     });
     const seen = new Map<string, number>();
+    /** Tiles whose clip is slowed past half speed to hold its tile. */
+    const held: string[] = [];
     /** The previous stage's element of each tile: a kept tile plays on from where it was. */
     let before: Element[] = [];
 
@@ -550,9 +570,11 @@ export const montageGrid: TemplateSpec = {
           to,
           media0,
           fps,
-          { width: drawn.w, radius: r.radius, ...(crop ? { crop } : {}), ...(start !== undefined ? { start, ...(clock ? { speed: clock.speed } : {}) } : {}) },
+          { width: drawn.w, radius: r.radius, ...(crop ? { crop } : {}), ...(start !== undefined ? { start, ...(clock ? { speed: clock.speed } : {}) } : { minSpeed: TILE_MIN_SPEED }) },
           keys,
         );
+        const speed = (el.source as MediaSource).speed;
+        if (media0.kind === "video" && speed < 0.5 - 1e-9 && !held.includes(file)) held.push(file);
         const flip = flips?.[i];
         if (flip && (flip.x || flip.y)) el = { ...el, source: { ...(el.source as MediaSource), flip } };
         if (camera) el = drifted(el, camera);
@@ -566,6 +588,9 @@ export const montageGrid: TemplateSpec = {
       before = current;
     }
     if (finish) cues.add(actionAt);
+    if (held.length > 0) {
+      warnings.push(`${held.length} clip(s) are shorter than their tiles (${held.join(", ")}): slowed down (to 1/16 at most) so each tile stays up; give longer clips for real motion in the tiles`);
+    }
     return { elements, cues: [...cues], ...(warnings.length > 0 ? { warnings } : {}) };
   },
 };

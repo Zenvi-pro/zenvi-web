@@ -30,7 +30,7 @@ import { placeOverlayClip } from "../../ops/overlays.js";
 import { buildMotionTemplate } from "../../motion/build.js";
 import { gridFromBeats, tempoGrid } from "../../motion/grid.js";
 import { PALETTES, withAccent } from "../../motion/palettes.js";
-import { GRID_DRIFTS, GRID_REVEALS, MOTION_TEMPLATE_IDS, MotionInputError, type GridOptions, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
+import { GRID_DRIFTS, GRID_PACES, GRID_REVEALS, MOTION_TEMPLATE_IDS, MotionInputError, type GridOptions, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
 import { FIELD_LAYOUTS, GRID_LAYOUTS } from "../../motion/tiles.js";
 import { TEMPLATES } from "../../motion/templates/index.js";
 import { bundledFamily } from "../../typography/families.js";
@@ -121,6 +121,7 @@ const input = z.strictObject({
   phase: z.number().min(0).max(2).optional().describe("grid repeat: seconds each copy runs ahead of the one before, so copies move out of phase (default 0: in step; narrowed when the clip is too short)."),
   mirror: z.boolean().optional().describe("grid repeat: mirror alternate copies so their edges meet as mirrors (a kaleidoscope always is)."),
   drift: z.enum(GRID_DRIFTS).optional().describe("grid: a slow camera move over the whole field for the template's length: in (push in 12 %), out (pull out), left, right, up, down (pan). Not with merge, zoom_into, band or film_strip."),
+  pace: z.enum(GRID_PACES).optional().describe("grid with steps: fill (default) spreads the layout steps over duration_seconds, each layout held longer before the next re-cut (tiles still arrive one per beat of the beat grid), so a 3 → 4 → 6 build fills a 15 s grid; beat re-cuts as soon as a layout is full and holds the last one for the rest."),
   transitions: z
     .enum(GRID_TRANSITIONS)
     .optional()
@@ -134,7 +135,7 @@ const input = z.strictObject({
 type Input = z.infer<typeof input>;
 
 /** Arguments only the grid template reads. */
-const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift", "transitions", "strict_variety"] as const satisfies readonly (keyof Input)[];
+const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift", "pace", "transitions", "strict_variety"] as const satisfies readonly (keyof Input)[];
 
 function displaySize(file: ProjectFile): { width: number; height: number } | null {
   const w = Number(file.width);
@@ -379,6 +380,7 @@ export const motionTemplateTools: CatalogTool[] = [
               ...(args.phase !== undefined ? { phase: args.phase } : {}),
               ...(args.mirror !== undefined ? { mirror: args.mirror } : {}),
               ...(args.drift ? { drift: args.drift } : {}),
+              ...(args.pace ? { pace: args.pace } : {}),
             }
           : undefined;
       const content: MotionContent = {

@@ -513,7 +513,8 @@ describe.each(Object.entries(FRAMES))("repeat and kaleidoscope fields, %s", (_na
     const starts = [...new Set(tiles(plan).map((l) => l.start))].sort((a, b) => a - b);
     expect(starts).toHaveLength(3);
     expect(starts[0]).toBe(beats.frame(0));
-    for (const at of starts) expect([0, 1, 2, 3, 4, 5, 6, 8].map((k) => beats.frame(k))).toContain(at);
+    // Spread over the 8 s (pace fill), every re-cut still on a beat.
+    for (const at of starts) expect(Array.from({ length: 17 }, (_, k) => beats.frame(k))).toContain(at);
   });
 
   it("repeat fills one copy per beat, then multiplies on a re-cut: the new copies all on its beat", () => {
@@ -555,5 +556,50 @@ describe("repeat and kaleidoscope refusals", () => {
     expect(refusal({ layout: "repeat", phase: 3 })).toMatch(/phase must be 0 to 2/);
     expect(refusal({ layout: "grid" }, { points: [{ x: 0.5, y: 0.5 }] })).toMatch(/points only apply to the kaleidoscope/);
     expect(refusal({ layout: "repeat", tiles: 4 }, { fileIds: ["SHORT00001"] }, { seconds: 8 })).toMatch(/even at half speed/);
+  });
+});
+
+describe("grid filling the asked length", () => {
+  const lastReveal = (plan: MotionPlan) => Math.max(...plan.layers.filter((l) => l.name.startsWith("tile-")).map((l) => l.start));
+
+  it("spreads a 3 → 4 → 6 build over 15 s (fill, the default) instead of finishing at half of it", () => {
+    const fill = build(FRAMES.portrait!, { steps: [3, 4, 6] }, {}, { seconds: 15, bpm: 143 });
+    const beat = build(FRAMES.portrait!, { steps: [3, 4, 6], pace: "beat" }, {}, { seconds: 15, bpm: 143 });
+    const fps = FRAMES.portrait!.fps;
+    expect(lastReveal(beat.plan) / fps).toBeLessThan(7);
+    expect(lastReveal(fill.plan) / fps).toBeGreaterThan(9.5);
+    // Each layout reads as a layout: the 4-tile stage holds over 3 s, not 1.3.
+    const stageStart = (plan: MotionPlan, s: number) => Math.min(...plan.layers.filter((l) => l.name.startsWith(`tile-${s}-`)).map((l) => l.start));
+    expect((stageStart(fill.plan, 3) - stageStart(fill.plan, 2)) / fps).toBeGreaterThan(3);
+    expect(fill.plan.frames).toBe(beat.plan.frames);
+    // Still on the beat grid: every tile arrives on a beat.
+    const onBeat = new Set(Array.from({ length: 80 }, (_, k) => fill.beats.frame(k)));
+    for (const l of fill.plan.layers.filter((l) => l.name.startsWith("tile-"))) expect(onBeat.has(l.start), l.name).toBe(true);
+  });
+
+  it("refuses an unknown pace", () => {
+    expect(() => build(FRAMES.portrait!, { pace: "slow" as never })).toThrow(MotionInputError);
+  });
+});
+
+describe("grid tiles from clips shorter than their tile", () => {
+  it("slows a 0.2 s shot (to 1/16 at most) so its tile stays up, and says so", () => {
+    const tiny: MotionMedia = { fileId: "FLASH00001", kind: "video", width: 1920, height: 1080, duration: 0.2 };
+    const tempo = tempoGrid(120, 70, 0.25);
+    const plan = buildMotionTemplate({
+      template: "grid",
+      frame: FRAMES.landscape!,
+      start: 2,
+      seconds: 4,
+      grid: tempo,
+      palette: PALETTES.ui_dark,
+      media: new Map([...MEDIA_BY_ID, [tiny.fileId, tiny]]),
+      content: { fileIds: ["FLASH00001", "VIDEO00001"], grid: { layout: "mosaic", tiles: 3, pace: "beat" } },
+    });
+    const tile = plan.layers.find((l) => l.name === "tile-1-1")!;
+    expect(tile.source.kind === "media" && tile.source.speed).toBeGreaterThanOrEqual(1 / 16);
+    // 0.2 s at 1/16 is 3.2 s: the tile stays up to the end of the 4 s grid less the frames before it arrives.
+    expect(tile.frames / 30).toBeGreaterThan(3);
+    expect(plan.warnings?.join(" ")).toMatch(/FLASH00001\): slowed down/);
   });
 });
