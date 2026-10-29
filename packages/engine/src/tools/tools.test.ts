@@ -564,6 +564,10 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { file_id: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ },
     failure: { args: { clip_id: "NOPE" }, status: "refused", summary: /^Error: No timeline clip with id='NOPE'\.$/ },
   },
+  detect_music_structure_tool: {
+    happy: { args: { clip_id: IDS.clipMusic }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { file_id: IDS.music, add_markers: "true" }, status: "refused", summary: /^Error: add_markers needs clip_id/ },
+  },
   shot_length_ramp_tool: {
     happy: {
       args: { file_ids: [IDS.broll, IDS.logo], shots: "6", first_shot_seconds: "2", last_shot_seconds: "0.5", position: "30", track: "1" },

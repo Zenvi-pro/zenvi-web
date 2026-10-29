@@ -3,10 +3,11 @@
  * ffmpeg on the CLI and in Zenvi Cloud), the engine tracks (analysis/beats.ts).
  * Shared by detect_beats_tool and build_reel_tool; transients alone
  * (`onsetsOfFile`) by detect_onsets_tool, snap_cuts_to_onsets_tool and the
- * shot-length ramp.
+ * shot-length ramp; song form (`structureOfFile`) by detect_music_structure_tool.
  */
 
 import { BEAT_SAMPLE_RATE, EDIT_BPM_MAX, detectBeats, detectOnsets, type BeatAnalysis, type BeatOptions, type Onset, type OnsetOptions } from "../analysis/beats.js";
+import { detectStructure, type MusicStructure } from "../analysis/structure.js";
 import type { ProjectFile } from "../model/types.js";
 import type { ToolCall } from "./define.js";
 
@@ -58,6 +59,12 @@ async function pcmOfFile(call: ToolCall, file: ProjectFile): Promise<{ samples: 
 export async function onsetsOfFile(call: ToolCall, file: ProjectFile, options: OnsetOptions = {}): Promise<Onset[] | string> {
   const pcm = await pcmOfFile(call, file);
   return typeof pcm === "string" ? pcm : detectOnsets(pcm.samples, pcm.sampleRate, options);
+}
+
+/** Sections, drops, phrases and dips of `file`'s audio in file seconds (analysis/structure.ts), or why not. */
+export async function structureOfFile(call: ToolCall, file: ProjectFile, options: BeatOptions = {}): Promise<(MusicStructure & { duration: number }) | string> {
+  const pcm = await pcmOfFile(call, file);
+  return typeof pcm === "string" ? pcm : { ...detectStructure(pcm.samples, pcm.sampleRate, options), duration: pcm.samples.length / pcm.sampleRate };
 }
 
 /** Below this the grid should be checked by ear (analysis/beats.ts, BeatAnalysis.confidence). */

@@ -53,6 +53,7 @@ const DIRECT_TOOLS = [
   "detect_onsets_tool",
   "snap_cuts_to_onsets_tool",
   "shot_length_ramp_tool",
+  "detect_music_structure_tool",
   "list_motion_blocks_tool",
   "setup_motion_runtime_tool",
   "add_motion_block_tool",
