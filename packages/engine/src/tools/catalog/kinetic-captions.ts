@@ -458,6 +458,13 @@ export const kineticCaptionTools: CatalogTool[] = [
 
       const doc = call.doc.project;
       const round = (t: number) => Math.round(t * 1000) / 1000;
+      const typed = scenes.filter((s) => s.textRows);
+      const rows = scenes[0]?.cost?.rows ?? 1;
+      const typeRows = [...new Set(typed.flatMap((s) => s.textRows!))].sort((a, b) => a - b);
+      if (typed.length > 0) {
+        const band = `${(typeRows[0]! / rows).toFixed(2)}-${((typeRows[typeRows.length - 1]! + 1) / rows).toFixed(2)}`;
+        warnings.push(`Type already in the picture (burnt-in captions or titles) in ${typed.length} of ${scenes.length} stretch(es), at y ${band} of the frame: captions were kept clear of it where a spot was free; check those stretches.`);
+      }
       const emphasised = built.groups.flatMap((g) => g.words.filter((w) => w.emphasis).map((w) => w.text));
       return applied(
         TOOL,
@@ -472,7 +479,14 @@ export const kineticCaptionTools: CatalogTool[] = [
             ...(args.animation ? { animation: args.animation } : {}),
             ...(args.rotation !== undefined ? { rotation: args.rotation } : {}),
             behind_subject: result.cutouts.length > 0 ? (behind === "emphasis" ? "emphasis" : "all") : "none",
-            placement: scenes.length > 0 ? { scenes: scenes.length, heads: scenes.filter((s) => s.head).length } : "style",
+            placement:
+              scenes.length > 0
+                ? {
+                    scenes: scenes.length,
+                    heads: scenes.filter((s) => s.head).length,
+                    ...(typed.length > 0 ? { burnt_in_text: typed.map((s) => ({ from: round(s.from), to: round(s.to), rows: s.textRows!.map((r) => [round(r / rows), round((r + 1) / rows)]) })) } : {}),
+                  }
+                : "style",
             text_size: round(args.text_size ?? baseShare(style)),
             words_from: args.cues ? "cues" : "speech",
             start: round(built.start),

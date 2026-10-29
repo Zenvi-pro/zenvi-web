@@ -10,7 +10,7 @@
  * the footage does: scaled, cropped or moved with the clip's keyframes.
  */
 
-import { gridSize, matteCells, matteHead, sceneCost, type CaptionScene } from "../captions/space.js";
+import { gridSize, matteCells, matteHead, sceneCost, textCells, type CaptionScene } from "../captions/space.js";
 import { decodePngBase64 } from "../io/png.js";
 import type { Clip, Project, ProjectFile } from "../model/types.js";
 import type { RgbaImage } from "../render/types.js";
@@ -21,8 +21,8 @@ import type { ToolCall } from "./define.js";
 const SPAN = 1;
 /** Most frames a run reads (a long piece: equal stretches instead). */
 const MAX_SAMPLES = 32;
-/** Width frames are read at: the cost grid has 16 cells across the long side. */
-const READ_WIDTH = 160;
+/** Width frames are read at: the cost grid has 16 cells across the long side; burnt-in type needs its strokes a pixel or two wide. */
+const READ_WIDTH = 240;
 
 const clipEnd = (c: Clip): number => Number(c.position) + Number(c.end) - Number(c.start);
 
@@ -76,9 +76,18 @@ export async function captionScenes(call: ToolCall, project: Project, from: numb
     const matteFile = top ? matteOf(top) : undefined;
     const image = await read(call, picture, t);
     const matte = matteFile && top ? await read(call, matteView(project, top, matteFile), t) : null;
-    const cost = sceneCost(image, matte, cols, rows);
+    const text = image ? textCells(image, cols, rows) : undefined;
+    const cost = sceneCost(image, matte, cols, rows, text);
     const head = matte ? matteHead(matte) : null;
-    scenes.push({ from: a, to: b, ...(head ? { head } : {}), ...(cost ? { cost } : {}), ...(matte ? { subject: { cols, rows, cells: matteCells(matte, cols, rows) } } : {}) });
+    const textRows = text ? [...new Set(text.flatMap((t, k) => (t ? [Math.floor(k / cols)] : [])))] : [];
+    scenes.push({
+      from: a,
+      to: b,
+      ...(head ? { head } : {}),
+      ...(cost ? { cost } : {}),
+      ...(matte ? { subject: { cols, rows, cells: matteCells(matte, cols, rows) } } : {}),
+      ...(textRows.length > 0 ? { textRows } : {}),
+    });
   }
   return scenes;
 }
