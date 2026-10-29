@@ -26,9 +26,11 @@ the 1-4 kHz band. Talk clips run the bed 18-30 dB under or drop it.
    in the test had 12-30 s of near-silence at the start.
 3. Duck with explicit ids:
    ```json
-   duck_under_speech_tool {"speech_clip_ids": ["<vo>"], "bed_clip_ids": ["<music>"], "duck_db": -10}
+   duck_under_speech_tool {"speech_clip_ids": "<vo>", "bed_clip_ids": "<music>", "duck_db": -10}
    ```
-   (Without ids it reported "no bed overlaps the speech" in the test.)
+   The ids are one comma-separated string, not a list (a list is refused).
+   Without ids it reported "no bed overlaps the speech" in the test; then
+   `master_audio_tool` ducks beds under speech itself (-5.8 dB in the test).
 4. Swell between lines: `automate_volume_tool {"role": "music", "shape": "swell_between_lines"}`;
    the montage after the VO: `"shape": "ramp"` up.
 5. `master_audio_tool {"preset": "social", "genre": "talking_head", "iterate": true}`,
@@ -49,13 +51,15 @@ fast, release 300-500 ms.
 
 ## Common mistakes
 - Bed louder than the voice on a phone speaker (B1 -3.3 dB in the first test).
-- Ducking twice (tool + master) so the bed vanishes (13.9 dB after both in the
-  second test: use `duck_db` -8 when mastering ducks again).
+- Ducking twice: `master_audio_tool` ducks beds under speech as well, so a
+  -12 dB tool duck plus mastering lands the bed 14+ dB under; use `duck_db` -8
+  when mastering follows (the master alone gave 13.9 dB in the test).
 - Silent intros in library tracks.
 
 ## Verified
 2026-10-28: 7.8 s running test, synthetic VO, acoustic bed. First pass:
 `duck_under_speech_tool` without ids ducked nothing, analyze_mix B1 -3.3 dB,
-Sound Score 55. With ids + master: B1 13.9 dB, Sound Score 75, -14 LUFS.
+Sound Score 55. Second pass (the ids were passed as a list and refused; `master_audio_tool`
+ducked the bed instead): B1 13.9 dB, Sound Score 75, -14 LUFS.
 Watch judge mix and overall 4.64; fix: end on the music phrase, not a fade
 mid-phrase (trim the bed so its phrase ends with the picture).

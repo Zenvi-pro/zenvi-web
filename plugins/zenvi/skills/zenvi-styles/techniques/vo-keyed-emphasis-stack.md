@@ -32,8 +32,9 @@ The type is the second voice; the music ducks under the real one.
 3. A stacked headline for the claim line instead of captions:
    `add_kinetic_title_tool {"text": "fewer tabs open", "style": "stack",
    "animation": "slide_up", "emphasis": ["fewer"]}`.
-4. Bed: `duck_under_speech_tool {"speech_clip_ids": ["<vo>"], "bed_clip_ids": ["<music>"],
-   "duck_db": -10}`; give the ids (without them it found no bed in one test).
+4. Bed: `duck_under_speech_tool {"speech_clip_ids": "<vo>", "bed_clip_ids": "<music>",
+   "duck_db": -10}`: ids as one comma-separated string (a list is refused);
+   without them it found no bed in one test, so check the receipt.
 5. `add_sfx_tool {"recipe": "pop", "gain_db": -18}` on each hero word, seeds varied.
 
 ## Timing & taste rules
