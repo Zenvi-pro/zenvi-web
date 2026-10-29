@@ -1,0 +1,45 @@
+{
+  "id": "data_clock",
+  "version": 1,
+  "title": "Data clock",
+  "description": "A calendar clock that steps at a set rate (days, weeks, months, quarters or years) for data animations and time-lapses: a huge ghost year or date, a small date badge, or a translucent bottom band with the date, a progress slider and colour-ramp legends. Mono numerals, a tick per step for the sound design; reverse runs it backwards to sit over a reversed clip. Meant to sit over a map, a simulation or footage.",
+  "tags": ["clock", "date", "year", "timeline", "legend", "hud", "data", "time-lapse"],
+  "duration": { "default": 8, "min": 2, "max": 60 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "dark", "display": "mono", "radius": 999 },
+  "params": {
+    "style": {
+      "type": "enum",
+      "options": ["band", "ghost", "badge"],
+      "default": "band",
+      "aliases": { "hud": "band", "bar": "band", "big": "ghost", "year": "ghost", "pill": "badge" },
+      "description": "band (bottom HUD band: date, slider, legends), ghost (huge translucent stamp) or badge (small pill in the top corner)."
+    },
+    "start": { "type": "string", "maxLength": 12, "default": "2006-01-20", "description": "First date: 2006, 2006-03 or 2006-03-21." },
+    "end": { "type": "string", "maxLength": 12, "default": "2006-02-05", "description": "Last date, same forms (empty: run at rate for the whole block)." },
+    "step": {
+      "type": "enum",
+      "options": ["day", "week", "month", "quarter", "year"],
+      "default": "day",
+      "aliases": { "days": "day", "daily": "day", "weekly": "week", "monthly": "month", "yearly": "year", "annual": "year" },
+      "description": "What one step of the clock is."
+    },
+    "rate": { "type": "number", "min": 0, "max": 60, "default": 0, "description": "Steps per second (0: fit start..end into the block; with end set, the clock stops there)." },
+    "format": {
+      "type": "enum",
+      "options": ["auto", "year", "month", "date", "day"],
+      "default": "auto",
+      "description": "Stamp: year (2006), month (Mar 2006, Q1 2006), date (2006 / 03 / 21), day (21 Mar 2006); auto picks by step."
+    },
+    "reverse": { "type": "boolean", "default": false, "description": "Run from end back to start (for a reversed clip)." },
+    "legends": {
+      "type": "strings",
+      "maxItems": 3,
+      "maxLength": 60,
+      "default": ["CO₂ ppm=377..395@thermal"],
+      "description": "Band legends, \"Label=min..max@ramp\" (ramps: thermal, ocean, aurora, heat, mono)."
+    },
+    "label": { "type": "string", "maxLength": 40, "default": "", "description": "Small caption beside the stamp (a source, a place)." }
+  }
+}

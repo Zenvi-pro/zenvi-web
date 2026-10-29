@@ -1,0 +1,7 @@
+.br-title { position: absolute; font-family: var(--font-display); font-size: 56px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; color: var(--ink); }
+.br-row { position: absolute; left: 0; top: 0; }
+.br-bar { position: absolute; left: 0; top: 0; height: 100%; border-radius: 0 var(--radius) var(--radius) 0; transform-origin: 0 50%; }
+.br-name { position: absolute; right: 100%; top: 50%; margin-right: 22px; transform: translateY(-50%); white-space: nowrap; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); }
+.br-value { position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
+.br-axis { position: absolute; width: 3px; background: var(--ink); opacity: 0.6; }
+.br-period { position: absolute; font-family: var(--font-display); font-weight: 700; letter-spacing: -0.05em; line-height: 0.85; font-variant-numeric: tabular-nums; color: var(--ink); opacity: 0.16; white-space: nowrap; text-align: right; }
