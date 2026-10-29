@@ -174,6 +174,16 @@ describe("motion transition tools", () => {
     expect(doc.undoLabels).toHaveLength(1);
   });
 
+  it("finds the cut from the time alone", async () => {
+    const doc = editDoc();
+    const result = await call(doc, "apply_motion_transition_tool", { preset: "tilt", time: 4.2 });
+    expect(result.ok, result.text).toBe(true);
+    expect((dataOf(result) as { cut: number; preset: string }).cut).toBe(4);
+    expect(summaryOf(result)).toMatch(/^Added tilt up on the cut at 4\.00s/);
+    const none = await call(doc, "apply_motion_transition_tool", { preset: "whip", time: 8.5 });
+    expect(none.text).toMatch(/no scene change within 0\.5 s of 8\.50s/);
+  });
+
   it("says which track has the cuts when the named one has none", async () => {
     // Agents pass track 1 after build_reel_tool, which puts the music there and the shots on track 2.
     const doc = editDoc();

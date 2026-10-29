@@ -127,7 +127,7 @@ add_motion_block_tool {"block": "prompt_bar", "position_seconds": 3.5, "duration
 add_motion_block_tool {"block": "glass_cards", "position_seconds": 8, "duration_seconds": 4.5, "placement": "full_frame", "draft": true,
   "params": {"background": "<plate file id>", "headline": "Every repo, *connected*", "cards": ["Billing API", "Mobile app", "Docs site"], "details": ["Ready", "Ready", "Review"], "click": 2, "status": "Shipped", "accent": "#2F6BFF"}}
 add_motion_block_tool {"block": "toggle_panel", "position_seconds": 12.5, "duration_seconds": 3.5, "draft": true, "params": {"palette": "light", "accent": "#2F6BFF"}}
-add_motion_block_tool {"block": "chart_build", "position_seconds": 16, "duration_seconds": 4, "placement": "full_frame", "draft": true,
+add_motion_block_tool {"block": "chart_build", "position_seconds": 16, "duration_seconds": 4, "placement": "over_video", "draft": true,
   "params": {"kind": "line", "title": "Releases shipped a week", "values": ["3", "5", "8", "12", "19"], "labels": ["W1", "W2", "W3", "W4", "W5"], "highlight": 4, "palette": "light", "accent": "#2F6BFF"}}
 add_motion_block_tool {"block": "word_rotator", "position_seconds": 20, "duration_seconds": 4, "draft": true,
   "params": {"prefix": "Ship", "words": ["faster", "calmer", "together", "today"], "size": 120, "palette": "light", "accent": "#2F6BFF"}}

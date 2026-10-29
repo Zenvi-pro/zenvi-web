@@ -83,7 +83,7 @@ const applyInput = z.strictObject({
   preset: z.enum(MOTION_TRANSITION_IDS).describe(`Which transition: ${PRESET_LINES}.`),
   clip1_id: z.string().max(64).optional().describe("Outgoing clip (the cut is at its end). With clip2_id omitted, the clip right after it on its track."),
   clip2_id: z.string().max(64).optional().describe("Incoming clip, starting the frame after clip1_id ends (on any track)."),
-  track: z.string().max(64).optional().describe("Instead of clip ids: the track of the cut (UI track number, 1 = bottom; name; or layer number) ..."),
+  track: z.string().max(64).optional().describe("Instead of clip ids: the track of the cut (UI track number, 1 = bottom; name; or layer number) ... (omit it with time: the scene change nearest that time)"),
   time: z.number().min(0).optional().describe("... and the cut's timeline time in seconds (the nearest cut within 0.5 s)."),
   ...common,
   ...focus,
@@ -170,6 +170,13 @@ function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionIn
     const i = cuts.findIndex((c) => c.outClip.id === clip.id);
     if (i < 0) throw new ToolError(`no clip is cut back to back after ${clip.id} on its track; give clip2_id`);
     return { outClipId: clip.id, inClipId: cuts[i]!.inClip.id };
+  }
+  if (args.track === undefined && args.time !== undefined) {
+    // Time alone: the scene change nearest it, on whichever tracks its shots sit (agents give the time they hear the cut at).
+    const t = args.time;
+    const near = sceneCuts(project).reduce<ReturnType<typeof sceneCuts>[number] | undefined>((best, c) => (!best || Math.abs(c.cut - t) < Math.abs(best.cut - t) ? c : best), undefined);
+    if (!near || Math.abs(near.cut - t) > 0.5) throw new ToolError(`no scene change within 0.5 s of ${t.toFixed(2)}s; give track and time, or clip1_id`);
+    return { outClipId: near.outClip.id, inClipId: near.inClip.id, acrossTracks: true };
   }
   if (args.track === undefined || args.time === undefined) throw new ToolError("give clip1_id (and optionally clip2_id), or track and time");
   const layer = resolveLayer(project, args.track);

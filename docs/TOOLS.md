@@ -4263,7 +4263,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `preset` | "whip" \| "slide" \| "tilt" \| "zoom_in" \| "zoom_out" \| "zoom_through" \| "spin" \| "squash" \| "shake" \| "glitch" \| "flash_white" \| "flash_black" \| "flash_invert" \| "blur_dissolve" | yes | Which transition: whip (left/right/up/down), slide (left/right/up/down), tilt (up/down), zoom_in, zoom_out, zoom_through, spin (cw/ccw), squash (left/right/up/down), shake, glitch, flash_white, flash_black, flash_invert, blur_dissolve. |
 | `clip1_id` | string |  | Outgoing clip (the cut is at its end). With clip2_id omitted, the clip right after it on its track. |
 | `clip2_id` | string |  | Incoming clip, starting the frame after clip1_id ends (on any track). |
-| `track` | string |  | Instead of clip ids: the track of the cut (UI track number, 1 = bottom; name; or layer number) ... |
+| `track` | string |  | Instead of clip ids: the track of the cut (UI track number, 1 = bottom; name; or layer number) ... (omit it with time: the scene change nearest that time) |
 | `time` | number |  | ... and the cut's timeline time in seconds (the nearest cut within 0.5 s). (min 0) |
 | `duration` | number |  | Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3). (min 0.03, max 4) |
 | `direction` | "left" \| "right" \| "up" \| "down" \| "cw" \| "ccw" \| "auto" |  | whip/slide/squash: left, right, up, down; tilt: up, down; spin: cw, ccw. auto (default) keeps the track's current: the direction of the previous motion transition on the track, else left (tilt: up, spin: cw). Keep one direction per sequence; a whip up is a reserved accent (a camera tilt is the tilt preset). |
