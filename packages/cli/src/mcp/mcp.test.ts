@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
+import { createProject } from "@zenvi/engine";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
@@ -16,8 +17,8 @@ let work: string;
 let desktop: FakeDesktop;
 const open: Array<{ client: Client; server: ZenviMcpServer }> = [];
 
-async function connect(projectFile?: string): Promise<Client> {
-  const ctx = createContext({ env: testEnv(home), cwd: work, registry: testRegistry() });
+async function connect(projectFile?: string, env: NodeJS.ProcessEnv = {}): Promise<Client> {
+  const ctx = createContext({ env: testEnv(home, env), cwd: work, registry: testRegistry() });
   const server = await createZenviMcpServer(ctx, projectFile);
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.server.connect(b);
@@ -55,15 +56,41 @@ afterAll(async () => {
 });
 
 describe("zenvi mcp", () => {
+  it("refuses cuts before a brief is saved, then lets them through", async () => {
+    const client = await connect(undefined, { ZENVI_MCP_BRIEF: "on" });
+    await call(client, "open_project_file", { path: "gate.zvn" });
+    const first = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
+    expect(first.receipt.status).toBe("refused");
+    expect(first.receipt.summary).toMatch(/^Error: no brief saved, nothing changed\. Step 0/);
+    const briefed = createProject({ id: "GATEDXXXXX" });
+    briefed.settings = { zenvi_brief: { goal: "g", platform: "Reels", aspect: "16:9", length_seconds: 10, style: "hype-reel", hook: "h", beats: [{ start: 0, end: 10, name: "all" }] } };
+    await writeFile(path.join(work, "gated.zvn"), JSON.stringify(briefed));
+    await call(client, "open_project_file", { path: "gated.zvn" });
+    expect((await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" })).receipt.summary).not.toMatch(/no brief saved/);
+  });
+
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {
     const client = await connect();
     const opened = await call(client, "open_project_file", { path: "plan.zvn" });
-    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: read the genre's recipe first, read_director_recipe \{recipe\}\..*Finish, in order: unify_grade_tool/);
+    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: First the brief: get_brief_tool; if none, inspect_media_bin_tool, read_director_recipe \{styles: "brief"\}.*Then read its style's recipe, read_director_recipe \{recipe\}\..*Finish, in order: unify_grade_tool/);
     const recipe = await call(client, "read_director_recipe", { recipe: "match-cut-montage" });
     expect(recipe.receipt.status).toBe("applied");
     expect(recipe.receipt.summary).toMatch(/match_cut_montage_tool/);
+    // No brief saved yet: the recipe comes after the brief compiler; once one is saved, alone.
+    expect(recipe.receipt.summary).toMatch(/^This project has no brief yet\. Step 0/);
+    expect(recipe.receipt.summary).toContain("# The brief compiler");
+    const briefed = createProject({ id: "BRIEFEDXXX" });
+    briefed.settings = { zenvi_brief: { goal: "g", platform: "Reels", aspect: "16:9", length_seconds: 10, style: "match-cut-montage", hook: "h", beats: [{ start: 0, end: 10, name: "all" }] } };
+    await writeFile(path.join(work, "briefed.zvn"), JSON.stringify(briefed));
+    expect((await call(client, "open_project_file", { path: "briefed.zvn" })).receipt.status).toBe("applied");
+    expect((await call(client, "read_director_recipe", { recipe: "match-cut-montage" })).receipt.summary).toMatch(/^# Match-cut montage/);
     expect((await call(client, "read_director_recipe", { sound_palette: "hype" })).receipt.summary.length).toBeGreaterThan(200);
     expect((await call(client, "read_director_recipe", {})).receipt.status).toBe("refused");
+    expect((await call(client, "read_director_recipe", { styles: "brief" })).receipt.summary).toMatch(/^# The brief compiler/);
+    expect((await call(client, "read_director_recipe", { styles: "index" })).receipt.summary).toContain("| [hype-reel](");
+    expect((await call(client, "read_director_recipe", { styles: "hype-reel" })).receipt.summary).toContain("build_reel_tool");
+    expect((await call(client, "read_director_recipe", { styles: "nope" })).receipt.status).toBe("refused");
+    expect((await call(client, "read_director_recipe", { styles: "brief", recipe: "hype-reel" })).receipt.status).toBe("refused");
   });
 
   it("lists catalog tools plus the local extras, with workflow instructions", async () => {
