@@ -63,6 +63,14 @@ export interface AlignOptions {
   cover?: CoverMode;
   /** Zoom each clip in by this fraction over its length, about the subject (0.04 = 4 %). Default 0. */
   zoomDrift?: number;
+  /**
+   * Refuse (nothing written) when matching a clip's subject to the target's
+   * size would enlarge it past this scale on any frame (the zoom that keeps
+   * the frame covered is not counted). A box on the wrong, small object (a
+   * highlight, a button) asks for 10-20x to match a large target: that is a
+   * measuring error, not a framing. Default: no limit.
+   */
+  maxZoom?: number;
 }
 
 export interface AlignedClip {
@@ -189,6 +197,11 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
 
   const planAll = (t: CanvasSubject) => inputs.map((input) => plan(project, input, t, fit, drift, cover));
   let plans = planAll(target);
+  if (options.maxZoom !== undefined) {
+    // The size match alone, before any zoom that keeps the frame covered: a box far smaller than the target is a measuring error.
+    const over = plans.filter((p) => Math.max(...p.fitScales) > options.maxZoom! + 1e-6);
+    if (over.length > 0) throw invalid(zoomMessage(over, target, options.maxZoom), { clipIds: over.map((p) => String(p.clip.id)) });
+  }
   const stuck = plans.filter((p) => p.cover !== "none" && p.covers.some((c) => !Number.isFinite(c)));
   if (stuck.length > 0) throw invalid(edgeMessage(stuck));
   if (cover === "zoom_all" && fit !== "position") {
@@ -200,9 +213,10 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
     }
   }
 
+  const scalesOf = (p: Planned) => p.fitScales.map((s, i) => (p.cover === "none" ? s : Math.max(s, p.covers[i]!)));
   const clips = plans.map((p): AlignedClip => {
     const id = String(p.clip.id);
-    const scales = p.fitScales.map((s, i) => (p.cover === "none" ? s : Math.max(s, p.covers[i]!)));
+    const scales = scalesOf(p);
     setClipKeyframes(tx, id, "scale_x", linear(p.frames, scales), { mode: "replace_range" });
     setClipKeyframes(tx, id, "scale_y", linear(p.frames, scales.map((s, i) => s * p.aspects[i]!)), { mode: "replace_range" });
     if (fit === "position_scale_rotation") setClipKeyframes(tx, id, "rotation", linear(p.frames, p.rotations), { mode: "replace_range" });
@@ -223,6 +237,19 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
     };
   });
   return { target: target!, clips };
+}
+
+/** Which clips would be blown up, why that is most likely a wrong box, and the ways out. */
+function zoomMessage(plans: readonly Planned[], target: CanvasSubject, maxZoom: number): string {
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const rows = plans.map((p) => {
+    const box = p.boxes[0]!;
+    return `${String(p.clip.id)} would be enlarged ${Math.round(Math.max(...p.fitScales) * 10) / 10}x (its box is ${r2(Math.sqrt(box.w * box.h))} of the frame across against a target ${r2(target.size)} of the canvas tall)`;
+  });
+  return (
+    `${rows.join("; ")}: more than max_zoom ${maxZoom}. A box that small is usually the wrong object (a highlight or a detail): ` +
+    "re-measure it (detect_subject_tool with near and radius, or kind=blob) or read it off a frame's grid; or give a smaller target, cover=none, or a larger max_zoom if the shot really is that small."
+  );
 }
 
 function edgeMessage(plans: readonly Planned[]): string {

@@ -21,6 +21,7 @@ import { z } from "zod";
 import type { Transaction } from "../../history/document.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { Interpolation, ScaleMode, type Clip, type ProjectFile } from "../../model/types.js";
+import { OpError } from "../../ops/errors.js";
 import { SOFT_ZOOM, alignMatchCut, type AlignClipInput, type AlignResult, type CoverMode } from "../../ops/match-cut.js";
 import { addClip, deleteClips, retimeClipTo, setClipKeyframes, setClipProperty } from "../../ops/clips.js";
 import { applyFittedMotionTransition, type MotionTransitionResult } from "../../ops/motion-transitions.js";
@@ -34,7 +35,7 @@ import { flashSvg } from "../../reels/typography.js";
 import { MONTAGE_TRANSITIONS, planMontageTransitions, type MontageCut, type MontageRule } from "../../transitions/motion/montage.js";
 import { beatOverrideProblem, beatOverrideShape, explicitBeats } from "../beat-override.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
-import { directTool, type CatalogTool } from "../define.js";
+import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
 import { varietyProblem } from "../variety.js";
 import { detectSubjects, SUBJECT_KINDS, type DetectedSubject, type FrameSubjects } from "../subjects.js";
@@ -50,6 +51,10 @@ const DETECT = "detect_subject_tool";
 const MONTAGE = "match_cut_montage_tool";
 
 const FITS = ["position", "position_scale", "position_scale_rotation"] as const;
+/** align_match_cut_tool refuses a bigger enlargement unless max_zoom allows it. */
+const MAX_ZOOM = 4;
+/** A best candidate smaller than this (radius, of the frame height) is more often a detail than the subject. */
+const SMALL_SUBJECT = 0.05;
 const COVERS = ["zoom", "zoom_all", "none"] as const;
 /** How long a flash frame lasts, frames. */
 const FLASH_FRAMES = 2;
@@ -86,7 +91,7 @@ const alignInput = z.strictObject({
     .array(
       z.strictObject({
         clip_id: z.string().min(1),
-        box: boxSchema,
+        box: boxSchema.optional().describe("The subject's box on the source frame (0-1, origin top-left). Leave it out and the clip's first frame is measured (detect_subject_tool, kind), picking the candidate closest in size to the other clips' subjects; the receipt lists what was measured."),
         time: z.number().min(0).optional().describe("Source seconds the box was measured at (default: the clip's first frame)."),
         end_box: boxSchema.optional().describe("The subject again later in the source, to follow it as it drifts."),
         end_time: z.number().min(0).optional().describe("Source seconds of end_box."),
@@ -100,10 +105,19 @@ const alignInput = z.strictObject({
   fit: fitSchema,
   cover: coverSchema,
   zoom_drift: z.number().min(0).max(0.5).optional().describe("Zoom each clip in by this fraction over its length, about the subject (0.04 = 4 %). Default 0."),
+  max_zoom: z.number().min(1).max(30).optional().describe(`Refuse (nothing changes) when matching a clip's subject to the target size would enlarge it more than this (the zoom that keeps the frame covered is not counted); the error names the clip and why. Default ${MAX_ZOOM}: a bigger zoom almost always means a box on the wrong, small object.`),
+  kind: z.enum(SUBJECT_KINDS).optional().describe("What to measure in clips given without a box: circle (default) or blob (a region brighter or darker than its surroundings: a silhouette, a window, a phone)."),
 });
 
+const pointSchema = z.strictObject({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) });
+
 const detectInput = z.strictObject({
-  kind: z.enum(SUBJECT_KINDS).optional().describe("What to look for. circle (default): round subjects (iris/pupil, moon, sun, cup rim, vinyl, lens, clock, eclipse)."),
+  kind: z
+    .enum(SUBJECT_KINDS)
+    .optional()
+    .describe("What to look for. circle (default): round subjects (iris/pupil, moon, sun, cup rim, vinyl, lens, clock, eclipse). blob: regions brighter or darker than their surroundings (a silhouette on the sky, a window, a phone screen, a sun in haze), with their centroid and box."),
+  near: pointSchema.optional().describe("Where the subject roughly is, 0-1 of the frame (e.g. read off a grid): candidates near it rank first."),
+  radius: z.number().gt(0).max(1).optional().describe("Its rough radius (half its height), fraction of the frame height: candidates of about that size rank first, and circles are looked for between radius/1.8 and radius*1.8."),
   file_id: z.string().min(1).optional().describe("A media-bin video or image."),
   clip_id: z.string().min(1).optional().describe("A timeline clip (its file is read)."),
   time: z.number().min(0).optional().describe("Source seconds to look at. Default: the clip's first frame, or the middle of the file."),
@@ -197,34 +211,76 @@ const alignTool = directTool({
   description:
     "Line up the shared subject of consecutive clips (an iris, the moon, a cup rim, a pose) so it sits at the same place and size on every cut: " +
     "writes scale/location (and rotation) keyframes from each clip's subject box, keeps the frame covered (zooming when needed, reported) and is one undo step. " +
-    "Boxes come from detect_subject_tool or from reading a frame's 0-1 grid (inspect_media_tool, preview_frame).",
+    "Boxes come from detect_subject_tool or from reading a frame's 0-1 grid (inspect_media_tool, preview_frame); a clip given without a box is measured here. " +
+    `Refuses with the reason when matching a subject's size would enlarge its clip more than max_zoom (default ${MAX_ZOOM}x): that is a box on the wrong, small object.`,
   input: alignInput,
   annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-  run: (call, args: AlignArgs) => {
-    const inputs: AlignClipInput[] = args.clips.map((c) => {
-      const later = laterBox(c);
-      return { clipId: c.clip_id, box: c.box, ...(c.time !== undefined ? { time: c.time } : {}), ...(later ? { later } : {}), ...(c.allow_edges ? { cover: "none" as const } : {}) };
-    });
+  run: async (call, args: AlignArgs) => {
     const bad = args.clips.find((c) => (c.end_box === undefined) !== (c.end_time === undefined));
     if (bad) return refused(ALIGN, `Error: ${bad.clip_id}: give end_box and end_time together.`);
+    const measured = await measureMissingBoxes(call, args);
+    if (typeof measured === "string") return refused(ALIGN, measured);
+    const inputs: AlignClipInput[] = args.clips.map((c) => {
+      const later = laterBox(c);
+      const box = c.box ?? measured.get(c.clip_id)!.box;
+      return { clipId: c.clip_id, box, ...(c.time !== undefined ? { time: c.time } : {}), ...(later ? { later } : {}), ...(c.allow_edges ? { cover: "none" as const } : {}) };
+    });
     const result = call.commit(
       (tx) =>
         alignMatchCut(tx, inputs, {
           fit: args.fit ?? "position_scale",
           cover: args.cover ?? "zoom",
           zoomDrift: args.zoom_drift ?? 0,
+          maxZoom: args.max_zoom ?? MAX_ZOOM,
           ...(args.target ? { target: toTarget(args.target) } : {}),
         }),
       "Align match cuts",
     );
     const { rows, warnings } = alignmentReport(result);
+    for (const row of rows) {
+      const m = measured.get(String(row.clip_id));
+      if (m) Object.assign(row, { measured: { box: roundBox(m.box), confidence: m.score } });
+    }
     const zoomed = result.clips.filter((c) => c.coverZoom > 1.001).length;
-    return applied(ALIGN, `Aligned ${result.clips.length} clip(s) on a subject at (${round(result.target.cx, 3)}, ${round(result.target.cy, 3)}), ${round(result.target.size, 3)} of the frame tall${zoomed ? `; ${zoomed} zoomed in to keep the frame covered` : ""}.`, {
+    const auto = measured.size > 0 ? `; measured ${measured.size} subject(s) (see measured)` : "";
+    return applied(ALIGN, `Aligned ${result.clips.length} clip(s) on a subject at (${round(result.target.cx, 3)}, ${round(result.target.cy, 3)}), ${round(result.target.size, 3)} of the frame tall${zoomed ? `; ${zoomed} zoomed in to keep the frame covered` : ""}${auto}.`, {
       warnings,
       data: { target: fromTarget(result.target), clips: rows },
     });
   },
 });
+
+/**
+ * Boxes for the clips given without one: each clip's frame at its box time is
+ * measured and the candidate kept is the one closest in size to the given
+ * boxes (or, with none given, to the first measured clip's best), since the
+ * chain's subjects are meant to match.
+ */
+async function measureMissingBoxes(call: ToolCall, args: AlignArgs): Promise<Map<string, DetectedSubject> | string> {
+  const out = new Map<string, DetectedSubject>();
+  const missing = args.clips.filter((c) => !c.box);
+  if (missing.length === 0) return out;
+  if (!call.host.frames) return `Error: ${missing.map((c) => c.clip_id).join(", ")} ha${missing.length === 1 ? "s" : "ve"} no box and this surface cannot read frames to measure one: give each clip its box.`;
+  const project = call.doc.project;
+  const given = args.clips.flatMap((c) => (c.box ? [c.box.h / 2] : [])).sort((a, b) => a - b);
+  let reference: number | undefined = given.length > 0 ? given[Math.floor(given.length / 2)] : undefined;
+  const kind = args.kind ?? "circle";
+  for (const c of missing) {
+    const clip = project.clips.find((k) => String(k.id) === c.clip_id);
+    if (!clip) return `Error: unknown clip_id ${c.clip_id}.`;
+    const file = project.files.find((f) => String(f.id) === String(clip.file_id));
+    if (!file || visualKind(file) === null) return `Error: ${c.clip_id} has no picture to measure: give its box.`;
+    const time = c.time ?? (visualKind(file) === "image" ? 0 : Number(clip.start) || 0);
+    const found = await detectSubjects(call, file, time, kind, { limit: 5, ...(reference !== undefined ? { radius: reference } : {}) });
+    if (typeof found === "string") return found;
+    // Without a reference yet, the larger of the strong candidates: a chain's subject fills the shot, a highlight does not.
+    const best = reference !== undefined ? found.subjects[0] : [...found.subjects].sort((a, b) => b.score * Math.min(1, b.radius / 0.12) - a.score * Math.min(1, a.radius / 0.12))[0];
+    if (!best) return `Error: no ${kind} found in ${c.clip_id} at ${round(time, 3)} s: give its box (read it off a frame's grid, inspect_media_tool) or try kind=${kind === "circle" ? "blob" : "circle"}.`;
+    out.set(c.clip_id, best);
+    reference ??= best.radius;
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // detect_subject_tool
@@ -234,8 +290,10 @@ function subjectRow(s: DetectedSubject) {
   return {
     box: roundBox(s.box),
     center: { x: round(s.box.x + s.box.w / 2), y: round(s.box.y + s.box.h / 2) },
-    radius: round(s.box.h / 2),
+    radius: round(s.radius),
     score: s.score,
+    confidence: s.confidence,
+    ...(s.tone ? { tone: s.tone } : {}),
   };
 }
 
@@ -243,8 +301,9 @@ const detectTool = directTool({
   name: DETECT,
   title: "Find the subject in a frame",
   description:
-    "Find round subjects (iris/pupil, moon, sun, cup rim, vinyl, lens, clock, eclipse) in a frame of a media-bin file or a timeline clip, " +
-    "best first, as 0-1 boxes on the source frame ready for align_match_cut_tool and match_cut_montage_tool. Concentric rings (iris and pupil) come back as separate candidates; dark_edges says the frame's edges are black (allow_edges). Reads only.",
+    "Measure the subject in a frame of a media-bin file or a timeline clip: round subjects (kind circle: iris/pupil, moon, sun, cup rim, vinyl, lens, clock, eclipse) or regions brighter or darker than their surroundings (kind blob: a silhouette, a window, a phone), " +
+    "best first, each with its centre, radius, 0-1 box on the source frame and confidence, ready for align_match_cut_tool and match_cut_montage_tool. Pass near and radius (read off a frame's grid) when the subject is not the frame's most circle-like edge: candidates near that place and size rank first. " +
+    "Concentric rings (iris and pupil) come back as separate candidates; dark_edges says the frame's edges are black (allow_edges). Reads only.",
   input: detectInput,
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   requires: ["frames"],
@@ -266,8 +325,11 @@ const detectTool = directTool({
     time ??= visualKind(file) === "video" ? (Number(file.duration) || 0) / 2 : 0;
     const kind = args.kind ?? "circle";
     const found = await detectSubjects(call, file, time, kind, {
-      ...(args.min_radius !== undefined ? { minRadius: args.min_radius } : {}),
-      ...(args.max_radius !== undefined ? { maxRadius: args.max_radius } : {}),
+      // A rough radius also narrows the search, unless the bounds are given.
+      ...(args.min_radius !== undefined ? { minRadius: args.min_radius } : args.radius !== undefined ? { minRadius: Math.max(0.01, args.radius / 1.8) } : {}),
+      ...(args.max_radius !== undefined ? { maxRadius: args.max_radius } : args.radius !== undefined ? { maxRadius: Math.min(1, args.radius * 1.8) } : {}),
+      ...(args.near ? { near: args.near } : {}),
+      ...(args.radius !== undefined ? { radius: args.radius } : {}),
       limit: args.limit ?? 3,
     });
     if (typeof found === "string") return failed(DETECT, found);
@@ -276,8 +338,12 @@ const detectTool = directTool({
     const summary =
       rows.length === 0
         ? `No ${kind} found in ${where}. Read the box off a frame with a grid (inspect_media_tool) instead.`
-        : `Found ${rows.length} ${kind}(s) in ${where}; best at (${rows[0]!.center.x}, ${rows[0]!.center.y}), radius ${rows[0]!.radius} of the frame height.`;
-    return applied(DETECT, summary, { data: { file_id: String(file.id), time: round(time, 3), kind, subjects: rows, dark_edges: found.darkEdges } }, 0);
+        : `Found ${rows.length} ${kind}(s) in ${where}; best at (${rows[0]!.center.x}, ${rows[0]!.center.y}), radius ${rows[0]!.radius} of the frame height, confidence ${rows[0]!.confidence}.`;
+    const warnings: string[] = [];
+    if (rows[0] && rows[0].radius < SMALL_SUBJECT && args.radius === undefined)
+      warnings.push(`The best ${kind} is small (radius ${rows[0].radius}): it may be a highlight or a detail, not the subject. Pass near and radius (read off a grid) to rank the one you mean first.`);
+    if (rows[0] && rows[0].confidence < 0.3) warnings.push(`Low confidence (${rows[0].confidence}): check the box on a frame before aligning on it.`);
+    return applied(DETECT, summary, { warnings, data: { file_id: String(file.id), time: round(time, 3), kind, subjects: rows, dark_edges: found.darkEdges } }, 0);
   },
 });
 
@@ -476,6 +542,8 @@ const montageTool = directTool({
     // Each file is looked at once, at its first shot: its circle (unless given) and whether its edges are black.
     const looked = new Map<string, FrameSubjects | null>();
     let cannotLook = false;
+    // The chain's subjects are meant to match: after the first, each file's candidate closest in size wins (a highlight does not).
+    let reference = [...given.values()].map((g) => g.box.h / 2).sort((a, b) => a - b)[Math.floor(given.size / 2)];
     const sources: ShotSource[] = [];
     for (const [i, shot] of plan.shots.entries()) {
       const id = ids[shot.clip]!;
@@ -483,7 +551,7 @@ const montageTool = directTool({
       const w = windows[i]!;
       const kind = visualKind(file)!;
       if (!looked.has(id) && call.host.frames && !cannotLook) {
-        const found = await detectSubjects(call, file, kind === "image" ? 0 : w.start, "circle", { limit: 1 });
+        const found = await detectSubjects(call, file, kind === "image" ? 0 : w.start, "circle", { limit: 5, ...(reference !== undefined ? { radius: reference } : {}) });
         if (typeof found === "string") {
           cannotLook = true;
           warnings.push(`${found} Shots without a subject box are kept centred.`);
@@ -499,7 +567,10 @@ const montageTool = directTool({
         sources.push({ fileId: id, kind, ...w, box, ...(later ? { later } : {}), from: "given", darkEdges });
         continue;
       }
-      const box = looked.get(id)?.subjects[0]?.box;
+      const subjects = looked.get(id)?.subjects ?? [];
+      const best = reference !== undefined ? subjects[0] : [...subjects].sort((a, b) => b.score * Math.min(1, b.radius / 0.12) - a.score * Math.min(1, a.radius / 0.12))[0];
+      reference ??= best?.radius;
+      const box = best?.box;
       if (box) sources.push({ fileId: id, kind, ...w, box, from: "detected", darkEdges });
       else {
         if (looked.has(id) && shot.use === 0) warnings.push(`No circle found in ${displayName(file)}: its shots are centred, not aligned.`);
@@ -566,14 +637,25 @@ const montageTool = directTool({
       const first = clips[0]!;
       const opening = subjectOnCanvas(tx.project, first, Math.round(sources[0]!.start * frameRate) + 1, sources[0]!.box);
       const target = args.target ? toTarget(args.target) : { cx: 0.5, cy: 0.5, size: opening.size, angle: opening.angle };
-      const alignment = alignMatchCut(
-        tx,
+      const alignInputs = () =>
         clips.map((clip, i) => {
           const src = sources[i]!;
           return { clipId: String(clip.id), box: src.box, time: src.start, ...(src.later ? { later: src.later } : {}), ...(src.darkEdges ? { cover: "none" as const } : {}) };
-        }),
-        { target, fit, cover, zoomDrift: args.zoom_drift ?? 0.04 },
-      );
+        });
+      const options = { target, fit, cover, zoomDrift: args.zoom_drift ?? 0.04 };
+      let alignment: AlignResult;
+      try {
+        alignment = alignMatchCut(tx, alignInputs(), { ...options, maxZoom: MAX_ZOOM });
+      } catch (error) {
+        // A detected box that needs a huge zoom is on the wrong object: those shots are centred instead (nothing was written yet).
+        const over = new Set(error instanceof OpError && Array.isArray(error.details?.clipIds) ? (error.details.clipIds as string[]) : []);
+        const wrong = clips.flatMap((clip, i) => (over.has(String(clip.id)) && sources[i]!.from === "detected" ? [i] : []));
+        if (wrong.length === 0) throw error;
+        for (const i of wrong) sources[i] = { ...sources[i]!, box: CENTRED, from: "centred" };
+        const names = [...new Set(wrong.map((i) => displayName(files.get(sources[i]!.fileId)!)))];
+        warnings.push(`The circle found in ${names.join(", ")} needed more than ${MAX_ZOOM}x to match the others' size: probably the wrong object, so those shots are centred. Give their boxes (detect_subject_tool with near and radius) to align them.`);
+        alignment = alignMatchCut(tx, alignInputs(), options);
+      }
       // After the alignment: a transition's frames ride on the aligned curves; a zoom-through flies into the subject.
       const focus = { x: alignment.target.cx, y: alignment.target.cy };
       const transitions = planned.flatMap((t): MotionTransitionResult[] => {

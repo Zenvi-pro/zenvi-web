@@ -51,19 +51,19 @@ const OUTER_BONUS = 0.15;
 /** Directions sampled when measuring a candidate's circumference support. */
 const ARC_SAMPLES = 180;
 
-interface Gray {
+export interface Gray {
   width: number;
   height: number;
   data: Float32Array;
 }
 
-interface Shrunk extends Gray {
+export interface Shrunk extends Gray {
   /** Source pixels per work pixel. */
   factor: number;
 }
 
 /** Luma (Rec. 601) box-averaged down to at most `edge` pixels on the longest side. */
-function shrinkLuma(image: RgbaImage, edge: number): Shrunk {
+export function shrinkLuma(image: RgbaImage, edge: number): Shrunk {
   const factor = Math.max(1, Math.ceil(Math.max(image.width, image.height) / edge));
   const width = Math.max(1, Math.floor(image.width / factor));
   const height = Math.max(1, Math.floor(image.height / factor));
@@ -82,7 +82,7 @@ function shrinkLuma(image: RgbaImage, edge: number): Shrunk {
   return { width, height, data, factor };
 }
 
-function blur3(g: Gray): Gray {
+export function blur3(g: Gray): Gray {
   const { width, height, data } = g;
   const out = new Float32Array(width * height);
   for (let y = 0; y < height; y += 1) {
