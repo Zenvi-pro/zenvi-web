@@ -28,7 +28,7 @@ import { cardFrame, cardFramePad, type CardFrameStyle } from "../shapes.js";
 import { refuse, type TemplateInput, type TemplateOutput, type TemplateSpec } from "../template.js";
 import type { Rect } from "../tiles.js";
 import type { Element, Key, MediaSource, MotionMedia, Pose } from "../types.js";
-import { blurredBackdrop, BLEED, chipElement, chipSize, coverWidth, fullBleed, lockedStart, onPicture } from "./layout-parts.js";
+import { blurredBackdrop, BLEED, chipElement, chipSize, coverWidth, fullBleed, lockedIn, lockedStart, onPicture } from "./layout-parts.js";
 
 export const COMPARE_VARIANTS = ["side_by_side", "stacked", "diagonal", "offset"] as const;
 type Variant = (typeof COMPARE_VARIANTS)[number];
@@ -113,7 +113,7 @@ export const compare: TemplateSpec = {
     const elements: Element[] = [];
     const cues = [...enters];
     const card = (i: number, track: number, o: { width: number; radius: number; crop?: MediaSource["crop"] }, keys: Key[]): Element => {
-      let el = mediaCard(`panel-${i + 1}`, track, enters[i]!, frames, files[i]!, fps, { ...o, ...(start !== undefined ? { start } : {}) }, keys);
+      let el = mediaCard(`panel-${i + 1}`, track, enters[i]!, frames, files[i]!, fps, { ...o, ...(start !== undefined ? { start: lockedIn(start, enters[i]!, fps) } : {}) }, keys);
       if (content.sound && i === 0) el = { ...el, source: { ...(el.source as MediaSource), sound: true } };
       return { ...el, cue: enters[i]! };
     };
@@ -190,7 +190,7 @@ export const compare: TemplateSpec = {
     const aspect = Math.min(1.4, Math.max(0.5, files[0]!.width / files[0]!.height));
     const boxes = offsetBoxes(count, layout, aspect);
     if (content.backdrop === false) elements.push(backdrop("compare-bg", 0, 0, frames, layout, (d) => d.rect(0, 0, W, H, { fill: palette.background })));
-    else elements.push(blurredBackdrop("compare-bg", 0, 0, frames, files[count - 1]!, fps, layout));
+    else elements.push(blurredBackdrop("compare-bg", 0, 0, frames, files[count - 1]!, fps, layout, start));
     const style: CardFrameStyle = { radius: Math.round(Math.min(boxes[0]!.w, boxes[0]!.h) * 0.05), border: { color: "#ffffff", width: Math.max(2, 3 * u) }, shadow: { color: "#000000", opacity: 0.35, offset: 12 * u } };
     const pad = cardFramePad(style);
     boxes.forEach((box, i) => {

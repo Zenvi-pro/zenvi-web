@@ -38,12 +38,12 @@ const BLUR = 28;
 
 /**
  * A frame-filling copy of `media` behind a layout, blurred (libopenshot Blur,
- * scaled to the source's size) and dimmed (Brightness), muted. `start` pins
- * its in-point (the layout's clips are frame-locked to it).
+ * scaled to the source's size) and dimmed (Brightness), muted. `start`
+ * frame-locks it with the layout's clips (lockedStart).
  */
 export function blurredBackdrop(name: string, track: number, from: number, to: number, media: MotionMedia, fps: number, layout: Layout, start?: number): Element {
   const el = mediaFill(name, track, from, to, media, fps, layout, [key(from, pose(layout.W / 2, layout.H / 2, { s: 1.06 }))]);
-  if (start !== undefined && media.kind === "video" && el.source.kind === "media") el.source = { ...el.source, start, speed: 1 };
+  if (start !== undefined && media.kind === "video" && el.source.kind === "media") el.source = { ...el.source, start: lockedIn(start, from, fps), speed: 1 };
   const radius = Math.round((BLUR * Math.min(media.width, media.height)) / 1080);
   const blur = { ...stripId(defaultEffectJson("Blur", "TEMPLATE00")), horizontal_radius: constant(radius), vertical_radius: constant(radius), sigma: constant(Math.max(3, radius / 3)), iterations: constant(3) };
   const dim = { ...stripId(defaultEffectJson("Brightness", "TEMPLATE00")), brightness: constant(-0.18) };
@@ -59,13 +59,23 @@ function stripId(effect: Effect): Omit<Effect, "id"> {
  * One in-point that frame-locks `files` for `seconds`: the moment every one
  * of them has (the shortest video's window, from mediaWindow), so passes of
  * one shot, or a raw take and its edit, show the same frame side by side.
- * Undefined when every file is a photo.
+ * It is the source time at the template's frame 0: an element starting
+ * later plays from lockedIn. Undefined when every file is a photo.
  */
 export function lockedStart(files: readonly MotionMedia[], seconds: number): number | undefined {
   const videos = files.filter((m) => m.kind === "video");
   if (videos.length === 0) return undefined;
   const shortest = videos.reduce((a, b) => (b.duration < a.duration ? b : a));
   return mediaWindow(shortest, seconds).start;
+}
+
+/**
+ * The in-point of a frame-locked element starting at template frame `from`:
+ * the locked source time at frame 0 plus the frames it joins after, so every
+ * locked element shows the same source frame on every template frame.
+ */
+export function lockedIn(start: number, from: number, fps: number): number {
+  return (Math.round(start * fps) + from) / fps;
 }
 
 /** Width a picture is drawn at to cover the frame (Best Fit keeps its aspect). */
@@ -81,14 +91,15 @@ export function onPicture(media: MotionMedia, width: number, cx: number, cy: num
 }
 
 /**
- * A frame-filling clip playing from a fixed in-point `start` (frame-locked
- * with the others), as long as the file allows within `from`-`to`.
+ * A frame-filling clip frame-locked with the others (`start` from
+ * lockedStart), as long as the file allows within `from`-`to`.
  */
 export function lockedFill(name: string, track: number, from: number, to: number, media: MotionMedia, fps: number, layout: Layout, start: number | undefined, keys?: Key[]): Element {
   const el = mediaFill(name, track, from, to, media, fps, layout, keys);
   if (start === undefined || media.kind !== "video" || el.source.kind !== "media") return el;
-  const left = Math.floor((media.duration - start) * fps + 1e-6);
-  return { ...el, to: Math.min(to, from + Math.max(1, left)), source: { ...el.source, start, speed: 1 } };
+  const at = lockedIn(start, from, fps);
+  const left = Math.floor((media.duration - at) * fps + 1e-6);
+  return { ...el, to: Math.min(to, from + Math.max(1, left)), source: { ...el.source, start: at, speed: 1 } };
 }
 
 /** Frames of a window's move to full bleed, and of the settle after it. */

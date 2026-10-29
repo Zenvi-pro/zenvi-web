@@ -71,8 +71,13 @@ describe("compare", () => {
       const plan = build("compare", { fileIds: files, variant, labels: ["Raw", "Matte", "Comp"] });
       const panels = plan.layers.filter((l) => /^panel-\d+$/.test(l.name));
       expect(panels).toHaveLength(files.length);
-      const starts = new Set(panels.map((p) => (p.source.kind === "media" ? p.source.start : -1)));
-      expect(starts.size, variant).toBe(1);
+      // Panels arrive half a beat apart, yet on every frame they show the same source frame.
+      expect(new Set(panels.map((p) => p.start)).size, variant).toBe(files.length);
+      expect(new Set(panels.map((p) => inFrames(p) - p.start)).size, variant).toBe(1);
+      if (variant === "offset") {
+        const bg = plan.layers.find((l) => l.name === "compare-bg")!;
+        expect(inFrames(bg) - bg.start).toBe(inFrames(panels[0]!) - panels[0]!.start);
+      }
       expect(plan.layers.filter((l) => l.name.startsWith("label-"))).toHaveLength(files.length);
     }
   });
@@ -133,8 +138,8 @@ describe("pass_wipe", () => {
     const plan = build("pass_wipe", { fileIds: IDS.slice(0, 3), labels: ["Plate", "Matte", "Comp"] }, WIDE, 3);
     const passes = plan.layers.filter((l) => l.name.startsWith("pass-"));
     expect(passes.map((p) => p.start)).toEqual([0, 30, 60]);
-    // Frame-locked.
-    expect(new Set(passes.map((p) => (p.source.kind === "media" ? p.source.start : -1))).size).toBe(1);
+    // Frame-locked: each pass is wiped on over the same source frame of the shot as the one under it.
+    expect(new Set(passes.map((p) => inFrames(p) - p.start)).size).toBe(1);
     // A covered pass ends once the next wipe has landed.
     expect(passes[0]!.start + passes[0]!.frames).toBe(30 + 14);
     const pass = passes[1]!;
