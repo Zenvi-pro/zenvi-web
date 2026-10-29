@@ -28,14 +28,21 @@ export function parseDate(s: string): Ymd | undefined {
   return { y, m: mo, d };
 }
 
+/** Date.UTC with the year taken literally (Date.UTC reads 0..99 as 1900..1999). */
+function utc(y: number, m: number, d: number): Date {
+  const t = new Date(0);
+  t.setUTCFullYear(y, m - 1, d);
+  return t;
+}
+
 function daysIn(y: number, m: number): number {
-  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return utc(y, m + 1, 0).getUTCDate();
 }
 
 /** `n` steps after `from` (months clamp the day: 31 Jan + 1 month = 28/29 Feb). */
 export function addSteps(from: Ymd, step: Step, n: number): Ymd {
   if (step === "day" || step === "week") {
-    const t = new Date(Date.UTC(from.y, from.m - 1, from.d + n * (step === "week" ? 7 : 1)));
+    const t = utc(from.y, from.m, from.d + n * (step === "week" ? 7 : 1));
     return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
   }
   const months = from.y * 12 + (from.m - 1) + n * (step === "year" ? 12 : step === "quarter" ? 3 : 1);
@@ -47,11 +54,14 @@ export function addSteps(from: Ymd, step: Step, n: number): Ymd {
 /** Whole steps from `a` to `b` (b on or after a). */
 export function stepsBetween(a: Ymd, b: Ymd, step: Step): number {
   if (step === "day" || step === "week") {
-    const days = (Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000;
+    const days = Math.round((utc(b.y, b.m, b.d).getTime() - utc(a.y, a.m, a.d).getTime()) / 86_400_000);
     return Math.floor(days / (step === "week" ? 7 : 1));
   }
-  const months = b.y * 12 + b.m - (a.y * 12 + a.m) - (b.d < a.d ? 1 : 0);
-  return Math.floor(months / (step === "year" ? 12 : step === "quarter" ? 3 : 1));
+  const months = b.y * 12 + b.m - (a.y * 12 + a.m);
+  const n = Math.floor(months / (step === "year" ? 12 : step === "quarter" ? 3 : 1));
+  // A step lands on a clamped day (31 Jan + 1 month = 28 Feb), so count the steps that do not pass b.
+  const past = (c: Ymd): boolean => c.y * 10_000 + c.m * 100 + c.d > b.y * 10_000 + b.m * 100 + b.d;
+  return past(addSteps(a, step, n)) ? n - 1 : n;
 }
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -104,7 +114,7 @@ export function planClock(params: Params, seconds: number): ClockPlan | { error:
   if (end) {
     count = stepsBetween(start, end, step);
     if (count < 1) return { error: `data_clock end (${endText}) must be at least one ${step} after start` };
-    if (rate > 0) count = Math.min(count, Math.floor(rate * runFor(seconds)));
+    if (rate > 0) count = Math.max(1, Math.min(count, Math.floor(rate * runFor(seconds))));
     else rate = count / runFor(seconds);
   } else {
     if (rate <= 0) rate = 2;

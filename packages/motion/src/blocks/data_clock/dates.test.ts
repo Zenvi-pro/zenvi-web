@@ -21,6 +21,16 @@ describe("dates", () => {
     expect(stepsBetween({ y: 1990, m: 1, d: 1 }, { y: 2024, m: 1, d: 1 }, "year")).toBe(34);
   });
 
+  it("reads years before 100 literally and counts clamped month steps", () => {
+    expect(addSteps({ y: 79, m: 8, d: 24 }, "day", 1)).toEqual({ y: 79, m: 8, d: 25 });
+    expect(addSteps({ y: 99, m: 12, d: 31 }, "week", 1)).toEqual({ y: 100, m: 1, d: 7 });
+    expect(stepsBetween({ y: 50, m: 1, d: 1 }, { y: 50, m: 3, d: 1 }, "day")).toBe(59);
+    expect(stepsBetween({ y: 2006, m: 1, d: 31 }, { y: 2006, m: 2, d: 28 }, "month")).toBe(1);
+    expect(stepsBetween({ y: 2006, m: 1, d: 20 }, { y: 2006, m: 2, d: 19 }, "month")).toBe(0);
+    expect(stepsBetween({ y: 2006, m: 1, d: 20 }, { y: 2007, m: 1, d: 19 }, "year")).toBe(0);
+    expect(stepsBetween({ y: 2006, m: 1, d: 20 }, { y: 2007, m: 4, d: 20 }, "quarter")).toBe(5);
+  });
+
   it("formats by step", () => {
     const d = { y: 2006, m: 3, d: 21 };
     expect(formatDate(d, "auto", "day")).toBe("2006 / 03 / 21");
@@ -35,6 +45,9 @@ describe("dates", () => {
     expect(fit).toMatchObject({ count: 16, rate: 16 / runFor(8) });
     const capped = planClock({ start: "2006-01-20", end: "2007-01-01", step: "day", rate: 2, legends: [] }, 8);
     expect(capped).toMatchObject({ count: Math.floor(2 * runFor(8)), rate: 2 });
+    // A rate too slow for one step in the block still takes one, so progress never divides by zero.
+    const slow = planClock({ start: "2006", end: "2010", step: "year", rate: 0.1, legends: [] }, 4);
+    expect(slow).toMatchObject({ count: 1, rate: 0.1 });
   });
 
   it("refuses bad dates, ranges and ramps through checkParams", () => {
