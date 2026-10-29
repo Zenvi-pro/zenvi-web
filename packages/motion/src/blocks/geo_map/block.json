@@ -53,7 +53,7 @@
       "type": "string",
       "maxLength": 60,
       "default": "",
-      "description": "Where the camera ends: a country, continent, Natural Earth subregion (\"South America\", \"Western Africa\"), city (\"Lisbon\", \"Paris, France\"), \"lat, lon\" or \"world\" (stay wide and turn). Empty: fit the markers."
+      "description": "Where the camera ends: a country, continent, Natural Earth subregion (\"South America\", \"Western Africa\"), city (\"Lisbon\", \"Paris, France\"), \"lat, lon\" or \"world\" (stay wide and turn). Empty: fit the markers, highlights and values."
     },
     "start": {
       "type": "string",
@@ -73,7 +73,7 @@
         "Germany",
         "Italy"
       ],
-      "description": "Countries or regions filled with the accent, one after another."
+      "description": "Countries or regions filled with the accent, one after another (the default is a Western Europe demo: pass [] for none)."
     },
     "markers": {
       "type": "strings",
@@ -87,7 +87,7 @@
         "Berlin",
         "Rome"
       ],
-      "description": "Places that get a pin, in the order they pop (cities, countries, \"lat, lon\")."
+      "description": "Places that get a pin, in the order they pop (cities, countries, \"lat, lon\"; the default is a Western Europe demo: pass [] for none)."
     },
     "labels": {
       "type": "strings",

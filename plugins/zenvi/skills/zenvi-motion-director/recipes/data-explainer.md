@@ -58,6 +58,9 @@ voice names is on screen when it is said; one accent colour per graphic.
 
 - Every country highlighted: the accent stops meaning anything; highlight
   the two or three the line is about.
+- `geo_map` with only `focus` (or only `markers`): `highlight` and `markers`
+  default to a Western Europe demo that is filled and pinned on your map too.
+  Always pass both, `[]` for none.
 - A race with 15 bars on a vertical frame: keep `top` at 5-6.
 - Map markers spoken after they popped: put the block so the pops land on
   the words.
