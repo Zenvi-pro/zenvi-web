@@ -67,7 +67,7 @@ const input = z.strictObject({
     .describe("A media-bin image or video (the person's footage, a brand photo) the set must look like: its measured colours and light join the style, and its frame is the reference image where the image model takes one."),
   animate: z.boolean().optional().describe("Turn each still into a clip that starts and ends on it (default true). false: stills only, cheaper."),
   duration_seconds: z.union([z.number(), z.string().regex(/^\d+(\.\d+)?$/)]).optional().describe("Clip length when animating: 5 (default) or 10."),
-  provider: z.enum(["auto", "gemini", "openai", "grok"]).optional().describe("Image model (auto: the backend's default, Gemini when a reference image goes with the prompt)."),
+  provider: z.enum(["auto", "gemini", "openai", "grok"]).optional().describe("Image model for the whole set (auto: Gemini when the set shares a reference image, else the backend's default)."),
   dry_run: z.boolean().optional().describe("List the prompts, the cache hits and what would be generated; spend nothing."),
 });
 type Args = z.output<typeof input>;
@@ -217,8 +217,9 @@ export const brollSetTools: CatalogTool[] = [
       // One reference for the whole set: the person's file, else the first still made.
       let referenceUrl = reference ? await frameDataUri(call, reference, REFERENCE_WIDTH) : null;
       const wantsProvider = args.provider && args.provider !== "auto" ? args.provider : undefined;
-      // Grok takes no reference image (zenvi-backend #69 refuses it): send it only to models that use it.
-      const providerFor = (withReference: boolean) => wantsProvider ?? (withReference ? "gemini" : undefined);
+      // One image model for the whole set: Gemini whenever a reference goes along (the person's frame, or the first still
+      // for the stills after it), so the first still is not drawn by another model. Grok takes no reference (zenvi-backend #69 refuses it).
+      const provider = wantsProvider ?? (referenceUrl || stillsToMake > 1 ? "gemini" : undefined);
       let referenceHonoured: boolean | null = null;
       const made: NewMedia[] = [];
       const warnings: string[] = [];
@@ -230,7 +231,6 @@ export const brollSetTools: CatalogTool[] = [
         let stillMedia: ImportedMedia | undefined;
         if (!plan.still && !(animate && plan.video)) {
           const sendReference = Boolean(referenceUrl) && wantsProvider !== "grok" && referenceHonoured !== false;
-          const provider = providerFor(sendReference);
           const result = await generateImage(call, plan.prompt, { width, height }, { ...(provider ? { provider } : {}), ...(sendReference ? { referenceImageUrl: referenceUrl! } : {}) });
           if ("error" in result) {
             warnings.push(`"${plan.shot}": the still failed: ${result.error}`);

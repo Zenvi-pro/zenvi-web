@@ -4198,7 +4198,7 @@ Availability: editor yes (only when signed in to Zenvi); cli yes (only when sign
 | `reference_file_id` | string |  | A media-bin image or video (the person's footage, a brand photo) the set must look like: its measured colours and light join the style, and its frame is the reference image where the image model takes one. |
 | `animate` | boolean |  | Turn each still into a clip that starts and ends on it (default true). false: stills only, cheaper. |
 | `duration_seconds` | number \| string |  | Clip length when animating: 5 (default) or 10. |
-| `provider` | "auto" \| "gemini" \| "openai" \| "grok" |  | Image model (auto: the backend's default, Gemini when a reference image goes with the prompt). |
+| `provider` | "auto" \| "gemini" \| "openai" \| "grok" |  | Image model for the whole set (auto: Gemini when the set shares a reference image, else the backend's default). |
 | `dry_run` | boolean |  | List the prompts, the cache hits and what would be generated; spend nothing. |
 
 ### generate_subject_matte_tool
