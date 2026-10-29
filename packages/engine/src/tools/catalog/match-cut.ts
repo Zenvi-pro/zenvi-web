@@ -22,7 +22,7 @@ import type { Transaction } from "../../history/document.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { Interpolation, ScaleMode, type Clip, type ProjectFile } from "../../model/types.js";
 import { OpError } from "../../ops/errors.js";
-import { SOFT_ZOOM, alignMatchCut, type AlignClipInput, type AlignResult, type CoverMode } from "../../ops/match-cut.js";
+import { SOFT_ZOOM, ZOOM_ALL_LIMIT, alignMatchCut, type AlignClipInput, type AlignResult, type CoverMode } from "../../ops/match-cut.js";
 import { addClip, deleteClips, retimeClipTo, setClipKeyframes, setClipProperty } from "../../ops/clips.js";
 import { applyFittedMotionTransition, type MotionTransitionResult } from "../../ops/motion-transitions.js";
 import { addTitleClip } from "../../ops/titles.js";
@@ -54,6 +54,8 @@ const MONTAGE = "match_cut_montage_tool";
 const FITS = ["position", "position_scale", "position_scale_rotation"] as const;
 /** align_match_cut_tool refuses a bigger enlargement unless max_zoom allows it. */
 const MAX_ZOOM = 4;
+/** The montage centres a detected shot whose scale, cover zoom included, would pass this. */
+const MAX_SCALE = 8;
 /** A best candidate smaller than this (radius, of the frame height) is more often a detail than the subject. */
 const SMALL_SUBJECT = 0.05;
 const COVERS = ["zoom", "zoom_all", "none"] as const;
@@ -190,6 +192,7 @@ function alignmentReport(result: AlignResult): { rows: Record<string, unknown>[]
   const rows = result.clips.map((c) => {
     if (c.scale > SOFT_ZOOM) warnings.push(`${c.clipId} is enlarged ${round(c.scale, 1)}×: it may look soft.`);
     if (c.uncovered) warnings.push(`${c.clipId} leaves black edges (cover=none).`);
+    if (result.coveredAlone.includes(c.clipId)) warnings.push(`${c.clipId} needed more than ${ZOOM_ALL_LIMIT}x to stay covered: it is zoomed on its own (its subject is larger than the others').`);
     return {
       clip_id: c.clipId,
       scale: round(c.scale),
@@ -646,18 +649,27 @@ const montageTool = directTool({
           return { clipId: String(clip.id), box: src.box, time: src.start, ...(src.later ? { later: src.later } : {}), ...(src.darkEdges ? { cover: "none" as const } : {}) };
         });
       const options = { target, fit, cover, zoomDrift: args.zoom_drift ?? 0.04 };
-      let alignment: AlignResult;
-      try {
-        alignment = alignMatchCut(tx, alignInputs(), { ...options, maxZoom: MAX_ZOOM });
-      } catch (error) {
-        // A detected box that needs a huge zoom is on the wrong object: those shots are centred instead (nothing was written yet).
-        const over = new Set(error instanceof OpError && Array.isArray(error.details?.clipIds) ? (error.details.clipIds as string[]) : []);
-        const wrong = clips.flatMap((clip, i) => (over.has(String(clip.id)) && sources[i]!.from === "detected" ? [i] : []));
-        if (wrong.length === 0) throw error;
-        for (const i of wrong) sources[i] = { ...sources[i]!, box: CENTRED, from: "centred" };
-        const names = [...new Set(wrong.map((i) => displayName(files.get(sources[i]!.fileId)!)))];
-        warnings.push(`The circle found in ${names.join(", ")} needed more than ${MAX_ZOOM}x to match the others' size: probably the wrong object, so those shots are centred. Give their boxes (detect_subject_tool with near and radius) to align them.`);
-        alignment = alignMatchCut(tx, alignInputs(), options);
+      // A detected box that needs a huge zoom (to match the size, or to stay covered) is on the wrong object or at
+      // the frame's edge: those shots are centred instead and the alignment runs again (nothing is written until it passes).
+      let alignment: AlignResult | null = null;
+      const centred = new Set<number>();
+      for (let attempt = 0; !alignment && attempt < 4; attempt += 1) {
+        try {
+          alignment = alignMatchCut(tx, alignInputs(), { ...options, maxZoom: MAX_ZOOM, maxScale: MAX_SCALE });
+        } catch (error) {
+          const over = new Set(error instanceof OpError && Array.isArray(error.details?.clipIds) ? (error.details.clipIds as string[]) : []);
+          const wrong = clips.flatMap((clip, i) => (over.has(String(clip.id)) && sources[i]!.from === "detected" ? [i] : []));
+          if (wrong.length === 0) break;
+          for (const i of wrong) {
+            sources[i] = { ...sources[i]!, box: CENTRED, from: "centred" };
+            centred.add(i);
+          }
+        }
+      }
+      alignment ??= alignMatchCut(tx, alignInputs(), options);
+      if (centred.size > 0) {
+        const names = [...new Set([...centred].map((i) => displayName(files.get(sources[i]!.fileId)!)))];
+        warnings.push(`The circle found in ${names.join(", ")} needed more than ${MAX_ZOOM}x to match the others or ${MAX_SCALE}x to stay covered: probably the wrong object or at the frame's edge, so those shots are centred. Give their boxes (detect_subject_tool with near and radius) to align them.`);
       }
       // After the alignment: a transition's frames ride on the aligned curves; a zoom-through flies into the subject.
       const focus = { x: alignment.target.cx, y: alignment.target.cy };

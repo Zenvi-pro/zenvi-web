@@ -241,7 +241,7 @@ describe("match_cut_montage_tool", () => {
     expect(new Set(data.shots.map((s) => s.file_id))).toEqual(new Set(["F0", "F1", "F2", "F3"]));
     for (const shot of data.shots.slice(1, -1)) expect(shot.frames).toBeGreaterThanOrEqual(3);
     for (const shot of data.shots.slice(1, -1)) expect(shot.frames).toBeLessThanOrEqual(8);
-    expect(data.shots.every((s) => s.subject_from === "detected")).toBe(true);
+    expect(data.shots.every((s) => s.subject_from === "detected"), result.data?.warnings?.join(" | ")).toBe(true);
     expect(data.sfx_cues.map((c) => c.time)).toEqual(data.shots.slice(1).map((s) => s.start));
     expect(data.flashes.length).toBeGreaterThan(0);
     // Every cut frame without a flash or a motion transition: the subject at the target (±2 px; the drift zooms in after it).
@@ -443,6 +443,18 @@ describe("measuring subjects for match cuts", () => {
     expect(doc.undoLabels).toEqual([]);
     const allowed = await runTool({ doc, host }, "align_match_cut_tool", { clips, max_zoom: 30 });
     expect(allowed.data?.status, allowed.data?.summary).toBe("applied");
+  });
+
+  it("zoom_all does not let one subject at the frame's edge make every subject much larger: that clip is covered on its own", async () => {
+    const doc = new ProjectDocument(project());
+    const host: ToolHost = { frames: pixelFrameHost(paint) };
+    // C1's subject sits near the right edge: centring it needs about a 3x cover zoom.
+    const result = await runTool({ doc, host }, "align_match_cut_tool", { clips: [{ clip_id: "C0", box: boxOf("/m/eye.mp4") }, { clip_id: "C1", box: { x: 0.7, y: 0.3, w: 0.28, h: 0.4 } }], cover: "zoom_all" });
+    expect(result.data?.status, result.data?.summary).toBe("applied");
+    const data = result.data?.data as { target: { size: number }; clips: { clip_id: string; cover_zoom: number }[] };
+    expect(data.target.size).toBeCloseTo(300 / 720, 2);
+    expect(data.clips[1]!.cover_zoom).toBeGreaterThan(3);
+    expect(result.data?.warnings?.join(" ")).toMatch(/C1 needed more than 3x to stay covered: it is zoomed on its own/);
   });
 
   it("align_match_cut_tool measures clips given without a box and lines them up (±2 px)", async () => {

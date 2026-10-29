@@ -71,6 +71,8 @@ export interface AlignOptions {
    * measuring error, not a framing. Default: no limit.
    */
   maxZoom?: number;
+  /** Refuse (nothing written) when a clip's scale, cover zoom included, would pass this on any frame. Default: no limit. */
+  maxScale?: number;
 }
 
 export interface AlignedClip {
@@ -91,12 +93,16 @@ export interface AlignedClip {
 export interface AlignResult {
   target: CanvasSubject;
   clips: AlignedClip[];
+  /** zoom_all: clips that needed more than ZOOM_ALL_LIMIT and were covered on their own (their subject is larger). */
+  coveredAlone: string[];
 }
 
 /** Frames between keyframes while a subject moves or a shot zooms (linear between them). */
 const KEY_STEP = 6;
 /** Cover a hair more than the exact bound: the decode size rounds to whole pixels. */
 const COVER_SLACK = 1.002;
+/** zoom_all raises every subject by at most this much; a clip that needs more is covered on its own. */
+export const ZOOM_ALL_LIMIT = 3;
 /** Zoom beyond this needs a sharper source (reported). */
 export const SOFT_ZOOM = 3;
 
@@ -197,6 +203,7 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
 
   const planAll = (t: CanvasSubject) => inputs.map((input) => plan(project, input, t, fit, drift, cover));
   let plans = planAll(target);
+  const alone: string[] = [];
   if (options.maxZoom !== undefined) {
     // The size match alone, before any zoom that keeps the frame covered: a box far smaller than the target is a measuring error.
     const over = plans.filter((p) => Math.max(...p.fitScales) > options.maxZoom! + 1e-6);
@@ -205,8 +212,12 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
   const stuck = plans.filter((p) => p.cover !== "none" && p.covers.some((c) => !Number.isFinite(c)));
   if (stuck.length > 0) throw invalid(edgeMessage(stuck));
   if (cover === "zoom_all" && fit !== "position") {
-    // Every subject grows by the largest zoom any covered clip needs, so they all still match.
-    const zoom = Math.max(1, ...plans.filter((p) => p.cover !== "none").flatMap((p) => p.covers.map((c, i) => c / p.fitScales[i]!)));
+    // Every subject grows by the largest zoom any covered clip needs, so they all still match; a clip that
+    // would make everyone more than ZOOM_ALL_LIMIT larger is covered on its own instead (round 7 matchcut
+    // fixture: one subject at a frame edge made all 75 shots 14.7x larger).
+    const needs = plans.map((p) => (p.cover === "none" ? 1 : Math.max(1, ...p.covers.map((c, i) => c / p.fitScales[i]!))));
+    alone.push(...plans.filter((_, i) => needs[i]! > ZOOM_ALL_LIMIT).map((p) => String(p.clip.id)));
+    const zoom = Math.max(1, ...needs.filter((n) => n <= ZOOM_ALL_LIMIT));
     if (zoom > 1) {
       target = { ...target, size: target.size * zoom };
       plans = planAll(target);
@@ -214,6 +225,13 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
   }
 
   const scalesOf = (p: Planned) => p.fitScales.map((s, i) => (p.cover === "none" ? s : Math.max(s, p.covers[i]!)));
+  if (options.maxScale !== undefined) {
+    const over = plans.filter((p) => Math.max(...scalesOf(p)) > options.maxScale! + 1e-6);
+    if (over.length > 0) {
+      const rows = over.map((p) => `${String(p.clip.id)} ${Math.round(Math.max(...scalesOf(p)) * 10) / 10}x`).join(", ");
+      throw invalid(`Keeping the frame covered would enlarge ${rows}: more than ${options.maxScale}x (the subject sits near the frame's edge, or the box is wrong).`, { clipIds: over.map((p) => String(p.clip.id)) });
+    }
+  }
   const clips = plans.map((p): AlignedClip => {
     const id = String(p.clip.id);
     const scales = scalesOf(p);
@@ -236,7 +254,7 @@ export function alignMatchCut(tx: Transaction, inputs: readonly AlignClipInput[]
       uncovered: p.cover === "none" && p.covers.some((c, i) => c > scales[i]! * COVER_SLACK),
     };
   });
-  return { target: target!, clips };
+  return { target: target!, clips, coveredAlone: alone };
 }
 
 /** Which clips would be blown up, why that is most likely a wrong box, and the ways out. */

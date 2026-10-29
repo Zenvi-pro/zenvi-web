@@ -98,7 +98,8 @@ export function segmentsBetween(segments: readonly MusicSegment[], start: number
 export function loopNote(original: MusicBeats, loop: LoopedMusic, seconds: number): string {
   const from = loop.segments[1]!.from;
   const bars = Math.round((loop.loopSeconds * original.bpm) / 240);
-  return `The music is ${round3(original.duration)} s, shorter than the ${round3(seconds)} s asked: ${bars} bar(s) from ${round3(from)} s repeat ${loop.repeats === 1 ? "once" : `${loop.repeats} times`}, cut on bar lines, so the reel runs the full length.`;
+  const why = original.duration < seconds ? `shorter than the ${round3(seconds)} s asked` : `too short to end on the bar line after the ${round3(seconds)} s asked`;
+  return `The music is ${round3(original.duration)} s, ${why}: ${bars} bar(s) from ${round3(from)} s repeat ${loop.repeats === 1 ? "once" : `${loop.repeats} times`}, cut on bar lines, so the reel runs the full length.`;
 }
 
 /** File times (hits, onsets) on the looped clock: each stretch carries the times inside it. */
