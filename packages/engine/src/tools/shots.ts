@@ -154,3 +154,32 @@ export async function findShotMoments(
   }
   return found.sort((a, b) => b.score - a.score).slice(0, options.limit);
 }
+
+/** Seconds at either end of a shot that stand for how it opens and how it ends. */
+const END_SECONDS = 0.5;
+
+/**
+ * How each shot opens and ends (embeddings of its first and last half
+ * second), for sequence_shots_tool's look term; null when this host has no
+ * shot model installed (never a download) or a shot cannot be read.
+ */
+export async function shotLooks(call: ToolCall, shots: readonly ShotWindow[]): Promise<{ head: Vector; tail: Vector }[] | null> {
+  const host = call.host.shots;
+  if (!host || shots.length < 2) return null;
+  try {
+    if (!(await host.status()).ready) return null;
+    const ends = shots.flatMap((s) => {
+      const end = isStill(s.file) ? s.start : s.end;
+      return [
+        { file: s.file, start: s.start, end: Math.min(end, s.start + END_SECONDS) },
+        { file: s.file, start: Math.max(s.start, end - END_SECONDS), end },
+      ];
+    });
+    const vectors = await shotVectors(call, host, ends, true);
+    if (vectors.some((v) => !v)) return null;
+    return shots.map((_, i) => ({ head: vectors[2 * i]!, tail: vectors[2 * i + 1]! }));
+  } catch (error) {
+    call.host.log?.(`shot embeddings for sequencing failed: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}

@@ -3538,6 +3538,7 @@ Availability: editor partial (without frame sampling each shot is compared on a 
 | `voice_file_id` | string |  | The voice-over / dialogue in the media bin that speaker shots sync to (speech_at, says; a clip of this same file syncs by itself). |
 | `voice_at` | number |  | Timeline seconds where voice_file_id's audio starts (default: where a clip of it plays it, else the sequence start). (min 0) |
 | `position` | number |  | File shots: timeline seconds the sequence starts at (default 0). (min 0) |
+| `look` | boolean |  | true: also weigh how alike the shots look across each cut (the shot model, when installed: embed_media_tool). Joins more of the shots an editor puts side by side, at some cost to the overall order; best for montages and match cuts. Default false. |
 | `dry_run` | boolean |  | Only plan: return the order (data.file_ids feeds match_cut_montage_tool or build_reel_tool) without changing the timeline. |
 
 ### track_point_tool
