@@ -493,6 +493,17 @@ export interface FrameHost {
    * browser draws titles with fonts it does not disclose).
    */
   fontFamilies?(): Promise<string[]>;
+  /**
+   * Small rgb24 frames (`width` × `height`, aspect ignored) of the media file
+   * at `path` from `start` to `end` source seconds, one every `every`
+   * seconds, in one decode: what sequence_shots_tool compares shots by.
+   * Absent where the host only renders single frames (the tool then renders a
+   * few with `renderFrame`).
+   */
+  sampleFrames?(
+    path: string,
+    options: { start: number; end: number; every: number; width: number; height: number; signal?: AbortSignal },
+  ): Promise<Uint8Array[]>;
 }
 
 /** Per-frame loudness of a file's audio (the input of the desktop's energy VAD). */

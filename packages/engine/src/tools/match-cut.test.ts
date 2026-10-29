@@ -298,7 +298,7 @@ describe("match_cut_montage_tool", () => {
     const base = project();
     base.clips = [];
     // 4 s at 120 BPM: the opening hold runs to the 2 s downbeat and the end hold starts there.
-    const result = await runTool({ doc: new ProjectDocument(base), host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 4 });
+    const result = await runTool({ doc: new ProjectDocument(base), host: fakeHost() }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 4, keep_order: true });
     expect(result.data?.warnings?.join(" ")).toMatch(/2 file\(s\) did not fit in 4 s: F1, F2/);
   });
 
