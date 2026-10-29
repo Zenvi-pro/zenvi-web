@@ -44,7 +44,7 @@ export const BRIEF_NOTE =
 
 /** The note on the session's first result while the timeline is empty. */
 export const PRODUCE_FIRST =
-  "Making a whole video? produce_video_tool {request: the person's words} makes it in one call (brief, style, cut, finish, render, review) and returns the review's findings with the next calls.";
+  "Making a whole video? Call produce_video_tool now, even for a detailed brief (request = the whole brief, output = the delivery file): frame, stock, music, cut, finish, render and review in one call, with the findings to fix next.";
 
 /** The note for `tool`'s receipt on `project`, if it is owed. */
 export function briefNote(tool: string, project: Project): string | undefined {

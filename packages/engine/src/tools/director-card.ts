@@ -60,4 +60,6 @@ const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
 /** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
-export const DIRECTOR_START: string = `A new edit: ${PRODUCE} By hand: read_director_recipe {recipe}. ${RECIPES} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;
+export const DIRECTOR_START: string =
+  "A new edit: call produce_video_tool FIRST, even for a detailed brief: request = the whole brief as written, output = the delivery file (e.g. output.mp4). It sets the frame, finds stock and music, cuts with the right builder, finishes, renders and reviews in one call; do not search, import or set the frame before it. " +
+  `Then layer what the brief asks beyond its cut (motion blocks, titles, swaps) and fix its findings, and re-run it with skip=["brief","format","footage","music","build"] to finish, render and review again. By hand only when no builder fits: read_director_recipe {recipe}. ${RECIPES} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;

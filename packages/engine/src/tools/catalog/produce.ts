@@ -462,10 +462,10 @@ export const produceTools: CatalogTool[] = [
     name: TOOL,
     title: "Produce a whole video",
     description:
-      "Call this FIRST for any whole video (reel, ad, promo, trailer, explainer, montage, a reference to recreate): from the request and the media bin it saves a brief (when none is saved), picks ONE style of the styles index and its one-call builder " +
+      "Call this FIRST for any whole video (reel, ad, promo, trailer, explainer, montage, a reference to recreate), even from a detailed brief: request = the whole brief as written, output = the delivery file; do not search, import or set the frame before it. From the request and the media bin it saves a brief (when none is saved), picks ONE style of the styles index and its one-call builder " +
       "(build_reel_tool, match_cut_montage_tool, build_trailer_tool, build_explainer_tool, build_talking_head_tool, build_product_launch_tool), sets the frame the request names, gathers stock footage and music at the style's tempo when the bin is short, cuts the edit, " +
       "finishes it (unify_grade_tool, apply_motion_transitions_tool by the style's rules, auto_sound_design_tool, master_audio_tool iterate), renders it and runs review_render_tool and watch_render_tool. " +
-      "Returns a compact report: what it made, the brief, every stage's outcome, and the review's findings with the exact next calls - then fix only what the findings list. " +
+      "Returns a compact report: what it made, the brief, every stage's outcome, and the review's findings with the exact next calls - then layer what the brief asks beyond its cut (motion blocks, titles) and fix the findings. " +
       "One undo step per stage; skip any stage with skip=[...]. Pass what only the person knows: title (the product or film), features (a launch), script (a voice-led video with no voice-over), hook, end_card.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
