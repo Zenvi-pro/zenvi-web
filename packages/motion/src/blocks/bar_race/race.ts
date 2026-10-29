@@ -14,7 +14,7 @@ export interface Series {
 export interface RacePlan {
   series: Series[];
   periods: string[];
-  /** The period labels as numbers when they all are (years), so the clock can count between them. */
+  /** The period labels as numbers when they all are ascending whole numbers (years), so the clock can count between them. */
   numericPeriods: number[] | null;
 }
 
@@ -41,8 +41,12 @@ export function planRace(params: Params): RacePlan | { error: string } {
   }
   if (series.length < 2) return { error: "bar_race needs at least 2 series" };
   if (periods.length < 2) return { error: "bar_race needs at least 2 periods" };
-  const numericPeriods = periods.every((s) => NUMBER.test(s)) ? periods.map(num) : null;
-  return { series, periods, numericPeriods };
+  const highlight = String(params.highlight ?? "").trim();
+  if (highlight && !series.some((s) => s.name.toLowerCase() === highlight.toLowerCase()))
+    return { error: `bar_race highlight: no series called "${highlight}" (${series.map((s) => s.name).join(", ")})` };
+  const asNumbers = periods.map(num);
+  const counting = periods.every((s) => /^[-+]?\d+$/.test(s)) && asNumbers.every((v, i) => i === 0 || v > asNumbers[i - 1]!);
+  return { series, periods, numericPeriods: counting ? asNumbers : null };
 }
 
 /** Every series' value at race position `pos` (0 = first period, periods - 1 = last). */
@@ -84,7 +88,9 @@ export function periodLabel(plan: RacePlan, pos: number): string {
     const i = Math.min(last - 1, Math.floor(p));
     const a = plan.numericPeriods[i]!;
     const b = plan.numericPeriods[i + 1]!;
-    return String(Math.floor(a + (b - a) * (p - i) + 1e-9));
+    const v = Math.floor(a + (b - a) * (p - i) + 1e-9);
+    // On a period the label is the period as written ("07" stays "07").
+    return v === a ? plan.periods[i]! : v === b ? plan.periods[i + 1]! : String(v);
   }
   return plan.periods[Math.round(p)]!;
 }

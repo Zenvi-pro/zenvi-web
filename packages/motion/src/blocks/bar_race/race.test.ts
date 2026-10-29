@@ -36,4 +36,21 @@ describe("bar race", () => {
     expect(checkParams(manifest, { series: ["A=1, x", "B=1, 2"], periods: ["2000", "2001"] })).toMatchObject({ ok: false });
     expect(checkParams(manifest, { series: ["A=1, 2"], periods: ["2000", "2001"] })).toMatchObject({ ok: false });
   });
+
+  it("refuses a highlight that names no series", () => {
+    const manifest = getBlock("bar_race")!;
+    expect(checkParams(manifest, { series: ["Kite=1 2", "Atlas=2 1"], periods: ["1", "2"], highlight: "Kyte" })).toEqual({ ok: false, error: expect.stringContaining('no series called "Kyte"') });
+    expect(checkParams(manifest, { series: ["Kite=1 2", "Atlas=2 1"], periods: ["1", "2"], highlight: "kite" })).toMatchObject({ ok: true });
+  });
+
+  it("counts only through ascending whole-number periods, keeping each period as written", () => {
+    const months = planRace({ series: ["A=1 2 3", "B=3 2 1"], periods: ["07", "08", "12"] }) as RacePlan;
+    expect(periodLabel(months, 0)).toBe("07");
+    expect(periodLabel(months, 1.5)).toBe("10");
+    expect(periodLabel(months, 2)).toBe("12");
+    const down = planRace({ series: ["A=1 2", "B=2 1"], periods: ["2024", "2018"] }) as RacePlan;
+    expect(down.numericPeriods).toBeNull();
+    expect(periodLabel(down, 0.4)).toBe("2024");
+    expect((planRace({ series: ["A=1 2", "B=2 1"], periods: ["1.5", "2.5"] }) as RacePlan).numericPeriods).toBeNull();
+  });
 });
