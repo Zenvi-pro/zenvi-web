@@ -54,6 +54,7 @@ const DIRECT_TOOLS = [
   "place_on_word_tool",
   "insert_broll_on_words_tool",
   "add_kinetic_title_tool",
+  "add_type_block_tool",
   "list_sfx_tool",
   "add_sfx_tool",
   "spot_sound_tool",

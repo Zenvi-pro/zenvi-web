@@ -13,7 +13,7 @@ import { ROOMY, textWidth } from "./text.js";
 import type { Ease, Element, Key, MediaSource, MotionMedia, Pose } from "./types.js";
 
 export function pose(x: number, y: number, extra: Partial<Omit<Pose, "x" | "y">> = {}): Pose {
-  return { x, y, s: extra.s ?? 1, alpha: extra.alpha ?? 1, rotation: extra.rotation ?? 0, ...(extra.sx !== undefined ? { sx: extra.sx } : {}) };
+  return { x, y, s: extra.s ?? 1, alpha: extra.alpha ?? 1, rotation: extra.rotation ?? 0, ...(extra.sx !== undefined ? { sx: extra.sx } : {}), ...(extra.sy !== undefined ? { sy: extra.sy } : {}) };
 }
 
 export function key(frame: number, p: Pose, ease: Ease = "out"): Key {
@@ -78,7 +78,7 @@ export function glide(el: Element, at: number, frames: number, dy: number, ease:
 
 export function samePose(a: Pose, b: Pose): boolean {
   const near = (x: number, y: number) => Math.abs(x - y) < 1e-6;
-  return near(a.x, b.x) && near(a.y, b.y) && near(a.s, b.s) && near(a.alpha, b.alpha) && near(a.rotation, b.rotation) && near(a.sx ?? 1, b.sx ?? 1);
+  return near(a.x, b.x) && near(a.y, b.y) && near(a.s, b.s) && near(a.alpha, b.alpha) && near(a.rotation, b.rotation) && near(a.sx ?? 1, b.sx ?? 1) && near(a.sy ?? 1, b.sy ?? 1);
 }
 
 /** The pose `p` seen through a camera zoomed by `z` about the frame centre. */
