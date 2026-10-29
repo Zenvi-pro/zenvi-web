@@ -23,7 +23,7 @@ its answer, the punchline. With two real cameras, alternate them (wide master,
 1. Boundaries: `get_transcript_tool {"includeWords": true}` (or
    `diarize_media_tool` for who speaks when). List the cut times: sentence
    ends, the word before a punchline, speaker turn starts.
-2. Single camera: `split_clip_tool {"clip_id", "at_seconds"}` at each time, then
+2. Single camera: `split_clip_tool {"clip_id": "<clip_id>", "at_seconds": "<at_seconds>"}` at each time, then
    on every other piece
    `set_clip_properties_tool {"timeline_clip_ids": [...], "properties":
    {"scale_x": 1.35, "scale_y": 1.35, "location_y": 0.08}}` (location_y keeps

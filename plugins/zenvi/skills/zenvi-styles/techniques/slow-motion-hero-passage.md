@@ -25,10 +25,10 @@ shots, then the edit snaps back to speed on a cut and a hit.
    "speed": 0.4}`. The receipt has the new `position` and `durationFrames`:
    place the next shot at that end (the clip after it does not move by itself;
    `ripple: true` on a full track was not enough in the test and left black).
-2. Or shape it: `speed_ramp_tool {"clip_id", "preset": "ramp_out"}` (normal, then
+2. Or shape it: `speed_ramp_tool {"clip_id": "<clip_id>", "preset": "ramp_out"}` (normal, then
    slows into the last frame) or `"hero"` (normal, held slow, normal).
 3. Smooth frames from 24/30 fps sources (CLI/local only), instead of step 1 or 2:
-   `apply_fx_tool {"clip_id", "effects": [{"effect": "optical_flow_slowmo",
+   `apply_fx_tool {"clip_id": "<clip_id>", "effects": [{"effect": "optical_flow_slowmo",
    "params": {"speed": 0.4}}]}` on the clip at normal speed (`apply_fx_tool`
    refuses a clip that is already retimed, so also put any other FX on first).
 4. A slow push over the hero: `set_keyframes_tool` `scale_x` and `scale_y`

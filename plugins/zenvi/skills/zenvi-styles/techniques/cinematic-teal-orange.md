@@ -31,7 +31,7 @@ subject (it just turns the sky cyan).
 2. A shot that still sticks out: `color_grade_clip_tool` on that clip only
    (`temperature`, `exposure`, `mix`), never a second LUT on top.
 3. Footage at 2048x1080 or 2.39:1 inside a 16:9 project shows black bars:
-   `set_clip_property_tool` `{"property": "scale", "value": 0}` (crop to fill) on
+   `set_clip_property_tool {"property": "scale", "value": 0}` (crop to fill) on
    those clips before grading, or the bars read as a grading mismatch.
 4. Fallback without LUT files: `color_grade_clip_tool` `{"look": "teal_orange"}`.
 

@@ -77,7 +77,7 @@ No transcript (TTS or script only): cues per phrase in timeline seconds.
 ## Tool sequence
 1. `set_project_setting_tool` width 1080 height 1920 fps 30.
 2. A-roll on track 1; `remove_words_tool {"fillerPreset": "english_fillers"}`
-   (after `transcribe_media_tool`), `remove_silence_tool {"clipId", "minPauseSec":
+   (after `transcribe_media_tool`), `remove_silence_tool {"clipId": "<clipId>", "minPauseSec":
    0.35, "padSec": 0.12}`; first word at frame 0.
 3. `get_transcript_tool {"includeWords": true}`; list sentence ends and 4-9
    trigger nouns.
@@ -91,8 +91,8 @@ No transcript (TTS or script only): cues per phrase in timeline seconds.
 6. `unify_grade_tool {"timeline_clip_ids": [all picture], "reference_clip_id": <A-roll>,
    "look": "warm_pop", "look_intensity": 0.35}`.
 7. Optional: `generate_subject_matte_tool` on the A-roll (CLI/cloud).
-8. `kinetic_captions_tool {"timeline_clip_ids": [all picture], "style": "creator",
-   "animation": "pop", "emphasis": [3-6 words], "text_size": 0.06, "y": 0.64,
+8. `kinetic_captions_tool {"timeline_clip_ids": ["<all picture>"], "style": "creator",
+   "animation": "pop", "emphasis": ["<3-6 words>"], "text_size": 0.06, "y": 0.64,
    "placement": "style"}` (with a matte: leave `placement` and `y` out).
 9. `add_kinetic_title_tool {"text": <hook topic>, "style": "creator", "emphasis":
    [1 word], "text_size": 0.05, "y": 0.14, "position_seconds": 0, "duration_seconds": 3}`.

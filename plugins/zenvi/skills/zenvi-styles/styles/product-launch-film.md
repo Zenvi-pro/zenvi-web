@@ -138,7 +138,7 @@ add_sfx_tool {"recipe": "impact_slam", "at_seconds": 3.6, "gain_db": -8}
 add_sfx_tool {"recipe": "sub_drop", "at_seconds": 6.1, "gain_db": -8}
 add_sfx_tool {"recipe": "whoosh_long", "at_seconds": 11.2, "gain_db": -12}
 add_sfx_tool {"recipe": "hit_transient", "at_seconds": 25.5, "gain_db": -6}
-master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}
+master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}
 review_edit_tool {}
 ```
 

@@ -80,7 +80,7 @@ Fast, clear VO at 165-185 wpm, almost wall-to-wall; first word on frame 1. One T
 ## Tool sequence
 
 1. VO per clause: `generate_tts_and_add_to_timeline_tool` back to back (`speed: 1.1`), `set_track_role_tool` voice.
-2. Footage: `gather_stock_footage_tool` `{"queries": [one per clause noun], "orientation": "portrait", "count": 10}`.
+2. Footage: `gather_stock_footage_tool` `{"queries": ["<one per clause noun>"], "orientation": "portrait", "count": 10}`.
 3. Picture per clause: `add_clip_to_timeline_tool` with `position_seconds` = clause start, length = clause;
    `set_keyframes_tool` scale 1.0 to 1.06 per shot; `set_clip_audio_video_tool` `{"audio": "off"}`.
 4. Hook (t060): `add_kinetic_title_tool` `{"text": "800,000-year-old air", "style": "creator", "animation": "pop",

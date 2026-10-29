@@ -24,7 +24,7 @@ photos, portraits in a landscape, title backgrounds.
 
 ## Build it in Zenvi
 
-Not buildable cleanly today. The layers exist: `replace_background_tool` `{"clip_id",
+Not buildable cleanly today. The layers exist: `replace_background_tool` `{"clip_id": "<clip_id>",
 "background": "blur", "blur": 3}` puts the person (subject matte) over the footage; then
 `set_keyframes_tool` moves the planes differently (background `location_x` 0.012 -> -0.012,
 person 0.004 -> -0.02, both `scale` >= 1.04). But the background layer still contains the

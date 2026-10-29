@@ -31,7 +31,7 @@ Related shot cards: `shot-rhythm-interrupt-moves` (jump-cut punch-in ladder), `s
 3. Missing a close-up: punch in on the medium - `set_keyframes_tool` `scale_x`/`scale_y`
    `[{"seconds": 0, "value": 2.2}]` and `location_y` `[{"seconds": 0, "value": 0.3}]` (positive moves the
    picture down; keep |location| <= (scale - 1) / 2). 1080p sources survive 2.2x at 720p, ~1.6x at 1080p.
-4. Sources that are not 16:9: `set_clip_property_tool` `{"property": "scale", "value": 0}` first.
+4. Sources that are not 16:9: `set_clip_property_tool {"property": "scale", "value": 0}` first.
 Tagging each shot's scale automatically is missing (`shot-heading-scale-tagger`, GAPS #59): judge it
 from a contact sheet.
 

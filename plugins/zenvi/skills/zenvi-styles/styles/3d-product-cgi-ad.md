@@ -134,7 +134,7 @@ add_sfx_tool {"recipe": "impact_thud", "at_seconds": 2.53, "gain_db": -9}
 add_sfx_tool {"recipe": "sparkle", "at_seconds": 8.0, "gain_db": -18}
 add_sfx_tool {"recipe": "mouse_click", "at_seconds": 25.4, "pitch": -4, "gain_db": -8}
 add_sfx_tool {"recipe": "hit_transient", "at_seconds": 25.5, "gain_db": -8}
-master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}
+master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}
 review_edit_tool {}
 ```
 

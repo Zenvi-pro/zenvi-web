@@ -234,7 +234,7 @@ A bin of finished shots (a reference's own cut, an editor's selects, a
 client's clips) is a sequencing job first, not a montage to build: the
 shots already carry their lengths and the music already fits them.
 
-1. `sequence_shots_tool {"file_ids": [every shot], "position": 0}` lays them
+1. `sequence_shots_tool {"file_ids": ["<every shot>"], "position": 0}` lays them
    at their own lengths in a continuity order with the strongest last. Do
    not trim them to a beat grid or swap in a genre tool's timing: the given
    lengths are the rhythm. `arc` only when the brief says it (`build` for a

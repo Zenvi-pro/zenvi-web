@@ -93,7 +93,7 @@ Narration calm, about 140-160 wpm, pauses kept. A translated subject gets subtit
    "documentary", "animation": "fade", "emphasis": "none", "text_size": 0.08, "duration_seconds": 2.8}` over the
    first context wide (add `"background": "#000000"` only in long-form); music starts on this frame.
 6. Context wides (t115): 2.5 s static wides on ambience, `fade_clip_tool` in/out, the place name
-   `add_kinetic_title_tool` `{"style": "editorial", "animation": "fade", "text_size": 0.22, "ink": "#f2efe8"}`.
+   `add_kinetic_title_tool {"style": "editorial", "animation": "fade", "text_size": 0.22, "ink": "#f2efe8"}`.
 7. Grade once: `unify_grade_tool` `{"look": "elegant_dark_cinema", "look_intensity": 0.5}`.
 8. Close on the subject: a last line of theirs over a working shot, held 2+ s after it ends, then a short fade.
 9. Music bed from the title: `add_clip_to_timeline_tool`, `set_track_role_tool` music, -20 dB,

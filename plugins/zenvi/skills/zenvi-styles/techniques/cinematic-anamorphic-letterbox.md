@@ -26,9 +26,9 @@ do most of the work. Shines on trailers, car films, travel and wedding highlight
    "height": 0.744, "feather": 0}` (no `clip_ids` = all footage and photos; titles stay full
    frame). 0.744 = (16/9) / 2.39; use 0.889 for 2:1. A 4:3 home-movie window is a pillarbox instead:
    `"width": 0.75, "height": 1.2` (0.75 = (4/3) / (16/9)).
-2. Lens character per clip: `apply_fx_tool` `{"clip_id", "effects": [{"effect": "bloom", "amount": 0.45,
+2. Lens character per clip: `apply_fx_tool` `{"clip_id": "<clip_id>", "effects": [{"effect": "bloom", "amount": 0.45,
    "params": {"threshold": 0.7, "radius": 0.45}}, {"effect": "chromatic_aberration", "amount": 0.25}]}`.
-3. Person breaking the bars (hero moment): `pop_out_tool` `{"clip_id", "band_aspect": 2.39}`.
+3. Person breaking the bars (hero moment): `pop_out_tool` `{"clip_id": "<clip_id>", "band_aspect": 2.39}`.
 4. The horizontal streak flare is missing (`anamorphic-streak-flare`): bloom is radial. Fallback:
    leave it out; never fake it with `directional_blur` on the whole frame (it smears the image).
 
@@ -47,7 +47,7 @@ None of its own; it sets up `cinematic-trailer-sound`.
 ## Common mistakes
 
 - 2.39 bars on top of footage that is already letterboxed (double bars) - crop-fill first
-  (`set_clip_property_tool` `{"property": "scale", "value": 0}`).
+  (`set_clip_property_tool {"property": "scale", "value": 0}`).
 - Text in the bars (looks like a broadcast ticker).
 
 ## Verified

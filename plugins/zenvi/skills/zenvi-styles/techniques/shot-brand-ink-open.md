@@ -21,7 +21,7 @@ It starts the energy curve low on purpose.
 
 ## Build it in Zenvi
 ```json
-add_motion_block_tool {"block": "hud_callouts", "params": {"title": "", "labels": [], "values": [], "grid": "crosshair"}, "position_seconds": 0, "duration_seconds": 1.2, "placement": "over_video"}
+add_motion_block_tool {"block": "hud_callouts", "params": {"title": "", "labels": [""], "values": [""], "grid": "crosshair"}, "position_seconds": 0, "duration_seconds": 1.2, "placement": "over_video"}
 add_motion_block_tool {"block": "kinetic_headline", "params": {"text": "northfold", "kicker": "MOTION & IDENTITY", "style": "blur", "emphasis": "display", "max_size": 220},
   "position_seconds": 0.35, "duration_seconds": 3.0, "placement": "over_video"}
 set_keyframes_tool {"timeline_clip_id": "<headline_clip>", "property": "location_y", "ease": "ease_in", "points": [{"seconds": 2.75, "value": 0}, {"seconds": 2.98, "value": -0.04}]}

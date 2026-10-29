@@ -28,7 +28,7 @@ mismatch between register and subject is the comedy.
 2. Ambience: `search_sound_library_tool` (birds, wind, room tone) on an
    ambience track, `set_track_role_tool` ambience, -30 to -38 LUFS.
 3. Trail-cam beat, on its shots only:
-   - `apply_look_tool {"timeline_clip_id", "look_id": "gloomy", "stack_grain": true,
+   - `apply_look_tool {"timeline_clip_id": "<timeline_clip_id>", "look_id": "gloomy", "stack_grain": true,
      "grain_preset": "16mm_classic"}` and `add_vignette_tool {"amount": 0.5}`
    - `add_timer_tool {"mode": "clock", "start_at_seconds": 20820, "format": "hh:mm:ss",
      "font": "Menlo", "text_size": 0.05, "screen_position": "bottom_right",

@@ -20,7 +20,7 @@ holds for a beat, then the frame punches in onto the one number that matters
 and holds it; 1.3-1.5 s per proof shot, a swoosh per push.
 
 ## Build it in Zenvi
-1. Place the capture: `add_clip_to_timeline_tool {"file_id", "position_seconds",
+1. Place the capture: `add_clip_to_timeline_tool {"file_id": "<file_id>", "position_seconds": "<position_seconds>",
    "duration_seconds": 4}` (images need `duration_seconds`).
 2. Find the number's centre on a `preview_frame {"grid": true}`: (px, py), 0-1.
 3. Zoom by `s` about the frame centre and offset so the number lands centre:
