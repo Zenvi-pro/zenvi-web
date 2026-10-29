@@ -13,7 +13,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { encodePng } from "../src/image/png.js";
 import { rasterizeSvg } from "../src/svg/rasterize.js";
@@ -38,9 +38,15 @@ const reportOnly = args.includes("--report-only");
 const dir = path.resolve(args.find((a) => !a.startsWith("--")) ?? "tool-truth-report");
 
 if (!reportOnly) {
-  await rm(dir, { recursive: true, force: true });
+  // Only what an earlier report wrote: <dir> is the caller's folder and may hold anything else.
+  if (existsSync(dir)) {
+    const owned = (name: string): boolean => ["cases.jsonl", "report.md", "report.json", "frames", "sounds"].includes(name) || /^sheet-.*\.png$/.test(name);
+    for (const name of (await readdir(dir)).filter(owned)) await rm(path.join(dir, name), { recursive: true, force: true });
+  }
   const run = spawnSync("npx", ["vitest", "run", "--project", "render-node", "packages/render-node/src/tool-truth"], {
     stdio: "inherit",
+    // npx is npx.cmd on Windows: spawning it needs a shell there.
+    shell: process.platform === "win32",
     env: { ...process.env, ZENVI_TOOL_TRUTH_FULL: "1", ZENVI_TOOL_TRUTH_REPORT: dir },
   });
   process.exitCode = run.status ?? 1;
@@ -107,9 +113,13 @@ const H = 90;
 const LABEL = 14;
 const escape = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+/** 80 rows per page: `<name>.png`, then `<name>-2.png` … so no case is left off. */
 async function sheet(name: string, rows: CaseLine[]): Promise<void> {
-  const picture = rows.filter((l) => l.probe === "picture" && existsSync(path.join(dir, "frames", `${caseSlug(l.id)}.base.png`))).slice(0, 80);
-  if (picture.length === 0) return;
+  const all = rows.filter((l) => l.probe === "picture" && existsSync(path.join(dir, "frames", `${caseSlug(l.id)}.base.png`)));
+  for (let page = 0; page * 80 < all.length; page += 1) await sheetPage(page === 0 ? name : `${name}-${page + 1}`, all.slice(page * 80, (page + 1) * 80));
+}
+
+async function sheetPage(name: string, picture: CaseLine[]): Promise<void> {
   const cols = 2;
   const cellW = 2 * W + 12;
   const cellH = H + LABEL + 8;
