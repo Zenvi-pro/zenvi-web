@@ -287,7 +287,7 @@ async function produce(call: ToolCall, args: Request): Promise<{ receipt: ToolRe
     const same = project().width === frame.width && project().height === frame.height;
     if (same || (!facts.size && aspect === projectAspect)) director.pass("format", `the project is already ${project().width}x${project().height}`);
     else if (project().clips.length > 0) director.pass("format", `the timeline has clips: the frame stays ${project().width}x${project().height}`);
-    else await director.run("format", "set_project_setting_tool", { width: frame.width, height: frame.height });
+    else await director.run("format", "set_project_setting_tool", { width: frame.width, height: frame.height, ...(facts.fps ? { fps: facts.fps } : {}) });
   }
 
   // 3. Footage: stock when the bin is short of pictures for the style.
@@ -297,7 +297,8 @@ async function produce(call: ToolCall, args: Request): Promise<{ receipt: ToolRe
   const queries = args.stock_queries ?? (facts.searches.length > 0 ? facts.searches : [facts.subject || rule.id.replace(/-/g, " ")]);
   if (director.wants("footage")) {
     const needed = Math.min(MAX_GATHER, wanted - pictures);
-    if (needed < MIN_GATHER) director.pass("footage", `the bin has ${pictures} picture file(s)`);
+    if (facts.noStock) director.pass("footage", "the request rules out stock: the bin's footage only");
+    else if (needed < MIN_GATHER) director.pass("footage", `the bin has ${pictures} picture file(s)`);
     else {
       await director.run("footage", "gather_stock_footage_tool", {
         queries,

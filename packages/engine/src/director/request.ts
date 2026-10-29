@@ -14,6 +14,10 @@ export interface RequestFacts {
   /** Frame size the request names ("1920x1080"). */
   size: { width: number; height: number } | null;
   bpm: number | null;
+  /** Frame rate the request names ("25 fps"). */
+  fps: number | null;
+  /** The request rules out stock footage ("use this footage only", "no stock"). */
+  noStock: boolean;
   /** The name after "called" / "named" / "titled", else null. */
   name: string | null;
   /** A headline, hook or title line in quotes. */
@@ -71,6 +75,7 @@ export function readRequest(request: string): RequestFacts {
     .map((q) => q.text);
   const size = request.match(/\b(\d{3,4})\s*[x×]\s*(\d{3,4})\b/);
   const bpm = request.match(/\b(\d{2,3})\s*bpm\b/i);
+  const fps = request.match(/\b(\d{2,3}(?:\.\d+)?)\s*fps\b/i);
   const url = request.match(/\b((?:https?:\/\/)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:com|io|ai|app|co|dev|pro|org|net)(?:\/\S*)?)\b/i);
   const firstSentence = request.split(/[.\n]/)[0] ?? request;
   const subject = firstSentence
@@ -85,6 +90,8 @@ export function readRequest(request: string): RequestFacts {
     aspect: aspectOf(request),
     size: size ? { width: Number(size[1]), height: Number(size[2]) } : null,
     bpm: bpm ? Number(bpm[1]) : null,
+    fps: fps ? Number(fps[1]) : null,
+    noStock: /\bno stock\b|\b(this|the given|my|our) (footage|shots|media) only\b|\buse only (the|this|my)\b|\bonly (the|this) (footage|shots|media)\b/i.test(request),
     name: named?.text ?? null,
     headline: headline?.text ?? null,
     url: url ? url[1]! : null,

@@ -58,6 +58,12 @@ describe("readRequest", () => {
     expect(facts.searches).toEqual(["green rolling hills lake landscape", "misty valley pine forest aerial"]);
   });
 
+  it("reads the re-edit bench's format and its no-stock rule", () => {
+    const facts = readRequest("A 15 second match-cut montage.\n# Format\n1920x1080, 24.0 fps, about 16 seconds.\nUse this footage only (no stock search, no AI video).");
+    expect(facts).toMatchObject({ size: { width: 1920, height: 1080 }, fps: 24, noStock: true, seconds: 15 });
+    expect(readRequest("a reel of my trip").noStock).toBe(false);
+  });
+
   it("reads minutes, vertical frames and sizes", () => {
     expect(readRequest("a 1 minute vertical recap for TikTok")).toMatchObject({ seconds: 60, aspect: "9:16", platform: "TikTok" });
     expect(readRequest("4:3 (1440x1080), about 20 seconds").size).toEqual({ width: 1440, height: 1080 });
