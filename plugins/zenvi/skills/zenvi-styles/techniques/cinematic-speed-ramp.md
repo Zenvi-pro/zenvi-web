@@ -1,7 +1,7 @@
 ---
 id: cinematic-speed-ramp
 kind: technique
-summary: When one moment of an action shot is the hero - rush in, near-freeze on the apex (lean, jump, splash), rush out, on the beat.
+summary: When one moment of an action shot is the hero - rush in, near-freeze on the apex, rush out, on the beat.
 categories: [sports-hype-edit, automotive-ad, movie-game-trailer, travel-cinematic-montage, fitness-lifestyle, gaming-montage]
 tools: [speed_ramp_tool, apply_fx_tool, add_sfx_tool, detect_beats_tool]
 pace: fast

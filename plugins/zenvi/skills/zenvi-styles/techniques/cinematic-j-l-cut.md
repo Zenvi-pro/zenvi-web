@@ -55,4 +55,7 @@ It is sound. Diegetic sources work best: room tone, ticks, needles, waves, voice
 2026-10-28, `tech/j-l-cut` (a fern, then a turntable whose own sound starts 1 s before its picture,
 6 s 720p24). First attempt trimmed the wrong clip (the receipt does not list the new audio clip;
 find it on its track). Watch judge (abs): transitions 7/10, sound 6, overall 5.0, "the classic
-J-cut audio pre-lap functions as intended, pulling the viewer into the next scene".
+J-cut audio pre-lap functions as intended, pulling the viewer into the next scene". In the documentary
+showcase an L-cut (the clock ticks on under two more shots): "the diegetic L-cut of the ticking clock
+establishes an immediate, claustrophobic sense of routine" (overall 7.7); in the brand film a J-cut of
+the turntable plus every clip's own sound: sound design 9/10.

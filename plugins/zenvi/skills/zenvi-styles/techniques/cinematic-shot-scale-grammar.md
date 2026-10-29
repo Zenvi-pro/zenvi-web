@@ -1,7 +1,7 @@
 ---
 id: cinematic-shot-scale-grammar
 kind: technique
-summary: When a scene must read as a story - wide establishes, medium places the subject, close-up gives the emotion, in that order.
+summary: When a scene must read as a story - wide sets the place, medium the subject, close-up the emotion, in order.
 categories: [documentary-true-story, brand-story-corporate, movie-game-trailer, wedding-event-film, real-estate-tour, travel-cinematic-montage]
 tools: [add_clip_to_timeline_tool, set_keyframes_tool, set_clip_property_tool]
 pace: calm

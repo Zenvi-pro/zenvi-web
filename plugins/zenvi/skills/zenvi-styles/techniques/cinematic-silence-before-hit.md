@@ -23,7 +23,7 @@ before any big hit.
 
 ## Build it in Zenvi
 
-Trailer version (black + dead air, 0.35-0.5 s):
+Trailer version (black + dead air, 0.4-0.6 s):
 1. Leave a gap on the picture track: the last build shot ends at `t`, the hero shot starts at
    `t + 0.4` (`add_clip_to_timeline_tool` `position_seconds`). The gap renders black.
 2. Music: two clips of the track - the build ending at `t`, then the drop section starting at
@@ -40,7 +40,8 @@ today read it off `detect_beats_tool` downbeats + the loudness curve.
 
 ## Timing & taste rules
 
-- Black + silence 0.35-0.5 s (8-12 frames at 24 fps); at 0.6 s the judge felt momentum stall.
+- Black + silence 0.4-0.6 s (10-14 frames at 24 fps); the judge called 0.6 s "slightly long" once, but a 0.42 s
+  pass (with other changes) scored lower - stay in the range, never over 0.75 s.
 - Suck-out 80-300 ms (150 ms default), at most 1-2 per 30 s.
 - The hit lands on frame one of the hero shot and on the drop's downbeat; never one frame late.
 - Nothing in the gap: no whoosh tail, no reverb ring (cut the riser at `t`).
@@ -61,4 +62,5 @@ This is a sound move: riser -> dead air -> slam + sub; afterwards the music at f
 left only 0.1 s of quiet - the judge asked for "8 to 12 frames of pure black with 100 % audio
 silence"; version 2 (0.5 s gap, two music clips, `clip_ids`) measured -70 to -73 dB RMS for 0.35 s of the gap (the slam's 0.1 s pre-roll fills the rest). Trailer
 showcase: "an effective silent freeze before the drop" (sound design 8/10, overall 6.6), with the
-note that 0.6 s was slightly long - hence 0.35-0.5 s.
+note that 0.6 s was slightly long. A later pass at 0.42 s (plus two other changes) scored 5.2, so the
+range stays 0.4-0.6 s.

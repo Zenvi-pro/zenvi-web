@@ -1,7 +1,7 @@
 ---
 id: cinematic-dolly-zoom
 kind: technique
-summary: When a character's realisation must hit (vertigo) - the subject holds size while the background stretches; needs a clean plate.
+summary: When a realisation must hit (vertigo) - subject holds size while the background stretches; needs a clean plate.
 categories: [movie-game-trailer, documentary-true-story, music-lyric-video]
 tools: [replace_background_tool, set_keyframes_tool, generate_subject_matte_tool, add_sfx_tool]
 pace: calm

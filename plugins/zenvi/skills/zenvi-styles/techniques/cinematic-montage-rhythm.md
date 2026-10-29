@@ -1,7 +1,7 @@
 ---
 id: cinematic-montage-rhythm
 kind: technique
-summary: When a montage must build - shot lengths shrink on the music's grid (bars, halves, quarters), then one long shot releases.
+summary: When a montage must build - shots shrink on the music grid (bars, halves, quarters), then one long shot releases.
 categories: [travel-cinematic-montage, movie-game-trailer, sports-hype-edit, wedding-event-film, automotive-ad, brand-story-corporate]
 tools: [detect_beats_tool, add_clip_to_timeline_tool, build_reel_tool, unify_grade_tool]
 pace: fast

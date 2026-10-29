@@ -1,7 +1,7 @@
 ---
 id: cinematic-warm-nostalgia
 kind: technique
-summary: When the edit is memory - weddings, family, travel diaries, brand origin stories: golden film colour, Super 8 grain, leaks.
+summary: When the edit is memory (weddings, family, travel diaries, origin stories) - golden film colour, Super 8 grain.
 categories: [wedding-event-film, travel-cinematic-montage, brand-story-corporate, music-lyric-video, documentary-true-story]
 tools: [apply_look_tool, apply_fx_tool, add_vignette_tool, unify_grade_tool]
 pace: calm

@@ -27,7 +27,9 @@ Hard rules:
 ## Order of operations (one undo step each; FX renders last)
 
 1. Cut first: shots on the music grid (`detect_beats_tool` downbeats), source windows inside the file
-   length, cuts on action (`match-on-action`), scale progression (`shot-scale-grammar`).
+   length, cuts on action (`match-on-action`), scale progression (`shot-scale-grammar`). Snap every
+   position and length to whole frames (beat grids are not frame multiples); otherwise neighbours end up
+   a frame apart and `apply_motion_transition_tool` refuses ("no clip is cut back to back").
 2. Crop-fill sources that are not 16:9 (`set_clip_property_tool` `scale` 0) before any grade.
 3. Retime: `speed_ramp_tool` (changes clip lengths; do it before keyframes and FX).
 4. Grade: `unify_grade_tool` with the family's look (`look`, `look_intensity` 0.4-0.85, `strength` 0.7-1.0),
@@ -47,22 +49,34 @@ All built only with `zenvi` CLI calls from stock footage; scripts and renders un
 
 - **Trailer** (22 s, dark city, 139.8 BPM): `cold build -> card -> tightening -> silence -> drop -> title`.
   `rack-focus` hook on an eye with a sub boom, one shot per bar (`push-in`), black `title-sequence` cards
-  with `trailer-sound` booms, `montage-rhythm` act 2 (2 -> 1 beats), `silence-before-hit` (0.6 s black,
+  with `trailer-sound` booms, `montage-rhythm` act 2 (2 -> 1 beats), `silence-before-hit` (black,
   music cut), drop cut on beats with one `whip-cut`, `teal-orange` + `halation-bloom` +
-  `anamorphic-letterbox` + `grain:35mm_fine`, end card on a boom. Judge: 3.7 -> 5.9 -> 6.6 over three passes.
+  `anamorphic-letterbox` + `grain:35mm_fine`, end card on a boom.
 - **Travel montage** (34 s, 132 BPM): `aspect-ratio-reveal` opener under the title, 2-bar aerials with
   `push-in`, the music's lift on a white flash, `montage-rhythm` (1 bar -> 1/2 -> 1/4), a 7 s release
   shot with a `light-leak`, warm sunlit look, bars throughout; music-led sound (riser into the release only).
-- **Brand film** (31 s, 108 BPM): one object per bar, `rack-focus` open on a signature, `film-emulation`
+- **Brand film** (31 s, one object per 2.22 s): `rack-focus` hook on a watch face, `film-emulation`
   tone + grain + halation on the hero objects, alternate `push-in`, `j-l-cut` of the turntable's own
-  sound, diegetic micro-sounds (paper, shutter, typing, clock), cream end card.
+  sound, every clip's own sound plus placed micro-sounds (paper, shutter, typing), an ambient drone
+  bed at half level, cream end card.
 - **Documentary open** (30 s): cold open of diegetic detail shots (`shot-scale-grammar` ECU -> WS:
   clock, calendar, sleeper, room) with an `j-l-cut` (the clock ticks on under the next shots), one
   blur dissolve at the structural joint, drone bed entering early, wides with `push-in`, restrained
   `title-sequence` after the cold open, natural grade (saturation 0.8) + `grain:16mm_classic`, no whooshes.
 
-Judge results and what was fixed between passes are in each technique's "Verified" section and in
-the PR description.
+Watch judge (abs, 0-10) per pass, and what moved the score:
+
+| Edit | Passes | What changed |
+| --- | --- | --- |
+| Trailer | 3.7 -> 5.9 -> 6.6 (v4 5.2) | dropped a flat moon opener and a CGI tunnel; titles 0.07 -> 0.12-0.16 of the short side; hook = rack focus + sub boom on frame 1. v4 (0.42 s silence, a repeated car shot instead of the mixer, rising end title) scored lower, so v3 stands |
+| Travel | 4.6 -> 6.9 | only landscapes (no stray people or props), `strength` 1.0 grade, sans titles faded whole |
+| Brand film | 3.8 -> 4.9 -> 8.1 | the clips' own sounds kept (watch tick, needle, cups, clock) over an ambient bed instead of a beat loop; hook moved to the watch |
+| Documentary | 7.7 (v2 5.0-5.2) | v2 replaced the blur dissolve at the cold-open joint with a hard cut and moved the title: it scored lower twice, so v1 stands |
+
+Lessons that hold across all four: sound is half the score (every edit's biggest jump was a sound
+change); one subject or one theme beats variety (the judge punishes any shot that leaves the
+theme); the judge's own suggested fixes are not always improvements - re-render and re-judge, keep
+the better pass.
 
 ## Pairings that worked / failed in testing
 

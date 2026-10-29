@@ -1,7 +1,7 @@
 ---
 id: cinematic-aspect-ratio-reveal
 kind: technique
-summary: When the opener (or the payoff) should feel like a curtain - bars open from a slit to 2.39:1, or widen to full frame on the hero.
+summary: When an opener or payoff should feel like a curtain - bars open from a slit to 2.39:1, or widen to full frame.
 categories: [travel-cinematic-montage, movie-game-trailer, wedding-event-film, real-estate-tour, brand-story-corporate, automotive-ad]
 tools: [add_shape_mask_tool]
 pace: calm

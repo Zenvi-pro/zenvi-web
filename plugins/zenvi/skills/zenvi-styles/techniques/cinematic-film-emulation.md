@@ -57,4 +57,6 @@ Optional: a projector flutter or room tone at -28 dB under the opening.
 2026-10-28, `tech/film-emulation` (lake aerial + man in a lake, 6 s 720p24). The judge saw "subtle
 grain and gate instability" (the weave reads), but marked the vignette heavy-handed and, with
 `classic_film`, the sky cyan (grade 3/10, overall 2.6-2.7, mostly for two unrelated shots). The recipe
-above drops the LUT and the vignette; the brand-film showcase uses it in context.
+above drops the LUT and the vignette. In context - the brand-film showcase (`show/brand`, 11 detail shots,
+this tone + `grain:35mm_fine` + halation on two shots + vignette 0.15/0.95) - the judge gave grade 8/10,
+overall 8.1.

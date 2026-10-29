@@ -1,7 +1,7 @@
 ---
 id: cinematic-trailer-sound
 kind: technique
-summary: When a cut must sound like a trailer - rumble bed, braam-style booms on cards, risers that end on the hit, reverse swells.
+summary: When a cut must sound like a trailer - rumble bed, booms on cards, risers cut on the hit, reverse swells.
 categories: [movie-game-trailer, automotive-ad, sports-hype-edit, gaming-montage, product-launch-film]
 tools: [add_sfx_tool, auto_sound_design_tool, automate_volume_tool, search_sound_library_tool, generate_sfx_tool]
 pace: medium
