@@ -28,6 +28,7 @@ import { readRequest } from "../../director/request.js";
 import { binFacts, fallbackFor, routeRequest, STYLE_RULES, type BuilderPlan, type Route, type SoundGenre } from "../../director/route.js";
 import { finishGaps } from "../../review/finish.js";
 import type { Problem } from "../../review/render.js";
+import type { ShotSwap } from "../../review/swaps.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { projectFps } from "../frame-time.js";
 import { applied, refused, type ToolReceipt } from "../receipt.js";
@@ -71,7 +72,13 @@ const MASTER_GENRE: Record<SoundGenre, string> = {
 const feature = z.union([z.string().trim().min(1).max(100), z.strictObject({ title: z.string().min(1).max(40), detail: z.string().max(60).optional() })]);
 
 const input = z.strictObject({
-  request: z.string().trim().min(1).max(6000).describe("The person's request as they wrote it (a brief, a reference to recreate, 'a reel of my trip'). Its length, frame, tempo, quoted names, headline, URL and suggested searches are read from it."),
+  request: z
+    .string()
+    .trim()
+    .min(1)
+    .max(6000)
+    .optional()
+    .describe("The person's request as they wrote it (a brief, a reference to recreate, 'a reel of my trip'). Its length, frame, tempo, quoted names, headline, URL and suggested searches are read from it. Optional once a brief is saved (re-runs: its goal and style)."),
   style: z
     .enum(STYLE_RULES.map((r) => r.id) as [string, ...string[]])
     .optional()
@@ -90,6 +97,7 @@ const input = z.strictObject({
   skip: z.array(z.enum(PRODUCE_STAGES)).max(PRODUCE_STAGES.length).optional().describe("Stages not to run: brief, format, footage, music, build, grade, transitions, sound, master, render, review, watch."),
 });
 type Input = z.output<typeof input>;
+type Request = Input & { request: string };
 
 interface StageRecord {
   stage: Stage;
@@ -167,7 +175,7 @@ class Director {
 }
 
 /** The builder's arguments for this request. */
-function builderArgs(plan: BuilderPlan, ctx: { args: Input; route: Route; seconds: number; name: string | null; hook: string | null; endCard: string | null; url: string | null; music: string | null; bpm: number | null; pictures: string[]; voices: string[]; speakers: string[]; replace: boolean }): Record<string, unknown> {
+function builderArgs(plan: BuilderPlan, ctx: { args: Request; route: Route; seconds: number; name: string | null; hook: string | null; endCard: string | null; url: string | null; music: string | null; bpm: number | null; pictures: string[]; voices: string[]; speakers: string[]; replace: boolean }): Record<string, unknown> {
   const { args } = ctx;
   const common = { ...(ctx.music ? { music_file_id: ctx.music } : {}), ...(ctx.replace ? { replace: true } : {}) };
   switch (plan.tool) {
@@ -237,7 +245,7 @@ function watchFindings(receipt: ToolReceipt | null): Finding[] {
   });
 }
 
-async function produce(call: ToolCall, args: Input): Promise<{ receipt: ToolReceipt; images?: ToolImage[] }> {
+async function produce(call: ToolCall, args: Request): Promise<{ receipt: ToolReceipt; images?: ToolImage[] }> {
   const director = new Director(call, args.skip ?? []);
   const project = () => call.doc.project;
   const facts = readRequest(args.request);
@@ -286,11 +294,11 @@ async function produce(call: ToolCall, args: Input): Promise<{ receipt: ToolRece
   const montage = rule.builder.tool === "match_cut_montage_tool" || (rule.builder.tool === "build_reel_tool" && rule.builder.style === "hype");
   const wanted = montage ? MONTAGE_PICTURES : SET_PICTURES;
   const pictures = binFacts(entries()).pictures;
+  const queries = args.stock_queries ?? (facts.searches.length > 0 ? facts.searches : [facts.subject || rule.id.replace(/-/g, " ")]);
   if (director.wants("footage")) {
     const needed = Math.min(MAX_GATHER, wanted - pictures);
     if (needed < MIN_GATHER) director.pass("footage", `the bin has ${pictures} picture file(s)`);
     else {
-      const queries = args.stock_queries ?? (facts.searches.length > 0 ? facts.searches : [facts.subject || rule.id.replace(/-/g, " ")]);
       await director.run("footage", "gather_stock_footage_tool", {
         queries,
         count: needed,
@@ -396,12 +404,20 @@ async function produce(call: ToolCall, args: Input): Promise<{ receipt: ToolRece
     ...watchFindings(watch).filter((f) => f.severity !== "high"),
     ...reviewFindings(review).filter((f) => f.severity !== "problem"),
   ];
+  // The review's own remedies as calls: swaps for repeated shots, else more footage and a new cut.
+  const reviewed = record(review?.data);
+  const swaps = Array.isArray(reviewed.swaps) ? (reviewed.swaps as ShotSwap[]) : [];
+  for (const swap of swaps.slice(0, 4)) director.next.push({ tool: "swap_shot_tool", args: { clip_id: swap.clip_id, file_id: swap.to_file_id, start_seconds: swap.start_seconds }, why: `${swap.name} repeats at ${swap.at}s` });
+  if (Array.isArray(reviewed.repeats) && reviewed.repeats.length > 0 && swaps.length === 0) {
+    director.next.push({ tool: "gather_stock_footage_tool", args: { queries, count: Math.min(MAX_GATHER, reviewed.repeats.length + MIN_GATHER) }, why: "shots repeat and nothing in the bin is unused: more footage first" });
+    director.next.push({ tool: TOOL, args: { replace: true, skip: ["brief", "format", "footage", "music"] }, why: "then cut again with the new footage, finish, render and review" });
+  }
   for (const gap of finishGaps(project())) {
     findings.push({ from: "finish", severity: "problem", message: gap.message });
     for (const next of gap.next) director.next.push({ ...next, why: gap.kind });
   }
   if (findings.length > 0 && rendered) {
-    director.next.push({ tool: TOOL, args: { request: "the same request", skip: ["brief", "format", "footage", "music", "build"], output: rendered.path }, why: "after the fixes: finish what is still owed, render, review and watch again" });
+    director.next.push({ tool: TOOL, args: { skip: ["brief", "format", "footage", "music", "build"], output: rendered.path }, why: "after the fixes: finish what is still owed, render, review and watch again" });
   }
   const failedStages = director.stages.filter((s) => s.outcome === "failed");
   const undoSteps = director.stages.reduce((n, s) => n + s.undo_steps, 0);
@@ -457,7 +473,10 @@ export const produceTools: CatalogTool[] = [
       if (call.doc.project.clips.length > 0 && args.replace === undefined && !(args.skip ?? []).includes("build")) {
         return refused(TOOL, `Error: the timeline already has ${call.doc.project.clips.length} clip(s), nothing changed. Pass replace=true to cut a new edit over it, or skip=["brief","footage","music","build"] to only finish, render and review this one.`);
       }
-      return produce(call, args);
+      const brief = readBrief(call.doc.project);
+      const request = args.request ?? (brief ? `${brief.goal} ${brief.style}` : undefined);
+      if (!request) return refused(TOOL, "Error: request is required (the person's words: what the video is, its length and frame) while the project has no brief; nothing changed.");
+      return produce(call, { ...args, request });
     },
   }),
 ];
