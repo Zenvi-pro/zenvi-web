@@ -28,6 +28,7 @@ is the rules every genre shares. Do not plan before you have read it.
 | one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
 | type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
 | tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
+| map, countries, stats, "over the years", data explainer | `recipes/data-explainer.md` | add_motion_block_tool (geo_map, pictogram_morph, bar_race, data_clock, chart_build) |
 | voice-over essay, story, explainer | `recipes/documentary.md` | TTS, kinetic_captions_tool documentary, add_kinetic_title_tool, build_reel_tool cinematic, grid collage |
 | sport, cars, launch hype, "fast", "hype", "trailer", "edit to this song" | `recipes/hype-reel.md` | **build_reel_tool hype first** (ramp, glitch drop, whips, flashes, one look built in), auto_sound_design_tool every_cut, review_edit_tool |
 | how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
