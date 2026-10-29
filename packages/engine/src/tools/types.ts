@@ -21,6 +21,7 @@ import type { ProjectDocument } from "../history/document.js";
 import type { FxEffect } from "../fx/catalog.js";
 import type { FxRender } from "../fx/link.js";
 import type { CloudMediaRef, FileFingerprint, Project, ProjectFile, ReaderInfo } from "../model/types.js";
+import type { LumaFrames } from "../analysis/action.js";
 import type { Scene3dId, Scene3dParams } from "../scenes3d/catalog.js";
 import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { Scene3dQuality, Scene3dRender } from "../scenes3d/link.js";
@@ -163,6 +164,13 @@ export interface MediaHost {
    * Zenvi Cloud's workers).
    */
   inspectRender?(path: string, options: RenderInspectOptions): Promise<RenderInspection>;
+  /**
+   * Decode `path`'s picture to small greyscale frames, scaled to `width` x
+   * `height` at a constant `fps`, from `startSeconds` for at most `maxSeconds`:
+   * what motion analysis (analysis/action.ts) reads. Hosts with ffmpeg have it.
+   * Rejects when the file has no video stream.
+   */
+  decodeLuma?(path: string, options: { width: number; height: number; fps: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal }): Promise<LumaFrames>;
 }
 
 /** Detector thresholds for `MediaHost.inspectRender`. */
