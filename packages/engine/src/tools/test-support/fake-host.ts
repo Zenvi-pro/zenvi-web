@@ -60,6 +60,7 @@ export type OptionalMethod =
   | "ui.preferences"
   | "ui.clearPlaybackCache"
   | "storage.writeBytes"
+  | "storage.saveCopy"
   | "storage.exportMedia"
   | "storage.currentPath"
   | "storage.recentProjects"
@@ -641,6 +642,21 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
           via: "backend",
         };
       },
+      compare: async (first, second) => {
+        calls.push(`compare ${first} ${second}`);
+        const scores = (n: number) => Object.fromEntries(WATCH_DIMENSION_NAMES.map((d) => [d, n])) as WatchCritique["scores"];
+        // The first render shown wins every time: the slot bias both orders cancel.
+        return {
+          model: "fake-watch",
+          durations: { A: 8, B: 8 },
+          winner: "A",
+          why: "A lands its cuts.",
+          scores: { A: scores(6), B: scores(5) },
+          fixes: [{ video: "A", start: 1, dimension: "sound_design", problem: "The cut is silent.", fix: "Add a whoosh on the cut." }],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          via: "gemini",
+        };
+      },
     };
   }
   if (!without.has("storage")) {
@@ -678,6 +694,16 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         calls.push(`writeBytes ${target}`);
         if (!opts?.overwrite && (written.has(target) || disk?.has(target))) throw Object.assign(new Error(`EEXIST: ${target}`), { code: "EEXIST", path: target });
         written.set(target, bytes);
+        disk?.add(target);
+        return target;
+      };
+    }
+    if (!omit.has("storage.saveCopy")) {
+      host.storage.saveCopy = async (project, path, opts) => {
+        const target = resolved(path);
+        calls.push(`saveCopy ${target}`);
+        if (!opts?.overwrite && (written.has(target) || disk?.has(target))) throw Object.assign(new Error(`EEXIST: ${target}`), { code: "EEXIST", path: target });
+        written.set(target, JSON.stringify(project));
         disk?.add(target);
         return target;
       };
