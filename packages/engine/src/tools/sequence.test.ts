@@ -105,6 +105,9 @@ describe("sequence_shots_tool", () => {
     expect((result.data?.data as Data).order.map((r) => r.id)).toEqual(["C2", "C0", "C3", "C1"]);
     expect(doc.undoLabels).toEqual([]);
     expect(doc.project.clips.find((c) => c.id === "C0")!.position).toBe(0);
+    // A track is named the way every tool names one: UI track 1 is the bottom layer.
+    const ui = await runTool({ doc, host: { frames: sampler() } }, "sequence_shots_tool", { track: 1, dry_run: true, arc: "flat", close: "none" });
+    expect((ui.data?.data as Data).order.map((r) => r.id)).toEqual(["C2", "C0", "C3", "C1"]);
   });
 
   it("starts a speaker shot on its words in the voice (says + the voice's transcript)", async () => {

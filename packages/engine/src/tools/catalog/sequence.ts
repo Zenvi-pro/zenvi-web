@@ -26,6 +26,7 @@ import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused, unchanged, failed } from "../receipt.js";
 import { shotFrames, type ShotWindow } from "../shot-frames.js";
 import { isLocked } from "../titles-text.js";
+import { normalizeTrackOrLayerArg } from "../tracks.js";
 import { storedTranscript } from "../transcripts.js";
 
 const TOOL = "sequence_shots_tool";
@@ -49,7 +50,10 @@ const shotSchema = z.strictObject({
 const input = z.strictObject({
   shots: z.array(shotSchema).min(2).max(MAX_SHOTS).optional().describe("The candidate shots: all timeline clips, or all bin files / windows of them."),
   file_ids: z.array(z.string().min(1)).min(2).max(MAX_SHOTS).optional().describe("Shorthand for shots: whole bin files."),
-  track: z.number().int().positive().optional().describe("Without shots or file_ids: reorder every clip on this track (track number). With file shots: the track to place them on (default an empty track)."),
+  track: z
+    .union([z.string(), z.number()])
+    .optional()
+    .describe("Without shots or file_ids: reorder every clip on this track (UI track number, 1 = bottom; name; or layer number). With file shots: the track to place them on (default an empty track)."),
   arc: z
     .enum(ENERGY_ARCS)
     .optional()
@@ -91,15 +95,15 @@ function emptyTrack(project: Project): number | null {
   return free[0] ?? null;
 }
 
-function resolve(project: Project, args: Input): Candidate[] | string {
+function resolve(project: Project, args: Input, layer: number | undefined): Candidate[] | string {
   const files = new Map(project.files.map((f) => [String(f.id), f]));
   const clips = new Map(project.clips.map((c) => [String(c.id), c]));
   let raw: z.output<typeof shotSchema>[];
   if (args.shots) raw = args.shots;
   else if (args.file_ids) raw = args.file_ids.map((file_id) => ({ file_id }));
-  else if (args.track !== undefined) {
-    const onTrack = project.clips.filter((c) => Number(c.layer) === args.track).sort((a, b) => Number(a.position) - Number(b.position));
-    if (onTrack.length < 2) return `Error: track ${args.track} has ${onTrack.length} clip(s); sequencing needs at least 2.`;
+  else if (layer !== undefined) {
+    const onTrack = project.clips.filter((c) => Number(c.layer) === layer).sort((a, b) => Number(a.position) - Number(b.position));
+    if (onTrack.length < 2) return `Error: track ${String(args.track)} has ${onTrack.length} clip(s); sequencing needs at least 2.`;
     raw = onTrack.map((c) => ({ clip_id: String(c.id) }));
   } else return "Error: give shots, file_ids, or a track whose clips to reorder.";
   if (args.shots && args.file_ids) return "Error: give shots or file_ids, not both.";
@@ -200,7 +204,9 @@ export const sequenceTools: CatalogTool[] = [
     requires: ["frames"],
     run: async (call, args: Input) => {
       const project = call.doc.project;
-      const resolved = resolve(project, args);
+      const track = normalizeTrackOrLayerArg(args.track, project.layers);
+      if (track.error !== undefined) return refused(TOOL, track.error);
+      const resolved = resolve(project, args, track.layer);
       if (typeof resolved === "string") return refused(TOOL, resolved);
       const cands = resolved as (Candidate & { says?: string; speechVoice?: number })[];
       const n = cands.length;
@@ -350,13 +356,12 @@ export const sequenceTools: CatalogTool[] = [
         return applied(TOOL, summary, { warnings, data });
       }
 
-      let layer = args.track ?? emptyTrack(project);
+      let layer = track.layer ?? emptyTrack(project);
       if (layer !== null) {
-        if (!project.layers.some((l) => Number(l.number) === layer)) return refused(TOOL, `Error: no track ${layer}.`);
-        if (isLocked(project, layer)) return refused(TOOL, `Error: track ${layer} is locked.`);
+        if (isLocked(project, layer)) return refused(TOOL, `Error: track ${String(args.track ?? layer)} is locked.`);
         const end = acc / fps;
         const blocking = project.clips.filter((c) => Number(c.layer) === layer && Number(c.position) < end - 1e-6 && Number(c.position) + Number(c.end) - Number(c.start) > position + 1e-6);
-        if (blocking.length) return refused(TOOL, `Error: track ${layer} has ${blocking.length} clip(s) between ${round(position)} s and ${round(end)} s; pick an empty track or another position.`);
+        if (blocking.length) return refused(TOOL, `Error: track ${String(args.track ?? layer)} has ${blocking.length} clip(s) between ${round(position)} s and ${round(end)} s; pick an empty track or another position.`);
       }
       const added = call.commit((tx) => {
         if (layer === null) layer = Number(addTrack(tx, {}).number);

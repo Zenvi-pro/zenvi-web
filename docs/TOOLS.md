@@ -3503,7 +3503,7 @@ Availability: editor partial (without frame sampling each shot is compared on a 
 | --- | --- | --- | --- |
 | `shots` | object[] |  | The candidate shots: all timeline clips, or all bin files / windows of them. |
 | `file_ids` | string[] |  | Shorthand for shots: whole bin files. |
-| `track` | integer |  | Without shots or file_ids: reorder every clip on this track (track number). With file shots: the track to place them on (default an empty track). (max 9007199254740991) |
+| `track` | string \| number |  | Without shots or file_ids: reorder every clip on this track (UI track number, 1 = bottom; name; or layer number). With file shots: the track to place them on (default an empty track). |
 | `arc` | "build" \| "peak" \| "release" \| "flat" |  | Energy curve over the sequence: peak (default: build to a peak three quarters in, then release), build, release, flat (order by continuity alone). |
 | `open` | string |  | clip_id or file_id of the shot that must open. |
 | `close` | string |  | clip_id or file_id of the payoff shot that closes, or "none". Default: the strongest shot (interest and length) closes. |
