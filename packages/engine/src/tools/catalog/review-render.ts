@@ -23,6 +23,7 @@ import { addTitleClip } from "../../ops/titles.js";
 import {
   differenceHash,
   endVerdict,
+  flatGround,
   INSPECT_THRESHOLDS,
   renderProblems,
   repeatedShots,
@@ -245,16 +246,19 @@ export const reviewRenderTools: CatalogTool[] = [
       const shots = shotsFromCuts(inspection.cuts, inspection.duration);
       const step = Math.max(1, Math.ceil(shots.length / MAX_HASHED_SHOTS));
       const hashes: (string | null)[] = [];
+      const graphic: boolean[] = [];
       try {
         for (const [i, shot] of shots.entries()) {
           if (call.signal?.aborted) return refused(TOOL, "Error: cancelled");
-          hashes.push(i % step === 0 ? differenceHash((await renderPixels(call, solo, secondsToFrame(solo, shot.mid), HASH_WIDTH)).pixels) : null);
+          const pixels = i % step === 0 ? (await renderPixels(call, solo, secondsToFrame(solo, shot.mid), HASH_WIDTH)).pixels : null;
+          hashes.push(pixels ? differenceHash(pixels) : null);
+          graphic.push(pixels ? flatGround(pixels) : false);
         }
       } catch (error) {
         if (error instanceof FrameRenderError) return failed(TOOL, `Error: reading the frames of ${args.path} failed: ${error.message}`);
         throw error;
       }
-      const repeats = repeatedShots(shots, hashes);
+      const repeats = repeatedShots(shots, hashes, graphic);
       const end = endVerdict(inspection, shots);
       const problems = renderProblems(inspection, shots, repeats, end, targets);
       let onsets: number[] | null = null;

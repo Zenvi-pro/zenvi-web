@@ -164,6 +164,26 @@ export function differenceHash(image: { width: number; height: number; data: Arr
   return hex;
 }
 
+/** A frame this much one flat ground (a type card, a graphic) is not compared as footage. */
+const GROUND_SHARE = 0.7;
+
+/**
+ * Whether most of an image is one flat ground: at least GROUND_SHARE of its
+ * pixels within a few levels of the commonest grey. Two centred words on
+ * the same ground hash alike; they are not the same footage.
+ */
+export function flatGround(image: { width: number; height: number; data: ArrayLike<number> }): boolean {
+  const bins = new Float64Array(64);
+  const n = image.width * image.height;
+  for (let k = 0; k < n; k += 1) {
+    const i = k * 4;
+    bins[Math.min(63, Math.floor((0.299 * image.data[i]! + 0.587 * image.data[i + 1]! + 0.114 * image.data[i + 2]!) / 4))]! += 1;
+  }
+  let best = 0;
+  for (let b = 0; b < 64; b += 1) best = Math.max(best, (bins[b - 1] ?? 0) + bins[b]! + (bins[b + 1] ?? 0));
+  return n > 0 && best / n >= GROUND_SHARE;
+}
+
 /** Bits that differ between two difference hashes. */
 export function hashDistance(a: string, b: string): number {
   let bits = 0;
@@ -187,9 +207,10 @@ export interface RepeatGroup {
 /**
  * Shots that show the same picture: middle frames within REPEAT_DISTANCE,
  * not counting neighbours (two halves of one shot split by a false cut).
- * A flat frame (black, a solid card) has no structure to compare and is left out.
+ * A flat frame (black, a solid card) has no structure to compare and is left
+ * out, and so is a frame that is mostly one flat ground (`graphic`: type on a card).
  */
-export function repeatedShots(shots: readonly Shot[], hashes: readonly (string | null)[]): RepeatGroup[] {
+export function repeatedShots(shots: readonly Shot[], hashes: readonly (string | null)[], graphic: readonly boolean[] = []): RepeatGroup[] {
   const parent = shots.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
   const usable = (h: string | null | undefined): h is string => Boolean(h) && h !== "0000000000000000" && h !== "ffffffffffffffff";
@@ -197,6 +218,7 @@ export function repeatedShots(shots: readonly Shot[], hashes: readonly (string |
     for (let j = i + 2; j < shots.length; j += 1) {
       const a = hashes[i];
       const b = hashes[j];
+      if (graphic[i] || graphic[j]) continue;
       if (usable(a) && usable(b) && hashDistance(a, b) <= REPEAT_DISTANCE) parent[find(j)] = find(i);
     }
   }

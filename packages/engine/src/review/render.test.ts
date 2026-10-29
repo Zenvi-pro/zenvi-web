@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RenderInspection } from "../tools/types.js";
-import { differenceHash, endVerdict, hashDistance, renderProblems, repeatedShots, sheetShots, shotsFromCuts, type Shot } from "./render.js";
+import { differenceHash, endVerdict, flatGround, hashDistance, renderProblems, repeatedShots, sheetShots, shotsFromCuts, type Shot } from "./render.js";
 
 function inspection(over: Partial<RenderInspection> = {}): RenderInspection {
   return {
@@ -75,6 +75,14 @@ describe("repeated shots", () => {
     const groups = repeatedShots(shots, [a, b, b, a, flat, flat]);
     // Shots 2 and 3 are neighbours (one shot split by a false cut); 4 repeats 1 three seconds later.
     expect(groups).toEqual([{ shots: [1, 4], minGapSeconds: 3 }]);
+    // Type cards on one flat ground hash alike but are not reused footage.
+    expect(repeatedShots(shots, [a, b, b, a, flat, flat], [true, false, false, true, false, false])).toEqual([]);
+  });
+
+  it("knows a frame that is mostly one flat ground", () => {
+    expect(flatGround(stripes(4))).toBe(false);
+    const card = { width: 10, height: 10, data: new Uint8Array(400).map((_, i) => (i % 4 === 3 ? 255 : Math.floor(i / 4) % 10 < 2 ? 250 : 12)) };
+    expect(flatGround(card)).toBe(true);
   });
 });
 
