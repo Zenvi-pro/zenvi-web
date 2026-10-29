@@ -117,3 +117,13 @@ describe("track helpers", () => {
     expect(m.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([2, 0.5, 3, -1, 1, -1]);
   });
 });
+
+describe("guide graphics", () => {
+  it("keep the golden spiral's strokes visible inside its scaled group", async () => {
+    const { guideSvg } = await import("./guides.js");
+    const svg = guideSvg("golden_spiral", 1280, 720, { cx: 640, cy: 360, w: 100, h: 100, angle: 0 }, { color: "#FFFFFF", stroke: 3 });
+    const widths = [...svg.matchAll(/stroke-width="([^"]+)"/g)].map((m) => Number(m[1]));
+    expect(widths.length).toBe(2);
+    for (const w of widths) expect(w * 720).toBeGreaterThan(1.5);
+  });
+});

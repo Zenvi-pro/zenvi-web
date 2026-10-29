@@ -97,7 +97,8 @@ function svg(width: number, height: number, body: string): string {
 }
 
 function strokeAttrs(style: GuideStyle, width = style.stroke, opacity = 1): string {
-  return `fill="none" stroke="${escapeXml(style.color)}" stroke-width="${num(width)}" stroke-linecap="round" stroke-linejoin="round"${opacity < 1 ? ` stroke-opacity="${num(opacity)}"` : ""}`;
+  // Four significant digits: the spiral's group is scaled by the canvas height, so its strokes are tiny numbers.
+  return `fill="none" stroke="${escapeXml(style.color)}" stroke-width="${String(Number(width.toPrecision(4)))}" stroke-linecap="round" stroke-linejoin="round"${opacity < 1 ? ` stroke-opacity="${num(opacity)}"` : ""}`;
 }
 
 /** The body of one guide graphic, in canvas pixels. */
