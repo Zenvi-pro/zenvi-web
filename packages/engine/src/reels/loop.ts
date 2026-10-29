@@ -43,13 +43,16 @@ const round3 = (v: number) => Math.round(v * 1000) / 1000;
 export function loopMusic(music: MusicBeats, seconds: number): LoopedMusic | null {
   // A bar of four beats: the slack planReelGrid may run past its target.
   const bar = (4 * 60) / Math.max(1, music.bpm);
-  // Music that covers the target ends on its last beat before it (planReelGrid); only shorter music loops.
-  if (music.duration >= seconds - EPS) return null;
   const downs = music.downbeats.filter((t) => t >= -EPS && t <= music.duration + EPS);
   if (downs.length < 2) return null;
   const last = downs[downs.length - 1]!;
   const first = downs[0]!;
-  const missing = seconds + bar - music.duration;
+  // A reel starts on a bar line, so the music it can use runs from the first one (fitness fixture: a 4.7 s
+  // intro left 25.3 s of a 30 s track). Music that covers the target ends on its last beat before it
+  // (planReelGrid); only shorter music loops.
+  const usable = music.duration - first;
+  if (usable >= seconds - EPS) return null;
+  const missing = seconds + bar - usable;
   // Whole phrases (4 bars) when the track has them, else whole bars.
   const barsAvailable = downs.length - 1;
   const step = barsAvailable >= BARS_PER_PHRASE ? BARS_PER_PHRASE : 1;
@@ -99,7 +102,9 @@ export function segmentsBetween(segments: readonly MusicSegment[], start: number
 export function loopNote(original: MusicBeats, loop: LoopedMusic, seconds: number): string {
   const from = loop.segments[1]!.from;
   const bars = Math.round((loop.loopSeconds * original.bpm) / 240);
-  return `The music is ${round3(original.duration)} s, shorter than the ${round3(seconds)} s asked: ${bars} bar(s) from ${round3(from)} s repeat ${loop.repeats === 1 ? "once" : `${loop.repeats} times`}, cut on bar lines, so the reel runs the full length.`;
+  const first = original.downbeats.find((t) => t >= -EPS) ?? 0;
+  const length = first > 0.5 ? `${round3(original.duration)} s (${round3(original.duration - first)} s from its first bar line)` : `${round3(original.duration)} s`;
+  return `The music is ${length}, shorter than the ${round3(seconds)} s asked: ${bars} bar(s) from ${round3(from)} s repeat ${loop.repeats === 1 ? "once" : `${loop.repeats} times`}, cut on bar lines, so the reel runs the full length.`;
 }
 
 /** File times (hits, onsets) on the looped clock: each stretch carries the times inside it. */

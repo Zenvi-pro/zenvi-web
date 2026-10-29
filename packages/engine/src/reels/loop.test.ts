@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loopMusic, onLoopedClock, segmentsBetween } from "./loop.js";
+import { loopMusic, loopNote, onLoopedClock, segmentsBetween } from "./loop.js";
 import type { MusicBeats } from "./plan.js";
 
 /** `seconds` of music at 120 BPM from 0 (a bar every 2 s). */
@@ -37,6 +37,14 @@ describe("loopMusic", () => {
     expect(loop.loopSeconds).toBe(6);
     expect(loop.repeats).toBe(3);
     expect(loop.music.duration).toBeGreaterThanOrEqual(22);
+  });
+
+  it("counts the music from its first bar line: a long intro leaves a 30 s track short of a 30 s reel", () => {
+    const base = grid(30);
+    const late = { ...base, beats: base.beats.filter((t) => t >= 4), downbeats: base.downbeats.filter((t) => t >= 4) };
+    const loop = loopMusic(late, 30)!;
+    expect(loop).not.toBeNull();
+    expect(loopNote(late, loop, 30)).toMatch(/^The music is 30 s \(26 s from its first bar line\), shorter than the 30 s asked/);
   });
 
   it("does nothing without bar lines", () => {
