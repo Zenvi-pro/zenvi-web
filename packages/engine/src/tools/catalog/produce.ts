@@ -89,7 +89,7 @@ const input = z.strictObject({
   features: z.array(feature).min(1).max(5).optional().describe("Product launch / SaaS promo: one feature per bar ('Title: detail' or {title, detail}). Without them a launch is cut as a motion reel."),
   script: z.string().trim().min(1).max(4000).optional().describe("Voice-led styles with no voice-over in the bin: the narration, timed at reading pace and captioned."),
   end_card: z.string().trim().min(1).max(80).optional().describe("The closing card (default: a URL in the request)."),
-  stock_queries: z.array(z.string().trim().min(1).max(80)).max(8).optional().describe("Stock searches when the bin is short of footage (default: the searches the request suggests, else its subject)."),
+  stock_queries: z.array(z.string().trim().min(1).max(200)).max(24).optional().describe("Stock searches when the bin is short of footage, one per shot idea (the first 12 are searched; default: the searches the request suggests, else its subject)."),
   music_query: z.string().trim().min(1).max(80).optional().describe("Freesound search for the music when the bin has none (default: the request's, else the style's)."),
   bpm: z.coerce.number().min(40).max(220).optional().describe("Music tempo wanted (default: the request's, else the style's)."),
   output: z.string().trim().min(1).max(400).optional().describe("Render path (default produce.mp4 in the project's folder)."),
@@ -192,7 +192,8 @@ function builderArgs(plan: BuilderPlan, ctx: { args: Request; route: Route; seco
       };
     }
     case "match_cut_montage_tool":
-      return { file_ids: ctx.pictures, transitions: plan.transitions, duration_seconds: Math.min(60, ctx.seconds), ...(plan.transitions === "flash" ? { min_frames: 2, max_frames: 6 } : {}), ...(ctx.bpm ? { bpm: ctx.bpm } : {}), ...common };
+      // Bench f1: the default zoom_all on a circle found in footage that has none blew shots up to 1.6-1.8 frames tall; moved, not resized, unless subjects are given.
+      return { file_ids: ctx.pictures, fit: "position", cover: "zoom", transitions: plan.transitions, duration_seconds: Math.min(60, ctx.seconds), ...(plan.transitions === "flash" ? { min_frames: 2, max_frames: 6 } : {}), ...(ctx.bpm ? { bpm: ctx.bpm } : {}), ...common };
     case "build_trailer_tool":
       return { title: ctx.name, duration_seconds: Math.max(15, ctx.seconds), ...(ctx.endCard ? { end_card: ctx.endCard } : {}), ...common };
     case "build_explainer_tool":
@@ -245,14 +246,14 @@ function watchFindings(receipt: ToolReceipt | null): Finding[] {
   });
 }
 
-async function produce(call: ToolCall, args: Request): Promise<{ receipt: ToolReceipt; images?: ToolImage[] }> {
+async function produce(call: ToolCall, args: Request, requested: boolean): Promise<{ receipt: ToolReceipt; images?: ToolImage[] }> {
   const director = new Director(call, args.skip ?? []);
   const project = () => call.doc.project;
   const facts = readRequest(args.request);
   const entries = () => inventoryFiles(project()).map((f) => inventoryEntry(project(), f));
   // A brief the director compiled earlier (the MCP server's, from one call's arguments) is replaced by one from the request.
   const found = readBrief(project());
-  const saved = found && !isAutoBrief(found) ? found : null;
+  const saved = found && (!isAutoBrief(found) || !requested) ? found : null;
   const name = args.title ?? facts.name;
   const hook = args.hook ?? facts.headline;
   const endCard = args.end_card ?? facts.url;
@@ -294,9 +295,10 @@ async function produce(call: ToolCall, args: Request): Promise<{ receipt: ToolRe
   const montage = rule.builder.tool === "match_cut_montage_tool" || (rule.builder.tool === "build_reel_tool" && rule.builder.style === "hype");
   const wanted = montage ? MONTAGE_PICTURES : SET_PICTURES;
   const pictures = binFacts(entries()).pictures;
-  const queries = args.stock_queries ?? (facts.searches.length > 0 ? facts.searches : [facts.subject || rule.id.replace(/-/g, " ")]);
+  const queries = (args.stock_queries ?? (facts.searches.length > 0 ? facts.searches : [facts.subject || rule.id.replace(/-/g, " ")])).slice(0, MAX_GATHER);
   if (director.wants("footage")) {
-    const needed = Math.min(MAX_GATHER, wanted - pictures);
+    // Searches the caller named are each worth a clip (round-robin), up to the most one call gathers.
+    const needed = Math.min(MAX_GATHER, Math.max(wanted, args.stock_queries?.length ?? 0) - pictures);
     if (facts.noStock) director.pass("footage", "the request rules out stock: the bin's footage only");
     else if (needed < MIN_GATHER) director.pass("footage", `the bin has ${pictures} picture file(s)`);
     else {
@@ -477,7 +479,7 @@ export const produceTools: CatalogTool[] = [
       const brief = readBrief(call.doc.project);
       const request = args.request ?? (brief ? `${brief.goal} ${brief.style}` : undefined);
       if (!request) return refused(TOOL, "Error: request is required (the person's words: what the video is, its length and frame) while the project has no brief; nothing changed.");
-      return produce(call, { ...args, request });
+      return produce(call, { ...args, request }, args.request !== undefined);
     },
   }),
 ];
