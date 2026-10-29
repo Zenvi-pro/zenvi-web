@@ -29,6 +29,8 @@ const TOOL = "spot_action_foley_tool";
 const MAX_SECONDS = 120;
 /** Width the frames are analysed at: enough for a fingertip, cheap for two minutes. */
 const ANALYSIS_WIDTH = 160;
+/** Fastest rate frames are analysed at (or the timeline's, when faster): cues land on the timeline's frame grid, and two minutes of a 240 fps clip would be 28 800 frames held at once. */
+const MAX_ANALYSIS_FPS = 60;
 /** A hit already in the clip's sound this close (frames) is the same event. */
 const HEARD_FRAMES = 2;
 
@@ -100,7 +102,7 @@ export const actionFoleyTools: CatalogTool[] = [
       if (!decode) return unavailable(TOOL, "this surface cannot decode video frames for motion analysis (the CLI and zenvi mcp can).");
 
       const g = gridOf(project);
-      const fps = fileFps(file, g.fps);
+      const fps = Math.min(fileFps(file, g.fps), Math.max(MAX_ANALYSIS_FPS, g.fps));
       const sourceFrom = clip.start + (from - clip.position);
       let events: ActionEvent[];
       try {

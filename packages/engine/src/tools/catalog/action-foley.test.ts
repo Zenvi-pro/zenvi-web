@@ -84,6 +84,20 @@ describe("spot_action_foley_tool", () => {
     expect(snapshotOf(doc.project)).toEqual(before);
   });
 
+  it("analyses high-frame-rate footage at no more than 60 fps", async () => {
+    const doc = fixtureDoc();
+    const fileId = String(doc.project.clips.find((c) => c.id === IDS.clipB)!.file_id);
+    doc.transaction("slow-motion source", (tx) => tx.update(["files", { id: fileId }], { fps: { num: 240, den: 1 } }));
+    const host = hostWithPicture();
+    const rates: number[] = [];
+    host.media!.decodeLuma = async (_path, options) => {
+      rates.push(options.fps);
+      return broll(options);
+    };
+    expect((await spot(doc, { clip_id: IDS.clipB }, host)).receipt.status).toBe("applied");
+    expect(rates).toEqual([60]);
+  });
+
   it("refuses a range outside the clip and surfaces that cannot decode frames", async () => {
     const doc = fixtureDoc();
     expect((await spot(doc, { clip_id: IDS.clipB, start: "30" })).receipt.summary).toMatch(/range is outside/);
