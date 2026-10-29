@@ -37,7 +37,7 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { HOST_IDS } from "@zenvi/adobe-link";
-import { readBrief, type ToolImage } from "@zenvi/engine";
+import { BRIEF_KEY, readBrief, type Brief, type ToolImage } from "@zenvi/engine";
 import { DIRECTOR_CARD, failed, parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import type { CommandContext } from "../commands/context.js";
 import { adobeToolDefinitions, callAdobeTool, hostOfTool, hostRefusal, isOkHostStatus } from "../hosts/adobe-tools.js";
@@ -46,7 +46,7 @@ import { APP_LABEL, type FamilyDecision, type FamilyDecisions } from "../hosts/p
 import { findProject } from "../project/select.js";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { VERSION } from "../version.js";
-import { BRIEF_GATE, briefGate, briefNote } from "./brief-note.js";
+import { autoBrief, autoBriefNote, briefNote, PRODUCE_FIRST } from "./brief-note.js";
 import { recordDirection } from "./directions.js";
 import { extraTools, type ExtraTool } from "./extra-tools.js";
 import { HANDOFF_TOOL_NAMES, hostTools } from "./host-tools.js";
@@ -55,7 +55,7 @@ import { McpState, type McpStateOptions } from "./state.js";
 export const SERVER_INSTRUCTIONS = [
   "Zenvi edits video. This server drives four hosts: the Zenvi desktop app, the portable Zenvi engine (this server, editing the .zvn project file with ffmpeg on this machine), and After Effects and Premiere Pro through the Zenvi Link extension. list_hosts shows which are connected and which is active (used most recently): call it first whenever the user mentions After Effects or Premiere Pro, and before a handoff.",
   "Picking tools: ae_* tools act inside After Effects and premiere_* tools inside Premiere Pro, on the project open there, with that app's own undo. Unprefixed tools act on the Zenvi project: in the desktop app while it has the project open (the person sees edits live; receipts say engine desktop), otherwise in the portable engine. Never edit a .zvn file or an Adobe project by hand.",
-  "Zenvi workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) render_video exports (mp4 by default). (4) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
+  "Zenvi workflow: (1) open_project_file with a .zvn path (created if missing; the project in the working folder is opened automatically). (2) For a whole video, produce_video_tool {request: the person's words} makes it in one call (brief, style, cut, finish, render, review) and lists what to fix; for single edits, import_files_tool with media paths, then add_clip_to_timeline_tool, apply_transition_tool, add_title_tool, set_clip_volume_tool, set_keyframes_tool, delete_from_timeline_tool and the other tools. (3) render_video exports (mp4 by default). (4) launch_editor shows the project in the Zenvi desktop app; push_to_cloud returns a zenvi.pro web editor link to share.",
   "Handoffs run in the Zenvi desktop app on the saved project, which is opened for you: send_to_after_effects_tool / export_to_after_effects_tool, send_to_premiere_tool / export_to_premiere_tool, import_timeline_xml_tool, the Remotion and HyperFrames import and export tools, and linked clips (get_linked_clip_tool, update_linked_clip_tool, rerender_linked_clip_tool, open_linked_source_tool, unlink_clip_tool). bring_from_after_effects renders a comp into the project as a linked clip; bring_from_premiere brings a sequence back as native clips. zenvi://handoff says what survives each direction.",
   DIRECTOR_CARD,
   "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again. After cutting a multi-shot edit, call review_edit_tool: one contact sheet of the cut plus pacing, beat and loudness numbers and a ranked problem list; fix what it flags and call it again.",
@@ -92,6 +92,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     { name: "zenvi", title: "Zenvi video editor", version: VERSION },
     { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS },
   );
+  /** Whether a receipt of this session has named produce_video_tool yet. */
+  let pointedAtProduce = false;
   /** The Adobe families in the client's last tools/list (undefined until it lists). */
   let listedFamilies: string | undefined;
 
@@ -178,9 +180,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
         if (receipt) return toCallResult(receipt, outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...(outcome.ok ? {} : { isError: true }) };
       }
-      if (ctx.env.ZENVI_MCP_BRIEF !== "off" && briefGate(name, state.session.doc.project)) {
-        return toCallResult(refused(name, BRIEF_GATE), undefined, { engine: "portable" });
-      }
+      const saved: Brief | null = ctx.env.ZENVI_MCP_BRIEF !== "off" ? autoBrief(name, state.session.doc.project, args) : null;
+      if (saved) state.session.doc.transaction("Save brief", (tx) => tx.update(["settings"], { [BRIEF_KEY]: saved }));
       state.notePortableCall();
       const { result } = await state.session.run(name, args, extra.signal);
       const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text);
@@ -191,8 +192,11 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
         const repeated = saved ? await recordDirection(ctx.config.configDir, saved, String(state.session.doc.project.id)) : [];
         if (repeated.length > 0) receipt.warnings = [...receipt.warnings, `The direction repeats the last edit's picks on ${repeated.join(", ")}: draw those differently (read_director_recipe {styles: "brief"} has a fresh draw) unless the subject needs them, and say why.`];
       }
-      const brief = isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
+      const brief = saved ? autoBriefNote(saved) : isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
       if (brief) receipt.notes = [...receipt.notes, brief];
+      // The first result an agent reads on an empty timeline names the one call a whole video starts with (rounds 6-7: the builders went undiscovered).
+      else if (!pointedAtProduce && name !== "produce_video_tool" && state.session.doc.project.clips.length === 0) receipt.notes = [...receipt.notes, PRODUCE_FIRST];
+      pointedAtProduce = true;
       if (!state.session.file && receipt.undoSteps > 0) {
         receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }

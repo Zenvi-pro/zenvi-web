@@ -17,7 +17,8 @@ describe("director card", () => {
   });
 
   it("names every recipe the director has, and only tools this server lists", () => {
-    const recipes = DIRECTOR_CARD.slice(DIRECTOR_CARD.indexOf("Recipes:"), DIRECTOR_CARD.indexOf("\n"));
+    const from = DIRECTOR_CARD.indexOf("Recipes:");
+    const recipes = DIRECTOR_CARD.slice(from, DIRECTOR_CARD.indexOf("\n", from));
     for (const recipe of DIRECTOR_RECIPES) expect(recipes, recipe.genre).toMatch(new RegExp(`\\b${recipe.genre}\\b`));
     const tools = new Set(engineRegistry().list("mcp", {}, { includeUnavailable: true }).map((t) => t.name));
     for (const name of DIRECTOR_CARD.match(/\b[a-z0-9]+(?:_[a-z0-9]+)*_tool\b/g) ?? []) expect(tools, name).toContain(name);

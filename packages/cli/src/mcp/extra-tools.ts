@@ -61,7 +61,7 @@ function text(v: unknown): string | undefined {
 
 /** What a recipe read before any brief starts with. */
 const BRIEF_FIRST =
-  "This project has no brief yet. Step 0, before the first edit: compile the brief with the brief compiler below (inspect_media_bin_tool, one style, up to four techniques, the critique) and save it with save_brief_tool; then build it with the recipe after it.";
+  "This project has no brief yet. produce_video_tool {request: the person's words} saves one and builds this recipe in one call (cut, finish, render, review); then fix what its findings list. To plan by hand instead, read_director_recipe {styles: \"brief\"} and save_brief_tool.";
 
 /** On an empty project, the plan: open_project_file is the one receipt every agent reads before its first edit. */
 function startNotes(state: McpState): { notes?: string[] } {
@@ -150,11 +150,10 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const uri = palette ? `zenvi://sound/${palette}` : recipe === "director" ? "zenvi://director" : `zenvi://director/${recipe}`;
         const markdown = guideText(uri);
         if (!markdown) return { receipt: refused(tool, `Error: no ${palette ? `sound palette ${palette}` : `recipe ${recipe}`}; recipes: director, ${DIRECTOR_RECIPES.map((r) => r.genre).join(", ")}.`), engine: null };
-        // Bench sk0, first pass: agents went from the card straight to the recipe and never compiled
-        // the brief. A genre recipe read before any brief is saved carries the brief compiler first.
+        // Bench sk0 put the brief compiler in front of a recipe read before any brief; rounds 6-7 read it
+        // as most of a run's tokens and errors. Now the note says produce_video_tool compiles the brief itself.
         if (recipe !== undefined && recipe !== "director" && !readBrief(state.session.doc.project)) {
-          const draw = await drawText(ctx.config.configDir, String(state.session.doc.project.id));
-          return { receipt: applied(tool, `${BRIEF_FIRST}\n\n${guideText("zenvi://styles/brief")}\n\n${draw}\n\n--- Recipe (${uri}) ---\n\n${markdown}`, { data: { uri, brief: "zenvi://styles/brief" } }, 0), engine: null };
+          return { receipt: applied(tool, `${BRIEF_FIRST}\n\n--- Recipe (${uri}) ---\n\n${markdown}`, { data: { uri, brief: "zenvi://styles/brief" } }, 0), engine: null };
         }
         return { receipt: applied(tool, markdown, { data: { uri } }, 0), engine: null };
       },

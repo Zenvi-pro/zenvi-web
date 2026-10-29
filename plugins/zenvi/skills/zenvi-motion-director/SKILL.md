@@ -10,7 +10,27 @@ receipt); your job is the decisions a senior editor makes before touching the
 timeline and the frames you check after. `zenvi-reels` is the one-call reel;
 this skill is for edits that must hold up next to a professional one.
 
-## Start here: the brief, then its style's recipe
+## Start here: produce_video_tool, then fix what its review lists
+
+**First call for any whole video: `produce_video_tool`** with `request` = the
+person's words (and `output` for the render path). In one call it saves a
+brief, picks one style of the styles index and its one-call builder, sets
+the frame, gathers stock footage and music at the style's tempo when the bin
+is short, cuts, runs the finish below, renders, and runs
+`review_render_tool` and `watch_render_tool`. Its report lists every stage and
+the review's findings worst first, with the exact next calls. Pass what only
+the person knows: `title` (a product or film), `features` (a launch, one a
+bar), `script` (a voice-led video with no voice-over), `hook`, `end_card`.
+Then spend your turns on the findings only: fix each one with the tool it
+names, and call `produce_video_tool` again with
+`skip=["brief","format","footage","music","build"]` to finish what is still
+owed, render, review and watch again (watch at most twice in all). Each stage
+is its own undo step; `skip` drops any stage.
+
+Build by hand only when the request needs something no builder makes; then
+the brief and the recipes below are the plan.
+
+## By hand: the brief, then its style's recipe
 
 **Step 0 is the brief**, on the project it belongs to: editing an existing
 `.zvn`, `open_project_file` it first (opening a file replaces the session's

@@ -1,20 +1,19 @@
 /**
- * The brief, asked for where agents look: the receipts of the calls that
- * start a whole video. Bench sk0's first runs read the director card and the
- * recipe (both open with "compile the brief") and still cut without one;
- * receipts are what they act on. Only until a brief is saved, and only while
- * the timeline is nearly empty, so a single quick edit hears it at most once
- * or twice.
+ * The brief, where agents look: the receipts of the calls that start a whole
+ * video. Bench sk0's first runs read the director card and the recipe and
+ * still cut without one, so for rounds 6-7 those calls were refused until a
+ * brief was saved; that made the gate most of the agents' tool errors (2.1
+ * save_brief_tool refusals, 0.8 gather and 0.8 import refusals a run), agents
+ * wrote placeholder briefs to pass it and the edits did not improve.
  *
- * Notes alone were not enough (bench pilots read three of them and cut
- * anyway), and neither was refusing the first cut once (the pilot repeated
- * the call), so until a brief is saved the calls that lay down material are
- * refused while the timeline is nearly empty. A piece under 6 s needs only a
- * short brief (brief/method.ts exempts it); a longer one, the motif method.
- * ZENVI_MCP_BRIEF=off turns the gate off.
+ * Now nothing is refused: the first call that lays down material on an
+ * unplanned project saves a minimal brief (the director's, from that call's
+ * arguments and the bin: director/brief.ts) in its own undo step, and the
+ * receipt says so and points at produce_video_tool, which compiles one from
+ * the request and makes the whole edit. ZENVI_MCP_BRIEF=off turns it off.
  */
 
-import { METHOD_MIN_SECONDS, readBrief, type Project } from "@zenvi/engine";
+import { minimalBrief, readBrief, type Brief, type Project } from "@zenvi/engine";
 
 /** Calls that gather or lay down the material of a whole video. */
 const STARTS_A_VIDEO = new Set([
@@ -41,7 +40,11 @@ const STARTS_A_VIDEO = new Set([
 const EARLY_CLIPS = 3;
 
 export const BRIEF_NOTE =
-  'No brief saved: a whole video starts with the creative brief (a detailed request is not one: the brief adds the 0-2 s hook, beat timings, the shot plan and its critique). read_director_recipe {styles: "brief"}, then save_brief_tool, before cutting.';
+  "No brief saved: for a whole video call produce_video_tool {request: the person's words} first; it saves the brief, cuts, finishes, renders and reviews in one call, then fix what its findings list.";
+
+/** The note on the session's first result while the timeline is empty. */
+export const PRODUCE_FIRST =
+  "Making a whole video? produce_video_tool {request: the person's words} makes it in one call (brief, style, cut, finish, render, review) and returns the review's findings with the next calls.";
 
 /** The note for `tool`'s receipt on `project`, if it is owed. */
 export function briefNote(tool: string, project: Project): string | undefined {
@@ -49,13 +52,27 @@ export function briefNote(tool: string, project: Project): string | undefined {
   return BRIEF_NOTE;
 }
 
-/** Calls the gate stops: they lay material on the timeline or fetch it for a plan (searches, the person's own imports and the frame setting stay free). */
-const GATED = new Set([...STARTS_A_VIDEO].filter((t) => !["set_project_setting_tool", "search_pexels_videos_tool", "search_freesound_music_tool", "import_files_tool"].includes(t)));
+/** Calls that lay material on the timeline or fetch it for a plan (searches, the person's own imports and the frame setting stay free of it). */
+const PLANNED = new Set([...STARTS_A_VIDEO].filter((t) => !["set_project_setting_tool", "search_pexels_videos_tool", "search_freesound_music_tool", "import_files_tool"].includes(t)));
 
-export const BRIEF_GATE =
-  `Error: no brief saved, nothing changed. Step 0 of a video is the creative brief: read_director_recipe {styles: "brief"}, then save_brief_tool (goal, platform, aspect, length_seconds, style, hook, beats; under ${METHOD_MIN_SECONDS} s one beat is enough, from ${METHOD_MIN_SECONDS} s on the motifs, storyboard, reskin and direction of BRIEF.md 4), then make this call again.`;
+/** Words of a call's arguments that say what the video is (queries, a style, a hook, a prompt). */
+function requestWords(tool: string, args: Readonly<Record<string, unknown>>): string {
+  const words: string[] = [tool.replace(/_tool$/, "").replace(/_/g, " ")];
+  for (const value of Object.values(args)) {
+    if (typeof value === "string") words.push(value);
+    else if (Array.isArray(value)) words.push(...value.filter((v): v is string => typeof v === "string"));
+  }
+  return words.join(". ").slice(0, 2000);
+}
 
-/** Whether `tool` on `project` lays down material before any brief, which the gate refuses. */
-export function briefGate(tool: string, project: Project): boolean {
-  return GATED.has(tool) && project.clips.length < EARLY_CLIPS && !readBrief(project);
+/** The minimal brief to save before `tool` lays down material on an unplanned `project`, or null when none is owed. */
+export function autoBrief(tool: string, project: Project, args: Readonly<Record<string, unknown>>): Brief | null {
+  if (!PLANNED.has(tool) || project.clips.length >= EARLY_CLIPS || readBrief(project)) return null;
+  const seconds = Number(args.duration_seconds);
+  return minimalBrief(project, requestWords(tool, args), Number.isFinite(seconds) && seconds > 0 ? seconds : undefined);
+}
+
+/** The receipt note when the server saved `brief`. */
+export function autoBriefNote(brief: Brief): string {
+  return `No brief was saved, so a minimal one was (${brief.style}, ${brief.aspect} ${brief.length_seconds}s; one undo step). produce_video_tool {request} replaces it with one from the person's words and makes the whole edit; save_brief_tool takes control of the plan.`;
 }

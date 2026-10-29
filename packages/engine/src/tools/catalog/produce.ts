@@ -23,7 +23,7 @@
 import { z } from "zod";
 import { BRIEF_KEY, briefSummary, readBrief, type Brief, type BriefAspect } from "../../brief/brief.js";
 import { inventoryEntry, inventoryFiles } from "../../brief/inventory.js";
-import { compileBrief, nearestAspect } from "../../director/brief.js";
+import { compileBrief, isAutoBrief, nearestAspect } from "../../director/brief.js";
 import { readRequest } from "../../director/request.js";
 import { binFacts, fallbackFor, routeRequest, STYLE_RULES, type BuilderPlan, type Route, type SoundGenre } from "../../director/route.js";
 import { finishGaps } from "../../review/finish.js";
@@ -242,7 +242,9 @@ async function produce(call: ToolCall, args: Input): Promise<{ receipt: ToolRece
   const project = () => call.doc.project;
   const facts = readRequest(args.request);
   const entries = () => inventoryFiles(project()).map((f) => inventoryEntry(project(), f));
-  const saved = readBrief(project());
+  // A brief the director compiled earlier (the MCP server's, from one call's arguments) is replaced by one from the request.
+  const found = readBrief(project());
+  const saved = found && !isAutoBrief(found) ? found : null;
   const name = args.title ?? facts.name;
   const hook = args.hook ?? facts.headline;
   const endCard = args.end_card ?? facts.url;

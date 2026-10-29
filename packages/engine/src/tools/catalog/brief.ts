@@ -162,7 +162,7 @@ export const briefTools: CatalogTool[] = [
     description:
       "Save the creative brief compiled from the person's prompt and the media inventory (zenvi-styles BRIEF.md): goal, platform, aspect, length, ONE style id from the styles index, up to 4 borrowed techniques with reasons and tools, the hook, the beats with timings, " +
       "8-12 motifs with one through-line, a storyboard (start, beats, picture, motif, source, composition, text_entrance, tone, transition, one climax) that does not repeat itself, the reskin test, a creative-direction draw of 3+ axes, type, palette, music, sound, captions, end card, the style's checklist and what the self-critique changed. " +
-      "From 6 s on a brief that breaks the method's rules is refused with the list of fixes. " +
+      "From 6 s on, what a brief misses of the method's rules comes back as warnings with the fixes (it is saved either way). produce_video_tool saves a minimal brief by itself: call this only to take control of the plan. " +
       "Replaces the saved brief (one undo step); review_edit_tool, render receipts and get_brief_tool then check the edit against it. Never invent brand facts: list them in missing.",
     input: saveInput,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
@@ -172,15 +172,14 @@ export const briefTools: CatalogTool[] = [
         if (beat.end <= beat.start) return refused(SAVE, `Error: beat "${beat.name}" ends at ${beat.end} s, not after its start ${beat.start} s.`);
         if (beat.start >= brief.length_seconds) return refused(SAVE, `Error: beat "${beat.name}" starts at ${beat.start} s, past the brief's ${brief.length_seconds} s.`);
       }
-      const problems = methodProblems(brief);
-      if (problems.length > 0) {
-        return refused(SAVE, `Error: not a plan yet, nothing saved (zenvi-styles BRIEF.md, the motif method). Fix, then save again:\n${problems.map((p) => `- ${p}`).join("\n")}`);
-      }
       const project = call.doc.project;
       if (sameBrief(readBrief(project), brief)) return unchanged(SAVE, "The project already has this brief; nothing changed.", { data: { brief } });
       const known = new Set(project.files.map((f) => String(f.id)));
       const unknownFiles = [...brief.shots, ...brief.storyboard].filter((s) => s.file_id && !known.has(s.file_id)).map((s) => s.file_id!);
       const warnings = unknownFiles.length > 0 ? [`Shot plan names files not in the bin: ${[...new Set(unknownFiles)].join(", ")} (inspect_media_bin_tool lists the ids).`] : [];
+      // Bench rounds 6-7: refusing these made agents write placeholder briefs (2.1 refusals a run) and changed nothing in the edit; saved, with the fixes listed.
+      const problems = methodProblems(brief);
+      if (problems.length > 0) warnings.push(`Not a full plan yet (zenvi-styles BRIEF.md, the motif method); saved as it is. To plan it fully, fix and save again: ${problems.join(" | ")}`);
       // Bench sk0: agents made to save a brief saved the least that validates, which changed nothing in the edit.
       const thin = [brief.shots.length === 0 && brief.storyboard.length === 0 && "no shot plan", brief.techniques.length === 0 && "no borrowed technique", !brief.critique && "no self-critique"].filter(Boolean);
       if (thin.length > 0) warnings.push(`A thin brief (${thin.join(", ")}): it plans little. Map shots to beats, borrow what the moment needs, critique it against the style's checklist (BRIEF.md 5), and save again.`);

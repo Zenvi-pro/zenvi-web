@@ -12,11 +12,15 @@
  */
 
 import { BRIEF_ASPECTS, briefSchema, type Brief, type BriefAspect } from "../brief/brief.js";
-import type { RequestFacts } from "./request.js";
-import type { Route } from "./route.js";
+import { inventoryEntry, inventoryFiles } from "../brief/inventory.js";
+import type { Project } from "../model/types.js";
+import { readRequest, type RequestFacts } from "./request.js";
+import { binFacts, routeRequest, type Route } from "./route.js";
 
 /** The longest goal a brief holds (brief.ts `goal`). */
 const GOAL_CHARS = 300;
+/** How a compiled brief's critique starts, so the director knows it may replace it. */
+const AUTO_MARK = "Compiled by the director";
 
 /** The brief aspect nearest a frame. */
 export function nearestAspect(width: number, height: number): BriefAspect {
@@ -50,7 +54,13 @@ export function compileBrief(input: AutoBriefInput): Brief {
   const { facts, route, seconds } = input;
   const rule = route.rule;
   const at = (share: number) => Math.round(share * seconds * 10) / 10;
-  const beats = rule.beats.map(([name, from, to, does]) => ({ name, start: at(from), end: Math.max(at(to), at(from) + 0.1), does }));
+  // Two beats, the hook and the rest: a builder cuts on the music, not on shares of the length, so more would read as misses in review.
+  const [first, ...rest] = rule.beats;
+  const hookEnd = Math.max(0.1, at(first![2]));
+  const beats = [
+    { name: first![0], start: 0, end: hookEnd, does: first![3] },
+    { name: rest.map((b) => b[0]).join(", "), start: hookEnd, end: Math.max(seconds, hookEnd + 0.1), does: rest.map((b) => b[3]).join("; ") },
+  ];
   const firstSentence = input.request.split(/(?<=[.!?])\s|\n/)[0] ?? input.request;
   const bpm = facts.bpm ?? rule.music.bpm;
   return briefSchema.parse({
@@ -65,9 +75,27 @@ export function compileBrief(input: AutoBriefInput): Brief {
     sound: clip(`${rule.sound} palette, ${rule.intensity}: a sound on the cuts and moves, mastered to -14 LUFS`, 300),
     ...(facts.url ? { end_card: facts.url } : {}),
     critique: clip(
-      `Compiled by produce_video_tool from the request: style ${rule.id} (${route.why}).${route.fallback ? ` Its builder ${route.fallback.wanted} could not run (${route.fallback.why}).` : ""} A minimal brief; save_brief_tool replaces it with a full plan.`,
+      `${AUTO_MARK} (produce_video_tool) from the request: style ${rule.id} (${route.why}).${route.fallback ? ` Its builder ${route.fallback.wanted} could not run (${route.fallback.why}).` : ""} A minimal brief; save_brief_tool replaces it with a full plan.`,
       800,
     ),
     missing: input.missing.slice(0, 8).map((m) => clip(m, 200)),
   });
+}
+
+/** Whether `brief` is one the director compiled (it replaces it with a better-informed one). */
+export function isAutoBrief(brief: Brief): boolean {
+  return brief.critique?.startsWith(AUTO_MARK) ?? false;
+}
+
+/**
+ * The minimal brief for `project` from what is known of the request: the
+ * MCP server saves it instead of refusing the first cut of an unplanned
+ * video, from the words of that call's arguments.
+ */
+export function minimalBrief(project: Project, request: string, seconds?: number): Brief {
+  const facts = readRequest(request);
+  const bin = binFacts(inventoryFiles(project).map((f) => inventoryEntry(project, f)));
+  const route = routeRequest({ request, bin });
+  const aspect = nearestAspect(project.width, project.height);
+  return compileBrief({ request, facts, route, aspect, seconds: seconds ?? facts.seconds ?? route.rule.seconds, missing: [] });
 }

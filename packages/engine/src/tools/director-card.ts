@@ -6,8 +6,9 @@
  * never opened the recipe left grade and sound to chance. It must stay under
  * 400 tokens: 366 on Claude Sonnet 5.5 at 926 characters (Bedrock
  * converse usage, 2026-10-28), so the CLI's test bounds it at 1000
- * characters; the brief step took the recipe hints' place (895), and the
- * ORDER line, watch_render_tool and data-explainer bring it to 995. The
+ * characters; the brief step took the recipe hints' place (895), the
+ * ORDER line, watch_render_tool and data-explainer brought it to 995, and
+ * produce_video_tool took the brief step's and the long finish's place. The
  * recipes keep the craft. DIRECTOR_CARD and DIRECTOR_START go
  * out only from the CLI's `zenvi mcp`, where render_video and
  * read_director_recipe exist; FINISH_HINT is in engine tool descriptions on
@@ -23,13 +24,17 @@ const RECIPES =
   "Recipes: match-cut-montage, flash-montage, hype-reel (sport, trailer: build_reel_tool hype), documentary (voice-over), kinetic-captions (talking head), " +
   "saas-ui-promo, 3d-product-ad, editorial-type, grid-montage, data-explainer, tutorial, showreel-intro.";
 
-/** Step 0 (plugins/zenvi/skills/zenvi-styles/BRIEF.md): the brief picks the style and the recipe. */
-const BRIEF = 'First the brief: get_brief_tool; if none, inspect_media_bin_tool, read_director_recipe {styles: "brief"} and follow it, save_brief_tool.';
+/**
+ * Step 0 (bench rounds 6-7: the recipe read in 6 of 52 runs, a builder called
+ * once, review tools never): one call makes the whole edit, the agent's turns
+ * go to its findings.
+ */
+const PRODUCE =
+  'call produce_video_tool {request: the person\'s words} FIRST: brief, style, builder, footage, music, cut, finish, render and review in one call. Then fix what its findings list (its next calls) and re-run it with skip=["brief","format","footage","music","build"] to finish, render and review again.';
 
-/** The finish every recipe ends with, in order. */
+/** The finish every recipe ends with, in order (what produce_video_tool runs; by hand, the same calls). */
 const FINISH =
-  "Finish, in order: unify_grade_tool; apply_motion_transitions_tool (no track = every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
-  "master_audio_tool iterate=true, last; render_video; review_render_tool; watch_render_tool once, fix its HIGH issues. Make the calls receipts say are missing.";
+  "By hand, finish: unify_grade_tool, apply_motion_transitions_tool (match cuts stay hard), auto_sound_design_tool, master_audio_tool iterate=true last, render_video, review_render_tool, watch_render_tool once.";
 
 /**
  * Re-edit bench (2026-10-28): agents given a bin of finished shots cut them in
@@ -38,10 +43,11 @@ const FINISH =
 const ORDER = "Given shots to re-edit: sequence_shots_tool first.";
 
 export const DIRECTOR_CARD: string = [
-  `Whole videos (reel, ad, promo, montage, a reference to recreate): ${BRIEF} Then read its style's recipe, read_director_recipe {recipe}. ${RECIPES}`,
+  `Whole videos (reel, ad, promo, trailer, montage, a reference): ${PRODUCE}`,
+  `By hand: read_director_recipe {recipe}. ${RECIPES}`,
   ORDER,
   FINISH,
-  "TTS captions: kinetic_captions_tool timeline_clip_ids=[the TTS clip] uses its word timings.",
+  "TTS captions: kinetic_captions_tool timeline_clip_ids=[the TTS clip].",
 ].join("\n");
 
 /** The one-call builders (P4): only here, the card is at its budget. A whole first cut in one undo step, then the recipe's fixes and the finish. */
@@ -54,4 +60,4 @@ const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
 /** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
-export const DIRECTOR_START: string = `A new edit: ${BRIEF} Then read its style's recipe, read_director_recipe {recipe}. ${RECIPES} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;
+export const DIRECTOR_START: string = `A new edit: ${PRODUCE} By hand: read_director_recipe {recipe}. ${RECIPES} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;

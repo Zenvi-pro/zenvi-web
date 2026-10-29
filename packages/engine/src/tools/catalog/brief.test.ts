@@ -144,14 +144,15 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(doc.undoLabels).toEqual(["fixture"]);
   });
 
-  it("refuses a whole-video brief that breaks the motif method, with every fix listed, and records nothing", async () => {
+  it("saves a whole-video brief that breaks the motif method, with every fix listed as a warning", async () => {
     const doc = bin();
     const out = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, motifs: ["sole"], reskin: { generic: 4 } });
-    expect(out.data!.status).toBe("refused");
-    expect(out.data!.summary).toMatch(/^Error: not a plan yet, nothing saved/);
-    expect(out.data!.summary).toContain("motifs: 1 of the 8-12");
-    expect(out.data!.summary).toContain("4 of 5 shots would work for any subject");
-    expect(doc.undoLabels).toEqual(["fixture"]);
+    expect(out.data!.status).toBe("applied");
+    const warnings = out.data!.warnings.join(" ");
+    expect(warnings).toMatch(/Not a full plan yet .*saved as it is/);
+    expect(warnings).toContain("motifs: 1 of the 8-12");
+    expect(warnings).toContain("4 of 5 shots would work for any subject");
+    expect(doc.undoLabels).toEqual(["fixture", "Save brief"]);
   });
 
   it("warns about a thin brief: no shots, no technique, no critique", async () => {

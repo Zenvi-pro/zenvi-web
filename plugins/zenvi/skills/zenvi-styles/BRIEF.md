@@ -71,8 +71,8 @@ kinetic-cut-video, see NOTICE); in short:
   `motion`, `3d`, `title`), `composition`, `text_entrance`, `tone`
   (brightness and main colour), `transition` (a motif match cut first: the
   waveform becomes the next shot's trace). The last four columns exist to
-  see repetition before cutting. Hard rules (save refuses a brief that
-  breaks them, from 6 s on):
+  see repetition before cutting. Hard rules (from 6 s on, save lists every one a
+  brief breaks as a warning to fix):
   - first and last shot grow from the through-line; every motif is a listed one;
   - lengths vary (1 / 2 / 4 / 8 beats in a curve: set-up, speed-up, breath,
     climax, hold), never all the same;
@@ -131,7 +131,7 @@ Pitfalls) and against these, and rewrite what fails:
   subject (a coffee brand instead of a university), would this picture still
   work? Count those rows in **reskin.generic**. More than a third is a
   template: regrow those shots from the motifs and count again. Save
-  refuses over a third.
+  warns over a third.
 - Does the hook work with the sound off, and does it hit in the first 0.5 s?
 - Is there one bold moment, and only one? Is there stillness before it?
 - Does every beat start with a picture change and end before it drags (the

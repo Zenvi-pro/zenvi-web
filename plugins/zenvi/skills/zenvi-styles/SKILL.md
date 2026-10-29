@@ -5,13 +5,18 @@ description: Load this FIRST, before any other Zenvi skill or tool call, wheneve
 
 # Zenvi styles: the brief compiler and the one index
 
-Every whole video starts here, before the first edit:
+Every whole video starts with **`produce_video_tool`** `{request: the
+person's words}`: it compiles a minimal brief from the request and the bin,
+picks ONE style of the table below and its one-call builder, cuts, finishes,
+renders and reviews in one call, and returns the findings with the next
+calls. Fix what it lists. To plan by hand instead (or to replace its brief
+with a full plan), follow these steps before the first edit:
 
 1. **Compile the brief.** Read `BRIEF.md` (this folder) now and follow it:
    `inspect_media_bin_tool`, the creative-direction draw, 8-12 motifs with
    a through-line, a storyboard that does not repeat itself, the reskin test
    and the self-critique against the style's checklist, then
-   `save_brief_tool` (it refuses a whole video planned without them). The
+   `save_brief_tool` (it warns about each one a whole video skips). The
    motif method is `METHOD-motif.md`; credits in `NOTICE`. A few minutes here is
    the difference between a reel and a slideshow.
 2. **Pick ONE style** from the table below: the row whose "use when" matches

@@ -76,3 +76,4 @@ export * from "./stock/stock.js";
 export * from "./web-video/web-video.js";
 export type * from "./tools/types.js";
 export type * from "./render/types.js";
+export { compileBrief, isAutoBrief, minimalBrief, nearestAspect } from "./director/brief.js";
