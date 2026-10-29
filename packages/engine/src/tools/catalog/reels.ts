@@ -410,10 +410,10 @@ export const reelTools: CatalogTool[] = [
       // file_ids in the bin's own order are no story either: ordered by continuity first (re-edit bench, 2026-10-28).
       if (args.file_ids && !args.keep_order && inBinOrder(project, args.file_ids)) {
         const sequenced = await sequenceFiles(call, args.file_ids, { arc: styleId === "hype" ? "build" : "peak" }, "keep_order");
-        if (sequenced) {
+        if (sequenced && "ids" in sequenced) {
           ordered = sequenced.ids.map((id) => media.find((m) => m.fileId === id)!);
           orderNotes.push(sequenced.note);
-        }
+        } else if (sequenced) warnings.push(sequenced.warning);
       }
       if (measured && look && !args.file_ids) {
         // Bin order has no story: the clips that already fit the look open the reel and close it.

@@ -424,10 +424,10 @@ const montageTool = directTool({
     const notes: string[] = [];
     if (!args.keep_order && inBinOrder(project, ids)) {
       const ordered = await sequenceFiles(call, ids, { arc: "flat", continuity: 2 }, "keep_order");
-      if (ordered) {
+      if (ordered && "ids" in ordered) {
         ids = ordered.ids;
         notes.push(ordered.note);
-      }
+      } else if (ordered) warnings.push(ordered.warning);
     }
 
     const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);

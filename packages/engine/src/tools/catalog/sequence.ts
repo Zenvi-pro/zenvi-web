@@ -158,22 +158,24 @@ export function inBinOrder(project: Project, ids: readonly string[]): boolean {
 
 /**
  * Whole bin files in sequence_shots_tool's order (continuity, `goal`'s arc,
- * the strongest last), with the receipt note that says so; null where the
- * frames cannot be read (the caller keeps its order).
+ * the strongest last), with the receipt note that says so; or the warning
+ * the caller keeps its order with (the frames cannot be read), null where
+ * this surface reads no frames at all.
  */
-export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal: SequenceGoal, keepFlag: string): Promise<{ ids: string[]; note: string } | null> {
+export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal: SequenceGoal, keepFlag: string): Promise<{ ids: string[]; note: string } | { warning: string } | null> {
   const project = call.doc.project;
   if (!call.host.frames) return null;
+  const unordered = (why: string) => ({ warning: `file_ids are in bin order and could not be ordered (${why}): order them with sequence_shots_tool, or pass ${keepFlag}: true.` });
   const fps = fpsFloat(project.fps);
   const shots: SequenceShotInput[] = [];
   for (const id of ids) {
     const file = project.files.find((f) => String(f.id) === id);
-    if (!file) return null;
+    if (!file) return unordered(`unknown file ${id}`);
     const still = isStill(file);
     const end = still ? STILL_SECONDS : Number(file.duration) || 0;
-    if (!(end > 0)) return null;
+    if (!(end > 0)) return unordered(`${fileLabel(file)} has no length`);
     const frames = await shotFrames(call, { file, start: 0, end, still }, fps);
-    if (typeof frames === "string") return null;
+    if (typeof frames === "string") return unordered(frames.replace(/^Error: /, ""));
     shots.push({ features: shotFeatures(frames), seconds: end, ...(still ? { still: true } : {}) });
   }
   const plan = planSequence(shots, goal);

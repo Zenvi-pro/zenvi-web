@@ -166,6 +166,10 @@ describe("sequence_shots_tool", () => {
     // A chosen order is left alone.
     const chosen = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ["TAKE2", "TAKE", "TAKE3", "TAKE1"], duration_seconds: 4, flash: false, transitions: "none", replace: true });
     expect(chosen.data?.notes ?? []).toEqual([]);
+    // Frames that cannot be read (ffmpeg could not start) keep the order given, with a warning that says so.
+    const broken: ToolHost = { ...host, frames: { renderFrame: () => Promise.reject(new Error("spawn ffmpeg EAGAIN")), sampleFrames: () => Promise.reject(new Error("spawn ffmpeg EAGAIN")) } };
+    const unordered = await runTool({ doc, host: broken }, "match_cut_montage_tool", { file_ids: ids, duration_seconds: 4, flash: false, transitions: "none", replace: true, subjects: ids.map((file_id) => ({ file_id, box: { x: 0, y: 0, w: 1, h: 1 } })) });
+    expect(unordered.data?.warnings?.join(" ")).toMatch(/file_ids are in bin order and could not be ordered \(could not read the frames of TAKE: spawn ffmpeg EAGAIN\)/);
     const reel = await runTool({ doc, host }, "build_reel_tool", { style: "hype", file_ids: ids, duration_seconds: 4, replace: true });
     expect(reel.data?.status, reel.data?.summary).toBe("applied");
     expect(reel.data?.notes?.[0]).toMatch(/^file_ids were in bin order: ordered by continuity first/);
