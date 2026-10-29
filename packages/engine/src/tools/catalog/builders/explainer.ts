@@ -11,7 +11,7 @@
 import { z } from "zod";
 import { CAPTION_STYLE_IDS } from "../../../captions/styles.js";
 import type { CaptionWord } from "../../../captions/words.js";
-import { numberSlots, planChapters, planExplainerShots } from "../../../builders/explainer.js";
+import { EXPLAINER_PACES, numberSlots, planChapters, planExplainerShots, type ExplainerPace } from "../../../builders/explainer.js";
 import { planKeywordBroll } from "../../../builders/keywords.js";
 import { addClip } from "../../../ops/clips.js";
 import { applyClipPreset } from "../../../ops/presets.js";
@@ -25,7 +25,7 @@ import { Composer, binOf, builderTracks, clearTimeline, placeBed, placeShot, rou
 const TOOL = "build_explainer_tool";
 /** Reading pace of a script with no voice, seconds per word (about 150 words a minute). */
 const SCRIPT_WORD_SECONDS = 0.4;
-const CHAPTER_SECONDS = 2.2;
+const CHAPTER_SECONDS = 1.6;
 const DATA_SECONDS = 3.5;
 
 const dataSlot = z.strictObject({
@@ -44,6 +44,11 @@ const input = z.strictObject({
   script: z.string().max(6000).optional().describe("No voice-over yet: the script; the edit is timed at reading pace (about 150 words a minute) and the captions show it."),
   broll_file_ids: z.array(z.string().min(1)).max(60).optional().describe("Bin videos and images for the picture, in story order. Default: every video and image in the bin but the voice's."),
   keywords: keywordsArg,
+  pace: z
+    .enum(Object.keys(EXPLAINER_PACES) as [ExplainerPace, ...ExplainerPace[]])
+    .optional()
+    .describe("documentary (default): a new shot every 0.6-1.6 s on the phrases (the documentary references); essay: 2-4.5 s holds for a calmer video essay."),
+  grade: z.string().min(1).optional().describe("A look over every shot, laid on matched plates (unify_grade_tool look at 0.6): a list_looks_tool id, default elegant_dark_cinema; none keeps the footage as it is."),
   hook: z.string().max(80).optional().describe("Opening title over the first sentence: the question or promise, 2-8 words."),
   chapters: z.array(z.string().min(1).max(60)).max(8).optional().describe("Chapter titles in order: each card sits in the pause nearest where its chapter should start."),
   data: z.array(dataSlot).max(6).optional().describe("Counters, charts and places to show while the voice talks about them."),
@@ -113,7 +118,7 @@ export const explainerTools: CatalogTool[] = [
       const hits = planKeywordBroll(words, keywordMedia(pictures), givenKeywords(args.keywords), { minStart: 0, minGap: 0.5, minHold: 2, maxHold: 4.5, until: duration });
       const matched = new Set(hits.map((h) => h.fileId));
       const fill = brollIds.filter((id) => !matched.has(id));
-      const shots = planExplainerShots(duration, words, hits, fill.length > 0 ? fill : brollIds, fps);
+      const shots = planExplainerShots(duration, words, hits, fill.length > 0 ? fill : brollIds, fps, args.pace ?? "documentary");
 
       const c = new Composer(call, TOOL);
       const placed = c.edit("picture", `${shots.length} B-roll shots over the ${round3(duration)} s voice: ${hits.length} on keywords, the rest at pauses`, (tx) => {
@@ -145,7 +150,9 @@ export const explainerTools: CatalogTool[] = [
       }
 
       for (const [i, slot] of planChapters(args.chapters ?? [], words, duration).entries()) {
-        await c.run(`chapter ${i + 1}`, "add_kinetic_title_tool", { text: slot.title, position_seconds: round3(slot.at), duration_seconds: CHAPTER_SECONDS, style: "stack", y: 0.3 }, `chapter card in the pause at ${round3(slot.at)} s`);
+        await c.run(`chapter ${i + 1}`, "add_kinetic_title_tool", { text: slot.title, position_seconds: round3(slot.at), duration_seconds: CHAPTER_SECONDS, style: "editorial", animation: "rise" }, `chapter card in the pause at ${round3(slot.at)} s`);
+        // A topic change lands on a low hit (the documentary references).
+        await c.run(`chapter ${i + 1} hit`, "add_sfx_tool", { recipe: "impact_thud", at_seconds: round3(slot.at), gain_db: -14, seed: i + 1 }, "a low impact on the topic change");
       }
 
       // Data: the caller's slots, then spoken numbers nowhere near one.
@@ -185,13 +192,17 @@ export const explainerTools: CatalogTool[] = [
       const captionStyle = args.captions ?? "documentary";
       if (captionStyle === "none") c.skip("captions", "captions=none");
       else if (placed.voiceClip) {
-        const got = await c.run("captions", "kinetic_captions_tool", { timeline_clip_ids: [placed.voiceClip], style: captionStyle, placement: "style" }, "the voice's words on the lower safe line");
+        const got = await c.run("captions", "kinetic_captions_tool", { timeline_clip_ids: [placed.voiceClip], style: captionStyle, animation: "rise", placement: "style" }, "the voice's words on the lower safe line");
         if (!got && args.script?.trim()) {
           await c.fallback("captions", "captions from the voice", "kinetic_captions_tool", { cues: words.map((w) => ({ text: w.text, start: w.start, end: w.end })), style: captionStyle, placement: "style" }, "the script, timed by length over the voice");
         }
       } else {
         await c.run("captions", "kinetic_captions_tool", { cues: words.map((w) => ({ text: w.text, start: w.start, end: w.end })), style: captionStyle, placement: "style" }, "no voice yet: the script at reading pace");
       }
+
+      const look = args.grade?.trim() || "elegant_dark_cinema";
+      if (look === "none") c.skip("grade", "grade=none");
+      else await c.run("grade", "unify_grade_tool", { timeline_clip_ids: placed.clips, look, look_intensity: 0.6 }, "the B-roll matched to one plate, then a dark slightly desaturated look over it");
 
       c.suggest("auto_sound_design_tool", { genre: "documentary" }, "soft whooshes on the cuts and hits under the cards and counters");
       c.suggest("master_audio_tool", { preset: "social", iterate: true }, "the voice on top, the bed under it, the loudness set last");

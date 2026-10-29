@@ -14,8 +14,8 @@ export interface ExplainerShot {
   fileId: string;
   start: number;
   end: number;
-  /** Why the shot starts here: on its keyword, at a pause, or because the last one ran long. */
-  cue: "start" | "keyword" | "pause" | "hold";
+  /** Why the shot starts here: on its keyword, at a pause, on a word, or because the last one ran long. */
+  cue: "start" | "keyword" | "pause" | "word" | "hold";
   keyword?: string;
 }
 
@@ -35,8 +35,12 @@ export interface NumberSlot {
   at: number;
 }
 
-const MIN_SHOT = 2;
-const MAX_SHOT = 4.5;
+/** How long a shot holds, seconds: a documentary cuts on the phrases, an essay lets a picture breathe. */
+export const EXPLAINER_PACES = {
+  documentary: { min: 0.6, max: 1.6 },
+  essay: { min: 2, max: 4.5 },
+} as const;
+export type ExplainerPace = keyof typeof EXPLAINER_PACES;
 
 /** Pauses between words: [end of the word before, start of the next], longest first. */
 export function pauses(words: readonly CaptionWord[], min = 0.3): [number, number][] {
@@ -48,37 +52,42 @@ export function pauses(words: readonly CaptionWord[], min = 0.3): [number, numbe
 /**
  * The B-roll cut: keyword hits put their picture on their word; between
  * them the unmatched pictures take turns, cutting at the pause nearest the
- * middle of the allowed shot length, or at MAX_SHOT when there is none.
+ * middle of the allowed shot length, else on the word start nearest it (a
+ * cut on a word lands with the voice), else at the longest hold.
  */
-export function planExplainerShots(duration: number, words: readonly CaptionWord[], hits: readonly KeywordHit[], fill: readonly string[], fps: number): ExplainerShot[] {
+export function planExplainerShots(duration: number, words: readonly CaptionWord[], hits: readonly KeywordHit[], fill: readonly string[], fps: number, pace: ExplainerPace): ExplainerShot[] {
+  const { min: minShot, max: maxShot } = EXPLAINER_PACES[pace];
   const snap = (t: number) => Math.round(t * fps) / fps;
   const gaps = pauses(words).map(([a, b]) => (a + b) / 2);
-  const anchors = hits.filter((h) => h.start >= MIN_SHOT * 0.5 && h.start <= duration - MIN_SHOT * 0.5);
+  const starts = words.map((w) => w.start);
+  const anchors = hits.filter((h) => h.start >= minShot * 0.5 && h.start <= duration - minShot * 0.5);
   const shots: ExplainerShot[] = [];
   let fillAt = 0;
   const nextFill = () => (fill.length > 0 ? fill[fillAt++ % fill.length]! : anchors[0]?.fileId ?? "");
   let at = 0;
   let cue: ExplainerShot["cue"] = "start";
-  let current = anchors.length > 0 && anchors[0]!.start < MIN_SHOT ? anchors[0]!.fileId : nextFill();
+  let current = anchors.length > 0 && anchors[0]!.start < minShot ? anchors[0]!.fileId : nextFill();
   let keyword: string | undefined;
   for (let guard = 0; guard < 2000 && at < duration - 1e-6; guard += 1) {
-    const hit = anchors.find((h) => h.start >= at + MIN_SHOT - 1e-6);
+    const hit = anchors.find((h) => h.start >= at + minShot - 1e-6);
     let end: number;
     let nextCue: ExplainerShot["cue"];
-    if (hit && hit.start <= at + MAX_SHOT) {
+    if (hit && hit.start <= at + maxShot) {
       end = hit.start;
       nextCue = "keyword";
     } else {
-      const lo = at + MIN_SHOT;
-      const hi = Math.min(duration, at + MAX_SHOT);
+      const lo = at + minShot;
+      const hi = Math.min(duration, at + maxShot);
       const mid = (lo + hi) / 2;
-      const pause = gaps.filter((g) => g >= lo && g <= hi).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0];
-      end = pause ?? hi;
-      nextCue = pause !== undefined ? "pause" : "hold";
+      const nearest = (ts: readonly number[]) => ts.filter((g) => g >= lo && g <= hi).sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid))[0];
+      const pause = nearest(gaps);
+      const word = pause === undefined ? nearest(starts) : undefined;
+      end = pause ?? word ?? hi;
+      nextCue = pause !== undefined ? "pause" : word !== undefined ? "word" : "hold";
     }
     end = snap(Math.min(duration, end));
     // A last sliver joins the shot before it.
-    if (duration - end < MIN_SHOT * 0.6) end = snap(duration);
+    if (duration - end < minShot * 0.6) end = snap(duration);
     shots.push({ fileId: current, start: snap(at), end, cue, ...(keyword ? { keyword } : {}) });
     at = end;
     cue = nextCue;

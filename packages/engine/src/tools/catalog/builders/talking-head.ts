@@ -153,6 +153,13 @@ export const talkingHeadTools: CatalogTool[] = [
         }
       }
 
+      // One whip up on the jump cut nearest two thirds in, clear of the B-roll (the creator references' one camera move).
+      const cuts = cut.segments.slice(1).map((s, i) => ({ at: s.position, out: placed.clips[i]!, in: placed.clips[i + 1]! }));
+      const clear = cuts.filter((k) => !hits.some((h) => k.at > h.start - 0.3 && k.at < h.end + 0.3));
+      const whip = clear.sort((a, b) => Math.abs(a.at - cut.duration * 0.66) - Math.abs(b.at - cut.duration * 0.66))[0];
+      if (whip) await c.run("whip", "apply_motion_transition_tool", { preset: "whip", clip1_id: whip.out, clip2_id: whip.in, direction: "up" }, `one whip up on the jump cut at ${round3(whip.at)} s`);
+      else c.skip("whip", cuts.length === 0 ? "one segment: no jump cut to whip on" : "every jump cut is under a B-roll cutaway");
+
       const captionStyle = args.caption_style ?? "creator";
       if (captionStyle === "none") c.skip("captions", "caption_style=none");
       else {

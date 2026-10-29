@@ -32,7 +32,7 @@ describe("explainer plan", () => {
 
   it("covers the voice with shots between 2 and 4.5 s, cutting on the keyword or in a pause", () => {
     const hits = [{ word: 10, text: "railways", fileId: "RAIL", start: 7.05, end: 9, source: "matched" as const }];
-    const shots = planExplainerShots(11, words, hits, ["A", "B"], 30);
+    const shots = planExplainerShots(11, words, hits, ["A", "B"], 30, "essay");
     expect(shots[0]!.start).toBe(0);
     expect(shots[shots.length - 1]!.end).toBeCloseTo(11, 6);
     for (let i = 1; i < shots.length; i += 1) expect(shots[i]!.start).toBeCloseTo(shots[i - 1]!.end, 6);

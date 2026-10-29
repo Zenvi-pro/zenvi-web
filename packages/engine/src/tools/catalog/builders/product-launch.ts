@@ -106,7 +106,14 @@ export const productLaunchTools: CatalogTool[] = [
         return { clips, bed, tracks: { music: musicTrack, picture: pictureTrack } };
       });
       if (!music) c.skip("music", "no music in the bin: the sections follow 120 BPM in silence");
-      const backdrop = (s: LaunchSection) => (shown.has(s) ? {} : { background: BACKDROP });
+      // Type never sits straight on a hard colour when a soft light field can render (the SaaS references); else a dark card.
+      const fields = new Set<LaunchSection>();
+      for (const s of plan.sections.filter((x) => !shown.has(x) && x.kind !== "end" && x.kind !== "feature")) {
+        const got = await c.run(`backdrop ${s.kind}`, "add_motion_block_tool", { block: "gradient_field", params: { style: "aurora" }, position_seconds: round3(s.start), duration_seconds: round3(s.end - s.start), placement: "full_frame" }, `a soft light field under the ${s.kind}'s type (no footage there)`);
+        if (got) fields.add(s);
+        else break;
+      }
+      const backdrop = (s: LaunchSection) => (shown.has(s) || fields.has(s) ? {} : { background: BACKDROP });
       const span = (s: LaunchSection) => ({ position_seconds: round3(s.start), duration_seconds: round3(s.end - s.start) });
 
       for (const s of plan.sections) {
