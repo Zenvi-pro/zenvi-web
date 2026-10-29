@@ -40,7 +40,7 @@ the 1-4 kHz band. Talk clips run the bed 18-30 dB under or drop it.
 
 ## Timing & taste rules
 - Voice -14 to -16 LUFS short-term; bed voice minus 8-12 LU (music-led
-  lifestyle) or 18-30 (podcast / Hormozi-style talk).
+  lifestyle) or 18-30 (podcast / business-advice talk).
 - Bed may enter late (around 28 % in) or swell at the reveal.
 - A calm bed against frantic content can be the joke (60 bpm pad under a
   105 wpm voice).

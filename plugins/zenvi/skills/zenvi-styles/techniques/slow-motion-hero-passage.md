@@ -27,9 +27,12 @@ shots, then the edit snaps back to speed on a cut and a hit.
    `ripple: true` on a full track was not enough in the test and left black).
 2. Or shape it: `speed_ramp_tool {"clip_id", "preset": "ramp_out"}` (normal, then
    slows into the last frame) or `"hero"` (normal, held slow, normal).
-3. Smooth frames from 24/30 fps sources (CLI/local only): `apply_fx_tool`
-   `optical_flow_slowmo`.
-4. A slow push over the hero: `set_keyframes_tool` scale 1.0 to 1.08-1.15.
+3. Smooth frames from 24/30 fps sources (CLI/local only), instead of step 1 or 2:
+   `apply_fx_tool {"clip_id", "effects": [{"effect": "optical_flow_slowmo",
+   "params": {"speed": 0.4}}]}` on the clip at normal speed (`apply_fx_tool`
+   refuses a clip that is already retimed, so also put any other FX on first).
+4. A slow push over the hero: `set_keyframes_tool` `scale_x` and `scale_y`
+   1.0 to 1.08-1.15.
 5. The snap back: hard cut to the next normal-speed shot +
    `add_sfx_tool {"recipe": "hit_transient", "gain_db": -14}` on the cut.
 

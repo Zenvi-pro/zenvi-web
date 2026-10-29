@@ -3,7 +3,7 @@ id: talking-head-captions
 kind: style
 summary: "For a creator speaking to camera (advice, story, hot take): tight speech, word-synced captions, noun B-roll, punch-ins."
 categories: [talking-head-captions]
-tools: [remove_silence_tool, remove_words_tool, transcribe_media_tool, get_transcript_tool, split_clip_tool, set_clip_properties_tool, gather_stock_footage_tool, add_clip_to_timeline_tool, unify_grade_tool, kinetic_captions_tool, add_kinetic_title_tool, generate_subject_matte_tool, text_behind_subject_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool]
+tools: [remove_silence_tool, remove_words_tool, transcribe_media_tool, get_transcript_tool, split_clip_tool, set_clip_properties_tool, gather_stock_footage_tool, add_clip_to_timeline_tool, unify_grade_tool, kinetic_captions_tool, add_kinetic_title_tool, generate_subject_matte_tool, text_behind_subject_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool, set_project_setting_tool, analyze_mix_tool]
 pace: fast
 mood: [direct, energetic, confident]
 aspect: ["9:16", "4:5"]
@@ -60,8 +60,8 @@ Medium-high contrast, natural skin, optional edge vignette; no heavy LUT.
 `text_behind_subject_tool` word at the emotional peak.
 
 ## Sound & music
-Voice -14 LUFS, dry, close; bed lo-fi 78-129 bpm, 18-30 dB under (Hormozi
-style) or 9-10 dB under (authored reels), ducked; or no bed. A quiet whoosh
+Voice -14 LUFS, dry, close; bed lo-fi 78-129 bpm, 18-30 dB under (business-
+advice style) or 9-10 dB under (authored reels), ducked; or no bed. A quiet whoosh
 (-22 dB) on B-roll entries only, none on returns; a pop (-18 to -20 dB) on 2-3
 emphasis words; at least 3 cue types, no two identical within 3 s. Master
 -14 ±1 LUFS, ≤ -1 dBTP.
@@ -81,8 +81,8 @@ No transcript (TTS or script only): cues per phrase in timeline seconds.
    0.35, "padSec": 0.12}`; first word at frame 0.
 3. `get_transcript_tool {"includeWords": true}`; list sentence ends and 4-9
    trigger nouns.
-4. `split_clip_tool` at sentence ends; `set_clip_properties_tool` scale 1.4,
-   location_y 0.06 on every other piece.
+4. `split_clip_tool` at sentence ends; `set_clip_properties_tool {"properties":
+   {"scale_x": 1.4, "scale_y": 1.4, "location_y": 0.06}}` on every other piece.
 5. `gather_stock_footage_tool {"queries": [<one per noun>], "orientation":
    "portrait", "count": 6, "min_seconds": 3}`; per noun `add_clip_to_timeline_tool
    {"file_id", "position_seconds": <word start>, "start_seconds", "end_seconds":

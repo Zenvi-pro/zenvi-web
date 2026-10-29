@@ -34,7 +34,7 @@ over the speaker's lap or chest at about 85 % frame width, below the eyes, for
    `set_clip_properties_tool {"timeline_clip_ids": ["<block clip>"],
    "properties": {"location_y": 0.42}}` (lower third of the frame).
 3. A real screen recording instead: `add_clip_to_timeline_tool` on a track above,
-   `set_clip_properties_tool` scale 0.8, location_y 0.25, `set_keyframes_tool`
+   `set_clip_properties_tool` `scale_x`/`scale_y` 0.8, `location_y` 0.25, `set_keyframes_tool`
    alpha 0 to 0.65 in 6 frames for the ghosted version.
 4. `add_sfx_tool {"recipe": "notification_blip", "gain_db": -18}` on the first
    card; vary or skip on the rest.

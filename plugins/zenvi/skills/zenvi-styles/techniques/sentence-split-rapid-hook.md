@@ -3,7 +3,7 @@ id: sentence-split-rapid-hook
 kind: technique
 summary: "When the first 2 s must grab: one hook sentence split over 5-6 takes, a word or phrase per 10-15 frame shot."
 categories: [podcast-clip-vertical]
-tools: [add_clip_to_timeline_tool, trim_clip_tool, kinetic_captions_tool, add_sfx_tool, unify_grade_tool]
+tools: [add_clip_to_timeline_tool, trim_clip_tool, kinetic_captions_tool, add_sfx_tool, unify_grade_tool, get_transcript_tool]
 pace: frantic
 mood: [energetic, playful, bold]
 aspect: ["9:16", "4:5"]

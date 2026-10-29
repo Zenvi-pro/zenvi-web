@@ -33,8 +33,8 @@ Per piece, in this order:
    ```
    On high-key footage keep `amount` ≤ 0.3 and `threshold` ≥ 0.75: at 0.45 /
    0.6 the test blew out the board and hands.
-4. `apply_look_tool {"timeline_clip_id", "look_id": "grain:35mm_fine"}` (one call per
-   clip; `clip_ids` takes a single string), `add_vignette_tool {"amount": 0.25}`.
+4. `apply_look_tool {"clip_ids": "<id1>,<id2>,...", "look_id": "grain:35mm_fine"}`
+   (every clip in one call and one undo step; ids as one comma-separated string), `add_vignette_tool {"amount": 0.25}`.
 5. Check `analyze_frame_colors_tool` on two clips: luma around 90-100 of 255,
    saturation 65-80, every clip's mean luma within 15 of the reference.
 
@@ -51,7 +51,8 @@ above the bed.
 - Bloom on already-bright frames: blown highlights.
 - Grading one hero shot and leaving the rest raw (the judge's top note on the
   first pass: shot 2 saturated, others flat).
-- `apply_look_tool` with `clip_ids` as a list: refused; use `timeline_clip_id`.
+- `apply_look_tool` with `clip_ids` as a JSON array: refused; pass one
+  comma-separated string.
 
 ## Verified
 2026-10-28: 5.4 s test, chop / olive-oil pour / herbs (stock), steps 1-4 at

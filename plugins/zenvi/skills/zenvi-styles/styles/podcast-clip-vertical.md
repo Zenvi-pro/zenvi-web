@@ -3,13 +3,13 @@ id: podcast-clip-vertical
 kind: style
 summary: "For a 30-90 s vertical cut of a podcast or interview: one story, picture follows the voice, karaoke captions, name card."
 categories: [podcast-clip-vertical]
-tools: [transcribe_media_tool, get_transcript_tool, diarize_media_tool, remove_silence_tool, split_clip_tool, set_clip_properties_tool, swap_shot_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, add_clip_to_timeline_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool]
+tools: [transcribe_media_tool, get_transcript_tool, diarize_media_tool, remove_silence_tool, split_clip_tool, set_clip_properties_tool, swap_shot_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, add_clip_to_timeline_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool, edit_captions_tool, set_project_setting_tool, unify_grade_tool, analyze_mix_tool]
 pace: medium
 mood: [conversational, candid, informative]
 aspect: ["9:16"]
 pairs_with: [karaoke-word-highlight-captions, angle-switching-on-speech, slide-in-pill-badge-and-name-cards, sentence-split-rapid-hook, ui-card-over-the-speaker, pause-free-tight-cut, voice-over-bed-mix-balance]
 avoid_with: [vo-keyed-emphasis-stack, accelerating-cut-length-ramp, documentary-register-parody-kit, hard-cut-chapter-title-cards]
-needs: [auto-reframe-9x16, speaker-angle-switch, clip-blend-mode]
+needs: [auto-reframe-9x16, speaker-angle-switch]
 ---
 
 # Podcast clip, vertical
@@ -88,7 +88,7 @@ pauses (`remove_silence_tool` 0.35 / 0.12) but keep laughs.
 9. End card: `add_kinetic_title_tool {"text": <show>, "style": "stack", "animation": "pop",
    "background": "#0d0d0d", "duration_seconds": 1.4}` + `add_sfx_tool impact_thud -16`.
 10. Bed (optional) with `duck_under_speech_tool {"speech_clip_ids": "<vo>",
-    "bed_clip_ids": "<bed>", "duck_db": -10}`; `master_audio_tool {"preset": "social", "genre": "podcast",
+    "bed_clip_ids": "<bed>", "duck_db": -10}`; `master_audio_tool {"preset": "social", "genre": "talking_head",
     "iterate": true}`; `render_video`; `review_render_tool`; one fix pass.
 
 ## Finish checklist

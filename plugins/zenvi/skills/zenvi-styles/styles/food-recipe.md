@@ -3,7 +3,7 @@ id: food-recipe
 kind: style
 summary: "For recipes and food stories: dish first, steps cut on the knife and the pour, warm soft grade, foley above the bed."
 categories: [food-recipe]
-tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, add_motion_block_tool, add_kinetic_title_tool, add_timer_tool, set_clip_speed_tool, unify_grade_tool, color_grade_clip_tool, apply_fx_tool, apply_look_tool, add_vignette_tool, add_sfx_tool, search_sound_library_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool]
+tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, add_motion_block_tool, add_kinetic_title_tool, add_timer_tool, set_clip_speed_tool, unify_grade_tool, color_grade_clip_tool, apply_fx_tool, apply_look_tool, add_vignette_tool, add_sfx_tool, search_sound_library_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool, set_project_setting_tool, analyze_mix_tool]
 pace: medium
 mood: [warm, cosy, satisfying, helpful]
 aspect: ["9:16", "1:1", "4:5", "16:9"]
@@ -79,7 +79,8 @@ Optional first-person VO over the cold open; captions only for VO, small
 4. Foley: `add_sfx_tool hit_transient -10` per strike, `static -26` with
    `duration` under the pan, `search_sound_library_tool` for pours.
 5. Hero: a different shot, `set_clip_speed_tool {"speed": 0.45}`; next shot at the
-   receipt's end + a transient.
+   receipt's end + a transient. Put its bloom (`apply_fx_tool`, step 7) on first:
+   FX are refused on a retimed clip.
 6. Closing hold 2.5-3 s + line ("save this for Sunday").
 7. Grade (step list above) over every clip.
 8. Bed with a 500 ms fade at the end; `master_audio_tool {"preset": "social",

@@ -3,7 +3,7 @@ id: multi-panel-and-card-video-layout
 kind: technique
 summary: "When one look or take should multiply: 2-6 panels with thin gutters stepping on the snare, or cards dropping in."
 categories: [fashion-beauty-ad, ugc-ad-testimonial]
-tools: [add_motion_template_tool, add_motion_block_tool, duplicate_clips_tool, add_shape_mask_tool, set_keyframes_tool, detect_beats_tool, add_sfx_tool]
+tools: [add_motion_template_tool, add_motion_block_tool, duplicate_clips_tool, add_shape_mask_tool, set_keyframes_tool, detect_beats_tool, add_sfx_tool, set_clip_properties_tool]
 pace: fast
 mood: [editorial, rhythmic, bold]
 aspect: ["9:16", "1:1", "4:5", "16:9"]
@@ -31,8 +31,8 @@ a click each (UGC social proof).
 - Cards: `add_motion_block_tool {"block": "card_shuffle", "params": {"media_1": "<id>",
   ...}}` for one card flipping through looks; true staggered video cards with
   shadows need `video-card-cascade-layout` (fallback: `duplicate_clips_tool`,
-  `set_clip_properties_tool` scale 0.45 + location per card, `add_shape_mask_tool`
-  rounded-ish rectangle, `set_keyframes_tool` scale 0.9→1.0 and alpha per card
+  `set_clip_properties_tool` `scale_x`/`scale_y` 0.45 + location per card, `add_shape_mask_tool`
+  rounded-ish rectangle, `set_keyframes_tool` `scale_x`/`scale_y` 0.9→1.0 and alpha per card
   6-8 frames apart, `add_sfx_tool` `ui_tap` per card).
 
 ## Timing & taste rules

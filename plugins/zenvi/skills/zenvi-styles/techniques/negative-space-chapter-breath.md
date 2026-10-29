@@ -3,7 +3,7 @@ id: negative-space-chapter-breath
 kind: technique
 summary: "When two dense blocks need a reset: a 1.9 s sky or empty plate with a small light title, music thinning."
 categories: [fitness-lifestyle]
-tools: [gather_stock_footage_tool, add_title_tool, add_kinetic_title_tool, fade_clip_tool, automate_volume_tool]
+tools: [gather_stock_footage_tool, add_title_tool, add_kinetic_title_tool, fade_clip_tool, automate_volume_tool, eq_tool]
 pace: calm
 mood: [calm, editorial, reflective]
 aspect: ["9:16", "16:9", "4:5"]

@@ -3,7 +3,7 @@ id: slow-pan-over-stills-or-documents
 kind: technique
 summary: "When proof or history is a photo or document: hold each still 1.2-1.6 s with a 5% push or micro-pan, never frozen."
 categories: [food-recipe, news-short-vertical-explainer]
-tools: [add_clip_to_timeline_tool, set_keyframes_tool, apply_look_tool, add_vignette_tool, add_sfx_tool]
+tools: [add_clip_to_timeline_tool, set_keyframes_tool, apply_look_tool, add_vignette_tool, add_sfx_tool, add_clips_to_timeline_tool]
 pace: calm
 mood: [nostalgic, warm, documentary]
 aspect: ["9:16", "16:9", "4:5", "1:1"]

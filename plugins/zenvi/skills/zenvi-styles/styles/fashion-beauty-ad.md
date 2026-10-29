@@ -3,7 +3,7 @@ id: fashion-beauty-ad
 kind: style
 summary: "For fashion, beauty and jewellery films: restrained hard cuts, one hue world, sparse two-tier type, one pivot."
 categories: [fashion-beauty-ad]
-tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, unify_grade_tool, color_grade_clip_tool, add_title_tool, add_shape_mask_tool, add_kinetic_title_tool, add_motion_template_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool]
+tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, unify_grade_tool, color_grade_clip_tool, add_title_tool, add_shape_mask_tool, add_kinetic_title_tool, add_motion_template_tool, add_sfx_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool, set_project_setting_tool, analyze_mix_tool]
 pace: medium
 mood: [elegant, editorial, sensual, confident]
 aspect: ["9:16", "4:5", "16:9"]

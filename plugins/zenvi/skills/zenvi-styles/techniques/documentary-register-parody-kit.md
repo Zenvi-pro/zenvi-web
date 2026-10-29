@@ -3,7 +3,7 @@ id: documentary-register-parody-kit
 kind: technique
 summary: "When the joke is the genre: hushed nature-doc narration, ambience bed, then a trail-cam HUD with a running clock."
 categories: [fitness-lifestyle]
-tools: [generate_tts_and_add_to_timeline_tool, search_sound_library_tool, add_timer_tool, add_title_tool, apply_look_tool, color_grade_clip_tool, add_vignette_tool]
+tools: [generate_tts_and_add_to_timeline_tool, search_sound_library_tool, add_timer_tool, add_title_tool, apply_look_tool, color_grade_clip_tool, add_vignette_tool, set_track_role_tool]
 pace: calm
 mood: [deadpan, comic, observational]
 aspect: ["9:16", "16:9"]

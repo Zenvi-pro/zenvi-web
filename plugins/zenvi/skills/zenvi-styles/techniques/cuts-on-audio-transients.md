@@ -3,7 +3,7 @@ id: cuts-on-audio-transients
 kind: technique
 summary: "When the work makes its own rhythm (knife, tool, footfall): cut on the in-world sound onsets, not the drum grid."
 categories: [fitness-lifestyle, food-recipe, kids-education, movie-game-trailer]
-tools: [analyze_timeline_audio_tool, trim_clip_tool, split_clip_tool, move_clips_tool, add_sfx_tool, set_track_role_tool, set_audio_gain_tool]
+tools: [analyze_timeline_audio_tool, trim_clip_tool, split_clip_tool, move_clips_tool, add_sfx_tool, set_track_role_tool, set_audio_gain_tool, watch_clip_window_tool, search_sound_library_tool]
 pace: medium
 mood: [tactile, satisfying, crafted]
 aspect: ["9:16", "16:9", "1:1", "4:5"]

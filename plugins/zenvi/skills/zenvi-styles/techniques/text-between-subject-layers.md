@@ -3,7 +3,7 @@ id: text-between-subject-layers
 kind: technique
 summary: "When one word is the emotional peak: a 30-35% height word behind the speaker, in front of the background, once."
 categories: [ugc-ad-testimonial]
-tools: [generate_subject_matte_tool, text_behind_subject_tool, set_keyframes_tool, add_sfx_tool]
+tools: [generate_subject_matte_tool, text_behind_subject_tool, set_keyframes_tool, add_sfx_tool, add_3d_scene_tool]
 pace: medium
 mood: [bold, premium, dramatic]
 aspect: ["9:16", "4:5", "1:1"]
