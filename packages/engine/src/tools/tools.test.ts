@@ -568,6 +568,10 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { clip_id: IDS.clipMusic }, status: "refused", summary: /not available in this Zenvi surface/ },
     failure: { args: { file_id: IDS.music, add_markers: "true" }, status: "refused", summary: /^Error: add_markers needs clip_id/ },
   },
+  spot_action_foley_tool: {
+    happy: { args: { clip_id: IDS.clipB }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { clip_id: IDS.clipMusic }, status: "refused", summary: /is not video: nothing moves in it\.$/ },
+  },
   shot_length_ramp_tool: {
     happy: {
       args: { file_ids: [IDS.broll, IDS.logo], shots: "6", first_shot_seconds: "2", last_shot_seconds: "0.5", position: "30", track: "1" },
