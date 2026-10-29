@@ -23,6 +23,8 @@ export interface LaunchInput {
   /** Bar lines on the timeline (seconds, ascending, from 0); the plan extends them at the last bar's length when it needs more. */
   downbeats: readonly number[];
   fps: number;
+  /** The longest the film may run: sections give up their second bar (proof, reveal, end card, problem, in that order) until it fits. */
+  maxSeconds?: number;
 }
 
 /** Bars each section holds. */
@@ -36,18 +38,25 @@ export function planLaunch(input: LaunchInput): { sections: LaunchSection[]; dur
     ...(input.hasProof ? [{ kind: "proof" as const }] : []),
     { kind: "end" },
   ];
-  const bars = kinds.reduce((n, k) => n + BARS[k.kind], 0);
   const lines = [...input.downbeats].filter((t) => t >= 0).sort((a, b) => a - b);
   if (lines.length === 0 || lines[0]! > 1e-6) lines.unshift(0);
   const bar = lines.length > 1 ? lines[lines.length - 1]! - lines[lines.length - 2]! : 2;
-  while (lines.length < bars + 1) lines.push(lines[lines.length - 1]! + bar);
+  const bars = new Map(kinds.map((k) => [k, BARS[k.kind]]));
+  const total = () => [...bars.values()].reduce((a, b) => a + b, 0);
+  const at = (n: number) => lines[n] ?? lines[lines.length - 1]! + (n - lines.length + 1) * bar;
+  if (input.maxSeconds !== undefined) {
+    for (const kind of ["proof", "reveal", "end", "problem"] as const) {
+      for (const k of kinds) if (k.kind === kind && at(total()) > input.maxSeconds + 0.05 && bars.get(k)! > 1) bars.set(k, 1);
+    }
+  }
+  while (lines.length < total() + 1) lines.push(lines[lines.length - 1]! + bar);
   const snap = (t: number) => Math.round(t * input.fps) / input.fps;
   const sections: LaunchSection[] = [];
-  let at = 0;
+  let n = 0;
   for (const k of kinds) {
-    const next = at + BARS[k.kind];
-    sections.push({ ...k, start: snap(lines[at]!), end: snap(lines[next]!) });
-    at = next;
+    const next = n + bars.get(k)!;
+    sections.push({ ...k, start: snap(lines[n]!), end: snap(lines[next]!) });
+    n = next;
   }
   return { sections, duration: sections[sections.length - 1]!.end };
 }
