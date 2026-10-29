@@ -1,3 +1,15 @@
+---
+id: data-explainer
+kind: style
+summary: A voice explains numbers and places - a map push-in, markers on hits, a pictogram chart, a bar race and a date clock
+categories: [video-essay-explainer, news-short-vertical-explainer, documentary-true-story]
+tools: [add_motion_block_tool, generate_tts_and_add_to_timeline_tool, auto_sound_design_tool]
+pace: medium
+mood: [curious, serious]
+aspect: ["16:9", "9:16"]
+pairs_with: []
+avoid_with: []
+---
 # Data / map explainer
 
 A voice explains numbers and places: the camera pushes from the whole globe
