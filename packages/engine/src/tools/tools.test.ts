@@ -1188,6 +1188,20 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { title: "The Long Way" }, status: "refused", summary: /^Error: the timeline already has \d+ clip\(s\)/ },
   },
 
+  produce_video_tool: {
+    happy: {
+      args: { request: "A 10 second hype reel of the city", replace: "true", skip: ["footage", "music", "render", "review", "watch"] },
+      summary: /^Produced a hype-reel edit \(16:9, ~10s\) with build_reel_tool: /,
+      check: ({ receipt }) => {
+        const data = receipt.data as { style: string; stages: { stage: string; undo_steps: number }[] };
+        expect(data.style).toBe("hype-reel");
+        expect(data.stages.find((s) => s.stage === "brief")?.undo_steps).toBe(1);
+        expect(receipt.undoSteps).toBe(data.stages.reduce((n, s) => n + s.undo_steps, 0));
+      },
+    },
+    failure: { args: { request: "a reel" }, status: "refused", summary: /^Error: the timeline already has \d+ clip\(s\), nothing changed/ },
+  },
+
   align_match_cut_tool: {
     happy: {
       args: {
@@ -1944,6 +1958,12 @@ for (const [name, spec] of Object.entries(SPECS)) {
         const undoneLabels = doc.undo();
         expect(undoneLabels).toHaveLength(1);
         expect(withoutTranscripts(snapshotOf(doc.project))).toEqual(before);
+      } else if (receipt.undoSteps > 1) {
+        // A staged tool (produce_video_tool): one undo step per stage, all of them undone restore it (the master mark is untracked).
+        expect(doc.undo(receipt.undoSteps)).toHaveLength(receipt.undoSteps);
+        const after = withoutTranscripts(snapshotOf(doc.project)) as { settings?: Record<string, unknown> };
+        const { zenvi_master: _m, ...settings } = after.settings ?? {};
+        expect({ ...after, settings }).toEqual(before);
       } else if (!["undo_tool", "redo_tool", "new_project_tool", "open_project_tool", "restore_recovery_version_tool"].includes(name)) {
         // No undo step: nothing tracked changed (untracked export overrides and kept transcripts aside).
         const after = withoutTranscripts(snapshotOf(doc.project)) as Record<string, unknown>;

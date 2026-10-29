@@ -78,6 +78,12 @@ export interface ToolImplementation<I> {
   annotations: Required<Pick<ToolAnnotations, "readOnlyHint" | "destructiveHint" | "openWorldHint">> & ToolAnnotations;
   /** Capabilities the host must provide; the tool is refused (and hidden from listings) without them. */
   requires?: HostCapability[];
+  /**
+   * The tool runs other tools on the call's own document, each its own undo
+   * step (produce_video_tool: one per stage), so the receipt counts the steps
+   * the history grew by, not only this call's own commit.
+   */
+  stages?: boolean;
   run(call: ToolCall, input: I): Promise<ToolOutcome> | ToolOutcome;
 }
 
@@ -227,6 +233,7 @@ async function runPipeline<I extends z.ZodType>(
 
   const doc = ctx.doc;
   const state: CallState = { committed: false, undoBefore: doc.undoLabels.length, undoAfter: doc.undoLabels.length };
+  const stagedFrom = impl.stages ? { snapshot: timelineSnapshot(doc.project), undo: doc.undoLabels.length } : undefined;
   const call: ToolCall = {
     ...ctx,
     tool: name,
@@ -250,6 +257,12 @@ async function runPipeline<I extends z.ZodType>(
     outcome = await impl.run(call, parsed.data as z.output<I>);
   } catch (error) {
     return resultFor(receiptForError(name, error, ctx.host));
+  }
+  if (stagedFrom) {
+    state.before = stagedFrom.snapshot;
+    state.after = timelineSnapshot(doc.project);
+    state.undoBefore = stagedFrom.undo;
+    state.undoAfter = doc.undoLabels.length;
   }
 
   const mutated = state.undoAfter > state.undoBefore;

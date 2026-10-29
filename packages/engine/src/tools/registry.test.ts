@@ -128,13 +128,14 @@ function stringForm(schema: JsonSchema): string | undefined {
 }
 
 describe("tool catalog", () => {
-  it("registers every ported desktop tool, in the contract's order, then the direct tools", () => {
+  it("registers produce_video_tool, every ported desktop tool in the contract's order, then the direct tools", () => {
     const ported = CONTRACT_TOOL_NAMES.filter((name) => !PENDING_DESKTOP_TOOLS.has(name) && !DESKTOP_NAMES_ON_DIRECT_TOOLS.has(name));
     expect(ported).toHaveLength(164);
-    expect(allTools.map((t) => t.name)).toEqual([...ported, ...DIRECT_TOOLS]);
+    // A whole video starts with produce_video_tool, so a client lists it first (bench rounds 6-7: the builders went undiscovered).
+    expect(allTools.map((t) => t.name)).toEqual(["produce_video_tool", ...ported, ...DIRECT_TOOLS]);
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length);
     for (const name of ported) expect(getTool(name)?.contract).toBe(true);
-    for (const name of DIRECT_TOOLS) expect(getTool(name)?.contract).toBe(false);
+    for (const name of ["produce_video_tool", ...DIRECT_TOOLS]) expect(getTool(name)?.contract).toBe(false);
   });
 
   it("gives every tool a title, a description, MCP annotations and a closed object schema", () => {
