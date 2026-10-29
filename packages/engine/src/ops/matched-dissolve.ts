@@ -8,15 +8,17 @@
  * before it) and the incoming one from its first frame on, both linear at
  * `rate` (scale per second), so their velocities match through the blend;
  * the incoming drift stops after DRIFT_IN seconds, long after the blend.
- * Scale stays >= 1, so the frame stays covered. A clip with its own scale
+ * The drift multiplies the clip's own (static) scale, so a clip framed at
+ * 1.5 stays framed and the frame stays covered. A clip with its own scale
  * animation keeps it (and is reported) rather than being overwritten.
  */
 
 import type { Transaction } from "../history/document.js";
 import { makeKeyframePoint } from "../keyframe/edit.js";
-import { Interpolation, type Clip, type Keyframe, type Transition } from "../model/types.js";
+import { Interpolation, type Clip, type Fraction, type Keyframe, type Transition } from "../model/types.js";
+import { clipFrameAtTime } from "../timeline/windows.js";
 import { invalid, requireClip, requireFinite } from "./errors.js";
-import { patchClip, rateOf } from "./internal.js";
+import { fpsOf, patchClip } from "./internal.js";
 import { applyTransitionBetween } from "./transitions.js";
 
 export const DISSOLVE_DRIFTS = ["push_in", "pull_out"] as const;
@@ -48,22 +50,24 @@ export interface MatchedDissolveResult {
 
 const animated = (kf: unknown): boolean => Array.isArray((kf as Keyframe | undefined)?.Points) && (kf as Keyframe).Points.length > 1;
 
-/** Clip-frame number (libopenshot: 1-based, counted from the source start) at timeline time `t`. */
-function clipFrame(clip: Clip, t: number, fps: number): number {
-  return Math.max(1, Math.round((t - Number(clip.position) + Number(clip.start)) * fps) + 1);
+/** A still curve's value (the clip's framing), 1 when it has none. */
+function staticValue(kf: unknown): number {
+  const y = Number((kf as Keyframe | undefined)?.Points?.[0]?.co?.Y);
+  return Number.isFinite(y) && y > 0 ? y : 1;
 }
 
-/** A linear scale ramp between timeline times `a` and `b`, `from` → `to`. */
-function ramp(clip: Clip, a: number, b: number, from: number, to: number, fps: number): Keyframe {
+/** A linear ramp between timeline times `a` and `b`, `from` → `to`, at clip frames (windows.ts clipFrameAtTime). */
+function ramp(clip: Clip, a: number, b: number, from: number, to: number, fps: Fraction): Keyframe {
   const round = (v: number) => Math.round(v * 1e6) / 1e6;
-  return { Points: [makeKeyframePoint(clipFrame(clip, a, fps), round(from), Interpolation.LINEAR), makeKeyframePoint(clipFrame(clip, b, fps), round(to), Interpolation.LINEAR)] };
+  const timed = { position: Number(clip.position), start: Number(clip.start), end: Number(clip.end) };
+  return { Points: [makeKeyframePoint(clipFrameAtTime(timed, a, fps), round(from), Interpolation.LINEAR), makeKeyframePoint(clipFrameAtTime(timed, b, fps), round(to), Interpolation.LINEAR)] };
 }
 
 export function applyMatchedDissolve(tx: Transaction, input: MatchedDissolveInput): MatchedDissolveResult {
   const rate = requireFinite(input.rate, "rate");
   if (!(rate >= 0.005 && rate <= 0.1)) throw invalid(`rate must be 0.005 to 0.1 scale per second (got ${rate}).`);
   if (!(DISSOLVE_DRIFTS as readonly string[]).includes(input.drift)) throw invalid(`drift must be ${DISSOLVE_DRIFTS.join(" or ")}.`);
-  const fps = rateOf(tx.project);
+  const fps = fpsOf(tx.project);
   const { transition, movedClip } = applyTransitionBetween(tx, input.outClipId, input.inClipId, "fade", input.duration);
   const out = requireClip(tx.project, input.outClipId);
   const inc = requireClip(tx.project, input.inClipId);
@@ -77,8 +81,9 @@ export function applyMatchedDissolve(tx: Transaction, input: MatchedDissolveInpu
     const grow = rate * (b - a);
     // A push grows the picture through the window; a pull shrinks it back to full frame.
     const [from, to] = input.drift === "push_in" ? [1, 1 + grow] : [1 + grow, 1];
-    const kf = ramp(clip, a, b, from, to, fps);
-    patchClip(tx, clip.id, { scale_x: kf, scale_y: structuredClone(kf) });
+    const sx = staticValue(clip.scale_x);
+    const sy = staticValue(clip.scale_y);
+    patchClip(tx, clip.id, { scale_x: ramp(clip, a, b, sx * from, sx * to, fps), scale_y: ramp(clip, a, b, sy * from, sy * to, fps) });
     drifted.push(clip.id);
   };
   const outEnd = Number(out.position) + Number(out.end) - Number(out.start);

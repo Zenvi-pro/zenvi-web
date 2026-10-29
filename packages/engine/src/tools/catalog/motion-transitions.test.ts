@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ProjectDocument } from "../../history/document.js";
 import { addClip } from "../../ops/clips.js";
 import { listProjectMotionTransitions, motionRecords } from "../../ops/motion-transitions.js";
+import { patchClip } from "../../ops/internal.js";
+import { makeKeyframePoint } from "../../keyframe/edit.js";
+import { Interpolation } from "../../model/types.js";
 import { makeDoc } from "../../ops/testkit.js";
 import { runTool } from "../registry.js";
 import { fakeHost } from "../test-support/fake-host.js";
@@ -154,6 +157,37 @@ describe("motion transition tools", () => {
     const whips = await call(same, "apply_motion_transitions_tool", { track: "1", preset: "whip" });
     expect(whips.ok, whips.text).toBe(true);
     expect(JSON.stringify(whips.data)).toMatch(/whip on all 8 cuts reads as a template/);
+  });
+
+  it("keeps whips and slides on the current after a mix's camera tilt (no flip to the reserved up)", async () => {
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      for (let i = 0; i < 18; i += 1) addClip(tx, { fileId: "VIDEO00001", position: i, layer: 1, start: 0, end: 1, id: `SHOT${i}` });
+    });
+    doc.clearHistory();
+    const result = await call(doc, "apply_motion_transitions_tool", { track: "1", style: "sport" });
+    expect(result.ok, result.text).toBe(true);
+    const records = listProjectMotionTransitions(doc.project);
+    const whips = records.filter((r) => r.preset === "whip");
+    expect(whips.length).toBeGreaterThanOrEqual(2);
+    expect(whips.map((r) => r.direction)).toEqual(whips.map(() => "left"));
+    expect(records.filter((r) => r.preset === "tilt").every((r) => r.direction === "up")).toBe(true);
+  });
+
+  it("drifts a dissolve's clips from their own framing, not from 1", async () => {
+    const doc = editDoc();
+    doc.transaction("frame", (tx) => {
+      patchClip(tx, "CLIP0", { scale_x: { Points: [makeKeyframePoint(1, 1.5, Interpolation.BEZIER)] }, scale_y: { Points: [makeKeyframePoint(1, 1.2, Interpolation.BEZIER)] } });
+    });
+    doc.clearHistory();
+    const result = await call(doc, "apply_matched_dissolve_tool", { clip1_id: "CLIP0", duration: 0.5, speed: 0.04 });
+    expect(result.ok, result.text).toBe(true);
+    const clip = doc.project.clips.find((c) => c.id === "CLIP0") as unknown as Record<"scale_x" | "scale_y", { Points: { co: { X: number; Y: number } }[] }>;
+    expect(clip.scale_x.Points[0]!.co.Y).toBeCloseTo(1.5, 6);
+    expect(clip.scale_y.Points[0]!.co.Y).toBeCloseTo(1.2, 6);
+    expect(clip.scale_x.Points[1]!.co.Y).toBeGreaterThan(1.5);
+    // The last key sits on the clip's last frame (2 s at 30 fps from source start 0), not one past it.
+    expect(clip.scale_x.Points[1]!.co.X).toBe(60);
   });
 
   it("dissolves with both shots pushing in at one speed, in one undo step", async () => {
