@@ -172870,17 +172870,16 @@ var init_match_cut2 = __esm({
           warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow bpm (default 120).");
         }
         const notes = [];
-        if (!args.keep_order && inBinOrder(project, ids3)) {
+        if (args.order === "look" && ids3.length > 3) {
+          const order = await lookOrder(call, ids3.map((id) => files.get(id)), ids3.map((id) => given2.get(id)?.time));
+          if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
+          else ids3 = order.map((i) => ids3[i]);
+        } else if (!args.keep_order && inBinOrder(project, ids3)) {
           const ordered = await sequenceFiles(call, ids3, { arc: "flat", continuity: 2 }, "keep_order");
           if (ordered && "ids" in ordered) {
             ids3 = ordered.ids;
             notes.push(ordered.note);
           } else if (ordered) warnings.push(ordered.warning);
-        }
-        if (args.order === "look" && ids3.length > 3) {
-          const order = await lookOrder(call, ids3.map((id) => files.get(id)), ids3.map((id) => given2.get(id)?.time));
-          if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
-          else ids3 = order.map((i) => ids3[i]);
         }
         const fps3 = Number(project.fps?.num) / Number(project.fps?.den || 1);
         const frameRate2 = Number.isFinite(fps3) && fps3 > 0 ? fps3 : 30;
