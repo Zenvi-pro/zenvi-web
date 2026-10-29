@@ -79,9 +79,11 @@ export const explainerTools: CatalogTool[] = [
       const busy = occupied(project, args.replace);
       if (busy) return refused(TOOL, busy);
       if (args.voice_file_id && !files.has(args.voice_file_id)) return refused(TOOL, `Error: unknown voice_file_id ${args.voice_file_id}.`);
-      const music0 = pickMusic(project, args.music_file_id, args.voice_file_id);
+      // Without a script the voice leads, so it is found first (a lone narration not named like one is the voice, not the bed); a script means there may be no voice yet, so the music is.
+      const voiceFirst = args.voice_file_id ? files.get(args.voice_file_id) : args.script?.trim() ? undefined : pickVoice(project, args.music_file_id);
+      const music0 = pickMusic(project, args.music_file_id, voiceFirst ? String(voiceFirst.id) : undefined);
       if (typeof music0 === "string") return refused(TOOL, music0);
-      const voice = args.voice_file_id ? files.get(args.voice_file_id)! : pickVoice(project, music0 ? String(music0.id) : undefined);
+      const voice = voiceFirst ?? (args.voice_file_id ? undefined : pickVoice(project, music0 ? String(music0.id) : undefined));
       const music = music0 && voice && String(music0.id) === String(voice.id) ? undefined : music0;
       if (voice && !voice.has_audio) return refused(TOOL, `Error: ${voice.id} has no sound to lead the explainer.`);
       if (!voice && !args.script?.trim()) {

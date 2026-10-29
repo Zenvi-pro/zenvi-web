@@ -227,3 +227,49 @@ describe("without words (no speech recognition here, nothing kept)", () => {
   });
 });
 
+
+describe("the builders' one undo step", () => {
+  it("a rebuild with replace=true is one more step, and undo brings the first build back", async () => {
+    const doc = project();
+    await build(doc, "build_trailer_tool", { file_ids: ["ROCKET0001", "CITY000001"], title: "First", duration_seconds: 20, braams: false });
+    const first = structuredClone(doc.project.clips);
+    await build(doc, "build_trailer_tool", { file_ids: ["OCEAN00001"], title: "Second", duration_seconds: 20, braams: false, replace: true });
+    expect(doc.project.clips.some((c) => c.file_id === "ROCKET0001")).toBe(false);
+    doc.undo();
+    expect(doc.project.clips).toEqual(first);
+  });
+
+  it("a build cancelled half way adds no history, changes nothing and deletes the media its steps wrote", async () => {
+    const doc = project();
+    const host = fakeHost();
+    const abort = new AbortController();
+    const write = host.media.writeGenerated!;
+    host.media.writeGenerated = async (name, bytes) => {
+      const path = await write(name, bytes);
+      abort.abort();
+      return path;
+    };
+    const result = await runTool({ doc, host, signal: abort.signal }, "build_trailer_tool", { file_ids: ["ROCKET0001", "CITY000001"], title: "Gone", duration_seconds: 20 });
+    expect(result.text).toMatch(/cancelled/);
+    expect(doc.undoLabels).toHaveLength(0);
+    expect(doc.project.clips).toHaveLength(0);
+    expect(host.calls.some((c) => c.startsWith("discardGenerated /generated/"))).toBe(true);
+    expect(host.written.size).toBe(0);
+  });
+});
+
+describe("build_explainer_tool picks its voice", () => {
+  it("takes a lone narration not named like a voice as the voice, not the music bed", async () => {
+    const scratch = new ProjectDocument(createProject({ id: "BUILDPROJ2", profile: findProfile("FHD Vertical 1080p 30 fps")! }));
+    scratch.transaction("fixture", (tx) => {
+      addFile(tx, media("/media/recording.m4a", audioInfo("/media/recording.m4a", 14)), { id: "RECORD0001" });
+      addFile(tx, media("/media/rocket_launch.mp4", videoInfo("/media/rocket_launch.mp4", 8, { has_audio: false })), { id: "ROCKET0001" });
+    });
+    const p: Project = structuredClone(scratch.project);
+    p.files.find((f) => f.id === "RECORD0001")!.ai_metadata = { asr: SPEECH };
+    p.history = { undo: [], redo: [] };
+    const data = await build(new ProjectDocument(p), "build_explainer_tool", { captions: "none", grade: "none" });
+    expect(data.voice_file_id).toBe("RECORD0001");
+    expect(data.music_file_id).toBeNull();
+  });
+});
