@@ -84,7 +84,8 @@ export function build(ctx: BlockContext): void {
   if (pick) {
     const doneAt = Math.min(S - 1.1, first + (n - 1) * step + 0.9);
     const ink = onColor(palette.accent);
-    tl.to(pick.mark, { opacity: 1 }, { at: doneAt, duration: 0.3, ease: "smooth" });
+    // fromTo: a `to` rests at the identity (opacity 1) before it starts, which showed the mark from the first frame.
+    tl.fromTo(pick.mark, { opacity: 0 }, { opacity: 1 }, { at: doneAt, duration: 0.3, ease: "smooth" });
     tl.fromTo(pick.texts, { color: palette.ink }, { color: ink }, { at: doneAt, duration: 0.3, ease: "smooth" });
     tl.to(pick.el, { scale: 1.03 }, { at: doneAt, duration: 0.18, ease: "out" });
     tl.to(pick.el, { scale: 1 }, { at: doneAt + 0.18, duration: 0.35, ease: "out" });
