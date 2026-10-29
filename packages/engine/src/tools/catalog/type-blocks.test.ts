@@ -68,6 +68,8 @@ describe("add_type_block_tool", () => {
     const bad = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "write_on", paths: ["M 10 10 L 20"] });
     expect(bad.ok).toBe(false);
     expect(bad.text).toMatch(/Error: a write_on path is not valid SVG path data/);
+    const both = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "write_on", text: "hi", paths: ["M0 0 L10 10"] });
+    expect(both.text).toContain("Error: write_on takes text or paths, not both");
     expect(snapshotOf(d.project)).toEqual(before);
   });
 

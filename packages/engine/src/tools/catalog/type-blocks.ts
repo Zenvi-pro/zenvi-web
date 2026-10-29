@@ -140,6 +140,7 @@ export const typeBlockTools: CatalogTool[] = [
       const stray = (Object.keys(args) as (keyof Input)[]).filter((k) => args[k] !== undefined && !COMMON.includes(k) && !OWN[block].includes(k));
       if (stray.length > 0) return refused(TOOL, `Error: ${stray.join(", ")} do not apply to ${block} (it reads ${[...OWN[block]].join(", ")}).`);
       if (block !== "strobe" && block !== "wheel" && !(block === "write_on" && args.paths) && !args.text?.trim()) return refused(TOOL, `Error: ${block} needs text.`);
+      if (args.paths && args.text) return refused(TOOL, "Error: write_on takes text or paths, not both.");
       const colour = (value: string | undefined, fallback: string, what: string): string => (value === undefined ? fallback : colorHexAlpha(value, what)[0]);
       let ink: string;
       let ground: string;
