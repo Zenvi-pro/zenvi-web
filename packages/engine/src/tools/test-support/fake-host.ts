@@ -61,6 +61,7 @@ export type OptionalMethod =
   | "ui.clearPlaybackCache"
   | "storage.writeBytes"
   | "storage.saveCopy"
+  | "storage.readCopy"
   | "storage.exportMedia"
   | "storage.currentPath"
   | "storage.recentProjects"
@@ -706,6 +707,14 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         written.set(target, JSON.stringify(project));
         disk?.add(target);
         return target;
+      };
+    }
+    if (!omit.has("storage.readCopy")) {
+      host.storage.readCopy = async (path) => {
+        calls.push(`readCopy ${path}`);
+        const saved = written.get(resolved(path));
+        if (typeof saved !== "string") throw new Error(`cannot read ${path} in tests`);
+        return JSON.parse(saved) as Project;
       };
     }
     if (!omit.has("storage.exportMedia")) {

@@ -662,6 +662,8 @@ export interface StorageHost {
    * existing file unless `overwrite`. Returns what opens the copy.
    */
   saveCopy?(project: Project, path: string, options?: { overwrite?: boolean }): Promise<string>;
+  /** Read another project (a variant `saveCopy` kept) without opening it: the open project and its file stay as they are. */
+  readCopy?(path: string): Promise<Project>;
   /**
    * Give the person a copy of a project file's media (Project Files > Export
    * Selected Clips) named `name`: the CLI copies it into `folder` (relative

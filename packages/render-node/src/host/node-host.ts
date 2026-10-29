@@ -224,6 +224,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         return file;
       },
       writeBytes: (p, bytes, _contentType, opts) => writeBytesFile(inProject(p), bytes, opts?.overwrite),
+      readCopy: (p) => readProjectFile(inProject(p)),
       saveCopy: (project, p, opts) => writeProjectCopy(inProject(p), project, { engineAssetsDir: assets, overwrite: opts?.overwrite }),
       exportMedia: (file, name, folder, render) =>
         exportMediaFile({

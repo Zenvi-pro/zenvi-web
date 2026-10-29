@@ -1193,7 +1193,7 @@ const SPECS: Record<string, Spec> = {
     happy: {
       args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
       setup: (doc, host) => {
-        host.storage!.open = async (path) => ({ ...structuredClone(doc.project), clips: path.endsWith("a.zvn") ? [] : doc.project.clips });
+        host.storage!.readCopy = async (path) => ({ ...structuredClone(doc.project), clips: path.endsWith("a.zvn") ? [] : doc.project.clips });
       },
       summary: /^Best of 2: a\.zvn \(\/out\/a\.mp4\)\. a\.zvn is now the open project/,
       check: ({ doc, receipt }) => {

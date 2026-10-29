@@ -269,6 +269,8 @@ export const variantTools: CatalogTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     requires: ["watch", "storage"],
     run: async (call, args: z.output<typeof pickInput>) => {
+      const storage = call.host.storage!;
+      if (!storage.readCopy) return unavailable(PICK, "picking a variant needs project storage that can read another project, which this host does not provide.");
       const variants: Variant[] = args.variants.map((v) => ({ name: v.name ?? (v.project.split(/[\\/]/).pop() ?? v.project), project: v.project, render: v.render }));
       if (new Set(variants.map((v) => v.render)).size < variants.length) return refused(PICK, "Error: two variants share a render; give each variant its own render.");
       const apply = args.apply !== false;
@@ -277,7 +279,7 @@ export const variantTools: CatalogTool[] = [
       if (apply) {
         for (const v of variants) {
           try {
-            projects.set(v.name, await call.host.storage!.open(v.project));
+            projects.set(v.name, await storage.readCopy(v.project));
           } catch (error) {
             return refused(PICK, `Error: could not open variant ${v.name} (${v.project}): ${message(error)}`);
           }

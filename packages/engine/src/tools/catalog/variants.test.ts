@@ -55,7 +55,7 @@ function variantsOn(ed: EditHarness, doc: ProjectDocument): Record<string, Proje
     "variants/cut-b.zvn": { ...structuredClone(base), clips: base.clips.slice(0, 2), id: "OTHERID001" },
     "variants/cut-c.zvn": { ...structuredClone(base), clips: base.clips.slice(1) },
   };
-  ed.host.storage!.open = async (p) => {
+  ed.host.storage!.readCopy = async (p) => {
     const project = files[p];
     if (!project) throw new Error(`no such file: ${p}`);
     return structuredClone(project);
@@ -173,7 +173,7 @@ describe("pick_best_variant_tool", () => {
     expect(report.summary).toContain("Nothing changed (apply: false).");
     expect(doc.undoLabels).toEqual([]);
 
-    ed.host.storage!.open = async () => structuredClone(doc.project);
+    ed.host.storage!.readCopy = async () => structuredClone(doc.project);
     const same = (await runTool({ doc, host: ed.host }, "pick_best_variant_tool", { variants: THREE })).data!;
     expect(same.status).toBe("unchanged");
     expect(same.summary).toContain("The open project already is a");
