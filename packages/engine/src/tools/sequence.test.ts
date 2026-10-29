@@ -141,6 +141,12 @@ describe("sequence_shots_tool", () => {
     expect((await run({ shots: [{ clip_id: "C0" }, { clip_id: "C1" }], slots: [2, 2] })).data?.summary).toMatch(/shorter than their slots/);
     expect((await run({ shots: [{ clip_id: "C0", says: "hi" }, { clip_id: "C1" }] })).data?.summary).toMatch(/give voice_file_id/);
     expect((await run({ shots: [{ clip_id: "C0", says: "hi" }, { clip_id: "C1" }], voice_file_id: "VOICE" })).data?.summary).toMatch(/transcribe_media_tool/);
+    // Pinned shots each need a slot; the default payoff gives way when none is left for it.
+    expect((await run({ track: doc.project.layers[0]!.number, open: "C0", close: "C1", slots: [0.5] })).data?.summary).toMatch(/2 shots must stay .* only 1 slots/);
+    const one = await run({ track: doc.project.layers[0]!.number, open: "C0", slots: [0.5], dry_run: true });
+    expect((one.data?.data as Data).order.map((r) => [r.id, r.at])).toEqual([["C0", 0]]);
+    // A subset of a track's clips laid back to back would cover the clip between them.
+    expect((await run({ shots: [{ clip_id: "C0" }, { clip_id: "C2" }], arc: "flat", close: "none" })).data?.summary).toMatch(/would cover clip\(s\) C1/);
     expect(doc.undoLabels).toEqual([]);
   });
 

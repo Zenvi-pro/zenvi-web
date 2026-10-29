@@ -247,6 +247,12 @@ export const sequenceTools: CatalogTool[] = [
         if (missing.length) call.host.log?.(`${TOOL}: no match for says of ${missing.join(", ")}`);
       }
 
+      if (args.slots) {
+        // Pinned shots are never left out, so each needs a slot of its own.
+        const pinned = new Set([...(open !== undefined ? [open] : []), ...(typeof close === "number" ? [close] : []), ...cands.flatMap((c, k) => (c.speechAt !== undefined ? [k] : []))]);
+        if (pinned.size > args.slots.length) return refused(TOOL, `Error: ${pinned.size} shots must stay (open, close, voice-synced) but there are only ${args.slots.length} slots: give more slots or pin fewer shots.`);
+      }
+
       const shots: SequenceShotInput[] = [];
       for (const c of cands) {
         const frames = await shotFrames(call, c.window, fps);
@@ -327,6 +333,16 @@ export const sequenceTools: CatalogTool[] = [
       if (clipShots) {
         const same = placed.every(({ c, at, srcEnd }) => Math.abs(Number(c.clip!.position) - at) < 1e-6 && Math.abs(Number(c.clip!.end) - srcEnd) < 1e-6) && plan.dropped.length === 0;
         if (same) return unchanged(TOOL, `The clips are already in this order and length: ${summary}`, { warnings, data });
+        // Back to back from the first one can land a listed clip on one that was not listed (a subset of a track).
+        const moving = new Set(cands.map((c) => String(c.clip!.id)));
+        const blocking = placed.flatMap(({ c, at, srcEnd }) => {
+          const end = at + srcEnd - c.window.start;
+          return project.clips.filter((o) => !moving.has(String(o.id)) && Number(o.layer) === Number(c.clip!.layer) && Number(o.position) < end - 1e-6 && Number(o.position) + Number(o.end) - Number(o.start) > at + 1e-6);
+        });
+        if (blocking.length) {
+          const ids = [...new Set(blocking.map((o) => String(o.id)))];
+          return refused(TOOL, `Error: the sequence would cover clip(s) ${ids.join(", ")}, which are not among the shots: list them too, sequence the whole track, or move them first.`);
+        }
         call.commit((tx) => {
           for (const { c, at, srcEnd } of placed) setClipTiming(tx, String(c.clip!.id), { position: at, end: srcEnd });
           if (plan.dropped.length) deleteClips(tx, plan.dropped.map((d) => String(cands[d.index]!.clip!.id)), { ripple: false });
