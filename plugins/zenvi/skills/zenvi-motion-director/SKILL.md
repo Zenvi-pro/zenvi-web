@@ -65,6 +65,11 @@ too quiet and nobody has looked at the file.
    when one does and say how many more to import; `strict_variety: true`
    makes them refuse instead. Short? Gather again with other words, or
    generate AI shots, before you cut; never loop five clips to fill the length.
+   To pick footage by what it shows, not its file name: `find_shots_tool`
+   ("close-up of hands typing" → file and seconds); `shot_similarity_tool`
+   orders shots so each looks like the one before (`match_cut_montage_tool
+   order=look` does it in the montage). They need the shot model: ask the
+   person once before its 213 MB download (`download=true`).
 5. **Cut.** The genre tool first (`match_cut_montage_tool`, `build_reel_tool`,
    `add_motion_template_tool template=grid`), otherwise
    `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
@@ -246,6 +251,7 @@ review_render_tool {"path": "reel.mp4"}
 | motion blocks (`add_motion_block_tool`) | CLI and `zenvi mcp` with headless Chrome (`zenvi motion setup`) | `add_motion_template_tool` (ui_cards, type_search, kinetic_type, word_scroll, callout, end_card) or `build_reel_tool` motion styles |
 | 3D scenes (`add_3d_scene_tool`) | CLI with Blender 4.2+ | AI product still + `set_keyframes_tool` scale/rotation pop + soft `impact_thud`; `add_animated_title_tool` on desktop |
 | subject mattes (`generate_subject_matte_tool` and composites) | CLI with onnxruntime-node; editor/cloud only with a matte already in the bin | big type beside the subject in its negative space |
+| shot search and look order (`find_shots_tool`, `shot_similarity_tool`, `embed_media_tool`) | CLI with onnxruntime-node, after the person agrees to the model download | file names, `inspect_media_tool` frames |
 | frame checks (`preview_frame`) | `zenvi mcp`; the editor has its own viewer | `inspect_timeline_tool` frames, or ask the person to look |
 | desktop app | engine tools reach it through the bridge; direct tools (sfx, transitions, blocks, 3D, mattes, ramps) are web/CLI only | build in `zenvi mcp`, then `launch_editor` |
 
