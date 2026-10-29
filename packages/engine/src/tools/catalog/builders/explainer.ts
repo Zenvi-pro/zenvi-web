@@ -19,7 +19,7 @@ import { directTool, type CatalogTool } from "../../define.js";
 import { FINISH_HINT } from "../../director-card.js";
 import { refused } from "../../receipt.js";
 import { displayName, visualKind } from "../reels.js";
-import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMusic, pickVoice, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
+import { binPictures, givenKeywords, keywordFileProblem, keywordMedia, keywordsArg, occupied, pickMusic, pickVoice, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
 import { Composer, binOf, builderTracks, clearTimeline, placeBed, placeShot, round3 } from "./compose.js";
 
 const TOOL = "build_explainer_tool";
@@ -93,6 +93,8 @@ export const explainerTools: CatalogTool[] = [
       const problem = pictureProblem(project, brollIds, "broll_file_ids");
       if (problem) return refused(TOOL, problem);
       if (brollIds.length === 0) return refused(TOOL, "Error: the bin has no videos or images for the picture. Import B-roll first.");
+      const keywordProblem = keywordFileProblem(project, args.keywords);
+      if (keywordProblem) return refused(TOOL, keywordProblem);
       const fps = Number(project.fps?.num) / Number(project.fps?.den || 1) || 30;
 
       // The words: the voice's (kept, indexed or transcribed), else the script at reading pace.
@@ -135,6 +137,7 @@ export const explainerTools: CatalogTool[] = [
           words = words.filter((w) => w.start < args.duration_seconds! - 0.2).map((w) => ({ ...w, end: Math.min(w.end, args.duration_seconds!) }));
         }
       }
+      if (words.length === 0) return refused(TOOL, `Error: the voice says nothing in its first ${args.duration_seconds} s: pass a longer duration_seconds.`);
       const duration = Math.round(Math.min(voice ? voiceLength : Infinity, words[words.length - 1]!.end + 0.8, args.duration_seconds ?? Infinity) * fps) / fps;
 
       const pictures = brollIds.map((id) => files.get(id)!);

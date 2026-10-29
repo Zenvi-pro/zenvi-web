@@ -135,6 +135,16 @@ describe("build_explainer_tool", () => {
     expect(receipt.notes.join(" ")).toMatch(/cut after "ocean"/);
   });
 
+  it("refuses a length the voice says nothing in, changing nothing", async () => {
+    const doc = project();
+    const p = structuredClone(doc.project);
+    p.files.find((f) => f.id === "VOICE00001")!.ai_metadata = { asr: asr("late@10", "words@10.4") };
+    const late = new ProjectDocument(p);
+    const result = await runTool({ doc: late, host: fakeHost() }, "build_explainer_tool", { voice_file_id: "VOICE00001", duration_seconds: 4 });
+    expect(result.text).toMatch(/says nothing in its first 4 s/);
+    expect(late.undoLabels).toHaveLength(0);
+  });
+
   it("refuses with nothing to lead it", async () => {
     const doc = project();
     const result = await runTool({ doc, host: fakeHost() }, "build_explainer_tool", { voice_file_id: "ROCKET0001" });
@@ -288,5 +298,17 @@ describe("build_product_launch_tool with five features", () => {
     expect(cards, cards.why).toMatchObject({ outcome: "applied" });
     expect(Number(cards.args!.position_seconds) + Number(cards.args!.duration_seconds)).toBeCloseTo(sections[3]!.end, 3);
     expect(step(data, "feature 5")).toMatchObject({ outcome: "fallback", args: expect.objectContaining({ position_seconds: sections[4]!.start }) });
+  });
+});
+
+describe("keywords naming their picture", () => {
+  it.each(["build_explainer_tool", "build_talking_head_tool"])("%s refuses a file_id that is not a bin picture, changing nothing", async (tool) => {
+    const doc = project();
+    const lead = tool === "build_explainer_tool" ? { voice_file_id: "VOICE00001" } : { speaker_file_ids: ["TAKE000001"] };
+    for (const fileId of ["NOPE000001", "SONG000001"]) {
+      const result = await runTool({ doc, host: fakeHost() }, tool, { ...lead, keywords: [{ word: "rocket", file_id: fileId }] });
+      expect(result.text).toMatch(new RegExp(`Error: .*keywords file_id.*${fileId}`));
+    }
+    expect(doc.undoLabels).toHaveLength(0);
   });
 });
