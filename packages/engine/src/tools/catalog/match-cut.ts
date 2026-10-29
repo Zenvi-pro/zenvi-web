@@ -425,20 +425,19 @@ const montageTool = directTool({
       warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow bpm (default 120).");
     }
 
-    // A list in the bin's own order is no chain: shapes are chained first (re-edit bench, 2026-10-28).
+    // order=look chains the files by the shot model. Otherwise a list in the bin's own order is no chain:
+    // shapes are chained first (re-edit bench, 2026-10-28).
     const notes: string[] = [];
-    if (!args.keep_order && inBinOrder(project, ids)) {
+    if (args.order === "look" && ids.length > 3) {
+      const order = await lookOrder(call, ids.map((id) => files.get(id)!), ids.map((id) => given.get(id)?.time));
+      if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
+      else ids = order.map((i) => ids[i]!);
+    } else if (!args.keep_order && inBinOrder(project, ids)) {
       const ordered = await sequenceFiles(call, ids, { arc: "flat", continuity: 2 }, "keep_order");
       if (ordered && "ids" in ordered) {
         ids = ordered.ids;
         notes.push(ordered.note);
       } else if (ordered) warnings.push(ordered.warning);
-    }
-
-    if (args.order === "look" && ids.length > 3) {
-      const order = await lookOrder(call, ids.map((id) => files.get(id)!), ids.map((id) => given.get(id)?.time));
-      if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
-      else ids = order.map((i) => ids[i]!);
     }
 
     const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);
