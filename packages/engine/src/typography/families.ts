@@ -135,13 +135,14 @@ export function fallbackFamily(name: string | null | undefined): FontFamilyId | 
   if (!n) return null;
   const rules: [RegExp, FontFamilyId][] = [
     [/mono|courier|menlo|consolas|monaco|code/, "space-mono"],
-    [/condensed|narrow|compressed|impact|oswald|league gothic|bebas|gothic/, "anton"],
-    [/^(?!.*sans).*serif|times|georgia|garamond|playfair|didot|baskerville|bodoni|cambria|book|merriweather|lora/, "instrument-serif"],
+    [/condensed|narrow|compressed|impact|oswald|league gothic|bebas/, "anton"],
+    // Not "book" or "display" alone: they are weights and optical sizes of sans faces too (Avenir Book, SF Pro Display).
+    [/^(?!.*sans).*serif|times|georgia|garamond|playfair|didot|baskerville|bodoni|cambria|antiqua|merriweather|lora/, "instrument-serif"],
     [/rounded|nunito|quicksand|comfortaa/, "varela-round"],
     [/hand|script|marker|brush|cursive/, "caveat-brush"],
     [/pixel|8.?bit|arcade/, "silkscreen"],
-    [/black|heavy|ultra|display/, "archivo-black"],
-    [/arial|helvetica|sans|roboto|open sans|montserrat|poppins|segoe|sf pro|system-ui|lato|grotesk|grotesque|neue|inter|verdana|tahoma|futura|avenir|proxima/, "inter"],
+    [/black|heavy|ultra/, "archivo-black"],
+    [/arial|helvetica|sans|roboto|open sans|montserrat|poppins|segoe|sf pro|system-ui|lato|grotesk|grotesque|gothic|gotham|neue|inter|verdana|tahoma|futura|avenir|proxima/, "inter"],
   ];
   return rules.find(([re]) => re.test(n))?.[1] ?? null;
 }

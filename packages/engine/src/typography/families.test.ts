@@ -15,6 +15,13 @@ describe("bundled fallbacks for fonts a brief names", () => {
     expect(fallbackFamily("Courier New")).toBe("space-mono");
     expect(fallbackFamily("DejaVu Sans Mono")).toBe("space-mono");
     expect(fallbackFamily("Comic Papyrus")).toBeNull();
+    // Weights and optical sizes of sans faces stay sans.
+    expect(fallbackFamily("SF Pro Display")).toBe("inter");
+    expect(fallbackFamily("Avenir Book")).toBe("inter");
+    expect(fallbackFamily("Century Gothic")).toBe("inter");
+    expect(fallbackFamily("League Gothic")).toBe("anton");
+    expect(fallbackFamily("Book Antiqua")).toBe("instrument-serif");
+    expect(fallbackFamily("Arial Black")).toBe("archivo-black");
   });
 
   it("stand in only for fonts the host lacks (or generic ones), keeping bundled and installed fonts", () => {
