@@ -64,6 +64,13 @@ function enumOf(node: unknown): readonly unknown[] | undefined {
   return undefined;
 }
 
+/** A property typed as a string and not as an array. */
+function takesString(node: unknown): boolean {
+  if (!isRecord(node)) return false;
+  const types = Array.isArray(node.type) ? node.type : [node.type];
+  return types.includes("string") && !types.includes("array") && node.anyOf === undefined && node.oneOf === undefined;
+}
+
 /** The object schema of an array property's items. */
 function itemsOf(node: unknown): SchemaNode | undefined {
   if (!isRecord(node)) return undefined;
@@ -84,7 +91,9 @@ function aliasObject(properties: Record<string, unknown>, args: Record<string, u
   for (const key of Object.keys(args)) {
     if (Object.hasOwn(properties, key)) continue;
     const targets = (names[key] ?? []).filter((name) => Object.hasOwn(properties, name));
-    const target = targets.length === 1 ? targets[0]! : undefined;
+    // One id where the tool takes only the list (separate_clip_audio_tool's timeline_clip_ids): the list of one.
+    const plural = targets.length === 0 && Object.hasOwn(properties, `${key}s`) && /_ids?$/.test(key) ? `${key}s` : undefined;
+    const target = targets.length === 1 ? targets[0]! : plural;
     if (!target || Object.hasOwn(args, target)) continue;
     edit()[target] = args[key];
     delete edit()[key];
@@ -92,6 +101,11 @@ function aliasObject(properties: Record<string, unknown>, args: Record<string, u
   }
   const current = out ?? args;
   for (const [key, value] of Object.entries(current)) {
+    // Ids as a list where the tool takes them comma-separated (the desktop's string arguments): one reading, no note.
+    if (key.endsWith("_ids") && Array.isArray(value) && value.every((v) => typeof v === "string") && takesString(properties[key])) {
+      edit()[key] = value.join(",");
+      continue;
+    }
     if (typeof value !== "string") continue;
     const options = enumOf(properties[key]);
     if (!options || options.includes(value)) continue;

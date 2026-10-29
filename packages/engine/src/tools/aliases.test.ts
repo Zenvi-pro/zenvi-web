@@ -61,6 +61,17 @@ describe("aliasArguments on items and enum values", () => {
     expect(r.notes).toHaveLength(2);
   });
 
+  it("reads one id as the list of one where the tool takes only the list", () => {
+    expect(aliasArguments(schema("timeline_clip_ids", "x"), { timeline_clip_id: "A" }).args).toEqual({ timeline_clip_ids: "A" });
+    expect(aliasArguments(schema("clip_id", "timeline_clip_ids"), { timeline_clip_id: "A" }).args).toEqual({ clip_id: "A" });
+  });
+
+  it("joins a list of ids where the tool takes them comma-separated, and leaves array arguments alone", () => {
+    // sk3-creator-social: duck_under_speech_tool and apply_look_tool refused arrays.
+    const desktop = { properties: { bed_clip_ids: { type: "string" }, clip_ids: { type: ["string", "array"] } } };
+    expect(aliasArguments(desktop, { bed_clip_ids: ["A", "B"], clip_ids: ["C"] }).args).toEqual({ bed_clip_ids: "A,B", clip_ids: ["C"] });
+  });
+
   it("reads an old genre spelling, but only where the schema has the new one", () => {
     const genre = (options: string[]) => ({ properties: { genre: { anyOf: [{ type: "string", enum: options }, { type: "null" }] } } });
     expect(aliasArguments(genre(["hype", "product_3d"]), { genre: "3d_product" }).args).toEqual({ genre: "product_3d" });
@@ -98,6 +109,8 @@ describe("aliases through runTool (sk2-product-brand regressions)", () => {
       const mastered = await runTool({ doc, host: fakeHost() }, "master_audio_tool", { genre, iterate: true });
       expect(mastered.text).not.toMatch(/Invalid arguments/);
     }
+    const ducked = await runTool({ doc, host: fakeHost() }, "duck_under_speech_tool", { speech_clip_ids: [IDS.clipA], bed_clip_ids: [IDS.clipMusic] });
+    expect(ducked.text).not.toMatch(/Invalid arguments/);
     const music = await runTool({ doc, host: fakeHost() }, "search_freesound_music_tool", { query: "lo-fi", max_results: 3 });
     expect(music.text).not.toMatch(/Invalid arguments/);
     expect(music.text).toMatch(/used it as 'count'/);
