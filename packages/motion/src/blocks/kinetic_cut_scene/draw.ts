@@ -62,6 +62,8 @@ interface Box {
   cy: number;
   maxW: number;
   maxSize: number;
+  /** Tallest the lines may stand together (bleed crops sideways, never off the top). */
+  maxH: number;
   align: CanvasTextAlign;
   rot: number;
   /** Where the motif layers centre, and their reach. */
@@ -74,7 +76,7 @@ interface Box {
 export function layoutBox(sc: Scene, shot: Shot): Box {
   const { W, H } = sc;
   const m = Math.min(W, H);
-  const base: Box = { cx: W / 2, cy: H / 2, maxW: W * 0.84, maxSize: m * 0.36, align: "center", rot: 0, rx: W / 2, ry: H / 2, rr: m * 0.42 };
+  const base: Box = { cx: W / 2, cy: H / 2, maxW: W * 0.84, maxSize: m * 0.36, maxH: H * 0.62, align: "center", rot: 0, rx: W / 2, ry: H / 2, rr: m * 0.42 };
   let layout = shot.layout;
   if (sc.portrait && layout === "left") layout = "top";
   if (sc.portrait && layout === "right") layout = "bottom";
@@ -88,7 +90,7 @@ export function layoutBox(sc: Scene, shot: Shot): Box {
     case "bottom":
       return { ...base, cy: H * 0.72, maxSize: m * 0.3, ry: H * 0.32, rr: m * 0.3 };
     case "bleed":
-      return { ...base, maxW: W * 1.32, maxSize: m * 0.82 };
+      return { ...base, maxW: W * 1.32, maxSize: m * 0.82, maxH: H * 0.86 };
     case "diagonal":
       return { ...base, maxW: Math.hypot(W, H) * 0.62, rot: -0.21 };
     case "space":
@@ -101,11 +103,11 @@ export function layoutBox(sc: Scene, shot: Shot): Box {
 const fontOf = (sc: Scene, size: number): string => `${sc.weight} ${size.toFixed(1)}px ${sc.font}`;
 
 /** The largest size ≤ maxSize at which every line fits maxW. */
-export function fitSize(g: CanvasRenderingContext2D, sc: Scene, lines: readonly string[], maxW: number, maxSize: number): number {
+export function fitSize(g: CanvasRenderingContext2D, sc: Scene, lines: readonly string[], maxW: number, maxSize: number, maxH = Infinity): number {
   g.font = fontOf(sc, 100);
   const widest = Math.max(1, ...lines.map((l) => g.measureText(l).width));
   const byLines = maxSize * (lines.length > 1 ? 1.6 / (lines.length + 0.6) : 1);
-  return Math.max(8, Math.min(byLines, (maxW / widest) * 100));
+  return Math.max(8, Math.min(byLines, maxH / (lines.length * 0.98), (maxW / widest) * 100));
 }
 
 interface Glyph {
@@ -199,8 +201,8 @@ export function drawShot(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: 
   g.save();
   // The second layer of motion: a slow drift, alternating direction shot to shot.
   const dir = shot.index % 2 === 0 ? 1 : -1;
-  const creep = 1 + 0.035 * (u / Math.max(0.5, len));
-  g.translate(sc.W / 2 + dir * 14 * sc.s * (u / Math.max(0.5, len)), sc.H / 2);
+  const creep = 1 + 0.08 * (u / Math.max(0.5, len));
+  g.translate(sc.W / 2 + dir * 36 * sc.s * (u / Math.max(0.5, len)), sc.H / 2);
   g.rotate(dir * 0.006 * u);
   g.scale(creep, creep);
   g.translate(-sc.W / 2, -sc.H / 2);
@@ -215,8 +217,8 @@ export function drawShot(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: 
   }
   if (shot.layout === "split") drawSplit(g, sc, shot, u, uf, ground);
   for (const layer of shot.layers) drawLayer(g, sc, shot, u, layer, box, ground);
-  if (shot.layout !== "split") drawText(g, sc, shot, u, uf, box, ink, ground);
-  drawSub(g, sc, shot, u, box, ink);
+  const extent = shot.layout !== "split" ? drawText(g, sc, shot, u, uf, box, ink, ground) : splitExtent(g, sc, shot);
+  drawSub(g, sc, shot, u, box, ink, extent);
   g.restore();
   if (shot.layers.includes("collapse")) {
     const q = cubicIn(prog(u, len - 0.3, 0.28));
@@ -252,8 +254,9 @@ function drawSplit(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number
   }
 }
 
-function drawText(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, uf: number, box: Box, ink: string, ground: Ground): void {
-  if (shot.entrance === "none" || shot.lines.length === 0) return;
+/** Draws the type; returns its top and bottom (design px, before the layout's rotation) for the sub line. */
+function drawText(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, uf: number, box: Box, ink: string, ground: Ground): { top: number; bottom: number } {
+  if (shot.entrance === "none" || shot.lines.length === 0) return { top: box.cy, bottom: box.cy };
   const len = shot.end - shot.start;
   g.save();
   g.translate(box.cx, box.cy);
@@ -262,7 +265,7 @@ function drawText(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number,
   const lines = shot.entrance === "strobe" ? [strobeWord(sc, shot, uf)] : shot.entrance === "count" ? [countText(shot.lines.join(" "), uf, len)] : shot.lines;
   // Counters are sized for their final value so the number does not grow while it counts.
   const sizing = shot.entrance === "count" ? [shot.lines.join(" ")] : lines;
-  const size = fitSize(g, sc, sizing, box.maxW, box.maxSize);
+  const size = fitSize(g, sc, sizing, box.maxW, box.maxSize, box.maxH);
   g.font = fontOf(sc, size);
   const bases = baselines(lines.length, size, box.cy);
   const lineAt = (i: number): number => bases[i]!;
@@ -399,6 +402,7 @@ function drawText(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number,
     }
   }
   g.restore();
+  return { top: lineAt(0) - size * 0.74, bottom: lineAt(lines.length - 1) + size * 0.2 };
 }
 
 function strobeWord(sc: Scene, shot: Shot, u: number): string {
@@ -419,7 +423,15 @@ export function countText(text: string, u: number, len: number): string {
   return text.slice(0, m.index) + shown + text.slice(m.index + raw.length);
 }
 
-function drawSub(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, box: Box, ink: string): void {
+/** The split layout's type extent (its text is drawn twice, clipped). */
+function splitExtent(g: CanvasRenderingContext2D, sc: Scene, shot: Shot): { top: number; bottom: number } {
+  const box = layoutBox(sc, { ...shot, layout: "center" });
+  const size = fitSize(g, sc, shot.lines, box.maxW, box.maxSize, box.maxH);
+  const b = baselines(shot.lines.length, size, box.cy);
+  return { top: b[0]! - size * 0.74, bottom: b[b.length - 1]! + size * 0.2 };
+}
+
+function drawSub(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, box: Box, ink: string, extent: { top: number; bottom: number }): void {
   if (!shot.sub) return;
   const e = expoOut(prog(u, 0.22, 0.5));
   if (e <= 0) return;
@@ -430,9 +442,9 @@ function drawSub(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, 
   g.textBaseline = "middle";
   g.globalAlpha = e;
   g.fillStyle = ink;
-  const below = shot.layout === "bottom" || shot.layout === "space" ? -1 : 1;
-  const reach = shot.layout === "space" ? box.maxSize * 1.3 : Math.min(box.maxSize, sc.H * 0.2) * (shot.lines.length * 0.5 + 0.55);
-  const y = box.cy + below * (reach + size) + (1 - e) * size * 0.6;
+  // Under the type, or over it when under would leave the frame.
+  const under = extent.bottom + size * 1.1;
+  const y = (under + size > sc.H * 0.94 ? extent.top - size * 0.9 : under) + (1 - e) * size * 0.6;
   // Tracking closes as it lands.
   g.letterSpacing = `${((0.25 + 0.35 * (1 - e)) * size * 0.3).toFixed(1)}px`;
   g.fillText(shot.sub.toUpperCase(), box.cx, y);

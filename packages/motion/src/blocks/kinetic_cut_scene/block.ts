@@ -68,7 +68,7 @@ export function build(ctx: BlockContext): void {
     // The text as a mask in the assembly's [-1, 1] box (half-size R about the text centre).
     const mask = shapeMask(ctx.doc, (g, side) => {
       const k = side / (2 * R);
-      const size = fitSize(g, scene, shot.lines, box.maxW, box.maxSize);
+      const size = fitSize(g, scene, shot.lines, box.maxW, box.maxSize, box.maxH);
       g.font = `${scene.weight} ${(size * k).toFixed(1)}px ${scene.font}`;
       g.textAlign = "center";
       g.textBaseline = "alphabetic";
