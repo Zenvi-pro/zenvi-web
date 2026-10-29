@@ -42,6 +42,7 @@ import type { ImportedMedia } from "../types.js";
 import { placeMusicBed } from "./music-bed.js";
 import { aspectOf, displayName, musicFromBeats, usableRange, visualKind, writeCard } from "./reels.js";
 import { FINISH_HINT } from "../director-card.js";
+import { lookOrder } from "../shots.js";
 
 const ALIGN = "align_match_cut_tool";
 const DETECT = "detect_subject_tool";
@@ -147,6 +148,10 @@ const montageInput = z.strictObject({
     .optional()
     .describe(`Refuse (nothing changes) when the files are too few for the pace and a file comes back within ${REUSE_GAP_SECONDS} s; the error says how many more to import. Default false: a warning.`),
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (in the same undo step)."),
+  order: z
+    .enum(["given", "look"])
+    .optional()
+    .describe("given (default): file_ids is the chain. look: keep the first and last file and order the others so each shot looks most like the one before (shape and pose continuity, from the shot model; embed_media_tool)."),
 });
 
 type AlignArgs = z.infer<typeof alignInput>;
@@ -360,7 +365,7 @@ const montageTool = directTool({
   run: async (call, args: MontageArgs) => {
     const project = call.doc.project;
     const files = new Map(project.files.map((f) => [String(f.id), f]));
-    const ids = args.file_ids;
+    let ids = args.file_ids;
     const unknown = ids.filter((id) => !files.has(id));
     if (unknown.length > 0) return refused(MONTAGE, `Error: unknown file id(s): ${unknown.join(", ")}.`);
     const notVisual = ids.filter((id) => visualKind(files.get(id)!) === null);
@@ -416,6 +421,12 @@ const montageTool = directTool({
       } else warnings.push("This surface cannot analyse audio: the cuts follow 120 BPM, not the music (pass bpm and offset_seconds).");
     } else if (args.beats || args.offset_seconds !== undefined) {
       warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow bpm (default 120).");
+    }
+
+    if (args.order === "look" && ids.length > 3) {
+      const order = await lookOrder(call, ids.map((id) => files.get(id)!), ids.map((id) => given.get(id)?.time));
+      if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
+      else ids = order.map((i) => ids[i]!);
     }
 
     const fps = Number(project.fps?.num) / Number(project.fps?.den || 1);
@@ -604,6 +615,7 @@ const montageTool = directTool({
           bpm: round(plan.bpm, 2),
           music_file_id: music ? String(music.id) : null,
           music_start: plan.musicStart,
+          ...(args.order === "look" ? { file_order: ids } : {}),
           target: fromTarget(built.alignment.target),
           shots,
           flashes,

@@ -27,6 +27,7 @@ import { renderProject, type RenderProgress } from "../render/render-project.js"
 import { installedFontFamilies } from "../svg/fonts.js";
 import { createNodeMatteHost } from "../matte/host.js";
 import { onnxRuntimeAvailable, rvmModel, type MatteModel } from "../matte/rvm.js";
+import { createNodeShotHost } from "../shots/host.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createSfxGenerator } from "./sfx-generate.js";
@@ -63,6 +64,8 @@ export interface NodeHostOptions {
    * Video Matting when onnxruntime-node is installed.
    */
   mattes?: MatteModel | false;
+  /** false: no shot embeddings (default: when onnxruntime-node is installed; the model downloads only on request). */
+  shots?: false;
   /** Zenvi 3D (Blender scenes) when Blender is installed (default true). */
   scenes3d?: boolean;
   /** Zenvi FX (ffmpeg footage effects; default true). */
@@ -259,6 +262,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   if (generateSfx) host.audio!.generateSfx = generateSfx;
   const matteModel = options.mattes ?? (onnxRuntimeAvailable() ? rvmModel({ env: options.env, signal: options.signal, log: options.log }) : false);
   if (matteModel) host.mattes = createNodeMatteHost({ projectFile: current, resolveMedia, model: matteModel, signal: options.signal, log: options.log });
+  if (options.shots !== false && onnxRuntimeAvailable()) host.shots = createNodeShotHost({ env: options.env, resolveMedia, signal: options.signal, log: options.log });
   if (options.scenes3d !== false) {
     const scenes3d = createNodeScenes3d({ env: options.env, resolveMedia, log: options.log });
     if (scenes3d) host.scenes3d = scenes3d;

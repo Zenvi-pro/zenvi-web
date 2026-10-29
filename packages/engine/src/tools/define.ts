@@ -95,6 +95,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   audio: "audio analysis",
   assets: "the bundled title templates and emoji",
   mattes: "subject matting (onnxruntime-node: the zenvi CLI and Zenvi Cloud)",
+  shots: "shot embeddings (SigLIP in onnxruntime-node: the zenvi CLI)",
   motion: "Zenvi Motion block rendering (headless Chrome: the zenvi CLI, zenvi mcp and Zenvi Cloud)",
   scenes3d: "Zenvi 3D (Blender on this computer)",
   fx: "Zenvi FX (ffmpeg renders on this computer)",
