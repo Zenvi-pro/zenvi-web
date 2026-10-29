@@ -1,13 +1,16 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { cosine, normalize } from "@zenvi/engine";
+import { resolveBinary } from "../ffmpeg/binaries.js";
 import { onnxRuntimeAvailable } from "../matte/rvm.js";
 import { ensureModel, modelDir, modelDownloadMb, modelPresent, type ModelDescriptor } from "../matte/model-cache.js";
 import { makeImage, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
-import { createNodeShotHost, type ShotModel } from "./host.js";
+import { createNodeShotHost, keyframeArgs, type ShotModel } from "./host.js";
 import { SIGLIP_BASE, Siglip } from "./siglip.js";
 
 let dir: string | undefined;
@@ -55,6 +58,20 @@ describe("node shot host", () => {
     // cachedOnly never computes.
     expect(await host.embedFile(await makeVideo(dir, "new.mp4", { duration: 1 }), { interval: 0.5, cachedOnly: true })).toBeNull();
     expect((await host.embedFrames(clip, [0.25, 1.75])).length).toBe(2);
+  });
+
+  it("keeps keyframe i within a frame of i × interval at 29.97 fps (no drift over a minute)", async () => {
+    dir = await makeTempDir("zenvi-shots-");
+    const clip = await makeVideo(dir, "ntsc.mp4", { width: 64, height: 64, fps: "30000/1001", duration: 61 });
+    // The host's selection, with showinfo printing each kept frame's time instead of piping pixels.
+    const args = keyframeArgs(clip, 1);
+    const vf = args.indexOf("-vf") + 1;
+    args[vf] = `${args[vf]},showinfo`;
+    args[args.indexOf("error")] = "info";
+    const { stderr } = await promisify(execFile)(resolveBinary("ffmpeg"), [...args.slice(0, args.indexOf("-f")), "-f", "null", "-"], { maxBuffer: 8 * 1024 * 1024 });
+    const times = [...stderr.matchAll(/pts_time:([\d.]+)/g)].map((m) => Number(m[1]));
+    expect(times.length).toBe(61);
+    for (const [i, t] of times.entries()) expect(Math.abs(t - i)).toBeLessThan(1001 / 30000);
   });
 
   it("asks before downloading the model: not ready, nothing fetched, and the files it would fetch", async () => {

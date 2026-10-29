@@ -25,7 +25,8 @@ const SIZE = 224;
 const FRAME_BYTES = SIZE * SIZE * 3;
 /** Frames embedded per model call while the decoder keeps reading. */
 const CHUNK = 32;
-const CACHE_FORMAT = 1;
+/** 2: keyframes anchored to i × interval (1 drifted at 29.97 fps). */
+const CACHE_FORMAT = 2;
 
 /** What the host runs: SigLIP, or a stand-in (tests). */
 export type ShotModel = Pick<Siglip, "info" | "embedImages" | "embedText">;
@@ -52,13 +53,14 @@ interface CacheFile {
 /**
  * ffmpeg arguments for 224 × 224 rgb24 keyframes (displayed orientation,
  * squashed like SiglipImageProcessor): the first frame, then the first frame
- * at least `interval` after the last one kept, so a clip shorter than the
- * interval still has a keyframe and keyframe i sits within a frame of
- * i × interval.
+ * at or after each i × interval, so a clip shorter than the interval still
+ * has a keyframe and keyframe i sits within a frame of i × interval. (Counting
+ * from the last kept frame instead drifts at 29.97 fps: a frame late per
+ * keyframe, 3.6 s by the end of an hour.)
  */
 export function keyframeArgs(file: string, interval: number): string[] {
   return ["-hide_banner", "-loglevel", "error", "-nostdin", "-i", file, "-map", "0:v:0", "-an", "-sn", "-dn",
-    "-vf", `select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,${interval - 0.001})',scale=${SIZE}:${SIZE}:flags=bicubic,format=rgb24`,
+    "-vf", `select='isnan(prev_selected_t)+gte(t\\,selected_n*${interval}-0.001)',scale=${SIZE}:${SIZE}:flags=bicubic,format=rgb24`,
     "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"];
 }
 
