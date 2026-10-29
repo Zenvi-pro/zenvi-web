@@ -1,121 +1,4 @@
 (() => {
-  // packages/motion/src/blocks/ui.ts
-  var ICONS = {
-    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
-    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
-    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
-    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
-    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
-    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
-    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
-    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
-    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
-    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
-    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
-    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
-    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
-    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
-    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
-    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
-    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
-    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
-    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
-    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
-  };
-  function icon(ctx, name, className, parent) {
-    const el = ctx.el("span", `icon ${className}`, parent);
-    el.innerHTML = ICONS[name];
-    return el;
-  }
-  function onColor(bg) {
-    const m = /^#?([0-9a-f]{6})/i.exec(bg.trim());
-    if (!m) return "#FFFFFF";
-    const lin = (i) => {
-      const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    };
-    const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
-    return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
-  }
-
-  // packages/motion/src/blocks/notification_stack/block.ts
-  var VISIBLE = 4;
-  var GAP = 16;
-  function depthLook(depth) {
-    return { scale: 1 - 0.035 * depth, opacity: depth >= VISIBLE ? 0 : 1 - 0.14 * depth, blur: depth >= 2 ? (depth - 1) * 1.5 : 0 };
-  }
-  function initials(name) {
-    const words = name.trim().split(/\s+/).filter(Boolean);
-    return (words.length > 1 ? words[0][0] + words[words.length - 1][0] : (words[0] ?? "?").slice(0, 2)).toUpperCase();
-  }
-  function build(ctx) {
-    const { tl, params: p, width: W, height: H, safe, palette } = ctx;
-    const items = p.items.map((s) => {
-      const i = s.indexOf(":");
-      return i > 0 ? { title: s.slice(0, i).trim(), body: s.slice(i + 1).trim() } : { title: "", body: s.trim() };
-    });
-    const n = items.length;
-    const dm = p.style === "dm";
-    const hot = p.highlight_last !== false && n > 1;
-    const onAccent = onColor(palette.accent);
-    const pos = p.position === "auto" ? ctx.portrait || W <= H * 1.3 ? "top" : "right" : String(p.position);
-    const cardW = pos === "right" ? Math.min(780, W * 0.4) : Math.min(860, W - safe.left - safe.right);
-    const stack = ctx.el("div", "ns-stack");
-    stack.style.width = `${cardW}px`;
-    stack.style.fontSize = `${pos === "right" ? 34 : ctx.portrait ? 37 : 33}px`;
-    stack.style.left = `${pos === "right" ? W - safe.right - cardW : (W - cardW) / 2}px`;
-    const fills = [palette.secondary, palette.ink, palette.muted, palette.accent];
-    const cards = items.map((item, i) => {
-      const card = ctx.el("div", "ns-card", stack);
-      if (dm) {
-        const row = ctx.el("div", "ns-dm", card);
-        const avatar = ctx.el("div", "ns-avatar", row, initials(item.title || "?"));
-        const fill = fills[i % fills.length];
-        Object.assign(avatar.style, { background: fill, color: onColor(fill.startsWith("#") ? fill : palette.ink) });
-        const text = ctx.el("div", "ns-text", row);
-        const headRow = ctx.el("div", "ns-head", text);
-        ctx.el("div", "ns-title", headRow, item.title);
-        ctx.el("span", "ns-time", headRow, String(p.time));
-        ctx.el("span", "ns-dot", headRow);
-        ctx.el("div", "ns-body", text, item.body);
-      } else {
-        const meta = ctx.el("div", "ns-meta", card);
-        const tile = ctx.el("span", "ns-tile", meta);
-        tile.style.color = onAccent;
-        icon(ctx, "bell", "", tile);
-        ctx.el("span", "ns-app", meta, String(p.app));
-        ctx.el("span", "ns-time", meta, String(p.time));
-        if (item.title) ctx.el("div", "ns-title", card, item.title);
-        ctx.el("div", "ns-body", card, item.body);
-      }
-      if (hot && i === n - 1) {
-        card.classList.add("is-hot");
-        card.style.color = onAccent;
-      }
-      card.style.zIndex = String(i + 1);
-      return card;
-    });
-    const heights = cards.map((c) => c.getBoundingClientRect().height);
-    const total = heights.reduce((a, b) => a + b + GAP, 0);
-    stack.style.top = `${pos === "center" ? Math.max(safe.top, (H - Math.min(total, heights.reduce((a, b) => Math.max(a, b), 0) * 3)) / 2) : safe.top}px`;
-    const first = 0.15;
-    const last = Math.max(first, ctx.seconds - (p.exit === false ? 1.2 : 1.6));
-    const pause = hot ? 0.35 : 0;
-    const fit = n > 1 ? (ctx.seconds - (p.exit === false ? 0 : 0.4) - 0.6 - first - pause) / (n - 1) : 0;
-    const interval = n > 1 ? Math.max(0.15, Math.min(1.4, Math.max(0.4, (last - first - pause) / (n - 1)), fit)) : 0;
-    const arrive = items.map((_, i) => first + i * interval + (hot && i === n - 1 ? pause : 0));
-    cards.forEach((card, i) => {
-      const h = heights[i];
-      tl.fromTo(card, { y: -h * 0.6, scale: 0.94, opacity: 0, blur: 10 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: arrive[i], duration: 0.6, ease: "out" });
-      ctx.cue(arrive[i], "pop", { weight: hot && i === n - 1 ? 0.6 : 0.45, at: card });
-      for (let j = i + 1; j < n; j += 1) {
-        let y = 0;
-        for (let k = j; k > i; k -= 1) y += heights[k] * depthLook(j - k).scale + GAP;
-        tl.to(card, { y, ...depthLook(j - i) }, { at: arrive[j], duration: 0.6, ease: "out" });
-      }
-    });
-  }
-
   // packages/motion/src/runtime/easing.ts
   function cubicBezier(x1, y1, x2, y2) {
     const cx = 3 * x1;
@@ -335,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger) {
-    if (!stagger || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger === "number" ? { each: stagger } : stagger;
+  function staggerOffsets(count, stagger2) {
+    if (!stagger2 || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -650,6 +533,123 @@
       api.error = error instanceof Error ? `${error.message}
 ${error.stack ?? ""}` : String(error);
       rejectReady(error);
+    });
+  }
+
+  // packages/motion/src/blocks/ui.ts
+  var ICONS = {
+    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
+    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
+    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
+    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
+    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
+    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
+    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
+    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
+    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
+    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
+    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
+    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
+    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
+    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
+    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+  };
+  function icon(ctx, name, className, parent) {
+    const el = ctx.el("span", `icon ${className}`, parent);
+    el.innerHTML = ICONS[name];
+    return el;
+  }
+  function onColor(bg) {
+    const m = /^#?([0-9a-f]{6})/i.exec(bg.trim());
+    if (!m) return "#FFFFFF";
+    const lin = (i) => {
+      const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+    return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
+  }
+
+  // packages/motion/src/blocks/notification_stack/block.ts
+  var VISIBLE = 4;
+  var GAP = 16;
+  function depthLook(depth) {
+    return { scale: 1 - 0.035 * depth, opacity: depth >= VISIBLE ? 0 : 1 - 0.14 * depth, blur: depth >= 2 ? (depth - 1) * 1.5 : 0 };
+  }
+  function initials(name) {
+    const words = name.trim().split(/\s+/).filter(Boolean);
+    return (words.length > 1 ? words[0][0] + words[words.length - 1][0] : (words[0] ?? "?").slice(0, 2)).toUpperCase();
+  }
+  function build(ctx) {
+    const { tl, params: p, width: W, height: H, safe, palette } = ctx;
+    const items = p.items.map((s) => {
+      const i = s.indexOf(":");
+      return i > 0 ? { title: s.slice(0, i).trim(), body: s.slice(i + 1).trim() } : { title: "", body: s.trim() };
+    });
+    const n = items.length;
+    const dm = p.style === "dm";
+    const hot = p.highlight_last !== false && n > 1;
+    const onAccent = onColor(palette.accent);
+    const pos = p.position === "auto" ? ctx.portrait || W <= H * 1.3 ? "top" : "right" : String(p.position);
+    const cardW = pos === "right" ? Math.min(780, W * 0.4) : Math.min(860, W - safe.left - safe.right);
+    const stack = ctx.el("div", "ns-stack");
+    stack.style.width = `${cardW}px`;
+    stack.style.fontSize = `${pos === "right" ? 34 : ctx.portrait ? 37 : 33}px`;
+    stack.style.left = `${pos === "right" ? W - safe.right - cardW : (W - cardW) / 2}px`;
+    const fills = [palette.secondary, palette.ink, palette.muted, palette.accent];
+    const cards = items.map((item, i) => {
+      const card = ctx.el("div", "ns-card", stack);
+      if (dm) {
+        const row = ctx.el("div", "ns-dm", card);
+        const avatar = ctx.el("div", "ns-avatar", row, initials(item.title || "?"));
+        const fill = fills[i % fills.length];
+        Object.assign(avatar.style, { background: fill, color: onColor(fill.startsWith("#") ? fill : palette.ink) });
+        const text = ctx.el("div", "ns-text", row);
+        const headRow = ctx.el("div", "ns-head", text);
+        ctx.el("div", "ns-title", headRow, item.title);
+        ctx.el("span", "ns-time", headRow, String(p.time));
+        ctx.el("span", "ns-dot", headRow);
+        ctx.el("div", "ns-body", text, item.body);
+      } else {
+        const meta = ctx.el("div", "ns-meta", card);
+        const tile = ctx.el("span", "ns-tile", meta);
+        tile.style.color = onAccent;
+        icon(ctx, "bell", "", tile);
+        ctx.el("span", "ns-app", meta, String(p.app));
+        ctx.el("span", "ns-time", meta, String(p.time));
+        if (item.title) ctx.el("div", "ns-title", card, item.title);
+        ctx.el("div", "ns-body", card, item.body);
+      }
+      if (hot && i === n - 1) {
+        card.classList.add("is-hot");
+        card.style.color = onAccent;
+      }
+      card.style.zIndex = String(i + 1);
+      return card;
+    });
+    const heights = cards.map((c) => c.getBoundingClientRect().height);
+    const total = heights.reduce((a, b) => a + b + GAP, 0);
+    stack.style.top = `${pos === "center" ? Math.max(safe.top, (H - Math.min(total, heights.reduce((a, b) => Math.max(a, b), 0) * 3)) / 2) : safe.top}px`;
+    const first = 0.15;
+    const last = Math.max(first, ctx.seconds - (p.exit === false ? 1.2 : 1.6));
+    const pause = hot ? 0.35 : 0;
+    const fit = n > 1 ? (ctx.seconds - (p.exit === false ? 0 : 0.4) - 0.6 - first - pause) / (n - 1) : 0;
+    const interval = n > 1 ? Math.max(0.15, Math.min(1.4, Math.max(0.4, (last - first - pause) / (n - 1)), fit)) : 0;
+    const arrive = items.map((_, i) => first + i * interval + (hot && i === n - 1 ? pause : 0));
+    cards.forEach((card, i) => {
+      const h = heights[i];
+      tl.fromTo(card, { y: -h * 0.6, scale: 0.94, opacity: 0, blur: 10 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: arrive[i], duration: 0.6, ease: "out" });
+      ctx.cue(arrive[i], "pop", { weight: hot && i === n - 1 ? 0.6 : 0.45, at: card });
+      for (let j = i + 1; j < n; j += 1) {
+        let y = 0;
+        for (let k = j; k > i; k -= 1) y += heights[k] * depthLook(j - k).scale + GAP;
+        tl.to(card, { y, ...depthLook(j - i) }, { at: arrive[j], duration: 0.6, ease: "out" });
+      }
     });
   }
 
