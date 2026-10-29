@@ -47,6 +47,7 @@ const HOLD = "hold_point_reframe_tool";
 const REFRAME = "auto_reframe_tool";
 const ZOOM = "screen_zoom_follow_tool";
 
+const HEX = /^#[0-9a-fA-F]{6}$/;
 const round = (v: number, digits = 4) => Math.round(v * 10 ** digits) / 10 ** digits;
 
 const pointSchema = z.strictObject({
@@ -73,8 +74,7 @@ const regionShape = {
   smoothing: z.number().min(0).max(2).optional().describe("Gaussian smoothing of the track, seconds (default per tool: removes tracker jitter and hand-held shake, keeps the subject's own motion)."),
 };
 
-const regionInput = z.object(regionShape);
-type RegionArgs = z.infer<typeof regionInput>;
+type RegionArgs = z.infer<z.ZodObject<typeof regionShape>>;
 
 /** A point is tracked as a square this tall (fraction of the frame height): enough texture to hold on to. */
 const POINT_SIZE = 0.08;
@@ -263,7 +263,7 @@ const pinInput = z.strictObject({
   anchor: pointSchema.optional().describe("The point of the following clip's own frame that sits on the track (0-1, default its centre; a callout's anchor is its dot)."),
   offset: canvasPointSchema.optional().describe("Added to the tracked point, fractions of the canvas (x right, y down): a label beside the subject rather than on it."),
   label_offset: canvasPointSchema.optional().describe("Callout: where the leader line ends relative to the dot, fractions of the canvas (default x 0.12, y -0.12: up and right)."),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Callout colour (default #FFFFFF)."),
+  color: z.string().max(16).optional().describe("Callout colour, #RRGGBB (default #FFFFFF)."),
   mono: z.boolean().optional().describe("Callout label in monospace (HUD look). Default false."),
   start: z.number().min(0).optional().describe("Callout: timeline seconds it appears (default the footage clip's start)."),
   duration: z.number().gt(0).optional().describe("Callout: seconds it stays (default to the footage clip's end)."),
@@ -280,6 +280,7 @@ const pinTool = directTool({
   requires: ["frames"],
   run: async (call, args: z.infer<typeof pinInput>) => {
     const project = call.doc.project;
+    if (args.color !== undefined && !HEX.test(args.color)) return refused(PIN, `Error: color must be #RRGGBB (got ${args.color}).`);
     if ((args.clip_id === undefined) === (args.label === undefined)) return refused(PIN, "Error: give exactly one of clip_id (a clip to pin) or label (a new callout).");
     if (args.label !== undefined && !call.host.media?.writeGenerated) return refused(PIN, "Error: this Zenvi surface cannot write the callout graphic; pin an existing clip with clip_id.");
     const foot = footageOf(project, args.footage_clip_id);
@@ -344,7 +345,7 @@ const guideInput = z.strictObject({
   ...regionShape,
   angle: z.number().min(-360).max(360).optional().describe("Turn the graphic, degrees clockwise (default 0; a pose's lean, a spiral's orientation)."),
   follow: z.enum(GUIDE_FOLLOWS).optional().describe("none (default): drawn where the subject is at time; position / position_scale / position_scale_rotation: tracked and keyframed to follow it."),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Stroke colour (default #FFFFFF)."),
+  color: z.string().max(16).optional().describe("Stroke colour, #RRGGBB (default #FFFFFF)."),
   stroke_width: z.number().gt(0).max(40).optional().describe("Stroke width, canvas pixels (default 0.35 % of the canvas height)."),
   padding: z.number().min(0.5).max(4).optional().describe("The graphic's box is the subject's box times this (default 1.25; 1 hugs it)."),
   flip_x: z.boolean().optional().describe("golden_spiral: mirror left-right (where the spiral sweeps from)."),
@@ -365,6 +366,7 @@ const guideTool = directTool({
   requires: ["frames"],
   run: async (call, args: z.infer<typeof guideInput>) => {
     const project = call.doc.project;
+    if (args.color !== undefined && !HEX.test(args.color)) return refused(GUIDE, `Error: color must be #RRGGBB (got ${args.color}).`);
     if (!call.host.media?.writeGenerated) return refused(GUIDE, "Error: this Zenvi surface cannot write the guide graphic.");
     const foot = footageOf(project, args.clip_id);
     if (typeof foot === "string") return refused(GUIDE, foot);

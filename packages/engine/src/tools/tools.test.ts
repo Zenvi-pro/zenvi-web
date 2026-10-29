@@ -1136,6 +1136,34 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { file_ids: [IDS.interview], subjects: [{ file_id: IDS.broll, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.2 } }], replace: "true" }, status: "refused", summary: /^Error: subjects names .*, which is not in file_ids\.$/ },
   },
+  track_point_tool: {
+    happy: { args: { clip_id: IDS.clipA, point: { x: 0.5, y: 0.5 }, max_samples: "5" }, summary: /^Tracked CLIPINTV01 over /, check: ({ receipt }) => expect(receipt.undoSteps).toBe(0) },
+    failure: { args: { clip_id: "NOPE000000", point: { x: 0.5, y: 0.5 } }, status: "refused", summary: /^Error: unknown clip_id NOPE000000\.$/ },
+  },
+  pin_to_track_tool: {
+    happy: { args: { footage_clip_id: IDS.clipB, point: { x: 0.5, y: 0.5 }, label: "Lens" }, summary: /^Pinned \w+ to a position track of CLIPBROL01: \d+ keyframes/ },
+    failure: { args: { footage_clip_id: IDS.clipB, point: { x: 0.5, y: 0.5 }, clip_id: IDS.clipA, label: "x" }, status: "refused", summary: /^Error: give exactly one of clip_id/ },
+  },
+  add_guide_overlay_tool: {
+    happy: { args: { kind: "golden_spiral", clip_id: IDS.clipB, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.3 } }, summary: /^Added a golden_spiral guide \(\w+\) on CLIPBROL01's subject at \(0\.5, 0\.45\)\.$/ },
+    failure: { args: { kind: "ring", clip_id: IDS.clipB }, status: "refused", summary: /^Error: give exactly one of point, box or quad\.$/ },
+  },
+  hold_point_reframe_tool: {
+    happy: { args: { clip_id: IDS.clipB, point: { x: 0.5, y: 0.5 }, zoom: "1.3" }, summary: /^Held CLIPBROL01's tracked point at \(0\.5, 0\.5\) with \d+ keyframes, scale 1\.3-1\.3\.$/ },
+    failure: { args: { clip_id: "NOPE000000", point: { x: 0.5, y: 0.5 } }, status: "refused", summary: /^Error: unknown clip_id NOPE000000\.$/ },
+  },
+  auto_reframe_tool: {
+    happy: {
+      args: { clip_ids: [IDS.clipB], subjects: [{ clip_id: IDS.clipB, box: { x: 0.45, y: 0.2, w: 0.1, h: 0.2 } }], follow: "false" },
+      summary: /^Reframed 1 clip\(s\) to 1080×1920: the crop follows the subject \(fixed\), close \(1\.3×\) every other 4 s\.$/,
+      check: ({ doc }) => expect([doc.project.width, doc.project.height]).toEqual([1080, 1920]),
+    },
+    failure: { args: { clip_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown clip_id NOPE000000\.$/ },
+  },
+  screen_zoom_follow_tool: {
+    happy: { args: { clip_id: IDS.clipB, stops: [{ start: 1, end: 3, x: 0.7, y: 0.3 }] }, summary: /^Zoomed CLIPBROL01 onto 1 stop\(s\) from the stops \(1\.3×, \d+ keyframes\)\.$/ },
+    failure: { args: { clip_id: IDS.clipB, stops: [{ start: 2, end: 1, x: 0.5, y: 0.5 }] }, status: "refused", summary: /^Error: stop 2-1s must end after it starts\.$/ },
+  },
 
   unify_grade_tool: {
     happy: { args: { timeline_clip_ids: [IDS.clipA, IDS.clipB], dry_run: true }, summary: /^Dry run: \d+ of 2 clip\(s\) brought within the band/ },
