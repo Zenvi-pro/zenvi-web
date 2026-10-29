@@ -31,6 +31,7 @@ export type HostMethod =
   | "media.fetchWebVideo"
   | "media.kitSample"
   | "media.inspectRender"
+  | "media.decodeLuma"
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
@@ -209,6 +210,15 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
+  detect_onsets_tool: { methods: ["audio.decodePcm"] },
+  snap_cuts_to_onsets_tool: { methods: ["audio.decodePcm"] },
+  detect_music_structure_tool: { methods: ["audio.decodePcm"] },
+  spot_action_foley_tool: {
+    methods: ["media.decodeLuma"],
+    optional: ["audio.decodePcm", "media.writeGenerated"],
+    partialNote: "without audio decoding cues are not checked against the clip's own sound; without generated media place=true is refused",
+  },
+  shot_length_ramp_tool: { optional: ["audio.decodePcm"], partialNote: "without audio decoding snap=beats and snap=onsets are refused; the curve, the motif and the settle shot always work" },
   master_audio_tool: { methods: ["audio.mixPcm"] },
   analyze_mix_tool: { methods: ["audio.mixPcm"] },
   pan_tool: { methods: ["audio.decodePcm", "media.writeGenerated"] },
@@ -435,6 +445,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.fetchWebVideo",
       "media.kitSample",
       "media.inspectRender",
+      "media.decodeLuma",
       "storage.open",
       "storage.readText",
       "storage.writeText",
@@ -579,6 +590,7 @@ function needName(need: HostCapability | HostMethod): string {
     "exporter.supports": "checking which codecs it can encode",
     "frames.fontFamilies": "listing the fonts titles render with",
     "frames.renderSheet": "composing contact sheets",
+    "media.decodeLuma": "decoding video frames for motion analysis",
     "audio.measureMix": "mixing and measuring the audio",
   };
   return names[need as HostMethod];

@@ -560,6 +560,30 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { path: "/out/captions.srt", clipId: "NOPE" }, summary: /^Error: Unknown clipId 'NOPE'\.$/ },
   },
   detect_beats_tool: { happy: { args: { fileId: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
+  detect_onsets_tool: {
+    happy: { args: { file_id: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { clip_id: "NOPE" }, status: "refused", summary: /^Error: No timeline clip with id='NOPE'\.$/ },
+  },
+  detect_music_structure_tool: {
+    happy: { args: { clip_id: IDS.clipMusic }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { file_id: IDS.music, add_markers: "true" }, status: "refused", summary: /^Error: add_markers needs clip_id/ },
+  },
+  spot_action_foley_tool: {
+    happy: { args: { clip_id: IDS.clipB }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { clip_id: IDS.clipMusic }, status: "refused", summary: /is not video: nothing moves in it\.$/ },
+  },
+  shot_length_ramp_tool: {
+    happy: {
+      args: { file_ids: [IDS.broll, IDS.logo], shots: "6", first_shot_seconds: "2", last_shot_seconds: "0.5", position: "30", track: "1" },
+      summary: /^Cut a 6-shot ramp from 2\.00 s to 0\.50 s on track 1, 30\.00-\d+\.\d\d s\.$/,
+      check: ({ doc }) => expect(doc.project.clips.filter((c) => c.position >= 30)).toHaveLength(6),
+    },
+    failure: { args: { file_ids: ["NOPE"] }, status: "refused", summary: /^Error: Unknown file_id 'NOPE'\.$/ },
+  },
+  snap_cuts_to_onsets_tool: {
+    happy: { args: { track: "1" }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { onsets_from: "clip" }, status: "refused", summary: /^Error: onsets_from=clip needs onset_clip_id\.$/ },
+  },
   diarize_media_tool: { happy: { args: { fileId: IDS.interview }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
   search_media_local_tool: { happy: { args: { query: "dog" }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
 

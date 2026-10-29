@@ -84,7 +84,7 @@ const ACCENT_MARGIN = 0.05;
 const EMPTY: BeatAnalysis = { bpm: 0, confidence: 0, alternatives: [], beatsPerBar: 4, barConfidence: 0, beats: [], downbeats: [], onsets: [], beatEnergy: [] };
 
 /** In-place iterative radix-2 FFT (re/im arrays of the same power-of-two length). */
-function fft(re: Float64Array, im: Float64Array): void {
+export function fft(re: Float64Array, im: Float64Array): void {
   const n = re.length;
   for (let i = 1, j = 0; i < n; i += 1) {
     let bit = n >> 1;
@@ -334,18 +334,23 @@ function trackBeats(env: Float64Array, period: number, tightness: number): numbe
   return frames.reverse();
 }
 
-function pickOnsets(env: Float64Array, frameRate: number): number[] {
-  const minGap = Math.round(0.1 * frameRate);
+/** Envelope frames that peak at or above `threshold`, at least `gapSeconds` apart. */
+function onsetFrames(env: Float64Array, frameRate: number, threshold = 0.3, gapSeconds = 0.1): number[] {
+  const minGap = Math.round(gapSeconds * frameRate);
   const out: number[] = [];
   let last = -minGap;
   for (let i = 1; i + 1 < env.length; i += 1) {
     const v = env[i]!;
-    if (v >= 0.3 && v >= env[i - 1]! && v > env[i + 1]! && i - last >= minGap) {
-      out.push(i / frameRate);
+    if (v >= threshold && v >= env[i - 1]! && v > env[i + 1]! && i - last >= minGap) {
+      out.push(i);
       last = i;
     }
   }
   return out;
+}
+
+function pickOnsets(env: Float64Array, frameRate: number): number[] {
+  return onsetFrames(env, frameRate).map((i) => i / frameRate);
 }
 
 /**
@@ -443,4 +448,32 @@ export function detectBeats(pcm: Float32Array, sampleRate: number, options: Beat
     onsets: pickOnsets(onset, frameRate).map((t) => Math.round((t + TRANSIENT_AT / (frameRate * HOP)) * 1000) / 1000),
     beatEnergy,
   };
+}
+
+/** A transient: where a hit, a strike, a step or a consonant starts. */
+export interface Onset {
+  timeSec: number;
+  /** Onset envelope at the hit, 0..1 relative to the strongest hit of the audio. */
+  strength: number;
+}
+
+export interface OnsetOptions {
+  /** Weakest hit kept, 0..1 (default 0.3, the hits `detectBeats` reports). */
+  threshold?: number;
+  /** Closest two hits may be, seconds (default 0.1). */
+  minGapSeconds?: number;
+}
+
+/**
+ * Transients of mono PCM, with how hard each one hits: the onsets
+ * `detectBeats` reports, without tracking a tempo, so any sound works
+ * (a knife on a board, a door, footsteps), not only music.
+ */
+export function detectOnsets(pcm: Float32Array, sampleRate: number, options: OnsetOptions = {}): Onset[] {
+  const { onset, frameRate } = envelopes(pcm, sampleRate);
+  const lag = TRANSIENT_AT / (frameRate * HOP);
+  return onsetFrames(onset, frameRate, options.threshold ?? 0.3, options.minGapSeconds ?? 0.1).map((i) => ({
+    timeSec: Math.round((i / frameRate + lag) * 1000) / 1000,
+    strength: Math.round(onset[i]! * 1000) / 1000,
+  }));
 }
