@@ -317,7 +317,7 @@ function drawText(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number,
     }
     case "assemble": {
       const pts = sc.particles.get(shot.index) ?? [];
-      const solid = cubicOut(prog(u, 1.0, 0.35));
+      const solid = cubicOut(prog(u, 0.95, 0.6));
       const R = Math.min(box.maxW, sc.W) / 2;
       g.fillStyle = ink;
       for (const p of pts) {
