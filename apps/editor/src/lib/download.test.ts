@@ -130,8 +130,9 @@ describe("downloadFile", () => {
 
   it("fails instead of returning a file with a hole when a part arrives short", async () => {
     const file = bytes(2_000_000);
-    const [, [start]] = splitRanges(FIRST_RANGE_BYTES, file.length);
-    const s = server(file, { shortAt: { start, missing: 10 } });
+    const second = splitRanges(FIRST_RANGE_BYTES, file.length)[1];
+    if (!second) throw new Error("expected at least two ranges");
+    const s = server(file, { shortAt: { start: second[0], missing: 10 } });
     await expect(downloadFile("https://x/a", { fetch: s.fetch })).rejects.toThrow(`cut short (${file.length - 10} of ${file.length} bytes)`);
   });
 
