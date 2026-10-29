@@ -120,6 +120,21 @@ describe("pin_to_track_tool", () => {
     }
   });
 
+  it("undoes the callout, its graphic and its track in one step; refusals leave no undo step", async () => {
+    const { doc, host } = setup();
+    const before = doc.project;
+    const self = await runTool({ doc, host }, "pin_to_track_tool", { footage_clip_id: "CSUB", clip_id: "CSUB", point: subjectAt(0) });
+    expect(self.ok).toBe(false);
+    expect(doc.undoLabels).toHaveLength(0);
+    const result = await runTool({ doc, host }, "pin_to_track_tool", { footage_clip_id: "CSUB", point: subjectAt(0), label: "SENSOR" });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.project.layers.length).toBe(before.layers.length + 1);
+    doc.undo();
+    expect(doc.project.clips).toEqual(before.clips);
+    expect(doc.project.layers).toEqual(before.layers);
+    expect(doc.project.files).toEqual(before.files);
+  });
+
   it("fits a clip onto a tracked surface", async () => {
     const { doc, host } = setup();
     doc.transaction("overlay", (tx) => {
