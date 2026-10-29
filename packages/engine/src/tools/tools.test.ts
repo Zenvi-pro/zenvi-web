@@ -1169,6 +1169,44 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for watch_render_tool/ },
   },
+  fork_project_tool: {
+    happy: {
+      args: { name: "fast-cuts" },
+      summary: /^Kept the edit \(\d+ clips\) as variant "fast-cuts" at \/projects\/current-fast-cuts\.zvn\. The open project is unchanged\./,
+      check: ({ host, receipt }) => {
+        expect(host.calls).toContain("saveCopy /projects/current-fast-cuts.zvn");
+        expect(receipt.undoSteps).toBe(0);
+      },
+    },
+    failure: { args: { name: "Fast Cuts" }, status: "refused", summary: /^Error: Invalid arguments for fork_project_tool/ },
+  },
+  compare_renders_tool: {
+    happy: {
+      args: { a: "/out/a.mp4", b: "/out/b.mp4" },
+      // The fake judge prefers whichever render is shown first: both orders disagree, the scores tie, a is kept.
+      summary: /^\/out\/a\.mp4 is the better edit \(a tie in both orders and scores; margin \+0 for \/out\/a\.mp4\)\./,
+      check: ({ host }) => expect(host.calls.filter((c) => c.startsWith("compare "))).toEqual(["compare /out/a.mp4 /out/b.mp4", "compare /out/b.mp4 /out/a.mp4"]),
+    },
+    failure: { args: { a: "/out/a.mp4", b: "/out/a.mp4" }, status: "refused", summary: /same render/ },
+  },
+  pick_best_variant_tool: {
+    happy: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      setup: (doc, host) => {
+        host.storage!.readCopy = async (path) => ({ ...structuredClone(doc.project), clips: path.endsWith("a.zvn") ? [] : doc.project.clips });
+      },
+      summary: /^Best of 2: a\.zvn \(\/out\/a\.mp4\)\. a\.zvn is now the open project/,
+      check: ({ doc, receipt }) => {
+        expect(doc.project.clips).toEqual([]);
+        expect(receipt.undoSteps).toBe(1);
+      },
+    },
+    failure: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      status: "refused",
+      summary: /^Error: could not open variant a\.zvn/,
+    },
+  },
   swap_shot_tool: {
     happy: {
       args: { clip_id: IDS.clipB },

@@ -7,7 +7,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { isWatchError, WATCH_PATH } from "@zenvi/engine";
 import { ffprobeJson, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
-import { backendCritic, createNodeWatchHost, geminiCritic, makeWatchProxy } from "./watch.js";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { backendCritic, createNodeWatchHost, geminiComparer, geminiCritic, makeWatchProxy } from "./watch.js";
+import { fileSha256 } from "./preferences.js";
 
 let dir: string;
 let tall: string;
@@ -119,11 +122,32 @@ describe("watch host (node)", { timeout: 60_000 }, () => {
     expect(critique.issues).toHaveLength(1);
   });
 
-  it("uses the developer key when set, else the backend, else nothing", () => {
+  it("compares two renders in one Gemini call, A then B, and logs the judgment as taste data", async () => {
+    const other = await makeVideo(dir, "other.mp4", { width: 640, height: 360, fps: "30", duration: 1, audioHz: 880 });
+    const scores = { hook: 4, pacing: 5 };
+    const gemini = fakeFetch(200, {
+      candidates: [{ content: { parts: [{ text: JSON.stringify({ A: scores, B: { hook: 7, pacing: 6 }, winner: "B", why: "B moves.", fixes: [{ video: "B", start: 0.4, dimension: "hook", problem: "slow", fix: "cut sooner" }] }) }] } }],
+      usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 120 },
+    });
+    const log = path.join(dir, "taste", "preferences.jsonl");
+    const verdict = await geminiComparer({ apiKey: "dev-key", fetchImpl: gemini.impl, log, source: "test" })(tall, other, { brief: "a reel" });
+    const parts = JSON.parse(String(gemini.calls[0]!.init.body)).contents[0].parts;
+    expect(parts.map((p: Record<string, unknown>) => (p.text ? String(p.text).slice(0, 15) : "video"))).toEqual(["=== Video A ===", "video", "=== Video B ===", "video", "Video A is 1.50"]);
+    expect(verdict).toMatchObject({ winner: "B", durations: { A: 1.5 }, usage: { inputTokens: 900, outputTokens: 120 }, via: "gemini" });
+    expect(verdict.fixes).toHaveLength(1);
+    const rows = (await readFile(log, "utf8")).trim().split("\n").map((l) => JSON.parse(l));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ v: 1, source: "test", judge: "gemini-3.8-flash", prompt: "zenvi-compare-1", winner: "b", a: { path: tall, seconds: 1.5 }, b: { path: other } });
+    expect(rows[0].a.sha256).toBe(await fileSha256(tall));
+    expect(rows[0].brief_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(rows[0].scores.b.hook).toBe(7);
+  });
+
+  it("uses the developer key when set, else the backend, else nothing; compares side by side only with the key", () => {
     const backend = { baseUrl: "https://api.test", token: async () => undefined };
     expect(createNodeWatchHost({ env: {}, resolvePath: (p) => p })).toBeUndefined();
-    expect(createNodeWatchHost({ env: {}, backend, resolvePath: (p) => p })).toBeDefined();
-    expect(createNodeWatchHost({ env: { ZENVI_GEMINI_API_KEY: "k" }, resolvePath: (p) => p })).toBeDefined();
+    expect(createNodeWatchHost({ env: {}, backend, resolvePath: (p) => p })?.compare).toBeUndefined();
+    expect(createNodeWatchHost({ env: { ZENVI_GEMINI_API_KEY: "k" }, resolvePath: (p) => p })?.compare).toBeTypeOf("function");
   });
 
   it("reads a render's length from the path it will watch", async () => {

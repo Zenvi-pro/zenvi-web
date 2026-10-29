@@ -33,4 +33,8 @@ export const DIRECTOR_CARD: string = [
 ].join("\n");
 
 /** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
-export const DIRECTOR_START: string = `A new edit: read the genre's recipe first, read_director_recipe {recipe}. ${RECIPES} ${FINISH}`;
+/** Best of three (the skill's "Best of three"): only here, the card is at its budget. */
+const BEST_OF =
+  "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
+
+export const DIRECTOR_START: string = `A new edit: read the genre's recipe first, read_director_recipe {recipe}. ${RECIPES} ${FINISH} ${BEST_OF}`;

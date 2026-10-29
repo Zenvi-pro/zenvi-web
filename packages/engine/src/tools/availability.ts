@@ -48,6 +48,8 @@ export type HostMethod =
   | "ui.preferences"
   | "ui.clearPlaybackCache"
   | "storage.writeBytes"
+  | "storage.saveCopy"
+  | "storage.readCopy"
   | "storage.exportMedia"
   | "storage.currentPath"
   | "storage.recentProjects"
@@ -104,6 +106,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   },
   save_project_tool: {},
   open_project_tool: { methods: ["storage.open"] },
+  fork_project_tool: { methods: ["storage.saveCopy"] },
+  pick_best_variant_tool: { methods: ["storage.readCopy"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
   import_video_url_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
   gather_stock_footage_tool: { methods: ["media.importUrl"] },
@@ -426,6 +430,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.readText",
       "storage.writeText",
       "storage.writeBytes",
+      "storage.saveCopy",
+      "storage.readCopy",
       "storage.exportMedia",
       "storage.currentPath",
       "storage.recentProjects",
@@ -552,6 +558,8 @@ function needName(need: HostCapability | HostMethod): string {
     "ui.preferences": "an editor's settings",
     "ui.clearPlaybackCache": "a playback cache",
     "storage.writeBytes": "saving files (images)",
+    "storage.saveCopy": "saving a copy of the project as another project",
+    "storage.readCopy": "reading another project without opening it",
     "storage.exportMedia": "copying media out (to a folder, a download or a link)",
     "storage.currentPath": "knowing where the project is saved",
     "storage.recentProjects": "a list of recent projects",
