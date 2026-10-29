@@ -5,13 +5,6 @@ Tweenkit's kinetic-cut-video skill (skills/kinetic-cut-video/SKILL.md,
 references/motif-method.md and scripts/brief.py), MIT License,
 Copyright (c) 2026 wmzspace. Zenvi's adaptation is
 packages/engine/src/brief/method.ts and packages/cli/src/mcp/directions.ts.
-The motif method in BRIEF.md (motifs and a through-line, the storyboard's
-duration / composition / text-entrance / tone columns and their variety
-rules, the reskin test, the creative-direction draw) is adapted from
-Tweenkit's kinetic-cut-video skill (skills/kinetic-cut-video/SKILL.md,
-references/motif-method.md and scripts/brief.py), MIT License,
-Copyright (c) 2026 wmzspace. Zenvi's adaptation is
-packages/engine/src/brief/method.ts and packages/cli/src/mcp/directions.ts.
 
 METHOD-motif.md, styles/kinetic-cut.md and techniques/kcut-*.md are adapted
 from the same skill (SKILL.md, references/motif-method.md,
