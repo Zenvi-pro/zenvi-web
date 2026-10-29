@@ -6,6 +6,7 @@ import type { BackendHost, CloudMediaRef, ExportOptions, ExportResult, ImportedM
 import { backendStock, fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { canExportWith } from "@zenvi/render-web";
 import { backendRequest } from "@/lib/backend";
+import { downloadFile, type DownloadProgress } from "@/lib/download";
 import { config } from "@/lib/env";
 import { downloadBlob, safeFileName } from "@/lib/projectFactory";
 import { projectRepository } from "@/lib/storage/projects";
@@ -23,16 +24,12 @@ const MAX_URL_IMPORT_BYTES = 2 * 1024 * 1024 * 1024;
 /** Text files tools read (title SVGs, subtitles); the largest bundled title template is under 5 MB. */
 const MAX_TEXT_BYTES = 16 * 1024 * 1024;
 
-async function fileFromUrl(url: string, filename: string | undefined, signal?: AbortSignal): Promise<File> {
+async function fileFromUrl(url: string, filename: string | undefined, signal?: AbortSignal, onProgress?: (progress: DownloadProgress) => void): Promise<File> {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("Only http(s) URLs can be imported.");
-  const response = await fetch(parsed, { signal });
-  if (!response.ok) throw new Error(`Download failed (${response.status}).`);
-  const length = Number(response.headers.get("content-length") ?? 0);
-  if (length > MAX_URL_IMPORT_BYTES) throw new Error("That file is too large to import in the browser.");
-  const blob = await response.blob();
+  const { blob, type } = await downloadFile(parsed.href, { signal, onProgress, maxBytes: MAX_URL_IMPORT_BYTES });
   const name = filename || decodeURIComponent(parsed.pathname.split("/").pop() || "download");
-  return new File([blob], name, { type: blob.type || contentTypeFor(name) });
+  return new File([blob], name, { type: type || contentTypeFor(name) });
 }
 
 /**
@@ -114,7 +111,12 @@ function isFullscreen(): boolean {
   return typeof document !== "undefined" && document.fullscreenElement !== null && document.fullscreenElement !== undefined;
 }
 
-export function createToolHost(session: EditorSession, pickFiles: () => Promise<File[]>): ToolHost {
+export interface ToolHostOptions {
+  /** Progress of URL imports (stock media, generated media) while they download. */
+  onDownload?: (progress: DownloadProgress & { url: string }) => void;
+}
+
+export function createToolHost(session: EditorSession, pickFiles: () => Promise<File[]>, options: ToolHostOptions = {}): ToolHost {
   // The loaded media of a project file (by path or id), for audio analysis.
   const specFor = (path: string) => {
     const file = session.project.files.find((f) => f.path === path || f.id === path);
@@ -198,8 +200,9 @@ export function createToolHost(session: EditorSession, pickFiles: () => Promise<
         if (!spec) throw new Error(`No media at ${path}`);
         return probe(spec, { path });
       },
-      async importUrl(url, options) {
-        const file = await fileFromUrl(url, options?.filename, options?.signal);
+      async importUrl(url, opts) {
+        const onDownload = options.onDownload;
+        const file = await fileFromUrl(url, opts?.filename, opts?.signal, onDownload && ((p) => onDownload({ ...p, url })));
         return prepare(session, file);
       },
       async pickFiles() {
