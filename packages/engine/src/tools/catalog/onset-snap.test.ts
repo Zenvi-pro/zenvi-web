@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BEAT_SAMPLE_RATE } from "../../analysis/beats.js";
 import { findClip } from "../../model/query.js";
-import { setClipSpeed } from "../../ops/clips.js";
+import { setClipSpeed, setClipTiming } from "../../ops/clips.js";
 import type { ToolReceipt } from "../receipt.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
@@ -114,11 +114,42 @@ describe("snap_cuts_to_onsets_tool", () => {
     expect(data.kept[0].reason).toMatch(/media can reach/);
   });
 
+  it("counts what the first roll took from a short clip between two snapped cuts", async () => {
+    const doc = fixtureDoc();
+    // A 0.5 s b-roll insert (timeline 10-10.5) between the interview's two clips.
+    doc.transaction("insert", (tx) => {
+      setClipTiming(tx, IDS.clipB, { end: 0.5 });
+      setClipTiming(tx, IDS.clipTail, { position: 10.5 });
+    });
+    const host = hostWithAudio();
+    // The insert's hit is 0.4 s in (cut 1 rolls 12 frames later); the tail's 0.25 s before its in point would roll cut 2 earlier than where the insert now starts.
+    const sounds: Record<string, Float32Array> = { "/media/broll.mp4": clicks(12, [0.4]), "/media/interview.mp4": clicks(20, [9.75]) };
+    host.audio!.decodePcm = async (path) => ({ sampleRate: SR, samples: sounds[path]! });
+    const { receipt, data } = await run(doc, "snap_cuts_to_onsets_tool", { track: "1", tolerance_frames: 12 }, host);
+    expect(receipt.status).toBe("applied");
+    expect(receipt.undoSteps).toBe(1);
+    expect(data.moved.map((m: { incoming: string; frames: number }) => [m.incoming, m.frames])).toEqual([[IDS.clipB, 12]]);
+    expect(data.kept).toEqual(expect.arrayContaining([expect.objectContaining({ incoming: IDS.clipTail, reason: expect.stringMatching(/media can reach/) })]));
+    const insert = findClip(doc.project, IDS.clipB)!;
+    expect([insert.position, insert.start, insert.end].map((v) => Math.round(v * 30))).toEqual([312, 12, 15]);
+  });
+
   it("keeps a cut between retimed clips and names it", async () => {
     const doc = fixtureDoc();
     doc.transaction("speed", (tx) => setClipSpeed(tx, IDS.clipTail, 2));
     const { data } = await run(doc, "snap_cuts_to_onsets_tool", { clip_ids: [IDS.clipTail] });
     expect(data.kept).toEqual([expect.objectContaining({ incoming: IDS.clipTail, reason: expect.stringMatching(/retimed/) })]);
+  });
+
+  it("keeps every cut of a locked track and adds no undo step", async () => {
+    const doc = fixtureDoc();
+    doc.setUntracked(["layers", { number: 1_000_000 }, "lock"], true);
+    const before = snapshotOf(doc.project);
+    const { receipt, data } = await run(doc, "snap_cuts_to_onsets_tool", { track: "1" });
+    expect(receipt.status).toBe("unchanged");
+    expect(receipt.undoSteps).toBe(0);
+    expect(data.kept.map((k: { reason: string }) => k.reason)).toEqual(["the track is locked", "the track is locked"]);
+    expect(snapshotOf(doc.project)).toEqual(before);
   });
 
   it("refuses an unknown clip and a missing onset clip before reading audio", async () => {
