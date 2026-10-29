@@ -39,6 +39,12 @@ export function givenKeywords(raw: z.infer<typeof keywordsArg>): GivenKeyword[] 
   return (raw ?? []).map((k) => (typeof k === "string" ? { word: k } : { word: k.word, ...(k.file_id ? { fileId: k.file_id } : {}) }));
 }
 
+/** Keyword file_ids that are not bin pictures, as a refusal message. */
+export function keywordFileProblem(project: Project, raw: z.infer<typeof keywordsArg>): string | null {
+  const ids = (raw ?? []).flatMap((k) => (typeof k !== "string" && k.file_id ? [k.file_id] : []));
+  return pictureProblem(project, ids, "keywords file_id");
+}
+
 export type VoiceWords = { words: TimedText[]; exact: boolean; source: string } | { error: string };
 
 /** The words of a voice file: kept, indexed, or transcribed now (estimates are fine for cutting and captions). */

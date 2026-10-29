@@ -19,7 +19,7 @@ import { directTool, type CatalogTool } from "../../define.js";
 import { FINISH_HINT } from "../../director-card.js";
 import { refused } from "../../receipt.js";
 import { displayName, visualKind } from "../reels.js";
-import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMusic, pickVoice, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
+import { binPictures, givenKeywords, keywordFileProblem, keywordMedia, keywordsArg, occupied, pickMusic, pickVoice, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
 import { Composer, binOf, builderTracks, clearTimeline, placeBed, placeShot, round3 } from "./compose.js";
 
 const TOOL = "build_explainer_tool";
@@ -79,9 +79,11 @@ export const explainerTools: CatalogTool[] = [
       const busy = occupied(project, args.replace);
       if (busy) return refused(TOOL, busy);
       if (args.voice_file_id && !files.has(args.voice_file_id)) return refused(TOOL, `Error: unknown voice_file_id ${args.voice_file_id}.`);
-      const music0 = pickMusic(project, args.music_file_id, args.voice_file_id);
+      // Without a script the voice leads, so it is found first (a lone narration not named like one is the voice, not the bed); a script means there may be no voice yet, so the music is.
+      const voiceFirst = args.voice_file_id ? files.get(args.voice_file_id) : args.script?.trim() ? undefined : pickVoice(project, args.music_file_id);
+      const music0 = pickMusic(project, args.music_file_id, voiceFirst ? String(voiceFirst.id) : undefined);
       if (typeof music0 === "string") return refused(TOOL, music0);
-      const voice = args.voice_file_id ? files.get(args.voice_file_id)! : pickVoice(project, music0 ? String(music0.id) : undefined);
+      const voice = voiceFirst ?? (args.voice_file_id ? undefined : pickVoice(project, music0 ? String(music0.id) : undefined));
       const music = music0 && voice && String(music0.id) === String(voice.id) ? undefined : music0;
       if (voice && !voice.has_audio) return refused(TOOL, `Error: ${voice.id} has no sound to lead the explainer.`);
       if (!voice && !args.script?.trim()) {
@@ -91,6 +93,8 @@ export const explainerTools: CatalogTool[] = [
       const problem = pictureProblem(project, brollIds, "broll_file_ids");
       if (problem) return refused(TOOL, problem);
       if (brollIds.length === 0) return refused(TOOL, "Error: the bin has no videos or images for the picture. Import B-roll first.");
+      const keywordProblem = keywordFileProblem(project, args.keywords);
+      if (keywordProblem) return refused(TOOL, keywordProblem);
       const fps = Number(project.fps?.num) / Number(project.fps?.den || 1) || 30;
 
       // The words: the voice's (kept, indexed or transcribed), else the script at reading pace.
@@ -133,6 +137,7 @@ export const explainerTools: CatalogTool[] = [
           words = words.filter((w) => w.start < args.duration_seconds! - 0.2).map((w) => ({ ...w, end: Math.min(w.end, args.duration_seconds!) }));
         }
       }
+      if (words.length === 0) return refused(TOOL, `Error: the voice says nothing in its first ${args.duration_seconds} s: pass a longer duration_seconds.`);
       const duration = Math.round(Math.min(voice ? voiceLength : Infinity, words[words.length - 1]!.end + 0.8, args.duration_seconds ?? Infinity) * fps) / fps;
 
       const pictures = brollIds.map((id) => files.get(id)!);

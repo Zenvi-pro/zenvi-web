@@ -44,7 +44,6 @@ export const DIRECTOR_CARD: string = [
   "TTS captions: kinetic_captions_tool timeline_clip_ids=[the TTS clip] uses its word timings.",
 ].join("\n");
 
-/** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
 /** The one-call builders (P4): only here, the card is at its budget. A whole first cut in one undo step, then the recipe's fixes and the finish. */
 const BUILDERS =
   "A whole first cut in one call (one undo step, every decision in its receipt), then fix single shots and finish: build_reel_tool (cut to music), build_trailer_tool (movie or game trailer), " +
@@ -54,4 +53,5 @@ const BUILDERS =
 const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
+/** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
 export const DIRECTOR_START: string = `A new edit: ${BRIEF} Then read its style's recipe, read_director_recipe {recipe}. ${RECIPES} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;

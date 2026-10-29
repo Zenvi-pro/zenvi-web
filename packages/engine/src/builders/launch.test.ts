@@ -75,4 +75,11 @@ describe("explainer plan", () => {
     ]);
     expect(planChapters(["One"], words, 11, 2).map((c) => c.at)).toEqual([4.8]);
   });
+
+  it("reads 'per cent' as percent but a bare 'per' as a rate", () => {
+    const said = (...tokens: string[]) => tokens.map((text, i) => ({ text, start: i * 7, end: i * 7 + 0.3 }));
+    expect(numberSlots(said("forty", "per", "day"))).toEqual([]);
+    expect(numberSlots(said("12", "per", "user")).map((n) => [n.value, n.suffix])).toEqual([["12", ""]]);
+    expect(numberSlots(said("forty", "per", "cent")).map((n) => [n.value, n.suffix])).toEqual([["40", "%"]]);
+  });
 });

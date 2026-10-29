@@ -20,7 +20,7 @@ import { FINISH_HINT } from "../../director-card.js";
 import { refused } from "../../receipt.js";
 import { isTalkingFootage } from "../../transcripts.js";
 import { displayName, visualKind } from "../reels.js";
-import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMusic, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
+import { binPictures, givenKeywords, keywordFileProblem, keywordMedia, keywordsArg, occupied, pickMusic, pictureProblem, replaceArg, voiceActivity, voiceWords } from "./common.js";
 import { Composer, binOf, builderTracks, clearTimeline, placeBed, placeShot, round3 } from "./compose.js";
 
 const TOOL = "build_talking_head_tool";
@@ -69,6 +69,8 @@ export const talkingHeadTools: CatalogTool[] = [
       const brollIds = args.broll_file_ids ?? binPictures(project, new Set(speakerIds)).map((f) => String(f.id));
       const brollProblem = pictureProblem(project, brollIds, "broll_file_ids");
       if (brollProblem) return refused(TOOL, brollProblem);
+      const keywordProblem = keywordFileProblem(project, args.keywords);
+      if (keywordProblem) return refused(TOOL, keywordProblem);
       const music = pickMusic(project, args.music_file_id);
       if (typeof music === "string") return refused(TOOL, music);
       const fps = Number(project.fps?.num) / Number(project.fps?.den || 1) || 30;

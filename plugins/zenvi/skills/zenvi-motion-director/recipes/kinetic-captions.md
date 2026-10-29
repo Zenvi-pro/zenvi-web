@@ -31,8 +31,8 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
 
 ## Tools
 
-0. One call first, once the take (or the TTS voice over a picture) is in the
-   bin: `build_talking_head_tool` (`speaker_file_ids`, `broll_file_ids` named
+0. One call first, once the speaker's take (video with sound) is in the bin
+   (a TTS voice over a picture: the steps below): `build_talking_head_tool` (`speaker_file_ids`, `broll_file_ids` named
    for what they show, `keywords` to choose, `hook` of 1-3 words). It
    jump-cuts the pauses with the framing changing on every cut, punches in on
    the strongest words, cuts to B-roll on the nouns that name a picture, sets

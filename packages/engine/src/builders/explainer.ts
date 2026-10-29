@@ -123,7 +123,12 @@ export function planChapters(titles: readonly string[], words: readonly CaptionW
   });
 }
 
-const PERCENT = new Set(["percent", "per", "%"]);
+const PERCENT = new Set(["percent", "%"]);
+/** "percent", "%" or "per cent" at word `k` (a bare "per" is a rate: "10 per user"). */
+function saysPercent(words: readonly CaptionWord[], k: number): boolean {
+  const at = (j: number) => (words[j] ? bareWord(words[j]!.text) : "");
+  return PERCENT.has(at(k)) || (at(k) === "per" && at(k + 1) === "cent");
+}
 const UNITS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
 const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
 
@@ -156,14 +161,13 @@ export function numberSlots(words: readonly CaptionWord[], max = 2, spacing = 6)
     if (m) {
       const digits = m[2]!.replace(/,/g, "");
       if (/^(19|20)\d\d$/.test(digits)) return; // a year is a date, not a stat
-      const after = words[i + 1] ? bareWord(words[i + 1]!.text) : "";
-      const suffix = m[3] ?? (PERCENT.has(after) ? "%" : "");
+      const suffix = m[3] ?? (saysPercent(words, i + 1) ? "%" : "");
       if (!suffix && Number(digits) < 10) return;
       out.push({ word: i, value: digits, prefix: m[1]!, suffix, at: w.start });
       return;
     }
     const said = spokenNumber(words, i);
-    if (said && PERCENT.has(words[i + said.used] ? bareWord(words[i + said.used]!.text) : "")) out.push({ word: i, value: String(said.value), prefix: "", suffix: "%", at: w.start });
+    if (said && saysPercent(words, i + said.used)) out.push({ word: i, value: String(said.value), prefix: "", suffix: "%", at: w.start });
   });
   return out.slice(0, max);
 }

@@ -11,8 +11,8 @@ Every call returns a contract-3 receipt (`{contract: 3, status, tool, summary, c
 | Surface | Host | Works | Partial | Not available |
 | --- | --- | --- | --- | --- |
 | Web editor (Zenvi Assistant, command palette) | `apps/editor/src/features/editor/assistant/host.ts` | 166 | 53 | 44 |
-| CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 205 | 29 | 29 |
-| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 165 | 44 | 54 |
+| CLI and local MCP server (zenvi, zenvi mcp) | `packages/render-node/src/host/node-host.ts` | 203 | 31 | 29 |
+| Zenvi Cloud remote MCP server (ChatGPT, Claude.ai) | `packages/cloud/src/mcp/engine.ts` | 163 | 46 | 54 |
 | Zenvi desktop | zenvi-core | 164 | 0 | 99 (direct tools are web-only) |
 
 Availability follows each tool's required host capabilities and the host methods it calls at run time; the hosts are described in `SURFACE_PROFILES` (packages/engine/src/tools/availability.ts). Capabilities a session may lack (signed out of Zenvi, no WebCodecs export) are noted per tool.
@@ -209,9 +209,9 @@ Availability follows each tool's required host capabilities and the host methods
 | [`space_tool`](#space_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`pan_tool`](#pan_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`build_reel_tool`](#build_reel_tool) | mcp, cli, editor | yes | yes | yes | — |
-| [`build_explainer_tool`](#build_explainer_tool) | mcp, cli, editor | partial | yes | yes | — |
+| [`build_explainer_tool`](#build_explainer_tool) | mcp, cli, editor | partial | partial | partial | — |
 | [`build_product_launch_tool`](#build_product_launch_tool) | mcp, cli, editor | partial | yes | partial | — |
-| [`build_talking_head_tool`](#build_talking_head_tool) | mcp, cli, editor | partial | yes | yes | — |
+| [`build_talking_head_tool`](#build_talking_head_tool) | mcp, cli, editor | partial | partial | partial | — |
 | [`build_trailer_tool`](#build_trailer_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`align_match_cut_tool`](#align_match_cut_tool) | mcp, cli, editor | yes | yes | yes | — |
 | [`detect_subject_tool`](#detect_subject_tool) | mcp, cli, editor | yes | yes | yes | — |
@@ -1929,7 +1929,7 @@ Availability: editor yes; cli yes; cloud yes; desktop yes.
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
 | `clip_query` | string |  | Describe one clip instead of ids. (default "") |
-| `groups` | "all" \| "alpha" \| "scale" \| "shear" \| "rotation" \| "location" \| "time" \| "volume"[] |  | What to copy, as in the Clip menu's Copy > Keyframes: all, alpha, scale (+gravity), shear, rotation (+gravity), location (+gravity), time, volume. (default ["all"]) |
+| `groups` | ("all" \| "alpha" \| "scale" \| "shear" \| "rotation" \| "location" \| "time" \| "volume")[] |  | What to copy, as in the Clip menu's Copy > Keyframes: all, alpha, scale (+gravity), shear, rotation (+gravity), location (+gravity), time, volume. (default ["all"]) |
 | `scope` | "" \| "selected" \| "track" \| "all" |  | Instead of ids/query: 'selected' = the timeline selection, 'track' = every clip on track, 'all' = every clip on the timeline. (default "") |
 | `source_clip_id` | string |  | Timeline clip id to copy FROM (preferred). (default "") |
 | `source_query` | string |  | Describe the source clip instead of an id. (default "") |
@@ -2515,7 +2515,7 @@ Availability: editor — (needs the Recording dock (microphone, screen and webca
 | `screen_fps` | integer |  | Screen capture frame rate: 15, 24, 30 or 60 (0 = keep). (default 0, min 0) |
 | `screen_region` | object \| null |  | Capture only this area of the screen (Region mode): {x, y, width, height} in screen pixels. Omit for the full screen. |
 | `show_cursor` | boolean \| null |  | Screen: include the mouse cursor. |
-| `sources` | "mic" \| "screen" \| "webcam"[] |  | What to record: mic (voice), screen, webcam; any combination. Empty = keep the dock's current choice. |
+| `sources` | ("mic" \| "screen" \| "webcam")[] |  | What to record: mic (voice), screen, webcam; any combination. Empty = keep the dock's current choice. |
 | `start_seconds` | number \| null |  | Timeline seconds where the recording will be placed (also moves the playhead there). Omit = wherever the playhead is when Record is pressed. (min 0) |
 | `system_audio` | boolean \| null |  | Screen: also record the computer's sound output. |
 | `timeline_clip_id` | string |  | Record over this clip, like its menu's Audio > Record: starts at the clip, on the nearest free unlocked track below it (track/start_seconds override). (default "") |
@@ -3467,7 +3467,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: media.
 
-Availability: editor partial (without speech recognition the voice's words come from the media index (or the script, timed by length); without Zenvi Motion block rendering the counters and charts are kinetic titles (the receipt lists each fallback)); cli yes; cloud yes (only when ffprobe is available); desktop — (web-only direct tool).
+Availability: editor partial (speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free; without speech recognition the voice's words come from the media index or the script (timed by length), else the cuts follow the voice's pauses with no captions; without Zenvi Motion block rendering the counters and charts are kinetic titles; without the bundled fonts there are no titles or captions (the receipt lists each fallback)); cli partial (speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free); cloud partial (speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free; only when ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -3475,7 +3475,7 @@ Availability: editor partial (without speech recognition the voice's words come 
 | `script` | string |  | No voice-over yet: the script; the edit is timed at reading pace (about 150 words a minute) and the captions show it. |
 | `duration_seconds` | number |  | Use only the start of the voice: it ends at the last pause before this many seconds (default: the whole voice). (min 4, max 600) |
 | `broll_file_ids` | string[] |  | Bin videos and images for the picture, in story order. Default: every video and image in the bin but the voice's. |
-| `keywords` | string \| object[] |  | Spoken words that cut to B-roll: a word (its picture is the bin file whose name or description has it) or {word, file_id} to choose the picture. Default: every spoken word that names a bin picture. |
+| `keywords` | (string \| object)[] |  | Spoken words that cut to B-roll: a word (its picture is the bin file whose name or description has it) or {word, file_id} to choose the picture. Default: every spoken word that names a bin picture. |
 | `pace` | "documentary" \| "essay" |  | documentary (default): a new shot every 0.6-1.6 s on the phrases (the documentary references); essay: 2-4.5 s holds for a calmer video essay. |
 | `grade` | string |  | A look over every shot, laid on matched plates (unify_grade_tool look at 0.6): a list_looks_tool id, default elegant_dark_cinema; none keeps the footage as it is. |
 | `hook` | string |  | Opening title over the first sentence: the question or promise, 2-8 words. |
@@ -3493,14 +3493,14 @@ Availability: editor partial (without speech recognition the voice's words come 
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: media.
 
-Availability: editor partial (without Zenvi 3D the reveal is a kinetic headline block, without Zenvi Motion block rendering it, the features, the proof and the end card are native kinetic titles and the end card template; without audio decoding the sections follow 120 BPM (the receipt lists each fallback)); cli yes; cloud partial (without Zenvi 3D the reveal is a kinetic headline block, without Zenvi Motion block rendering it, the features, the proof and the end card are native kinetic titles and the end card template; without audio decoding the sections follow 120 BPM (the receipt lists each fallback); only when ffprobe is available); desktop — (web-only direct tool).
+Availability: editor partial (without Zenvi 3D the reveal is a kinetic headline block, without Zenvi Motion block rendering it, the features, the proof and the end card are native kinetic titles and the end card template; without audio decoding the sections follow 120 BPM; without the bundled fonts there is no native type (the receipt lists each fallback)); cli yes; cloud partial (without Zenvi 3D the reveal is a kinetic headline block, without Zenvi Motion block rendering it, the features, the proof and the end card are native kinetic titles and the end card template; without audio decoding the sections follow 120 BPM; without the bundled fonts there is no native type (the receipt lists each fallback); only when ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
 | `product` | string | yes | The product's name: the reveal and the end card. |
 | `problem` | string |  | The pain it solves, one line (the opening). Default: no problem section. |
 | `tagline` | string |  | The line under the reveal. |
-| `features` | string \| object[] | yes | One per bar: a title, or {title, detail}, or 'Title: detail'. |
+| `features` | (string \| object)[] | yes | One per bar: a title, or {title, detail}, or 'Title: detail'. |
 | `proof` | object |  | The proof: a stat that counts up (stat '2400', label 'teams'), or a short quote. |
 | `cta` | string |  | End card call to action. |
 | `url` | string |  | End card URL. |
@@ -3517,13 +3517,13 @@ Availability: editor partial (without Zenvi 3D the reveal is a kinetic headline 
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: media.
 
-Availability: editor partial (without speech recognition the takes' words come from the media index (a take with none plays whole, with no jump cuts); without subject matting the hook is set over the speaker instead of behind them (the receipt lists each fallback)); cli yes; cloud yes (only when ffprobe is available); desktop — (web-only direct tool).
+Availability: editor partial (speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free; without speech recognition the takes' words come from the media index (a take with none is jump-cut on its loudness, with no captions, keyword B-roll or punch-ins); without subject matting the hook is set over the speaker instead of behind them; without the bundled fonts there are no captions and no hook over the speaker (the receipt lists each fallback)); cli partial (speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free); cloud partial (speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free; only when ffprobe is available); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
 | `speaker_file_ids` | string[] |  | The takes of the speaker, in order. Default: every bin video with sound. |
 | `broll_file_ids` | string[] |  | Bin videos and images to cut to on keywords. Default: every other video and image in the bin. |
-| `keywords` | string \| object[] |  | Spoken words that cut to B-roll: a word (its picture is the bin file whose name or description has it) or {word, file_id} to choose the picture. Default: every spoken word that names a bin picture. |
+| `keywords` | (string \| object)[] |  | Spoken words that cut to B-roll: a word (its picture is the bin file whose name or description has it) or {word, file_id} to choose the picture. Default: every spoken word that names a bin picture. |
 | `hook` | string |  | One to three huge words for the opening, set behind the speaker (needs a subject matte; else over them). |
 | `caption_style` | "creator" \| "documentary" \| "split" \| "karaoke" \| "stack" \| "editorial" \| "none" |  | Caption style (default creator: word by word, emphasis words huge in the accent), or none. |
 | `emphasis` | string \| string[] |  | Caption emphasis: auto (default), none, or the words to emphasise. |
@@ -3898,7 +3898,7 @@ Availability: editor — (needs watching a render with sound (the zenvi CLI and 
 | --- | --- | --- | --- |
 | `path` | string | yes | The rendered video to watch, as render/export wrote it (a path relative to the project's folder, or absolute). |
 | `brief` | string |  | What the edit was asked to be, in a sentence or two; the critic judges against it. |
-| `focus` | "hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending"[] |  | Dimensions to weigh most, e.g. ["sound_design", "mix"] after sound design. |
+| `focus` | ("hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending")[] |  | Dimensions to weigh most, e.g. ["sound_design", "mix"] after sound design. |
 
 ### fork_project_tool
 
@@ -3927,7 +3927,7 @@ Availability: editor — (needs watching a render with sound (the zenvi CLI and 
 | `a` | string | yes | The first render (a path as render/export wrote it). |
 | `b` | string | yes | The second render. |
 | `brief` | string |  | What the edit was asked to be (the brief), so the judge picks the better attempt at it. |
-| `focus` | "hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending"[] |  | Dimensions to weigh most, e.g. ["pacing", "transitions"] when the variants differ on pacing. |
+| `focus` | ("hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending")[] |  | Dimensions to weigh most, e.g. ["pacing", "transitions"] when the variants differ on pacing. |
 
 ### pick_best_variant_tool
 
@@ -3941,7 +3941,7 @@ Availability: editor — (needs watching a render with sound (the zenvi CLI and 
 | --- | --- | --- | --- |
 | `variants` | object[] | yes | 2-4 variants, each a project and its render. The first is the champion to beat. |
 | `brief` | string |  | What the edit was asked to be (the brief), so the judge picks the better attempt at it. |
-| `focus` | "hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending"[] |  | Dimensions to weigh most, e.g. ["pacing", "transitions"] when the variants differ on pacing. |
+| `focus` | ("hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending")[] |  | Dimensions to weigh most, e.g. ["pacing", "transitions"] when the variants differ on pacing. |
 | `apply` | boolean |  | Make the winner the open project, one undo step (default true). false: only report the ranking. |
 
 ### swap_shot_tool
@@ -4157,7 +4157,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `beats` | number[] |  | strobe: timeline seconds to cut on instead of hold_frames (detect_beats_tool's beats moved to the music's position); a word per beat from the first one at or after position_seconds, the lockup on the next. wheel: the drum turns on these beats (the first n-1 after position_seconds). |
 | `seed` | integer |  | paper: seed of the boil (default 1): the same seed boils the same. (min 0, max 2147483648) |
 | `marks` | boolean |  | paper: the hand-drawn marks orbiting the word (default true). |
-| `layouts` | "fit" \| "bleed" \| "outline" \| "mirror" \| "tall" \| "stack"[] |  | strobe: layouts cycled cut by cut (default all: fit, bleed, outline, mirror, tall, stack). |
+| `layouts` | ("fit" \| "bleed" \| "outline" \| "mirror" \| "tall" \| "stack")[] |  | strobe: layouts cycled cut by cut (default all: fit, bleed, outline, mirror, tall, stack). |
 
 ### list_sfx_tool
 

@@ -44,9 +44,9 @@ interface Built {
   [key: string]: unknown;
 }
 
-async function build(doc: ProjectDocument, tool: string, args: Record<string, unknown>): Promise<Built> {
+async function build(doc: ProjectDocument, tool: string, args: Record<string, unknown>, host = fakeHost()): Promise<Built> {
   const before = doc.undoLabels.length;
-  const result = await runTool({ doc, host: fakeHost() }, tool, args);
+  const result = await runTool({ doc, host }, tool, args);
   expect(result.ok, result.text).toBe(true);
   // The whole video is ONE undo step.
   expect(doc.undoLabels.length).toBe(before + 1);
@@ -133,6 +133,16 @@ describe("build_explainer_tool", () => {
     expect(receipt.data.duration).toBeLessThanOrEqual(6);
     expect(receipt.data.duration).toBeGreaterThan(5.4);
     expect(receipt.notes.join(" ")).toMatch(/cut after "ocean"/);
+  });
+
+  it("refuses a length the voice says nothing in, changing nothing", async () => {
+    const doc = project();
+    const p = structuredClone(doc.project);
+    p.files.find((f) => f.id === "VOICE00001")!.ai_metadata = { asr: asr("late@10", "words@10.4") };
+    const late = new ProjectDocument(p);
+    const result = await runTool({ doc: late, host: fakeHost() }, "build_explainer_tool", { voice_file_id: "VOICE00001", duration_seconds: 4 });
+    expect(result.text).toMatch(/says nothing in its first 4 s/);
+    expect(late.undoLabels).toHaveLength(0);
   });
 
   it("refuses with nothing to lead it", async () => {
@@ -227,3 +237,80 @@ describe("without words (no speech recognition here, nothing kept)", () => {
   });
 });
 
+
+describe("the builders' one undo step", () => {
+  it("a rebuild with replace=true is one more step, and undo brings the first build back", async () => {
+    const doc = project();
+    await build(doc, "build_trailer_tool", { file_ids: ["ROCKET0001", "CITY000001"], title: "First", duration_seconds: 20, braams: false });
+    const first = structuredClone(doc.project.clips);
+    await build(doc, "build_trailer_tool", { file_ids: ["OCEAN00001"], title: "Second", duration_seconds: 20, braams: false, replace: true });
+    expect(doc.project.clips.some((c) => c.file_id === "ROCKET0001")).toBe(false);
+    doc.undo();
+    expect(doc.project.clips).toEqual(first);
+  });
+
+  it("a build cancelled half way adds no history, changes nothing and deletes the media its steps wrote", async () => {
+    const doc = project();
+    const host = fakeHost();
+    const abort = new AbortController();
+    const media = host.media!;
+    const write = media.writeGenerated!.bind(media);
+    media.writeGenerated = async (name, bytes, type) => {
+      const path = await write(name, bytes, type);
+      abort.abort();
+      return path;
+    };
+    const result = await runTool({ doc, host, signal: abort.signal }, "build_trailer_tool", { file_ids: ["ROCKET0001", "CITY000001"], title: "Gone", duration_seconds: 20 });
+    expect(result.text).toMatch(/cancelled/);
+    expect(doc.undoLabels).toHaveLength(0);
+    expect(doc.project.clips).toHaveLength(0);
+    expect(host.calls.some((c) => c.startsWith("discardGenerated /generated/"))).toBe(true);
+    expect(host.written.size).toBe(0);
+  });
+});
+
+describe("build_explainer_tool picks its voice", () => {
+  it("takes a lone narration not named like a voice as the voice, not the music bed", async () => {
+    const scratch = new ProjectDocument(createProject({ id: "BUILDPROJ2", profile: findProfile("FHD Vertical 1080p 30 fps")! }));
+    scratch.transaction("fixture", (tx) => {
+      addFile(tx, media("/media/recording.m4a", audioInfo("/media/recording.m4a", 14)), { id: "RECORD0001" });
+      addFile(tx, media("/media/rocket_launch.mp4", videoInfo("/media/rocket_launch.mp4", 8, { has_audio: false })), { id: "ROCKET0001" });
+    });
+    const p: Project = structuredClone(scratch.project);
+    p.files.find((f) => f.id === "RECORD0001")!.ai_metadata = { asr: SPEECH };
+    p.history = { undo: [], redo: [] };
+    const data = await build(new ProjectDocument(p), "build_explainer_tool", { captions: "none", grade: "none" });
+    expect(data.voice_file_id).toBe("RECORD0001");
+    expect(data.music_file_id).toBeNull();
+  });
+});
+
+describe("build_product_launch_tool with five features", () => {
+  it("ends the glass cards on the fourth feature's bar, so the fifth's title does not sit over them", async () => {
+    const doc = project();
+    const host = fakeHost();
+    const motion = host.motion!;
+    // A motion host that renders every block the builder asks for.
+    const blocks = motion.blocks!().flatMap((b) => ["glass_cards", "gradient_field", "logo_reveal_end"].map((id) => ({ ...b, id })));
+    host.motion = { ...motion, blocks: () => blocks, check: (_id, params) => ({ ok: true, params }) };
+    const data = await build(doc, "build_product_launch_tool", { product: "Oarlight", features: ["A", "B", "C", "D", "E"], file_ids: ["CITY000001"], three_d: "none" }, host);
+    const sections = (data.sections as { kind: string; start: number; end: number }[]).filter((s) => s.kind === "feature");
+    const cards = step(data, "features")!;
+    // The glass blurs the product's footage, drawn by the block (without it the block draws an opaque sky).
+    expect(cards, cards.why).toMatchObject({ outcome: "applied", args: { placement: "full_frame", params: expect.objectContaining({ background: "CITY000001" }) } });
+    expect(Number(cards.args!.position_seconds) + Number(cards.args!.duration_seconds)).toBeCloseTo(sections[3]!.end, 3);
+    expect(step(data, "feature 5")).toMatchObject({ outcome: "fallback", args: expect.objectContaining({ position_seconds: sections[4]!.start }) });
+  });
+});
+
+describe("keywords naming their picture", () => {
+  it.each(["build_explainer_tool", "build_talking_head_tool"])("%s refuses a file_id that is not a bin picture, changing nothing", async (tool) => {
+    const doc = project();
+    const lead = tool === "build_explainer_tool" ? { voice_file_id: "VOICE00001" } : { speaker_file_ids: ["TAKE000001"] };
+    for (const fileId of ["NOPE000001", "SONG000001"]) {
+      const result = await runTool({ doc, host: fakeHost() }, tool, { ...lead, keywords: [{ word: "rocket", file_id: fileId }] });
+      expect(result.text).toMatch(new RegExp(`Error: .*keywords file_id.*${fileId}`));
+    }
+    expect(doc.undoLabels).toHaveLength(0);
+  });
+});

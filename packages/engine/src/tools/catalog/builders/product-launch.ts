@@ -151,23 +151,23 @@ export const productLaunchTools: CatalogTool[] = [
         }
       }
 
-      // The features: one glass-cards block over all of them, else a title per feature.
+      // The features: one glass-cards block over the first four (the block's most), else a title per feature; a fifth gets its own title after the cards.
       const featureSections = plan.sections.filter((s) => s.kind === "feature");
       const first = featureSections[0]!;
-      const last = featureSections[featureSections.length - 1]!;
+      const last = featureSections[Math.min(4, featureSections.length) - 1]!;
       const background = shown.get(first);
       const cards = await c.run(
         "features",
         "add_motion_block_tool",
         {
           block: "glass_cards",
-          // Over the footage, which keeps cutting a shot per feature under the cards (a held still behind them reads as a slide).
-          params: { headline: `*${args.product}*`, cards: features.map((f) => f.title).slice(0, 4), details: features.map((f) => f.detail).slice(0, 4) },
+          // The first feature's footage as the block's own background: the glass blurs only what the block draws, and without one it draws an opaque sky over the timeline's shots.
+          params: { headline: `*${args.product}*`, cards: features.map((f) => f.title).slice(0, 4), details: features.map((f) => f.detail).slice(0, 4), ...(background ? { background } : {}) },
           position_seconds: round3(first.start),
           duration_seconds: round3(last.end - first.start),
-          placement: background ? "over_video" : "full_frame",
+          placement: "full_frame",
         },
-        `${features.length} feature(s) as glass cards over the product shots, one entrance per bar`,
+        `${Math.min(4, features.length)} feature(s) as glass cards over the product${background ? "'s footage" : " (a drawn sky: no footage)"}, one entrance per bar`,
       );
       if (!cards || features.length > 4) {
         for (const s of cards ? featureSections.slice(4) : featureSections) {
