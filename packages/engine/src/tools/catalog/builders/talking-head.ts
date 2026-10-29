@@ -24,8 +24,8 @@ import { binPictures, givenKeywords, keywordMedia, keywordsArg, occupied, pickMu
 import { Composer, binOf, builderTracks, clearTimeline, placeBed, placeShot, round3 } from "./compose.js";
 
 const TOOL = "build_talking_head_tool";
-/** A punch-in on a strong word: this much tighter than the framing it cuts from. */
-const WORD_PUNCH = 1.18;
+/** The alternate framing: a second camera 1.4x tighter (the creator talking-head references: 1.4-1.5x every other piece). */
+const PUNCH = 1.4;
 
 const input = z.strictObject({
   speaker_file_ids: z.array(z.string().min(1)).min(1).max(12).optional().describe("The takes of the speaker, in order. Default: every bin video with sound."),
@@ -35,8 +35,8 @@ const input = z.strictObject({
   caption_style: z.enum([...CAPTION_STYLE_IDS, "none"]).optional().describe("Caption style (default creator: word by word, emphasis words huge in the accent), or none."),
   emphasis: z.union([z.string(), z.array(z.string())]).optional().describe("Caption emphasis: auto (default), none, or the words to emphasise."),
   remove_pauses: z.boolean().optional().describe("Jump-cut the pauses longer than 0.45 s out of each take (default true)."),
-  punch_in: z.number().min(1).max(1.5).optional().describe("Scale of the alternate framing on every jump cut (default 1.12; 1: no alternation)."),
-  word_punch: z.boolean().optional().describe("A hard punch-in on numbers and strongly stressed words, at most one every 4 s (default true)."),
+  punch_in: z.number().min(1).max(1.6).optional().describe("Scale of the alternate framing on every jump cut, a second camera (default 1.4; 1: no alternation)."),
+  word_punch: z.boolean().optional().describe("A hard punch-in on numbers and strongly stressed words said on the wide framing, at most one every 4 s (default true)."),
   music_file_id: z.string().min(1).optional().describe("Music bed under the speech. Default: the longest audio file in the bin; none when there is none."),
   music_level: z.number().min(0).max(1).optional().describe("The bed's level under the speech, linear (default 0.12, about -18 dB)."),
   replace: replaceArg,
@@ -84,18 +84,19 @@ export const talkingHeadTools: CatalogTool[] = [
       }
       // Without pause removal each take is one window (its words still drive captions, B-roll and punch-ins).
       const keepAll = args.remove_pauses === false;
-      const cut = planSpeakerCut(takes, keepAll ? { fps, maxPause: Infinity, pad: Infinity, punch: 1 } : { fps, punch: args.punch_in ?? 1.12 });
+      const cut = planSpeakerCut(takes, keepAll ? { fps, maxPause: Infinity, pad: Infinity, punch: 1 } : { fps, punch: args.punch_in ?? PUNCH });
       const words = cut.words;
       const pictures = brollIds.map((id) => files.get(id)!);
       // A cutaway's phrase ends at the jump cut where its pause was.
       const breaks = cut.segments.slice(1).map((s) => s.position);
-      const hits = planKeywordBroll(words, keywordMedia(pictures), givenKeywords(args.keywords), { until: cut.duration, breaks });
+      // Inserts of 0.8-1.5 s, one every 5-8 s at most (the references: median 1.1 s, 14-20 % of the runtime).
+      const hits = planKeywordBroll(words, keywordMedia(pictures), givenKeywords(args.keywords), { until: cut.duration, breaks, minHold: 0.8, maxHold: 1.5, minGap: 4 });
       const punches = args.word_punch === false ? [] : punchWords(words).filter((i) => !hits.some((h) => words[i]!.start >= h.start - 0.2 && words[i]!.start < h.end));
 
       const c = new Composer(call, TOOL);
       const placed = c.edit(
         "speaker cuts",
-        `${cut.segments.length} segment(s) from ${takes.length} take(s), ${round3(cut.removed)} s of pauses and dead air cut, the framing alternating 1 / ${args.punch_in ?? 1.12} on each jump cut`,
+        `${cut.segments.length} segment(s) from ${takes.length} take(s), ${round3(cut.removed)} s of pauses and dead air cut, the framing alternating 1 / ${args.punch_in ?? PUNCH} on each jump cut`,
         (tx) => {
           if (args.replace) clearTimeline(tx);
           const [speakerTrack, brollTrack, musicTrack] = builderTracks(tx, 3) as [number, number, number];
@@ -113,7 +114,8 @@ export const talkingHeadTools: CatalogTool[] = [
             if (k < 0) return [];
             const s = cut.segments[k]!;
             const at = Math.round(w.start * fps) / fps;
-            if (at - s.position < 0.25) return [];
+            // Only the wide framing cuts tighter on the word; a punched-in piece is already the close shot.
+            if (at - s.position < 0.25 || s.scale !== 1) return [];
             for (const prop of ["scale_x", "scale_y"]) {
               setClipKeyframes(
                 tx,
@@ -121,7 +123,7 @@ export const talkingHeadTools: CatalogTool[] = [
                 prop,
                 [
                   { time: s.position, value: s.scale, interpolation: Interpolation.CONSTANT },
-                  { time: at, value: s.scale * WORD_PUNCH, interpolation: Interpolation.CONSTANT },
+                  { time: at, value: args.punch_in ?? PUNCH, interpolation: Interpolation.CONSTANT },
                 ],
                 { mode: "merge" },
               );

@@ -3444,6 +3444,8 @@ Availability: editor partial (without speech recognition the voice's words come 
 | `script` | string |  | No voice-over yet: the script; the edit is timed at reading pace (about 150 words a minute) and the captions show it. |
 | `broll_file_ids` | string[] |  | Bin videos and images for the picture, in story order. Default: every video and image in the bin but the voice's. |
 | `keywords` | string \| object[] |  | Spoken words that cut to B-roll: a word (its picture is the bin file whose name or description has it) or {word, file_id} to choose the picture. Default: every spoken word that names a bin picture. |
+| `pace` | "documentary" \| "essay" |  | documentary (default): a new shot every 0.6-1.6 s on the phrases (the documentary references); essay: 2-4.5 s holds for a calmer video essay. |
+| `grade` | string |  | A look over every shot, laid on matched plates (unify_grade_tool look at 0.6): a list_looks_tool id, default elegant_dark_cinema; none keeps the footage as it is. |
 | `hook` | string |  | Opening title over the first sentence: the question or promise, 2-8 words. |
 | `chapters` | string[] |  | Chapter titles in order: each card sits in the pause nearest where its chapter should start. |
 | `data` | object[] |  | Counters, charts and places to show while the voice talks about them. |
@@ -3470,7 +3472,7 @@ Availability: editor partial (without Zenvi 3D the reveal is a kinetic headline 
 | `proof` | object |  | The proof: a stat that counts up (stat '2400', label 'teams'), or a short quote. |
 | `cta` | string |  | End card call to action. |
 | `url` | string |  | End card URL. |
-| `file_ids` | string[] |  | Product footage, screens and photos in order: the problem, the reveal, then one per feature and the proof. Default: every video and image in the bin. |
+| `file_ids` | string[] |  | Product footage, screens and photos in order: the problem, the reveal, then one per feature (the proof and the end card draw their own backgrounds). Default: every video and image in the bin. |
 | `logo_file_id` | string |  | The logo (a bin image) for the end card. |
 | `three_d` | "auto" \| "title_3d" \| "logo_extrude" \| "device_mockup" \| "none" |  | The reveal in 3D (Zenvi 3D, needs Blender): auto = title_3d with the product name; device_mockup shows the reveal's footage on a phone; none = no 3D. |
 | `music_file_id` | string |  | Music to cut to. Default: the longest audio file in the bin; without music the sections follow 120 BPM. |
@@ -3493,15 +3495,15 @@ Availability: editor partial (without speech recognition the takes' words come f
 | `caption_style` | "creator" \| "documentary" \| "split" \| "karaoke" \| "stack" \| "editorial" \| "none" |  | Caption style (default creator: word by word, emphasis words huge in the accent), or none. |
 | `emphasis` | string \| string[] |  | Caption emphasis: auto (default), none, or the words to emphasise. |
 | `remove_pauses` | boolean |  | Jump-cut the pauses longer than 0.45 s out of each take (default true). |
-| `punch_in` | number |  | Scale of the alternate framing on every jump cut (default 1.12; 1: no alternation). (min 1, max 1.5) |
-| `word_punch` | boolean |  | A hard punch-in on numbers and strongly stressed words, at most one every 4 s (default true). |
+| `punch_in` | number |  | Scale of the alternate framing on every jump cut, a second camera (default 1.4; 1: no alternation). (min 1, max 1.6) |
+| `word_punch` | boolean |  | A hard punch-in on numbers and strongly stressed words said on the wide framing, at most one every 4 s (default true). |
 | `music_file_id` | string |  | Music bed under the speech. Default: the longest audio file in the bin; none when there is none. |
 | `music_level` | number |  | The bed's level under the speech, linear (default 0.12, about -18 dB). (min 0, max 1) |
 | `replace` | boolean |  | Clear the timeline first when it already has clips (in the same undo step). |
 
 ### build_trailer_tool
 
-**Build a trailer** (direct tool). Cut a finished three-act trailer in one step: the world in long faded shots, the trouble at half that, a climax whose cuts get faster and faster, a riser into a beat of silence on black, the title on a braam, act cards on black between the acts, an end card, the score under it falling silent before the title.
+**Build a trailer** (direct tool). Cut a finished movie or game trailer in one step: a cold open of slow faded shots, a card on black, the world in 2 s shots, one held hit with a riser under it, black and dead silence (the score too), an escalation whose cuts get faster down to 0.4 s with one white flash, the title on a braam, an end card.
 
 Surfaces: mcp, cli, editor. edits, destructive. Needs: media.
 
@@ -3511,7 +3513,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | --- | --- | --- | --- |
 | `file_ids` | string[] |  | Bin videos and images in story order. Default: every video and image in the bin. |
 | `title` | string | yes | The title card after the silence (the film, the product, the event). |
-| `act_cards` | string[] |  | Up to two cards on black between the acts (e.g. 'THIS SUMMER', 'ONE CHANCE'). |
+| `act_cards` | string[] |  | Up to two small cards on black: one after the cold open (a billing or tagline, e.g. 'THIS WINTER'), one before the held hit. |
 | `end_card` | string |  | The last card: a date, a URL, 'coming soon'. |
 | `duration_seconds` | number |  | Target length, seconds (default 40). (min 15, max 120) |
 | `music_file_id` | string |  | Score in the bin. Default: the longest audio file; none when there is none. |

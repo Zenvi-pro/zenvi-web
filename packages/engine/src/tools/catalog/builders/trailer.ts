@@ -1,12 +1,12 @@
 /**
  * build_trailer_tool: a three-act trailer in one call (builders/trailer.ts
- * plans it): the world in long faded shots, the trouble at half that, a
- * climax whose every shot is shorter than the last, a riser into a beat of
- * silence on black, the title on a braam, the end card. Title cards on black
- * between the acts; braams (a low boom and a sub drop together) open act two,
- * the climax and the title. The cinematic look and slow push-ins of
- * build_reel_tool's cinematic style on every shot. One undo step; the receipt
- * lists every decision.
+ * plans it): a cold open of slow faded shots, a card on black, the world in
+ * 2 s shots, one held hit with a riser under it, black and dead silence, an
+ * escalation whose every shot is shorter than the last (one white flash),
+ * the title on a braam, the end card. Braams (a low boom and a sub drop
+ * together) land on the held hit, the escalation and the title. The
+ * cinematic look and slow push-ins of build_reel_tool's cinematic style on
+ * every shot. One undo step; the receipt lists every decision.
  */
 
 import { z } from "zod";
@@ -30,7 +30,7 @@ const ACT1_DIP = 0.3;
 const input = z.strictObject({
   file_ids: z.array(z.string().min(1)).min(1).max(80).optional().describe("Bin videos and images in story order. Default: every video and image in the bin."),
   title: z.string().min(1).max(60).describe("The title card after the silence (the film, the product, the event)."),
-  act_cards: z.array(z.string().min(1).max(60)).max(2).optional().describe("Up to two cards on black between the acts (e.g. 'THIS SUMMER', 'ONE CHANCE')."),
+  act_cards: z.array(z.string().min(1).max(60)).max(2).optional().describe("Up to two small cards on black: one after the cold open (a billing or tagline, e.g. 'THIS WINTER'), one before the held hit."),
   end_card: z.string().max(80).optional().describe("The last card: a date, a URL, 'coming soon'."),
   duration_seconds: z.number().min(15).max(120).optional().describe("Target length, seconds (default 40)."),
   music_file_id: z.string().min(1).optional().describe("Score in the bin. Default: the longest audio file; none when there is none."),
@@ -45,8 +45,8 @@ export const trailerTools: CatalogTool[] = [
     name: TOOL,
     title: "Build a trailer",
     description:
-      "Cut a finished three-act trailer in one step: the world in long faded shots, the trouble at half that, a climax whose cuts get faster and faster, a riser into a beat of silence on black, " +
-      "the title on a braam, act cards on black between the acts, an end card, the score under it falling silent before the title. Cuts in acts two and three land on the music's beats when it can be tracked. One undo step; " +
+      "Cut a finished movie or game trailer in one step: a cold open of slow faded shots, a card on black, the world in 2 s shots, one held hit with a riser under it, black and dead silence (the score too), " +
+      "an escalation whose cuts get faster down to 0.4 s with one white flash, the title on a braam, an end card. The world and the escalation cut on the music's beats when it can be tracked. One undo step; " +
       "data.decisions lists every step and every fallback. " +
       FINISH_HINT,
     input,
@@ -74,7 +74,7 @@ export const trailerTools: CatalogTool[] = [
 
       const style = REEL_STYLES.cinematic;
       const c = new Composer(call, TOOL);
-      const placed = c.edit("three acts", `${plan.shots.length} shots: act one ${plan.shots.filter((s) => s.act === 1).length}, act two ${plan.shots.filter((s) => s.act === 2).length}, the climax ${plan.shots.filter((s) => s.act === 3).length} getting faster`, (tx) => {
+      const placed = c.edit("three acts", `${plan.shots.length} shots: the cold open ${plan.shots.filter((s) => s.act === 1).length}, the world ${plan.shots.filter((s) => s.act === 2 && !s.held).length} and the held hit, the escalation ${plan.shots.filter((s) => s.act === 3).length} getting faster`, (tx) => {
         if (args.replace) clearTimeline(tx);
         const [musicTrack, pictureTrack] = builderTracks(tx, 2) as [number, number];
         const uses = new Map<number, number>();
@@ -132,29 +132,38 @@ export const trailerTools: CatalogTool[] = [
         );
       }
 
-      if (args.braams === false) c.skip("braams", "braams=false");
-      else {
-        for (const [i, at] of plan.braams.entries()) {
-          const what = i === plan.braams.length - 1 ? "title" : i === 0 ? "act two" : "the climax";
-          await c.run(`braam ${what}`, "add_sfx_tool", { recipe: "impact_boom", at_seconds: round3(at), pitch: -7, brightness: 0.2, intensity: 0.95, seed: i + 1 }, `the low hit that opens ${what}`);
-          await c.run(`braam ${what} (sub)`, "add_sfx_tool", { recipe: "sub_drop", at_seconds: round3(at), seed: i + 1 }, "the sub under the braam");
+      if (plan.flash !== null) {
+        const k = plan.shots.findIndex((x) => Math.abs(x.end - plan.flash!) < 1e-6);
+        if (k >= 0 && k + 1 < placed.clips.length) {
+          await c.run("flash", "apply_motion_transition_tool", { preset: "flash_white", clip1_id: placed.clips[k]!, clip2_id: placed.clips[k + 1]! }, `the escalation's one white flash at ${round3(plan.flash)} s`);
         }
-        const [from, to] = plan.riser;
-        if (to - from >= 1) await c.run("riser", "add_sfx_tool", { recipe: "riser_tonal", at_seconds: round3(to), duration: round3(Math.min(8, to - from)) }, "the climax rises into the silence and stops dead");
       }
 
-      c.suggest("auto_sound_design_tool", { genre: "hype", climax_seconds: round3(plan.silence[0]) }, "whooshes and hits on the climax's cuts (the braams are placed)");
+      if (args.braams === false) c.skip("braams", "braams=false");
+      else {
+        const names = ["the held hit", "the escalation", "the title"];
+        for (const [i, at] of plan.braams.entries()) {
+          await c.run(`braam ${names[i]}`, "add_sfx_tool", { recipe: "impact_boom", at_seconds: round3(at), pitch: -7, brightness: 0.2, intensity: 0.95, seed: i + 1 }, `the low hit on ${names[i]}`);
+          await c.run(`braam ${names[i]} (sub)`, "add_sfx_tool", { recipe: "sub_drop", at_seconds: round3(at), seed: i + 1 }, "the sub under the braam");
+        }
+        const [from, to] = plan.riser;
+        if (to - from >= 1) await c.run("riser", "add_sfx_tool", { recipe: "riser_tonal", at_seconds: round3(to), duration: round3(Math.min(8, to - from)) }, "the held hit rises into the silence and stops dead");
+      }
+
+      c.suggest("auto_sound_design_tool", { genre: "hype", climax_seconds: round3(plan.silence[1]) }, "whooshes and hits on the escalation's cuts (the braams are placed)");
       c.suggest("master_audio_tool", { preset: "social", iterate: true }, "the loudness set last");
+      const esc = plan.shots.filter((x) => x.act === 3).map((x) => x.end - x.start);
       return c.finish(
         "Build trailer",
-        `Built a trailer: ${round3(plan.duration)} s, ${plan.shots.length} shots in three acts, the climax from ${round3(plan.shots.find((s) => s.act === 3)!.end - plan.shots.find((s) => s.act === 3)!.start)} s shots down to ${round3(Math.min(...plan.shots.filter((s) => s.act === 3).map((s) => s.end - s.start)))} s, silence at ${round3(plan.silence[0])} s, the title at ${round3(plan.silence[1])} s.`,
+        `Built a trailer: ${round3(plan.duration)} s, ${plan.shots.length} shots in three acts, the escalation from ${round3(esc[0]!)} s shots down to ${round3(Math.min(...esc.slice(0, -1).concat(esc.length === 1 ? esc : [])))} s, silence at ${round3(plan.silence[0])} s, the title at ${round3(plan.cards.find((x) => x.kind === "title")!.start)} s.`,
         {
           category: "trailer",
           duration: plan.duration,
           beat_source: grid.source,
           tracks: placed.tracks,
           acts: plan.acts.map((a) => ({ ...a, shots: plan.shots.filter((s) => s.act === a.act).length })),
-          shots: plan.shots.map((s, i) => ({ clip_id: placed.clips[i], file_id: ids[s.media], act: s.act, start: s.start, end: s.end })),
+          shots: plan.shots.map((s, i) => ({ clip_id: placed.clips[i], file_id: ids[s.media], act: s.act, start: s.start, end: s.end, ...(s.held ? { held: true } : {}) })),
+          flash: plan.flash,
           cards: plan.cards,
           silence: plan.silence,
           braams: plan.braams,

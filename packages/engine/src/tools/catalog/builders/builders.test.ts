@@ -63,7 +63,7 @@ describe("build_talking_head_tool", () => {
     const tracks = data.tracks as { speaker: number; broll: number; music: number };
     const segments = data.segments as { scale: number; start: number }[];
     // Four phrases (pauses over 0.45 s cut), the framing changing on every jump cut.
-    expect(segments.map((s) => s.scale)).toEqual([1, 1.12, 1, 1.12]);
+    expect(segments.map((s) => s.scale)).toEqual([1, 1.4, 1, 1.4]);
     const speaker = on(doc, tracks.speaker);
     expect(speaker).toHaveLength(4);
     for (let i = 1; i < speaker.length; i += 1) expect(speaker[i]!.position).toBeCloseTo(speaker[i - 1]!.position + (speaker[i - 1]!.end - speaker[i - 1]!.start), 5);
