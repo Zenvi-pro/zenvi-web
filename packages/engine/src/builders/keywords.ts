@@ -44,6 +44,8 @@ export interface KeywordRules {
   until: number;
   /** A picture is shown once unless the caller named it for several words (default true). */
   oncePerFile?: boolean;
+  /** Timeline times a phrase ends at whatever the gap (a talking head's jump cuts, where the pauses were). */
+  breaks?: readonly number[];
 }
 
 /** A light stem: plural and verb endings off, so "rockets" meets "rocket" and "launching" meets "launch". */
@@ -70,10 +72,11 @@ export function termsOf(...texts: readonly string[]): string[] {
 }
 
 /** End of the phrase a word is in: the last word before a pause longer than `gap`. */
-export function phraseEnd(words: readonly CaptionWord[], index: number, gap = 0.35): number {
+export function phraseEnd(words: readonly CaptionWord[], index: number, gap = 0.35, breaks: readonly number[] = []): number {
   let end = words[index]!.end;
+  const stop = breaks.filter((b) => b > words[index]!.start + 1e-6).reduce((a, b) => Math.min(a, b), Infinity);
   for (let i = index + 1; i < words.length; i += 1) {
-    if (words[i]!.start - end > gap) break;
+    if (words[i]!.start - end > gap || words[i]!.start >= stop - 1e-6) break;
     end = words[i]!.end;
   }
   return end;
@@ -120,7 +123,7 @@ export function planKeywordBroll(words: readonly CaptionWord[], media: readonly 
     if (c.source === "named" && usedNamed.has(stem(w.text))) continue;
     if (once && c.source === "matched" && usedFiles.has(c.fileId)) continue;
     const start = w.start;
-    const end = Math.min(rules.until, start + Math.min(maxHold, Math.max(minHold, phraseEnd(words, c.word) - start)));
+    const end = Math.min(rules.until, start + Math.min(maxHold, Math.max(minHold, phraseEnd(words, c.word, 0.35, rules.breaks) - start)));
     if (end - start < minHold * 0.6) continue;
     if (chosen.some((h) => start < h.end + minGap && h.start < end + minGap)) continue;
     chosen.push({ word: c.word, text: w.text, fileId: c.fileId, start, end, source: c.source });

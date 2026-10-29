@@ -87,7 +87,9 @@ export const talkingHeadTools: CatalogTool[] = [
       const cut = planSpeakerCut(takes, keepAll ? { fps, maxPause: Infinity, pad: Infinity, punch: 1 } : { fps, punch: args.punch_in ?? 1.12 });
       const words = cut.words;
       const pictures = brollIds.map((id) => files.get(id)!);
-      const hits = planKeywordBroll(words, keywordMedia(pictures), givenKeywords(args.keywords), { until: cut.duration });
+      // A cutaway's phrase ends at the jump cut where its pause was.
+      const breaks = cut.segments.slice(1).map((s) => s.position);
+      const hits = planKeywordBroll(words, keywordMedia(pictures), givenKeywords(args.keywords), { until: cut.duration, breaks });
       const punches = args.word_punch === false ? [] : punchWords(words).filter((i) => !hits.some((h) => words[i]!.start >= h.start - 0.2 && words[i]!.start < h.end));
 
       const c = new Composer(call, TOOL);

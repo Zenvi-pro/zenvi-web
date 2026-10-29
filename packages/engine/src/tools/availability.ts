@@ -210,6 +210,26 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote:
       "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
   },
+  build_explainer_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.transcribe", "motion"],
+    partialNote: "without speech recognition the voice's words come from the media index (or the script, timed by length); without Zenvi Motion block rendering the counters and charts are kinetic titles (the receipt lists each fallback)",
+  },
+  build_product_launch_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm", "motion", "scenes3d", "media.importPath"],
+    partialNote: "without Zenvi 3D the reveal is a kinetic headline block, without Zenvi Motion block rendering it, the features, the proof and the end card are native kinetic titles and the end card template; without audio decoding the sections follow 120 BPM (the receipt lists each fallback)",
+  },
+  build_talking_head_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.transcribe", "mattes"],
+    partialNote: "without speech recognition the takes' words come from the media index (a take with none plays whole, with no jump cuts); without subject matting the hook is set over the speaker instead of behind them (the receipt lists each fallback)",
+  },
+  build_trailer_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm"],
+    partialNote: "without audio decoding the cuts follow the frame grid, not the score's beats",
+  },
   add_sfx_tool: {
     methods: ["media.writeGenerated"],
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.kitSample"],
