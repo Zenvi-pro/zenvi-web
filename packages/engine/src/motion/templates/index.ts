@@ -8,6 +8,7 @@ import { endCard } from "./end-card.js";
 import { kineticType } from "./kinetic-type.js";
 import { montageGrid } from "./montage-grid.js";
 import { passWipe } from "./pass-wipe.js";
+import { reflow } from "./reflow.js";
 import { stepCard } from "./step-card.js";
 import { typeSearch } from "./type-search.js";
 import { uiCards } from "./ui-cards.js";
@@ -30,4 +31,5 @@ export const TEMPLATES: Readonly<Record<MotionTemplateId, TemplateSpec>> = {
   compare,
   window_cascade: windowCascade,
   pass_wipe: passWipe,
+  reflow,
 };

@@ -156,3 +156,54 @@ describe("pass_wipe", () => {
     expect(() => build("pass_wipe", { fileIds: IDS.slice(0, 2), variant: "diagonal" })).toThrow(/right, left, down, up/);
   });
 });
+
+describe("reflow", () => {
+  /** The box a cell shows at clip frame `x`: its centre from the pose, its size from the picture less the crop. */
+  function shownBox(l: MotionLayer, x: number, pictureWidth: number, aspect: number): { x: number; y: number; w: number; h: number } {
+    const crop = l.effects.find((e) => (e as { class_name: string }).class_name === "Crop") as unknown as Record<string, Keyframe>;
+    const cx = (0.5 + evaluate(kf(l, "location_x")!, x)) * WIDE.width;
+    const cy = (0.5 + evaluate(kf(l, "location_y")!, x)) * WIDE.height;
+    const w = pictureWidth * (1 - evaluate(crop.left!, x) - evaluate(crop.right!, x));
+    const h = (pictureWidth / aspect) * (1 - evaluate(crop.top!, x) - evaluate(crop.bottom!, x));
+    return { x: cx - w / 2, y: cy - h / 2, w, h };
+  }
+
+  it("moves each cell through the given states on the beat, the crop and the pose landing on each box together", () => {
+    const states = [
+      [
+        { x: 0.3, y: 0.5, w: 0.6, h: 1 },
+        { x: 0.8, y: 0.5, w: 0.4, h: 1 },
+      ],
+      [
+        { x: 0.5, y: 0.5, w: 1, h: 1 },
+        { x: 0.5, y: 0.5, w: 1, h: 1 },
+      ],
+    ];
+    const plan = build("reflow", { fileIds: IDS.slice(0, 2), states }, WIDE, 4);
+    expect(plan.cues).toEqual([0, 15, 45]);
+    const cell = layer(plan, "cell-1");
+    // The first cell is on top (it is the one left when the cells collapse).
+    expect(cell.track).toBeGreaterThan(layer(plan, "cell-2").track);
+    const x0 = inFrames(cell) + 1;
+    const box = (f: number) => shownBox(cell, x0 + f, WIDE.width, 16 / 9);
+    // After the first move (beat 1 + 12 frames) it shows the first given box; after the second, the whole frame.
+    const near = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => {
+      for (const k of ["x", "y", "w", "h"] as const) expect(a[k]).toBeCloseTo(b[k], 0);
+    };
+    near(box(15 + 12), { x: 0, y: 0, w: 0.6 * 1920, h: 1080 });
+    near(box(45 + 12), { x: 0, y: 0, w: 1920, h: 1080 });
+    // Mid-move every side is on the straight line between the two boxes (one ease on pose and crop).
+    const mid = box(15 + 6);
+    const start = box(15);
+    const end = box(27);
+    const t = (mid.w - start.w) / (end.w - start.w);
+    expect(mid.x).toBeCloseTo(start.x + t * (end.x - start.x), 0);
+    expect(() => build("reflow", { fileIds: IDS.slice(0, 2), states: [[{ x: 0.5, y: 0.5, w: 1, h: 1 }]] })).toThrow(/one per cell/);
+  });
+
+  it("drops states that do not fit the duration, with a warning", () => {
+    const plan = build("reflow", { fileIds: IDS.slice(0, 3) }, WIDE, 1.2);
+    expect(plan.warnings?.[0]).toMatch(/did not fit/);
+    expect(plan.cues).toEqual([0, 15]);
+  });
+});

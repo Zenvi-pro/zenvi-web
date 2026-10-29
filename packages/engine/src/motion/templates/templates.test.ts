@@ -39,6 +39,7 @@ const CONTENT: Record<MotionTemplateId, { content: MotionContent; palette: Palet
   compare: { content: { fileIds: ["VIDEO00001", "VIDEO00002"], labels: ["Raw", "Edit"], replay: true }, palette: "ui_dark" },
   window_cascade: { content: { fileIds: ["VIDEO00001", "VIDEO00002", "PHOTO00001", "VIDEO00001"] }, palette: "ui_dark" },
   pass_wipe: { content: { fileIds: ["VIDEO00001", "VIDEO00002", "VIDEO00001"], labels: ["Plate", "Matte", "Comp"] }, palette: "ui_dark" },
+  reflow: { content: { fileIds: ["VIDEO00001", "VIDEO00002", "PHOTO00001", "VIDEO00001"] }, palette: "ui_dark" },
 };
 
 const ALLOWED = new Set(["svg", "rect", "line", "polyline", "path", "circle", "text", "tspan"]);

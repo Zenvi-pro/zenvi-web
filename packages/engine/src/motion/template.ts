@@ -26,6 +26,7 @@ export const MOTION_TEMPLATE_IDS = [
   "compare",
   "window_cascade",
   "pass_wipe",
+  "reflow",
 ] as const;
 export type MotionTemplateId = (typeof MOTION_TEMPLATE_IDS)[number];
 
@@ -120,6 +121,8 @@ export interface MotionContent {
   sound?: boolean;
   /** compare: end on the last clip alone, the split growing back into one full frame. */
   replay?: boolean;
+  /** reflow: the layouts after the first, a box per cell in each. */
+  states?: readonly (readonly NormBox[])[];
 }
 
 export interface TemplateInput {

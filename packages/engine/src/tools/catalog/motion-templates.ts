@@ -64,6 +64,7 @@ const DEFAULT_PALETTE: Readonly<Record<MotionTemplateId, PaletteId>> = {
   compare: "ui_dark",
   window_cascade: "ui_dark",
   pass_wipe: "ui_dark",
+  reflow: "ui_dark",
 };
 
 const TEMPLATE_LINES = MOTION_TEMPLATE_IDS.map((id) => `${id}: ${TEMPLATES[id].summary} Reads ${TEMPLATES[id].reads}.`).join(" ");
@@ -82,7 +83,7 @@ const input = z.strictObject({
   text: z.string().max(200).optional().describe("Main text: the typed phrase (type_search), the headline (kinetic_type; * stands for an image tile), the title (end_card), the caption (step_card), the product name (callout)."),
   subtitle: z.string().max(120).optional().describe("A second line: end_card's subtitle, the text cards' line (ui_cards), the prompt above the search (type_search), a still header at the top (step_card)."),
   words: z.array(z.string().min(1).max(40)).max(12).optional().describe("word_scroll: the word list (2-10 words)."),
-  file_ids: z.array(z.string().min(1)).max(9).optional().describe("Media-bin videos or photos: the cards (ui_cards), the shot (crop_labels), the product (callout), the step's footage (step_card), the image tiles (kinetic_type), the clips that fill the tiles (grid; cycled when there are fewer than tiles; one clip for layout repeat or kaleidoscope), the cards (card_cascade, 2-9), the clips to compare (compare, 2-4, raw first), the panes (window_cascade, 2-6), the passes in order (pass_wipe, 2-6)."),
+  file_ids: z.array(z.string().min(1)).max(9).optional().describe("Media-bin videos or photos: the cards (ui_cards), the shot (crop_labels), the product (callout), the step's footage (step_card), the image tiles (kinetic_type), the clips that fill the tiles (grid; cycled when there are fewer than tiles; one clip for layout repeat or kaleidoscope), the cards (card_cascade, 2-9), the clips to compare (compare, 2-4, raw first), the panes (window_cascade, 2-6), the passes in order (pass_wipe, 2-6), the cells (reflow, 2-9, the first on top)."),
   labels: z.array(z.string().max(48)).max(8).optional().describe("Short labels: card captions (ui_cards), suggestions under the search (type_search), crop box labels (crop_labels), callout names (callout), corner labels (grid_background editorial)."),
   values: z.array(z.string().max(48)).max(8).optional().describe("callout: the second line of each callout (a spec, a number)."),
   points: z.array(z.strictObject({ x: unit, y: unit })).max(8).optional().describe("callout: anchor points on the product picture (0-1 from its top left); step_card: the point the label's arrow points at; grid kaleidoscope: [the mirror centre on the shot] (default its middle)."),
@@ -93,6 +94,12 @@ const input = z.strictObject({
   highlight: z.number().int().min(0).max(30).optional().describe("kinetic_type: index of the word the highlighter marks; window_cascade: the pane (0-based) that goes full bleed."),
   sound: z.boolean().optional().describe("card_cascade: each card plays its own sound until the next one lands; compare: keep the first clip's sound. Default: muted under the music."),
   replay: z.boolean().optional().describe("compare: end on the last clip alone, the split growing back into one full frame on a beat about 60 % of the way in."),
+  states: z
+    .array(z.array(z.strictObject({ x: unit, y: unit, w: unit.gt(0), h: unit.gt(0) })).min(2).max(9))
+    .min(1)
+    .max(4)
+    .optional()
+    .describe("reflow: the layouts the cells move to after the first (a grid), one every two beats: each a list of boxes, one per file_id in order (centre x, y and size w, h, 0-1 of the frame). Default: a bento, then the first cell alone."),
   variant: z
     .string()
     .max(20)
@@ -337,7 +344,7 @@ export const motionTemplateTools: CatalogTool[] = [
     description:
       "Place one motion-design template on the timeline, timed to the beat: UI cards that slide in with depth, a search field that types, a scrolling word list with a selection box, " +
       "labelled crop boxes over a shot, a product callout with leader lines, kinetic type with image tiles, a tutorial step card, a grid background, an end card, " +
-      "a cascade of video cards dropping in, a frame-locked A/B compare (split, diagonal or offset boxes), skewed parallelogram windows snapping to full bleed, or a layer-pass breakdown wiped on with a travelling hairline. " +
+      "a cascade of video cards dropping in, a frame-locked A/B compare (split, diagonal or offset boxes), skewed parallelogram windows snapping to full bleed, a layer-pass breakdown wiped on with a travelling hairline, or footage cells reflowing between grid layouts. " +
       "Drawings are SVG titles and the media plays inside them, all animated with clip keyframes, so the result renders the same on every Zenvi surface and stays editable. " +
       `One undo step; the layers go on the lowest free tracks above the video. For a whole motion-led video use build_reel_tool with a motion style (ui_promo, editorial_motion, product_callout, tutorial). ${FINISH_HINT}`,
     input,
@@ -393,6 +400,7 @@ export const motionTemplateTools: CatalogTool[] = [
         ...(args.backdrop !== undefined ? { backdrop: args.backdrop } : {}),
         ...(args.sound !== undefined ? { sound: args.sound } : {}),
         ...(args.replay !== undefined ? { replay: args.replay } : {}),
+        ...(args.states ? { states: args.states } : {}),
         ...(gridOptions ? { grid: gridOptions } : {}),
       };
       const [width, height] = projectSize(project);
