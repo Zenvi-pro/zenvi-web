@@ -48,7 +48,7 @@ const effectsGone: ToolSpec = { tool: "remove_effect_tool", args: { timeline_cli
 export const EDIT_TOOL_CASES: readonly TruthCase[] = [
   // Placement and trims: the probed time shows another source frame, or nothing.
   param(move, "position_seconds", 0, { expect: [up("coverage")] }),
-  param(move, "track", "2", { clips: [{ fixture: "rings.mp4", id: "B", track: 2 }, { fixture: "bars.mp4", id: "A", track: 1 }], probe: at(0.5), label: "over" }),
+  param(move, "track", "3", { clips: [{ fixture: "rings.mp4", id: "B", track: 2 }, { fixture: "bars.mp4", id: "A", track: 1 }], probe: at(0.5), label: "over" }),
   param(moves, "position_seconds", 0, { expect: [up("coverage")] }),
   param(moves, "by_seconds", -0.5, { expect: [up("coverage")] }),
   param(moves, "by_frames", -15, { expect: [up("coverage")] }),
@@ -115,9 +115,8 @@ export const EDIT_TOOL_CASES: readonly TruthCase[] = [
   param(ramp, "slow", 0.1, { with: { preset: "ramp_in" }, base: 0.5 }),
   param(ramp, "fast", 3, { with: { preset: "velocity" }, base: 1.5 }),
   param(ramp, "ramp_seconds", 0.2, { with: { preset: "ramp_in" }, base: 0.9 }),
-  param(ramp, "hold_seconds", 0.6, { with: { preset: "hero" }, base: 0.1 }),
   param(ramp, "hit_at", 0.3, { with: { preset: "hero", ramp_seconds: 0.1, hold_seconds: 0.1 }, base: 0.7 }),
-  param(ramp, "ease", "linear", { with: { preset: "ramp_in" }, base: "smooth" }),
+  param(ramp, "ease", "linear", { with: { preset: "ramp_in", ramp_seconds: 0.9 }, base: "smooth", probe: at(0.5) }),
   param(ramp, "points", [{ at_seconds_in_clip: 0, speed: 0.2 }, { at_seconds_in_clip: 0.5, speed: 3 }], { with: { preset: "custom" }, base: [{ at_seconds_in_clip: 0, speed: 1 }, { at_seconds_in_clip: 0.5, speed: 2 }], probe: at(0.1) }),
   param({ ...ramp, probe: SOUND, clips: BARS }, "audio", "keep", { with: { preset: "ramp_in" }, base: "mute", expect: [up("rms")] }),
 

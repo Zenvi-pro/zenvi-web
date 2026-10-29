@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { allCases } from "./cases/index.js";
 import { CLIP_PROPERTY_CASES, CLIP_PROPERTY_EXEMPT } from "./cases/clip-props.js";
 import { COMMON_EXEMPT, COMMON_PARAM_CASES, EFFECT_EXEMPT, EFFECT_INERT, IDENTITY_DEFAULTS, matrixParams, rendersEffect } from "./cases/effects.js";
-import { BACKLOG, catalogParams, classify, OFFSCREEN, provenIndex } from "./coverage.js";
+import { BACKLOG, catalogParams, classify, OFFSCREEN, paramNoteKeys, provenIndex } from "./coverage.js";
 import { KNOWN_FAILURES } from "./ledger.js";
 
 const cases = allCases();
@@ -38,6 +38,7 @@ describe("tool truth coverage", () => {
         if (proven.has(`${tool} ${param}`)) stale.push(`BACKLOG.${tool}.${param} (proven now: delete it)`);
       }
     }
+    for (const key of paramNoteKeys()) if (!params.has(key.replace(".", " "))) stale.push(`PARAM_NOTES.${key} (no such argument)`);
     for (const c of cases) if (!toolNames.has(c.tool)) stale.push(`case ${c.id} (no such tool)`);
     const ids = new Set(cases.map((c) => c.id));
     for (const id of Object.keys(KNOWN_FAILURES)) if (!ids.has(id) && !id.includes("=")) stale.push(`KNOWN_FAILURES ${id}`);

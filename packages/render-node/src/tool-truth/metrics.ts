@@ -126,9 +126,10 @@ export function pictureChanged(diff: PictureDiff): boolean {
 }
 
 /**
- * Pearson correlation of two renderers' per-pixel luma changes (variant −
- * base): near 1 when both moved the same pixels the same way, near 0 or
- * below when one renderer reads the parameter differently.
+ * Pearson correlation of two renderers' per-pixel, per-channel changes
+ * (variant − base): near 1 when both moved the same pixels the same way,
+ * near 0 or below when one renderer reads the parameter differently.
+ * Channels, not luma: a white-balance change barely moves luma.
  */
 export function changeCorrelation(baseA: RgbaImage, variantA: RgbaImage, baseB: RgbaImage, variantB: RgbaImage): number {
   const n = baseA.width * baseA.height;
@@ -140,17 +141,24 @@ export function changeCorrelation(baseA: RgbaImage, variantA: RgbaImage, baseB: 
   let sxy = 0;
   for (let p = 0; p < n; p += 1) {
     const i = p * 4;
-    const x = lumaOf(...rgbAt(variantA, i)) - lumaOf(...rgbAt(baseA, i));
-    const y = lumaOf(...rgbAt(variantB, i)) - lumaOf(...rgbAt(baseB, i));
-    sx += x;
-    sy += y;
-    sxx += x * x;
-    syy += y * y;
-    sxy += x * y;
+    const va = rgbAt(variantA, i);
+    const ba = rgbAt(baseA, i);
+    const vb = rgbAt(variantB, i);
+    const bb = rgbAt(baseB, i);
+    for (let c = 0; c < 3; c += 1) {
+      const x = va[c]! - ba[c]!;
+      const y = vb[c]! - bb[c]!;
+      sx += x;
+      sy += y;
+      sxx += x * x;
+      syy += y * y;
+      sxy += x * y;
+    }
   }
-  const cov = sxy / n - (sx / n) * (sy / n);
-  const vx = sxx / n - (sx / n) ** 2;
-  const vy = syy / n - (sy / n) ** 2;
+  const m = 3 * n;
+  const cov = sxy / m - (sx / m) * (sy / m);
+  const vx = sxx / m - (sx / m) ** 2;
+  const vy = syy / m - (sy / m) ** 2;
   return vx > 1e-9 && vy > 1e-9 ? cov / Math.sqrt(vx * vy) : 0;
 }
 

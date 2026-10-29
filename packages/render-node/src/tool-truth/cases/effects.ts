@@ -32,6 +32,8 @@ const CONTEXT: Readonly<Record<string, Args>> = {
   "Caption.background_padding": { background_alpha: 1 },
   "Caption.fade_out": { caption_text: SHORT_CAPTION },
   "ChromaKey.*": { color: SCREEN },
+  // A tight tolerance: at the default every method keys the whole evenly lit screen alike.
+  "ChromaKey.keymethod": { color: SCREEN, fuzz: 5 },
   "ColorGrade.lut_intensity": { lut_path: LUT },
   "ColorGrade.mix": { exposure: 1 },
   "ColorMap.*": { lut_path: LUT },

@@ -118,7 +118,8 @@ let runs = 0;
 async function runHost(session: TruthSession): Promise<NodeHost> {
   const folder = path.join(session.dir, `run-${(runs += 1)}`);
   await mkdir(folder, { recursive: true });
-  return createNodeHost({ projectFile: path.join(folder, "truth.zvn"), scenes3d: false, mattes: false });
+  // desktopDir: custom profiles (set_project_setting_tool sizes no built-in profile has) are saved there.
+  return createNodeHost({ projectFile: path.join(folder, "truth.zvn"), desktopDir: path.join(folder, "desktop"), scenes3d: false, mattes: false });
 }
 
 const projects = new Map<string, Promise<Project>>();
@@ -171,14 +172,27 @@ async function edited(
   return { project: doc.project, host };
 }
 
-/** `"@effect:Blur"` → the id of the first Blur effect in the project (ids are generated, cases name the class). */
+/**
+ * Generated ids the cases cannot know: `"@effect:Blur"` → the id of the
+ * first Blur effect in the project, `"@file:bars.mp4"` → the id of that
+ * fixture in Project Files. Arrays are resolved item by item.
+ */
 function resolveRefs(project: Project, args: Args): Args {
-  const out: Args = {};
-  for (const [key, value] of Object.entries(args)) {
-    const ref = typeof value === "string" && value.startsWith("@effect:") ? value.slice("@effect:".length) : undefined;
-    out[key] = ref ? (project.clips.flatMap((clip) => clip.effects ?? []).find((e) => e.type === ref)?.id ?? value) : value;
-  }
-  return out;
+  const resolve = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(resolve);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolve(v)]));
+    if (typeof value !== "string") return value;
+    if (value.startsWith("@effect:")) {
+      const type = value.slice("@effect:".length);
+      return project.clips.flatMap((clip) => clip.effects ?? []).find((e) => e.type === type)?.id ?? value;
+    }
+    if (value.startsWith("@file:")) {
+      const name = value.slice("@file:".length);
+      return project.files.find((f) => path.basename(String(f.path)) === name)?.id ?? value;
+    }
+    return value;
+  };
+  return Object.fromEntries(Object.entries(args).map(([key, value]) => [key, resolve(value)]));
 }
 
 type Rendered = { kind: "picture"; image: RgbaImage } | { kind: "sound"; mix: MixPcm };

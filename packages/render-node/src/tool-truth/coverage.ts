@@ -91,6 +91,29 @@ const INERT: Readonly<Record<string, string>> = {
   replace: "replaces this tool's earlier output instead of stacking: same picture for one call",
 };
 
+/** One tool's arguments that change nothing on their own (`tool.param` → why). */
+const PARAM_NOTES: Readonly<Record<string, string>> = {
+  "set_clip_audio_video_tool.waveform": "the timeline's waveform display in the editor, not the picture",
+  "separate_clip_audio_tool.per_channel": "one clip per channel plays the same mix as one clip with all channels",
+  "separate_clip_audio_tool.to_track": "where the separated audio clip goes: same mix",
+  "add_clips_to_timeline_tool.min_clip_seconds": "a floor for fit_total_seconds' trims: equal fixtures trim evenly above it",
+  "add_effect_tool.effect_name": "the same as effect (either works)",
+  "add_effect_tool.processing": "OpenCV analysis options: Zenvi desktop only",
+  "add_emoji_tool.group": "narrows an emoji name lookup; the emoji argument is proven",
+  "set_project_setting_tool.save_as_default": "a Preferences default for new projects",
+  "set_clip_speed_tool.ripple": "moves the later clips on the track; with one clip, the same picture",
+  "trim_clips_tool.ripple": "moves the later clips on the track; with one clip, the same picture",
+  "slice_clips_tool.ripple": "moves the later clips on the track; with one clip, the same picture",
+  "freeze_frame_tool.ripple": "moves the later clips on the track; with one clip, the same picture",
+  "speed_ramp_tool.ripple": "moves the later clips on the track; with one clip, the same picture",
+  "repeat_clip_tool.ripple": "moves the later clips on the track; with one clip, the same picture",
+  "move_clips_tool.ripple": "moves the later clips on the track; with one clip, the same picture",
+  "duplicate_clips_tool.ripple": "pushes clips at the destination later; with one clip, the same picture",
+  "delete_from_timeline_tool.ripple": "closes the gap by moving later clips; with one clip, the same picture",
+  "update_transition_tool.ripple": "moves the later clips on the track; with two clips, the same picture",
+  "update_transition_tool.keep_overlap": "leaves the clips where they are when the duration changes (proven with position_seconds)",
+};
+
 /** Tools that change no picture and no sound (whole tool, every argument). */
 export const OFFSCREEN: Readonly<Record<string, string>> = {
   new_project_tool: "replaces the project (no media)",
@@ -148,11 +171,11 @@ export interface BacklogEntry {
  * a stale entry).
  */
 export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
-  delete_from_timeline_tool: { reason: "not proven yet", params: ["include_transitions", "ripple"] },
+  delete_from_timeline_tool: { reason: "not proven yet", params: ["include_transitions"] },
   delete_clips_on_track_tool: { reason: "not proven yet", params: ["include_transitions"] },
   duck_under_speech_tool: { reason: "needs speech clips with transcript cues", params: ["duck_db", "attack_ms", "release_ms", "pad_before_ms", "pad_after_ms", "boost_speech_db"] },
   split_file_add_clip_tool: { reason: "needs the media index for queries; seconds/frames not proven yet", params: ["start_seconds", "end_seconds", "start_frame", "end_frame", "require_visual_match"] },
-  add_clip_to_timeline_tool: { reason: "not proven yet", params: ["position_seconds", "duration_seconds", "start_seconds", "end_seconds", "full_file"] },
+  add_clip_to_timeline_tool: { reason: "duration_seconds alone is refused on media nothing has watched (it needs a watched keep window)", params: ["duration_seconds"] },
   import_video_url_and_add_to_timeline_tool: { reason: "downloads from a URL (network): the clip it adds is footage like any other", params: ["video_url", "position_seconds", "start_seconds", "end_seconds", "duration_seconds", "full_file"] },
   ingest_web_video_tool: { reason: "downloads from a URL (network, yt-dlp)", params: ["url", "video_url", "intent", "place", "position_seconds", "write_subs", "job_id"] },
   match_color_to_reference_tool: { reason: "not proven yet: iterative grade matching against a reference frame", params: ["reference", "referenceClipId", "referenceFileId", "referenceImagePath", "max_iterations"] },
@@ -165,15 +188,11 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   generate_transition_clip_tool: { reason: "generates a transition clip through the backend", params: ["prompt_hint", "duration_seconds"] },
   generate_tts_and_add_to_timeline_tool: { reason: "speech through the Zenvi backend (account, credits)", params: ["model", "position", "position_seconds", "speed", "text", "voice"] },
   import_stock_media_tool: { reason: "downloads stock media (network)", params: ["source", "video_id", "link", "sound_id", "preview_url", "filename", "local_path", "position_seconds", "duration_seconds", "start_seconds"] },
-  add_effect_tool: { reason: "not proven yet", params: ["effect_name", "processing"] },
   add_title_tool: { reason: "not proven yet", params: ["screen_position"] },
-  set_project_setting_tool: { reason: "not proven yet: profile changes (size, fps, channels) change every frame", params: "*" },
   remove_words_tool: { reason: "needs a transcript (Zenvi backend speech recognition)", params: ["wordIndices", "matches", "fillerPreset", "transcriptGeneration", "language", "modelId", "engine"] },
   remove_silence_tool: { reason: "not proven yet: silence detection needs a fixture with pauses", params: ["minPauseSec", "padSec", "maxRemoveFraction"] },
   add_captions_tool: { reason: "not proven yet (the transcript arguments need speech recognition)", params: ["engine", "language", "maxChars", "maxWords", "modelId", "overlay_track", "srtPath", "time_base"] },
   add_animated_title_tool: { reason: "not proven yet: animated title templates (Blender/Chrome renders)", params: ["length_multiplier", "params", "position_seconds", "template", "text"] },
-  add_clips_to_timeline_tool: { reason: "not proven yet", params: ["fade", "fade_seconds", "fit_total_seconds", "image_seconds", "items", "min_clip_seconds", "order", "start_seconds", "transition", "transition_seconds", "zoom"] },
-  add_emoji_tool: { reason: "not proven yet", params: ["group"] },
   add_transitions_between_clips_tool: { reason: "not proven yet", params: ["audio_crossfade", "max_gap_seconds", "method"] },
   align_clips_tool: { reason: "not proven yet", params: ["edge", "to_seconds"] },
   chroma_key_clip_tool: { reason: "not proven yet", params: ["align", "background_query", "sample_time"] },
@@ -181,27 +200,18 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   copy_effects_tool: { reason: "not proven yet", params: ["effects", "mode"] },
   copy_transition_tool: { reason: "not proven yet", params: ["at_seconds", "fit_duration", "what"] },
   create_media_with_comfyui_tool: { reason: "generates media on a ComfyUI server", params: ["kind", "prompt", "reference_image_file_id", "template"] },
-  duplicate_clips_tool: { reason: "not proven yet", params: ["copies", "include_transitions", "position_seconds", "ripple", "to_track"] },
-  edit_captions_tool: { reason: "not proven yet: edits captions add_captions_tool made", params: ["add_cues", "background_color", "background_opacity", "cue_edits", "fade_seconds", "find", "font", "position", "shift_seconds", "stroke_color", "stroke_width", "style", "text_color", "text_size", "uppercase"] },
+  duplicate_clips_tool: { reason: "not proven yet", params: ["include_transitions", "to_track"] },
   edit_title_tool: { reason: "not proven yet", params: ["fit_text", "lines", "subtitle"] },
   enhance_file_with_comfyui_tool: { reason: "processes media on a ComfyUI server", params: ["action", "auto_detect", "background_brightness", "border_color", "border_width", "boxes", "highlight_color", "highlight_opacity", "mask_brightness", "negative_boxes", "negative_points", "points", "prompt", "reference_image_file_id", "seed_frame", "template"] },
-  freeze_frame_tool: { reason: "not proven yet", params: ["ripple"] },
-  move_clips_tool: { reason: "not proven yet", params: ["after_clip_id", "before_clip_id", "ripple", "to_track"] },
+  move_clips_tool: { reason: "not proven yet", params: ["after_clip_id", "before_clip_id", "to_track"] },
   process_clip_effect_tool: { reason: "OpenCV analysis effects: Zenvi desktop only", params: ["boxes", "class_filter", "confidence", "device", "download_model", "mask_quality", "model", "negative_points", "points", "properties", "region", "region_time", "smoothing", "tracker_type"] },
-  remove_captions_tool: { reason: "not proven yet", params: ["all_captions"] },
   remove_gaps_tool: { reason: "not proven yet", params: ["from_seconds", "only_first"] },
   remove_keyframes_tool: { reason: "not proven yet", params: ["end_seconds", "properties", "start_seconds"] },
   remove_track_tool: { reason: "not proven yet", params: ["with_clips"] },
   remove_transition_tool: { reason: "not proven yet", params: ["at_seconds"] },
-  repeat_clip_tool: { reason: "not proven yet", params: ["delay_seconds", "pattern", "reverse", "ripple", "speed_ramp_percent", "times"] },
   reverse_transition_tool: { reason: "not proven yet", params: ["at_seconds"] },
-  separate_clip_audio_tool: { reason: "not proven yet", params: ["per_channel", "to_track"] },
-  set_clip_audio_video_tool: { reason: "not proven yet", params: ["video", "waveform"] },
-  set_clip_speed_tool: { reason: "not proven yet", params: ["ripple"] },
-  set_project_profile_tool: { reason: "not proven yet: profile changes (size, fps) change every frame", params: "*" },
-  slice_clips_tool: { reason: "not proven yet", params: ["at_seconds", "include_transitions", "ripple"] },
-  trim_clips_tool: { reason: "not proven yet", params: ["ripple"] },
-  update_transition_tool: { reason: "not proven yet", params: ["at_seconds", "contrast_keyframes", "keep_overlap", "mask_file_id", "ripple"] },
+  slice_clips_tool: { reason: "not proven yet", params: ["at_seconds", "include_transitions"] },
+  update_transition_tool: { reason: "not proven yet", params: ["at_seconds", "contrast_keyframes", "mask_file_id"] },
   trim_clip_tool: { reason: "not proven yet", params: ["edge", "at_seconds"] },
   split_clip_tool: { reason: "not proven yet", params: ["at_seconds"] },
   master_audio_tool: { reason: "not proven yet: a loudness plan over a whole mix (mastering tests cover the plan)", params: ["preset", "target_lufs", "true_peak_dbtp", "balance", "duck", "genre", "score", "limit", "iterate"] },
@@ -211,19 +221,16 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety"] },
   unify_grade_tool: { reason: "not proven yet: iterative grade matching across clips", params: ["reference_clip_id", "reference_file_id", "strength", "look", "look_intensity", "samples", "max_iterations"] },
   swap_shot_tool: { reason: "not proven yet", params: ["start_seconds"] },
-  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid \u2026)", params: ["template", "position_seconds", "duration_seconds", "palette", "accent", "bpm", "offset_seconds", "beats", "text", "subtitle", "words", "labels", "values", "points", "boxes", "button", "tag", "step", "highlight", "variant", "align", "position", "backdrop", "font_family", "layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift", "transitions", "strict_variety"] },
-  kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["cues", "start_seconds", "end_seconds", "style", "emphasis", "avoid", "accent", "ink", "text_size", "y", "animation", "behind_subject", "placement", "language"] },
+  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety"] },
+  kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["behind_subject", "placement", "language"] },
   add_sfx_tool: { reason: "not proven yet", params: ["provider", "sound_id", "title", "max_seconds", "allow_noncommercial", "kit", "edge"] },
   auto_sound_design_tool: { reason: "not proven yet: places many cues at once", params: "*" },
   apply_motion_transition_tool: { reason: "not proven yet", params: ["time"] },
-  speed_ramp_tool: { reason: "not proven yet", params: ["ripple"] },
+  speed_ramp_tool: { reason: "not proven yet: hero hold_seconds moves the slow moment, but no single probed frame has shown it", params: ["hold_seconds"] },
   add_motion_block_tool: { reason: "Zenvi Motion blocks render in headless Chrome (packages/motion), not on this host; word_rotator size (sk2 report) lives here", params: ["block", "params", "position_seconds", "duration_seconds", "placement", "motion_blur"] },
   update_motion_block_tool: { reason: "Zenvi Motion blocks render in headless Chrome (packages/motion), not on this host", params: ["params", "duration_seconds", "motion_blur"] },
   add_3d_scene_tool: { reason: "Zenvi 3D renders in Blender", params: ["scene", "params", "position_seconds", "duration_seconds", "quality"] },
   rerender_3d_scene_tool: { reason: "Zenvi 3D renders in Blender", params: ["params", "quality", "duration_seconds"] },
-  apply_fx_tool: { reason: "not proven yet: Zenvi FX renders footage through ffmpeg (fx/render.test.ts covers the filtergraphs)", params: ["effects"] },
-  update_fx_tool: { reason: "not proven yet: Zenvi FX renders footage through ffmpeg", params: ["index", "amount", "params", "start", "end", "whole_clip", "effects"] },
-  remove_fx_tool: { reason: "not proven yet: Zenvi FX renders footage through ffmpeg", params: ["index"] },
   create_sound_kit_tool: { reason: "not proven yet: builds a sound kit the sfx tools then play", params: ["source", "tone", "pitch", "brightness", "seed", "style", "license", "variants"] },
   generate_sfx_tool: { reason: "generates a sound with ElevenLabs (API key, paid plan)", params: ["prompt", "duration_seconds", "at_seconds", "align", "gain_db", "prompt_influence", "loop"] },
   gather_stock_footage_tool: { reason: "searches and downloads stock footage (network, account)", params: "*" },
@@ -233,6 +240,10 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   subject_glow_tool: { reason: "needs a subject matte (RVM model)", params: ["look", "color", "glow_color", "glow", "background", "subject"] },
   pop_out_tool: { reason: "needs a subject matte (RVM model)", params: ["band_aspect", "bar_color", "subject"] },
 };
+
+export function paramNoteKeys(): string[] {
+  return Object.keys(PARAM_NOTES);
+}
 
 /** Every (tool, argument) the coverage gate classifies: mutating tools, deprecated ones included. */
 export function catalogParams(): { tool: string; param: string }[] {
@@ -253,6 +264,8 @@ export function classify(tool: string, param: string, provenBy: ReadonlyMap<stri
   if (OFFSCREEN[tool]) return { kind: "offscreen", reason: OFFSCREEN[tool] };
   if (param in SELECTORS) return { kind: "selector", reason: SELECTORS[param]! };
   if (param in INERT) return { kind: "inert", reason: INERT[param]! };
+  const note = PARAM_NOTES[`${tool}.${param}`];
+  if (note) return { kind: "inert", reason: note };
   const backlog = BACKLOG[tool];
   if (backlog && (backlog.params === "*" || backlog.params.includes(param))) return { kind: "backlog", reason: backlog.reason };
   return undefined;
