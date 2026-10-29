@@ -371,12 +371,13 @@ export function mergeColorGrade(effect: Json | null, rawPatch: Json): Json {
   if (sat !== undefined && sat !== null && sat !== "") {
     if (toFloat(sat, "saturation") < 0.5) throw new ColorValueError(SATURATION_REFUSAL);
   }
-  // A full paste replaces the colour fields but keeps id and order.
+  // A paste lays its fields over the grade and keeps id and order. zenvi-core's merge_color_grade
+  // (src/classes/color_agent.py) replaces the payload instead: the same result for a full paste,
+  // but a partial one there drops the fields (and the `type`) it leaves out.
   const colorObj = patch.color;
   if (isRecord(colorObj)) {
     const keepId = payload.id;
     const keepOrder = payload.order;
-    // Over the current grade: a partial paste keeps the fields (and the effect `type`) it leaves out.
     payload = { ...payload, ...structuredClone(colorObj) };
     payload.class_name = COLOR_GRADE_CLASS_NAME;
     if (keepId) payload.id = keepId;

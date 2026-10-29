@@ -13,6 +13,7 @@ import {
   blankColorGrade,
   buildLookProfile,
   capColorPatch,
+  ColorValueError,
   findColorGrade,
   gradesMeaningfullyDiffer,
   hintsToColorPatch,
@@ -125,6 +126,14 @@ describe("tests/test_color_agent_tools.py", () => {
     const merged = mergeColorGrade(blankColorGrade("keep-me"), { color: { exposure: 1, saturation: "1.5" } });
     expect(scalarY(merged, "exposure")).toBeCloseTo(1);
     expect(scalarY(merged, "saturation")).toBeCloseTo(1.5);
+  });
+
+  it("a paste keeps the grade's fields it leaves out, and refuses a value that is not a number", () => {
+    const graded = mergeColorGrade({ ...blankColorGrade("keep-me"), type: "ColorGrade" }, { contrast: 1.3 });
+    const merged = mergeColorGrade(graded, { color: { exposure: 1 } });
+    expect(merged.type).toBe("ColorGrade");
+    expect(scalarY(merged, "contrast")).toBeCloseTo(1.3);
+    expect(() => mergeColorGrade(graded, { color: { exposure: "bright" } })).toThrow(ColorValueError);
   });
 
   it("summaries, reference hints and the warm-gap distance", () => {
