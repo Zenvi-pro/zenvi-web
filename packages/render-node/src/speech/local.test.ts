@@ -1,10 +1,12 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseTranscription } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { makeSpeech, makeTempDir, removeDir } from "../test-support/fixtures.js";
+import { makeAudio, makeSpeech, makeTempDir, removeDir } from "../test-support/fixtures.js";
 import { createNodeHost } from "../host/node-host.js";
-import { modelAssets } from "../matte/model-cache.js";
+import { modelAssets, modelDir } from "../matte/model-cache.js";
 import { cacheDir } from "../svg/fonts.js";
+import { speechRuntimeDir } from "./runtime.js";
 import { chunksToAnswer, localSpeechReady, segmentWords, transcribeLocally } from "./local.js";
 import { SPEECH_MODELS, speechModelBytes, speechModelId, speechModelPresent } from "./models.js";
 
@@ -78,6 +80,39 @@ describe("speech models", () => {
     const host = createNodeHost({ env });
     expect(host.audio?.transcribe).toBeUndefined();
     expect(host.audio?.transcribesOnDevice).toBeUndefined();
+  });
+});
+
+describe("a runtime that will not start", () => {
+  it("falls back to the Zenvi backend, except for a call made because on-device speech is free", async () => {
+    const env = { ZENVI_CACHE_DIR: path.join(dir, "broken-cache"), ZENVI_SPEECH: "auto" };
+    const pkg = path.join(speechRuntimeDir(env), "node_modules", "@huggingface", "transformers");
+    await mkdir(pkg, { recursive: true });
+    await writeFile(path.join(speechRuntimeDir(env), "package.json"), "{}");
+    await writeFile(path.join(pkg, "package.json"), JSON.stringify({ name: "@huggingface/transformers", main: "index.js" }));
+    await writeFile(path.join(pkg, "index.js"), 'throw new Error("broken build");\n');
+    const model = SPEECH_MODELS.base;
+    for (const asset of modelAssets(model)) {
+      const file = path.join(modelDir(model, { env }), asset.file);
+      await mkdir(path.dirname(file), { recursive: true });
+      await writeFile(file, "");
+    }
+    const uploads: string[] = [];
+    const fetchImpl = (async (url: string | URL) => {
+      uploads.push(String(url));
+      return new Response(JSON.stringify({ language: "en", model: "whisper-1", duration_seconds: 1, words: [{ word: "hello", start: 0.1, end: 0.5 }], segments: [] }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+    const host = createNodeHost({ env, backend: { baseUrl: "http://127.0.0.1:9", token: async () => "t", fetchImpl } });
+    expect(host.audio?.transcribesOnDevice).toBe(true);
+    const file = await makeAudio(dir, "tone.wav", { duration: 1 });
+    await expect(host.audio!.transcribe!(file, { onDeviceOnly: true })).rejects.toMatchObject({ code: "unavailable" });
+    expect(uploads).toEqual([]);
+    const t = await host.audio!.transcribe!(file);
+    expect(t.words.map((w) => w.text)).toEqual(["hello"]);
+    expect(t.onDevice).toBeUndefined();
+    expect(uploads).toHaveLength(1);
   });
 });
 

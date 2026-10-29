@@ -358,7 +358,7 @@ export const generationTools: CatalogTool[] = [
       let aligned: StoredTranscript | undefined;
       if (call.host.audio?.transcribesOnDevice && call.host.audio.transcribe) {
         try {
-          const heard = await call.host.audio.transcribe(path, { language: "", prompt: lyricsPrompt(narration), signal: call.signal });
+          const heard = await call.host.audio.transcribe(path, { language: "", prompt: lyricsPrompt(narration), onDeviceOnly: true, signal: call.signal });
           const got = alignedTranscript(narration, heard, "");
           if (got.alignment.heardRatio >= 0.5) {
             aligned = got.record;

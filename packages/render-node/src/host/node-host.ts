@@ -8,7 +8,7 @@
 import { mkdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { isTranscriptionError, type AssetHost, type ExportOptions, type ToolHost } from "@zenvi/engine";
+import { isTranscriptionError, TranscriptionError, type AssetHost, type ExportOptions, type ToolHost } from "@zenvi/engine";
 import { backendStock } from "@zenvi/engine/tools";
 import { fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
@@ -297,12 +297,15 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     host.audio!.transcribe = async (p, o) => {
       const file = resolveMedia(p);
       const signal = o?.signal ?? options.signal;
-      if (!local) return transcribeMediaFile(file, { ...o, signal, upload: upload! });
+      if (!local) {
+        if (o?.onDeviceOnly) throw new TranscriptionError("unavailable", "speech recognition is not set up on this machine (zenvi speech setup)");
+        return transcribeMediaFile(file, { ...o, signal, upload: upload! });
+      }
       try {
         return await transcribeLocally(file, { ...o, signal, env: options.env, log: options.log });
       } catch (error) {
         // A runtime that will not start falls back to the server; anything else (no audio, a failed run) is the answer.
-        if (!upload || !isTranscriptionError(error) || error.code !== "unavailable") throw error;
+        if (!upload || o?.onDeviceOnly || !isTranscriptionError(error) || error.code !== "unavailable") throw error;
         options.log?.(`${error.message}; transcribing through the Zenvi backend instead`);
         return transcribeMediaFile(file, { ...o, signal, upload });
       }

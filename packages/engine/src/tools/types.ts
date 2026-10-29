@@ -608,6 +608,8 @@ export interface TranscribeOptions {
   language?: string;
   /** Text that steers the recognizer, such as `FILLER_PROMPT` (`transcriptionPrompt`). */
   prompt?: string;
+  /** Only on this machine: a call made because it is free never falls back to the paid Zenvi server. */
+  onDeviceOnly?: boolean;
   signal?: AbortSignal;
 }
 

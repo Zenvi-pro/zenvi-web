@@ -78,6 +78,7 @@ describe("generate_tts_and_add_to_timeline_tool word timings", () => {
     const asked: string[] = [];
     ed.host.audio!.transcribesOnDevice = true;
     ed.host.audio!.transcribe = async (path, options) => {
+      expect(options?.onDeviceOnly).toBe(true);
       asked.push(`${path} ${options?.prompt ?? ""}`);
       return { language: "en", model: "whisper-base", words: heard, segments: [], durationSeconds: 3.5, onDevice: true };
     };
