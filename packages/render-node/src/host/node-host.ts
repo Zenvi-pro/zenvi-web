@@ -21,7 +21,7 @@ import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderContactSheet } from "../render/contact-sheet.js";
 import { inspectRender } from "../render/inspect-render.js";
-import { renderFrame } from "../render/render-frame.js";
+import { renderFrame, renderFrameImages } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
 import { installedFontFamilies } from "../svg/fonts.js";
 import { createNodeMatteHost } from "../matte/host.js";
@@ -191,6 +191,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         });
         return { mimeType: format === "jpeg" ? "image/jpeg" : "image/png", data: bytes.toString("base64") };
       },
+      renderFrames: (project, seconds, frameOptions = {}) =>
+        renderFrameImages(project, seconds, { resolveMedia, width: frameOptions.width, engine: options.renderEngine, signal: frameOptions.signal ?? options.signal }),
       renderSheet: (project, tiles, layout, signal) =>
         renderContactSheet(project, tiles, layout, { resolveMedia, engine: options.renderEngine, signal: signal ?? options.signal, log: options.log }),
       // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
