@@ -161,7 +161,7 @@ function message(error: unknown): string {
 }
 
 /** The cut an apply call names, as op input. */
-function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionInput, "outClipId" | "inClipId" | "acrossTracks"> {
+function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionInput, "outClipId" | "inClipId" | "acrossTracks" | "followers"> {
   if (args.clip1_id) {
     if (args.clip2_id) return { outClipId: args.clip1_id, inClipId: args.clip2_id, acrossTracks: true };
     const clip = project.clips.find((c) => c.id === args.clip1_id);
@@ -176,7 +176,8 @@ function applyTarget(project: Project, args: ApplyArgs): Pick<MotionTransitionIn
     const t = args.time;
     const near = sceneCuts(project).reduce<ReturnType<typeof sceneCuts>[number] | undefined>((best, c) => (!best || Math.abs(c.cut - t) < Math.abs(best.cut - t) ? c : best), undefined);
     if (!near || Math.abs(near.cut - t) > 0.5) throw new ToolError(`no scene change within 0.5 s of ${t.toFixed(2)}s; give track and time, or clip1_id`);
-    return { outClipId: near.outClip.id, inClipId: near.inClip.id, acrossTracks: true };
+    // The scene's stack moves as one, as apply_motion_transitions_tool moves it.
+    return { outClipId: near.outClip.id, inClipId: near.inClip.id, acrossTracks: true, followers: near.followers };
   }
   if (args.track === undefined || args.time === undefined) throw new ToolError("give clip1_id (and optionally clip2_id), or track and time");
   const layer = resolveLayer(project, args.track);

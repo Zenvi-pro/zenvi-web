@@ -218,6 +218,20 @@ describe("motion transition tools", () => {
     expect(none.text).toMatch(/no scene change within 0\.5 s of 8\.50s/);
   });
 
+  it("moves a scene's whole stack when the cut is found from the time alone", async () => {
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      addClip(tx, { fileId: "VIDEO00001", position: 0, layer: 1, start: 0, end: 2, id: "BG1" });
+      addClip(tx, { fileId: "VIDEO00001", position: 0, layer: 2, start: 0, end: 2, id: "HEAD1" });
+      addClip(tx, { fileId: "VIDEO00001", position: 2, layer: 3, start: 0, end: 2, id: "CARDS" });
+    });
+    doc.clearHistory();
+    const result = await call(doc, "apply_motion_transition_tool", { preset: "whip", time: 2.1 });
+    expect(result.ok, result.text).toBe(true);
+    const roles = (dataOf(result) as { clips: { clip_id: string; role: string }[] }).clips.map((c) => `${c.clip_id}:${c.role}`);
+    expect(roles.sort()).toEqual(["BG1:out", "CARDS:in", "HEAD1:out"]);
+  });
+
   it("says which track has the cuts when the named one has none", async () => {
     // Agents pass track 1 after build_reel_tool, which puts the music there and the shots on track 2.
     const doc = editDoc();
