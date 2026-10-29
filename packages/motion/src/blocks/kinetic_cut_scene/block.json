@@ -1,0 +1,34 @@
+{
+  "id": "kinetic_cut_scene",
+  "version": 1,
+  "title": "Kinetic cut scene",
+  "description": "A beat-cut kinetic-type sequence (卡点快剪): one full-frame shot per storyboard line on the BPM grid, every cut a hit that punches the camera, shakes, fires a flash, chromatic aberration and a bloom pulse, with motion blur inside each shot (never across a cut). Each line is `<beats> <entrance> <TEXT> [| sub line] [@layout] [#ground] [+layer…] [!]`: entrances slam, type, assemble (particles build the word), mask, flip, stretch, drop, count (rolls the first number), strobe (one word per half beat), none; layouts @center @left @right @top @bottom @bleed (type cropped by the frame) @diagonal @space (small type, empty frame) @split; grounds #dark #light #accent #secondary; motif layers +scope +routes +rings +rays +grid +orbit +bars +tunnel +blobs +marquee +dial +collapse (squash to a line before the next cut); `!` marks the climax (heaviest hit). ' / ' breaks lines. Vary beats (1/2/4/8), use 3+ entrances, no layout more than twice, one light or accent shot, a climax that breaks the system. For intros, launches, brand and data highlights. The last shot holds to the end; cues a sound on every cut.",
+  "tags": ["kinetic", "kinetic-cut", "beat", "quick-cut", "type", "flash", "punch", "shake", "chromatic", "intro", "launch", "data"],
+  "duration": { "default": 12, "min": 1, "max": 60 },
+  "aspects": ["16:9", "9:16", "1:1", "4:5"],
+  "alpha": false,
+  "tokens": { "palette": "dark", "display": "display" },
+  "params": {
+    "shots": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 40,
+      "maxLength": 160,
+      "default": [
+        "2 slam MAKE / IT MOVE +rings",
+        "1 stretch FAST #light +rays",
+        "2 strobe CUT ON THE BEAT",
+        "2 type every frame a poster | half a second each @left +scope",
+        "4 count 120 BPM | locked to the grid #accent +bars",
+        "2 flip TWO LAYERS / OF MOTION @top +orbit",
+        "1 mask NEVER STILL @diagonal +grid +collapse",
+        "4 assemble KINETIC | the climax breaks the system #light +blobs !",
+        "6 drop CUT. @bleed +dial"
+      ],
+      "description": "The storyboard, one shot per line: `<beats> <entrance> <TEXT> [| sub] [@layout] [#ground] [+layer…] [!]` (see the block description)."
+    },
+    "bpm": { "type": "number", "min": 60, "max": 200, "default": 120, "description": "Tempo of the beat grid the shots are cut on (use the music's: detect_beats_tool)." },
+    "look": { "type": "enum", "options": ["clean", "punchy", "wild"], "default": "punchy", "description": "How hard hits hit: clean (no resting aberration, soft flash), punchy, wild (big punch, heavy aberration and flash)." },
+    "shutter_samples": { "type": "integer", "min": 1, "max": 16, "default": 6, "description": "Sub-frames averaged per frame for motion blur inside a shot (1 = off; 10+ for very fast moves; renders that many times slower)." }
+  }
+}
