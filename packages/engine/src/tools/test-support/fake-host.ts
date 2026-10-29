@@ -30,6 +30,7 @@ import type {
 } from "../types.js";
 import { readBundledFont } from "../../typography/test-fonts.js";
 import { backendStock } from "../backend.js";
+import { WATCH_DIMENSION_NAMES, type WatchCritique } from "../../review/watch.js";
 import { fakeMotionHost } from "./fake-motion.js";
 import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
@@ -621,6 +622,27 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
     };
   }
   if (!without.has("stock") && host.backend) host.stock = backendStock(host.backend);
+  if (!without.has("watch")) {
+    host.watch = {
+      watch: async (path, request) => {
+        calls.push(`watch ${path}`);
+        const scores = Object.fromEntries(WATCH_DIMENSION_NAMES.map((d) => [d, 5])) as WatchCritique["scores"];
+        return {
+          model: "fake-watch",
+          duration: 8,
+          hasAudio: true,
+          verdict: `Watched${request?.brief ? ` for "${request.brief}"` : ""}.`,
+          overall: 5,
+          wouldPost: false,
+          scores,
+          issues: [{ start: 1, end: 1.5, dimension: "sound_design", severity: "high", problem: "The cut is silent.", fix: "Add a whoosh on the cut." }],
+          strengths: [],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          via: "backend",
+        };
+      },
+    };
+  }
   if (!without.has("storage")) {
     host.storage = {
       save: async (_project, path) => {

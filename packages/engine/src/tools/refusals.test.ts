@@ -55,6 +55,7 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   apply_fx_tool: { clip_id: IDS.clipB, effects: [{ effect: "bloom" }] },
   update_fx_tool: { clip_id: IDS.clipB, amount: 0.8 },
   review_render_tool: { path: "/out/reel.mp4" },
+  watch_render_tool: { path: "/out/reel.mp4" },
 };
 
 async function expectNotAvailable(name: string, args: Record<string, unknown>, host: FakeHostOptions): Promise<void> {

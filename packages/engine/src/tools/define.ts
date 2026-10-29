@@ -99,6 +99,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   scenes3d: "Zenvi 3D (Blender on this computer)",
   fx: "Zenvi FX (ffmpeg renders on this computer)",
   library: "the public sound libraries (Openverse)",
+  watch: "watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)",
 };
 
 /**
