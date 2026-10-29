@@ -48,8 +48,9 @@ export function matchProbability(cos: number, head: { logitScale: number; logitB
 /**
  * Two shots at or above this cosine read as the same shot: the same take a
  * moment later, or the same set-up from almost the same place. SigLIP base
- * on the re-edit bench's match-cut bin (51 shots): keyframes 0.5 s apart in
- * one shot sit at 0.96 and up (5th percentile), different shots at 0.62
- * (median) and 0.83 (99th percentile).
+ * on the re-edit bench (47 edits, 678 cuts, the editors' own shot order):
+ * keyframes 0.5 s apart in one shot sit at 0.96 (median); editors cut
+ * between shots this alike 5 % of the time (0.9 would flag 19 % of their
+ * cuts, mostly new angles on one scene in hype and fitness edits).
  */
-export const NEAR_DUPLICATE = 0.9;
+export const NEAR_DUPLICATE = 0.95;
