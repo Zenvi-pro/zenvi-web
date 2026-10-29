@@ -23,7 +23,7 @@ const RECIPES =
   "saas-ui-promo, 3d-product-ad, editorial-type, grid-montage, tutorial, showreel-intro.";
 
 /** Step 0 (plugins/zenvi/skills/zenvi-styles/BRIEF.md): the brief picks the style and the recipe. */
-const BRIEF = 'First the brief: get_brief_tool; if none, inspect_media_bin_tool, read_director_recipe {styles: "brief"} and follow it, save_brief_tool.';
+const BRIEF = 'A brief first helps: get_brief_tool; to plan one, read_director_recipe {styles: "brief"}, then save_brief_tool (nothing waits for it: the first cut saves a minimal one).';
 
 /** The finish every recipe ends with, in order. */
 const FINISH =

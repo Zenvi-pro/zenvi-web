@@ -109,5 +109,7 @@ export function checkBrief(project: Project, brief: Brief): BriefCheck {
     });
   }
 
+  // A minimal brief Zenvi saved by itself (brief/auto.ts) guessed its length and beats: it advises, never holds the finish.
+  if (brief.auto) for (const miss of misses) miss.hard = false;
   return { style: brief.style, lengthSeconds: brief.length_seconds, beats, techniques, checklist: brief.checklist, misses, ok: misses.length === 0 };
 }

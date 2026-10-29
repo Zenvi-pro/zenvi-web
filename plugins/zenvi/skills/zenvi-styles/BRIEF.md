@@ -13,6 +13,11 @@ prices, claims, URLs, dates, people. When the piece needs one you do not
 have, put it in `missing`, leave a neutral placeholder out of the video (no
 fake URL, no "Brand" logo), and say so.
 
+Nothing waits for the brief: if you cut without one, the first call saves a
+minimal brief by itself (style matched from your words, the frame, the
+length, one beat) and says so. That keeps review honest, but it plans
+nothing; a brief of your own is what makes the edit directed.
+
 ## 1. Read what you have
 
 - The prompt: who it is for, where it goes, what it must make someone do.
@@ -71,8 +76,8 @@ kinetic-cut-video, see NOTICE); in short:
   `motion`, `3d`, `title`), `composition`, `text_entrance`, `tone`
   (brightness and main colour), `transition` (a motif match cut first: the
   waveform becomes the next shot's trace). The last four columns exist to
-  see repetition before cutting. Hard rules (save refuses a brief that
-  breaks them, from 6 s on):
+  see repetition before cutting. The rules (advice, never a refusal: from
+  20 s, or with `check_method: true`, the save receipt lists what breaks them):
   - first and last shot grow from the through-line; every motif is a listed one;
   - lengths vary (1 / 2 / 4 / 8 beats in a curve: set-up, speed-up, breath,
     climax, hold), never all the same;
@@ -118,8 +123,7 @@ Pitfalls) and against these, and rewrite what fails:
 - **The reskin test.** For each storyboard row: if the copy named another
   subject (a coffee brand instead of a university), would this picture still
   work? Count those rows in **reskin.generic**. More than a third is a
-  template: regrow those shots from the motifs and count again. Save
-  refuses over a third.
+  template: regrow those shots from the motifs and count again. The save receipt flags over a third.
 - Does the hook work with the sound off, and does it hit in the first 0.5 s?
 - Is there one bold moment, and only one? Is there stillness before it?
 - Does every beat start with a picture change and end before it drags (the

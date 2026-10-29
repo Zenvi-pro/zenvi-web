@@ -3559,6 +3559,8 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `checklist` | string[] |  | The style's finish checklist, the lines review checks before done. (default []) |
 | `critique` | string |  | What the self-critique against the style's best-vs-average list changed. |
 | `missing` | string[] |  | Facts the person must supply (brand name, URL, price): never invented. (default []) |
+| `auto` | boolean |  | Set by Zenvi when the first cut saved a minimal brief for an agent that had none; a brief you save yourself leaves it out. |
+| `check_method` | boolean |  | true lists where the brief falls short of the motif method at any length (default: from 20 s). |
 
 ### get_brief_tool
 

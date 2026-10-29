@@ -1,25 +1,43 @@
-import { createProject, METHOD_MIN_SECONDS } from "@zenvi/engine";
+import { createProject, ProjectDocument, readBrief } from "@zenvi/engine";
 import { describe, expect, it } from "vitest";
-import { BRIEF_GATE, BRIEF_NOTE, briefGate, briefNote } from "./brief-note.js";
+import { autoBriefFor } from "./brief-note.js";
 
-describe("the brief note on receipts", () => {
-  it("asks for the brief on the calls that start a video, until one is saved or the cut is under way", () => {
-    const project = createProject({ id: "BRIEFNOTEX" });
-    expect(briefNote("gather_stock_footage_tool", project)).toBe(BRIEF_NOTE);
-    expect(briefNote("trim_clip_tool", project)).toBeUndefined();
-    project.settings = { zenvi_brief: { goal: "g", platform: "p", aspect: "9:16", length_seconds: 10, style: "hype-reel", hook: "h", beats: [{ start: 0, end: 10, name: "all" }] } };
-    expect(briefNote("gather_stock_footage_tool", project)).toBeUndefined();
-    const busy = createProject({ id: "BRIEFNOTEY" });
-    busy.clips = [{}, {}, {}] as never;
-    expect(briefNote("add_clip_to_timeline_tool", busy)).toBeUndefined();
+const doc = (width = 1080, height = 1920): ProjectDocument => {
+  const project = createProject({ id: "AUTOBRIEFX" });
+  project.width = width;
+  project.height = height;
+  return new ProjectDocument(project);
+};
+
+describe("the auto brief", () => {
+  it("is saved by the first call that starts a video, outside the undo history, and says so once", () => {
+    const d = doc();
+    expect(autoBriefFor("search_pexels_videos_tool", d, "{}")).toBeUndefined();
+    expect(readBrief(d.project)).toBeNull();
+    const note = autoBriefFor("gather_stock_footage_tool", d, JSON.stringify({ queries: ["sprinter on a track", "sports car drift"] }));
+    expect(note).toMatch(/^Saved a minimal brief for this project \(auto: style hype-reel matched from the styles index, 9:16, 15 s, one beat\)/);
+    expect(readBrief(d.project)).toMatchObject({ auto: true, style: "hype-reel", aspect: "9:16", length_seconds: 15 });
+    expect(d.undoLabels).toEqual([]);
+    expect(autoBriefFor("add_clip_to_timeline_tool", d, "{}")).toBeUndefined();
   });
 
-  it("gates the cuts made before a brief, never a search, the person's import or the frame setting", () => {
-    const project = createProject({ id: "BRIEFGATEX" });
-    expect(briefGate("match_cut_montage_tool", project)).toBe(true);
-    expect(briefGate("gather_stock_footage_tool", project)).toBe(true);
-    // What the refusal promises matches what save_brief_tool accepts (brief/method.ts).
-    expect(BRIEF_GATE).toContain(`under ${METHOD_MIN_SECONDS} s one beat is enough`);
-    for (const tool of ["search_pexels_videos_tool", "import_files_tool", "set_project_setting_tool", "save_brief_tool", "trim_clip_tool"]) expect(briefGate(tool, project), tool).toBe(false);
+  it("matches the style from the call's words and the bin's names", () => {
+    const d = doc(1920, 1080);
+    autoBriefFor("import_files_tool", d, JSON.stringify({ paths: ["/clips/app_dashboard_demo.mov"] }) + " saas launch");
+    expect(readBrief(d.project)).toMatchObject({ style: "saas-ui-promo", aspect: "16:9", platform: "YouTube / web" });
+  });
+
+  it("keeps an auto brief's frame in step with the project, and never touches a brief the agent saved", () => {
+    const d = doc(1920, 1080);
+    autoBriefFor("import_files_tool", d, "{}");
+    d.setUntracked(["width"], 1080);
+    d.setUntracked(["height"], 1920);
+    autoBriefFor("add_clip_to_timeline_tool", d, "{}");
+    expect(readBrief(d.project)?.aspect).toBe("9:16");
+    const own = { goal: "g", platform: "p", aspect: "1:1", length_seconds: 8, style: "tutorial", hook: "h", beats: [{ start: 0, end: 8, name: "all" }] };
+    d.setUntracked(["settings"], { zenvi_brief: own });
+    expect(autoBriefFor("import_files_tool", d, "{}")).toBeUndefined();
+    expect(readBrief(d.project)).toMatchObject({ aspect: "1:1", style: "tutorial" });
+    expect(readBrief(d.project)?.auto).toBeUndefined();
   });
 });

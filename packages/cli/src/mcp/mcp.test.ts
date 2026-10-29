@@ -56,29 +56,27 @@ afterAll(async () => {
 });
 
 describe("zenvi mcp", () => {
-  it("refuses cuts before a brief is saved, then lets them through", async () => {
+  it("never refuses for a missing brief: the first import saves a minimal one and says so", async () => {
     const client = await connect(undefined, { ZENVI_MCP_BRIEF: "on" });
-    await call(client, "open_project_file", { path: "gate.zvn" });
-    const first = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
-    expect(first.receipt.status).toBe("refused");
-    expect(first.receipt.summary).toMatch(/^Error: no brief saved, nothing changed\. Step 0/);
-    const briefed = createProject({ id: "GATEDXXXXX" });
-    briefed.settings = { zenvi_brief: { goal: "g", platform: "Reels", aspect: "16:9", length_seconds: 10, style: "hype-reel", hook: "h", beats: [{ start: 0, end: 10, name: "all" }] } };
-    await writeFile(path.join(work, "gated.zvn"), JSON.stringify(briefed));
-    await call(client, "open_project_file", { path: "gated.zvn" });
-    expect((await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" })).receipt.summary).not.toMatch(/no brief saved/);
+    await call(client, "open_project_file", { path: "auto.zvn" });
+    await makeVideo(work, "auto.mp4", { duration: 1, width: 160, height: 90 });
+    const first = await call(client, "import_files_tool", { paths: JSON.stringify([path.join(work, "auto.mp4")]) });
+    expect(first.receipt.status).toBe("applied");
+    expect(first.receipt.notes.join(" ")).toMatch(/Saved a minimal brief for this project \(auto: style \S+ matched from the styles index, 16:9, 15 s, one beat\)/);
+    const again = await call(client, "import_files_tool", { paths: JSON.stringify([path.join(work, "auto.mp4")]) });
+    expect(again.receipt.notes.join(" ")).not.toMatch(/minimal brief/);
   });
 
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {
     const client = await connect();
     const opened = await call(client, "open_project_file", { path: "plan.zvn" });
-    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: First the brief: get_brief_tool; if none, inspect_media_bin_tool, read_director_recipe \{styles: "brief"\}.*Then read its style's recipe, read_director_recipe \{recipe\}\..*Finish every edit, in order: unify_grade_tool/);
+    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: A brief first helps: get_brief_tool; to plan one, read_director_recipe \{styles: "brief"\}, then save_brief_tool \(nothing waits for it.*Then read its style's recipe, read_director_recipe \{recipe\}\..*Finish every edit, in order: unify_grade_tool/);
     const recipe = await call(client, "read_director_recipe", { recipe: "match-cut-montage" });
     expect(recipe.receipt.status).toBe("applied");
     expect(recipe.receipt.summary).toMatch(/match_cut_montage_tool/);
-    // No brief saved yet: the recipe comes after the brief compiler; once one is saved, alone.
-    expect(recipe.receipt.summary).toMatch(/^This project has no brief yet\. Step 0/);
-    expect(recipe.receipt.summary).toContain("# The brief compiler");
+    // No brief saved yet: one line points at the brief compiler (never all of it); once one is saved, the recipe alone.
+    expect(recipe.receipt.summary).toMatch(/^No brief saved yet\. A short one plans the edit/);
+    expect(recipe.receipt.summary).not.toContain("# The brief compiler");
     const briefed = createProject({ id: "BRIEFEDXXX" });
     briefed.settings = { zenvi_brief: { goal: "g", platform: "Reels", aspect: "16:9", length_seconds: 10, style: "match-cut-montage", hook: "h", beats: [{ start: 0, end: 10, name: "all" }] } };
     await writeFile(path.join(work, "briefed.zvn"), JSON.stringify(briefed));

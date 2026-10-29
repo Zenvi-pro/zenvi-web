@@ -50,7 +50,7 @@ export function testEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.Pro
     ZENVI_CONFIG_DIR: path.join(home, ".config", "zenvi"),
     ZENVI_CACHE_DIR: process.env.ZENVI_CACHE_DIR,
     ZENVI_NO_BROWSER: "1",
-    // The brief gate (mcp/brief-note.ts) refuses cuts before a brief; its own test turns it on.
+    // The auto brief (mcp/brief-note.ts) adds a note and a setting to first cuts; its own test turns it on.
     ZENVI_MCP_BRIEF: "off",
     ZENVI_FFMPEG: process.env.ZENVI_FFMPEG,
     ZENVI_FFPROBE: process.env.ZENVI_FFPROBE,
