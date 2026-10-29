@@ -93,6 +93,16 @@ describe("inspect_media_bin_tool", () => {
     expect(files.find((f) => f.id === "SONGXXXXXX")!.energy).not.toBeNull();
     expect(host.calls).toContain("analyzeAudio /m/song.mp3");
   });
+
+  it("never runs a title through the audio pass", async () => {
+    const doc = bin();
+    doc.transaction("title", (tx) => addFile(tx, media("/m/title.svg", imageInfo("/m/title.svg")), { id: "TITLEXXXXX" }));
+    const host = fakeHost();
+    const result = await runTool({ doc, host: host as ToolHost }, "inspect_media_bin_tool", {});
+    const files = (result.data!.data as { files: { id: string; kind: string }[] }).files;
+    expect(files.find((f) => f.id === "TITLEXXXXX")?.kind).toBe("title");
+    expect(host.calls).not.toContain("analyzeAudio /m/title.svg");
+  });
 });
 
 describe("save_brief_tool / get_brief_tool", () => {
@@ -156,6 +166,9 @@ describe("save_brief_tool / get_brief_tool", () => {
     const doc = bin();
     const result = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, shots: [{ source: "media", file_id: "NOPEXXXXXX", note: "x" }] });
     expect(result.data!.warnings.join(" ")).toContain("NOPEXXXXXX");
+    const rows = METHOD.storyboard.map((r, i) => (i === 0 ? { ...r, file_id: "GONEXXXXXX" } : r));
+    const story = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, storyboard: rows });
+    expect(story.data!.warnings.join(" ")).toContain("GONEXXXXXX");
   });
 
   it("get_brief_tool without a brief says how to make one; with one it checks beats and techniques", async () => {
@@ -176,6 +189,11 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(Object.fromEntries(check.techniques.map((t) => [t.id, t.status]))).toEqual({ "flash-frames": "missing", "kinetic-word-slam": "missing", "match-cut": "unverified" });
     expect(got.text).toContain("BRIEF: The brief borrows flash-frames");
     expect(got.text).toContain("Checklist: a sound on every cut");
+
+    // One unreadable tool in the list (a montage of plain cuts) may have built it: unverified, not missing.
+    await runTool(ctx, "save_brief_tool", { ...BRIEF, techniques: [{ id: "match-cut", why: "feet line up", tools: ["match_cut_montage_tool", "apply_motion_transitions_tool"] }] });
+    const mixed = await runTool(ctx, "get_brief_tool", {});
+    expect((mixed.data!.data as { check: { techniques: { status: string }[] } }).check.techniques[0]!.status).toBe("unverified");
   });
 });
 

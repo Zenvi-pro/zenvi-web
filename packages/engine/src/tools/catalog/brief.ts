@@ -49,9 +49,9 @@ type InspectInput = z.output<typeof inspectInput>;
 async function frameAt(call: ToolCall, file: ProjectFile, seconds: number): Promise<RgbaImage | null> {
   const frames = call.host.frames;
   if (!frames) return null;
-  const scratch = singleFileProject(call.doc.project, file);
-  const [width] = fitSize(scratch.width, scratch.height, MEASURE_EDGE);
   try {
+    const scratch = singleFileProject(call.doc.project, file);
+    const [width] = fitSize(scratch.width, scratch.height, MEASURE_EDGE);
     const png = await frames.renderFrame(scratch, seconds, { width, format: "png" });
     return png.mimeType === "image/png" ? decodePngBase64(png.data) : null;
   } catch (error) {
@@ -75,7 +75,7 @@ async function measured(call: ToolCall, file: ProjectFile, entry: InventoryEntry
         if (second) out.energy = motionLevel(frameChange(first, second));
       }
     }
-  } else {
+  } else if (entry.kind === "music" || entry.kind === "voice" || entry.kind === "sfx" || entry.kind === "audio") {
     const analyze = call.host.audio?.analyzeAudio;
     const path = mediaPathOf(file);
     if (analyze && path) {
@@ -178,7 +178,7 @@ export const briefTools: CatalogTool[] = [
       const project = call.doc.project;
       if (sameBrief(readBrief(project), brief)) return unchanged(SAVE, "The project already has this brief; nothing changed.", { data: { brief } });
       const known = new Set(project.files.map((f) => String(f.id)));
-      const unknownFiles = brief.shots.filter((s) => s.file_id && !known.has(s.file_id)).map((s) => s.file_id!);
+      const unknownFiles = [...brief.shots, ...brief.storyboard].filter((s) => s.file_id && !known.has(s.file_id)).map((s) => s.file_id!);
       const warnings = unknownFiles.length > 0 ? [`Shot plan names files not in the bin: ${[...new Set(unknownFiles)].join(", ")} (inspect_media_bin_tool lists the ids).`] : [];
       // Bench sk0: agents made to save a brief saved the least that validates, which changed nothing in the edit.
       const thin = [brief.shots.length === 0 && brief.storyboard.length === 0 && "no shot plan", brief.techniques.length === 0 && "no borrowed technique", !brief.critique && "no self-critique"].filter(Boolean);

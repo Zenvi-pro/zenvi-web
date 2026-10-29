@@ -3,7 +3,8 @@
  * each borrowed technique's tools; a technique counts as used when one of its
  * tools left a mark on the timeline. Tools that leave nothing a later reader
  * can tell apart from a hand edit (a montage of plain cuts) have no entry:
- * their techniques are reported as unverified, never as missing.
+ * their techniques are reported as unverified, never as missing (nor is a
+ * technique that also lists one of them).
  */
 
 import { listProjectMotionTransitions } from "../ops/motion-transitions.js";

@@ -96,7 +96,8 @@ export function checkBrief(project: Project, brief: Brief): BriefCheck {
   const techniques = brief.techniques.map((t): BriefTechniqueCheck => {
     const tools = t.tools ?? [];
     const seen = tools.map((tool) => toolUsed(project, tool));
-    const status: TechniqueStatus = seen.some((s) => s === true) ? "used" : seen.some((s) => s === false) ? "missing" : "unverified";
+    // Missing only when every tool leaves a readable mark and none did: an unreadable tool may have built it.
+    const status: TechniqueStatus = seen.some((s) => s === true) ? "used" : seen.length > 0 && seen.every((s) => s === false) ? "missing" : "unverified";
     return { id: t.id, status, tools };
   });
   const absent = techniques.filter((t) => t.status === "missing");
