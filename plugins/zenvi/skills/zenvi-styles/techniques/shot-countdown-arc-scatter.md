@@ -25,7 +25,7 @@ The tangent-arranged dial and the numeral that changes identity into a title let
 Fallback that keeps the "from many to few" meaning: a rolling counter, then the headline built around the landed number.
 ```json
 add_motion_block_tool {"block": "counter", "position_seconds": 0, "duration_seconds": 1.6, "placement": "full_frame",
-  "params": {"values": ["45", "35", "28", "22", "17", "10", "5"], "style": "odometer", "weight": 700, "align": "center",
+  "params": {"values": ["45", "35", "28", "17", "10", "5"], "style": "odometer", "weight": 700, "align": "center",
              "palette": "cream", "suffix": " min"}}
 add_motion_block_tool {"block": "kinetic_headline", "position_seconds": 1.6, "duration_seconds": 2.6, "placement": "full_frame",
   "params": {"text": "*5 minutes* / to install", "style": "blur", "emphasis": "accent", "palette": "cream", "accent": "#d2381f", "align": "center", "max_size": 200}}
@@ -36,7 +36,7 @@ Cut the counter's last value onto the headline's number so they sit at the same 
 A hand-built dial would be nine title clips (`add_kinetic_title_tool`, one numeral each) on an arc via `rotation` and `location` keyframes.
 
 ## Timing & taste rules
-- Sequence is a decreasing, uneven run: 45, 35, 28, 22, 17, 10, 5 (then 4, 3 reserved). Equal steps look like a ruler.
+- Sequence is a decreasing, uneven run: 45, 35, 28, 17, 10, 5 (the counter takes six values; then 4, 3 reserved). Equal steps look like a ruler.
 - Sweep: anticipation +3 degrees for 5 frames, then 99 to 0 degrees in about 24 frames (damping 12, stiffness 60), ~2 degrees of overshoot, settled by frame 34; over 4 degrees looks like a toy.
 - Numerals are equal in size and weight (112 px / 700 on 1080p), faded by angle: invisible beyond 70 degrees, full inside 48.
 - The hero numeral leaves the dial 2 frames before it has settled and flies 20 frames to the first slot (112 to 150 px, rotation to 0) on an asymmetric ease-in-out; no pause between sweep and flight.

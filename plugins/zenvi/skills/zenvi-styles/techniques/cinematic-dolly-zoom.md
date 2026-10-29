@@ -24,7 +24,7 @@ Related shot card: `shot-tension-camera-moves` (pull-back isolation and bullet t
 ## Build it in Zenvi
 
 Not buildable cleanly today. The emulation is two layers: `replace_background_tool`
-`{"clip_id", "background": "blur", "blur": 2}` (footage below, the person cut out above by the
+`{"clip_id": "<clip_id>", "background": "blur", "blur": 2}` (footage below, the person cut out above by the
 subject matte), then `set_keyframes_tool` on the lower layer's `scale_x`/`scale_y`
 `[{"seconds": 0, "value": 1.0}, {"seconds": 4, "value": 1.35, "ease": "ease_in_out_sine"}]`.
 The lower layer still contains the person, so as it scales a second, larger copy of them

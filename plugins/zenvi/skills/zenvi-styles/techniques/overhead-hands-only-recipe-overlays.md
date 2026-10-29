@@ -23,14 +23,14 @@ genre's well-known form.
 ## Build it in Zenvi
 Per step (shot start `s`):
 ```json
-add_kinetic_title_tool {"text": "STEP 1", "position_seconds": s, "duration_seconds": 1.8,
+add_kinetic_title_tool {"text": "STEP 1", "position_seconds": "<s>", "duration_seconds": 1.8,
   "style": "stack", "animation": "slide_up", "text_size": 0.12, "y": 0.14}
-add_motion_block_tool {"block": "lower_third", "position_seconds": s + 0.25, "duration_seconds": 2.5,
+add_motion_block_tool {"block": "lower_third", "position_seconds": "<s + 0.25>", "duration_seconds": 2.5,
   "params": {"name": "2 tbsp parsley, chopped", "role": "", "accent": "#f2b134"}}
-add_sfx_tool {"recipe": "pop", "at_seconds": s + 0.25, "gain_db": -18}
+add_sfx_tool {"recipe": "pop", "at_seconds": "<s + 0.25>", "gain_db": -18}
 ```
 Cook time: `add_timer_tool {"mode": "count_down", "countdown_from_seconds": 240,
-"screen_position": "top_right", "text_size": 0.05, "position_seconds", "duration_seconds"}`.
+"screen_position": "top_right", "text_size": 0.05, "position_seconds": "<position_seconds>", "duration_seconds": "<duration_seconds>"}`.
 Shots 2.5-3 s here because `lower_third` needs 2.5 s minimum; faster recipes
 use `add_kinetic_title_tool` for the ingredient line instead (0.4 s minimum).
 A card that builds as each ingredient enters needs `recipe-step-overlay`.

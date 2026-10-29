@@ -25,7 +25,7 @@ athletes at the top of a jump, water, hair, dancers.
 ## Build it in Zenvi
 
 1. Find the apex in source seconds on a contact sheet (`zenvi frame` / `watch_clip_tool`).
-2. `speed_ramp_tool` `{"clip_id", "preset": "custom", "ease": "smooth", "ripple": true, "points": [
+2. `speed_ramp_tool` `{"clip_id": "<clip_id>", "preset": "custom", "ease": "smooth", "ripple": true, "points": [
    {"at_seconds_in_clip": 0, "speed": 1.6}, {"at_seconds_in_clip": 0.7, "speed": 1.6},
    {"at_seconds_in_clip": 0.95, "speed": 0.15}, {"at_seconds_in_clip": 1.9, "speed": 0.15},
    {"at_seconds_in_clip": 2.2, "speed": 2.0}, {"at_seconds_in_clip": 2.8, "speed": 2.0}]}` - point times
@@ -44,7 +44,7 @@ athletes at the top of a jump, water, hair, dancers.
 - Land the slowest frame on a beat or the drop (`hit_at` = a `detect_beats_tool` time).
 - One ramp per 8-10 s; every shot ramped is a template look.
 - Sources at 50-60 fps survive 0.25x; 24-30 fps footage stutters below 0.4x without optical flow.
-- Freeze variant (merged from `shot-speed-ramp-freeze`, video-shotcraft, Apache-2.0): hold the freeze >= 1.5 s (45 f at 30 fps) or the look does not register; enter it instantly (no ease - a freeze is a cut in time) with a 3-frame white flash as the "pause" signal (the hold: `freeze_frame_tool` `{"timeline_clip_id", "at_seconds", "hold_seconds": 1.5, "ripple": true}`; the flash: `apply_motion_transition_tool` `flash_white`, `duration` 0.1, on the cut into the hold); leave it with a smootherstep ramp of ~0.73 s (22 f) that runs faster than 1x to win the time back; at most 2 freezes per 30 s.
+- Freeze variant (merged from `shot-speed-ramp-freeze`, video-shotcraft, Apache-2.0): hold the freeze >= 1.5 s (45 f at 30 fps) or the look does not register; enter it instantly (no ease - a freeze is a cut in time) with a 3-frame white flash as the "pause" signal (the hold: `freeze_frame_tool` `{"timeline_clip_id": "<timeline_clip_id>", "at_seconds": "<at_seconds>", "hold_seconds": 1.5, "ripple": true}`; the flash: `apply_motion_transition_tool` `flash_white`, `duration` 0.1, on the cut into the hold); leave it with a smootherstep ramp of ~0.73 s (22 f) that runs faster than 1x to win the time back; at most 2 freezes per 30 s.
 
 ## Sound for it
 

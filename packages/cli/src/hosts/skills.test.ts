@@ -27,7 +27,8 @@ function markdownFiles(dir: string): string[] {
 }
 
 /**
- * `tool_name {json}` examples inside ```json fences (one call may span lines).
+ * `tool_name {json}` examples inside ```json fences (one call may span lines;
+ * one with placeholders like <t> or ... is a template, not an example).
  * A `fragment` names a few arguments of a call in prose (`tool_name {"style": "pop"}`):
  * the arguments it names must be valid, the ones it leaves out are not required.
  */
@@ -37,11 +38,17 @@ function examples(markdown: string): { tool: string; args: string; fragment?: tr
     const body = fence[1]!;
     for (const start of body.matchAll(/^([a-z0-9_]+) \{/gm)) {
       let depth = 0;
+      let inString = false;
       const from = start.index! + start[1]!.length + 1;
       for (let i = from; i < body.length; i++) {
-        if (body[i] === "{") depth++;
+        if (inString) {
+          if (body[i] === "\\") i++;
+          else if (body[i] === '"') inString = false;
+        } else if (body[i] === '"') inString = true;
+        else if (body[i] === "{") depth++;
         else if (body[i] === "}" && --depth === 0) {
-          found.push({ tool: start[1]!, args: body.slice(from, i + 1) });
+          const args = body.slice(from, i + 1);
+          if (!/<|\.\.\.|…/.test(args)) found.push({ tool: start[1]!, args });
           break;
         }
       }

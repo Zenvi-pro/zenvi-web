@@ -29,7 +29,7 @@ frame. The calm, held centre of an otherwise cut-heavy fitness piece.
    length; read it from the speed receipt), plus `location_x`/`location_y`
    keyframes that move against the drift so the anchor stays put.
 3. Smoother than frame repeats (CLI/local only):
-   `apply_fx_tool {"clip_id", "effects": [{"effect": "optical_flow_slowmo"}]}`.
+   `apply_fx_tool {"clip_id": "<clip_id>", "effects": [{"effect": "optical_flow_slowmo"}]}`.
 4. Shaky handheld: `process_clip_effect_tool` Stabilizer first.
 
 ## Timing & taste rules

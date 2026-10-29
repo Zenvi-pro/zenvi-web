@@ -32,7 +32,7 @@ set_clip_properties_tool {"timeline_clip_ids": ["<after clip>"], "properties": {
 The mask is drawn in the clip's own frame, so mask the centre (x 0.5) and then
 move the clip; masking at x 0.25 and moving as well cut the wrong strip in the
 test. Labels: `add_title_tool` per label (centred template), then
-`set_clip_properties_tool {"properties": {"location_x": ∓0.25, "location_y": 0.36}}` on its clip.
+`set_clip_properties_tool {"properties": {"location_x": "<\u22130.25>", "location_y": 0.36}}` on its clip.
 The 0.005 gap between the masks is the divider. A one-call A/B layout with
 staggered boxes or a blurred background copy needs `ab-compare-layout`.
 

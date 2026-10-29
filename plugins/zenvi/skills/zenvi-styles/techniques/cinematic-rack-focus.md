@@ -29,7 +29,7 @@ Related shot card: `shot-tension-camera-moves` (focus falling off the surroundin
     "vertical_radius":   [{"time": 0, "value": 18}, {"time": 0.6, "value": 18}, {"time": 2.2, "value": 0}]}}`
    (times are timeline seconds; the clip here starts at 0).
 2. Reverse it (sharp to soft) on the last shot before a title card.
-3. Fine-tune one point: `set_effect_property_tool` `{"effect_id", "property": "horizontal_radius",
+3. Fine-tune one point: `set_effect_property_tool` `{"effect_id": "<effect_id>", "property": "horizontal_radius",
    "value": 0, "at_seconds": 2.0}`.
 
 What it cannot do: a true pull between two planes (foreground sharp → background
