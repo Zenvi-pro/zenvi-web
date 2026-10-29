@@ -43,6 +43,7 @@ export {
   getTool,
   listTools,
   runTool,
+  unavailableAssistantTools,
   unknownToolMessage,
   type ListToolsOptions,
   type RunToolOptions,

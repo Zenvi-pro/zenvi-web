@@ -95,10 +95,11 @@ import { titleTemplateTools } from "./catalog/title-templates.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
 import { webVideoTools } from "./catalog/web-video.js";
+import { toolAvailability, type AvailabilitySurface } from "./availability.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
 import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
 import { failed, refused, type ToolReceipt } from "./receipt.js";
-import { CONTRACT_TOOL_NAMES } from "./schemas.gen.js";
+import { CONTRACT_TOOL_NAMES, type ContractToolName } from "./schemas.gen.js";
 import type { ToolContext, ToolHost, ToolResult, ToolSurface } from "./types.js";
 
 /** The refusal for a tool this surface does not have (zenvi-backend #40: "Error: … not available"). */
@@ -181,6 +182,22 @@ const TOOLS_BY_NAME: ReadonlyMap<string, CatalogTool> = new Map(allTools.map((to
 
 export function getTool(name: string): CatalogTool | undefined {
   return TOOLS_BY_NAME.get(name);
+}
+
+/**
+ * The Assistant's editor tools (the backend's names, zenvi-core's contract)
+ * a web surface cannot run: not ported, not exposed there, desktop-only
+ * (ComfyUI, recording) or needing what its host lacks. The web editor sends
+ * these with every chat turn, so the backend leaves them out of the agent's
+ * tools instead of letting it call them for a refusal.
+ */
+export function unavailableAssistantTools(surface: Exclude<AvailabilitySurface, "desktop">, host?: ToolHost): ContractToolName[] {
+  return CONTRACT_TOOL_NAMES.filter((name) => {
+    const tool = getTool(name);
+    if (!tool?.contract) return true;
+    if (toolAvailability(tool)[surface] === "no") return true;
+    return host !== undefined && missingCapabilities(tool.requires, host).length > 0;
+  });
 }
 
 export interface ListToolsOptions {
