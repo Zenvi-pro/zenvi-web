@@ -67,7 +67,7 @@
       "min": 0,
       "max": 220,
       "default": 0,
-      "description": "Font size, px at 1080 (0: fit the safe width)."
+      "description": "Font size, px at 1080. 0 (default): 120 (150 when stacked), smaller if the line would overflow the safe width; so 120 looks like the default, go to 160-220 for a bigger line."
     }
   }
 }
