@@ -16,24 +16,35 @@ const SUGGESTIONS: Record<Source, string[]> = {
   audio: ["upbeat", "ambient", "cinematic", "whoosh", "applause", "rain"],
 };
 
-function VideoResult({ video, onImport, busy }: { video: PexelsVideo; onImport: (toTimeline: boolean) => void; busy: boolean }) {
+/** An import under way: the fraction downloaded (null until the size is known), and how to stop it. */
+interface Importing {
+  fraction: number | null;
+  controller: AbortController;
+}
+
+function percent(job: Importing): string {
+  return job.fraction === null ? "" : `${Math.round(job.fraction * 100)}%`;
+}
+
+function VideoResult({ video, onImport, job }: { video: PexelsVideo; onImport: (toTimeline: boolean) => void; job: Importing | undefined }) {
+  const busy = job !== undefined;
   const [hover, setHover] = useState(false);
   const preview = hover ? pexelsPreviewLink(video) : "";
   return (
     <div className="group min-w-0" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
       <button
         type="button"
-        disabled={busy}
-        onClick={() => onImport(false)}
-        title="Import to Project Files"
+        onClick={() => (job ? job.controller.abort() : onImport(false))}
+        title={job ? "Cancel import" : "Import to Project Files"}
         className="relative block aspect-video w-full overflow-hidden rounded-md bg-elevated outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <img src={video.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         {preview ? <video src={preview} muted autoPlay loop playsInline className="absolute inset-0 h-full w-full object-cover" /> : null}
         <span className="absolute bottom-1 right-1 rounded-[3px] bg-black/70 px-1 text-[10px] font-medium tnum text-fg-muted">{formatDuration(video.duration)}</span>
-        {busy ? (
-          <span className="absolute inset-0 grid place-items-center bg-black/50">
+        {job ? (
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/50" role="status" aria-label={`Importing ${percent(job)}`}>
             <Spinner size={16} className="text-fg" />
+            <span className="text-2xs tnum text-fg">{percent(job)}</span>
           </span>
         ) : null}
       </button>
@@ -56,7 +67,7 @@ function VideoResult({ video, onImport, busy }: { video: PexelsVideo; onImport: 
   );
 }
 
-function AudioResult({ sound, playing, onToggle, onImport, busy }: { sound: FreesoundSound; playing: boolean; onToggle: () => void; onImport: (toTimeline: boolean) => void; busy: boolean }) {
+function AudioResult({ sound, playing, onToggle, onImport, job }: { sound: FreesoundSound; playing: boolean; onToggle: () => void; onImport: (toTimeline: boolean) => void; job: Importing | undefined }) {
   return (
     <div className="group flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-white/[0.04]">
       <button
@@ -74,8 +85,18 @@ function AudioResult({ sound, playing, onToggle, onImport, busy }: { sound: Free
           <span className="shrink-0 text-2xs tnum text-fg-subtle">{formatDuration(sound.duration)}</span>
         </div>
       </div>
-      {busy ? (
-        <Spinner size={14} className="text-fg-subtle" />
+      {job ? (
+        <button
+          type="button"
+          role="status"
+          aria-label={`Importing ${percent(job)}, cancel`}
+          title="Cancel import"
+          onClick={() => job.controller.abort()}
+          className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-sm px-1 text-2xs tnum text-fg-subtle outline-none hover:bg-white/[0.08] hover:text-fg"
+        >
+          <Spinner size={14} />
+          {percent(job)}
+        </button>
       ) : (
         <div className="flex shrink-0 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           <Button size="xs" variant="ghost" onClick={() => onImport(false)}>
@@ -105,7 +126,7 @@ export function StockPanel() {
   const [sounds, setSounds] = useState<FreesoundSound[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<Set<number>>(new Set());
+  const [jobs, setJobs] = useState<ReadonlyMap<number, Importing>>(new Map());
   const [playing, setPlaying] = useState<number | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
 
@@ -140,12 +161,14 @@ export function StockPanel() {
   };
 
   const doImport = async (id: number, item: StockItem, toTimeline: boolean) => {
-    setBusy((b) => new Set(b).add(id));
+    const controller = new AbortController();
+    const update = (fraction: number | null) => setJobs((m) => (m.has(id) ? new Map(m).set(id, { fraction, controller }) : m));
+    setJobs((m) => new Map(m).set(id, { fraction: null, controller }));
     try {
-      await importStock(session, item, toTimeline ? "end" : null);
+      await importStock(session, item, toTimeline ? "end" : null, { onProgress: update, signal: controller.signal });
     } finally {
-      setBusy((b) => {
-        const next = new Set(b);
+      setJobs((m) => {
+        const next = new Map(m);
         next.delete(id);
         return next;
       });
@@ -211,13 +234,13 @@ export function StockPanel() {
         ) : source === "video" ? (
           <div className="grid grid-cols-2 gap-2 px-1">
             {(videos ?? []).map((v) => (
-              <VideoResult key={v.id} video={v} busy={busy.has(v.id)} onImport={(t) => void doImport(v.id, { kind: "pexels", video: v }, t)} />
+              <VideoResult key={v.id} video={v} job={jobs.get(v.id)} onImport={(t) => void doImport(v.id, { kind: "pexels", video: v }, t)} />
             ))}
           </div>
         ) : (
           <div className={cn("space-y-0.5")}>
             {(sounds ?? []).map((s) => (
-              <AudioResult key={s.id} sound={s} playing={playing === s.id} busy={busy.has(s.id)} onToggle={() => toggle(s)} onImport={(t) => void doImport(s.id, { kind: "freesound", sound: s }, t)} />
+              <AudioResult key={s.id} sound={s} playing={playing === s.id} job={jobs.get(s.id)} onToggle={() => toggle(s)} onImport={(t) => void doImport(s.id, { kind: "freesound", sound: s }, t)} />
             ))}
           </div>
         )}

@@ -74,15 +74,23 @@ export function pexelsPreviewLink(video: PexelsVideo): string {
 
 export type StockItem = { kind: "pexels"; video: PexelsVideo } | { kind: "freesound"; sound: FreesoundSound };
 
+export interface ImportStockOptions {
+  /** Fraction downloaded (null while the size is not known). */
+  onProgress?: (fraction: number | null) => void;
+  signal?: AbortSignal;
+}
+
 /** Import one stock item into the bin and onto the timeline (engine `import_stock_media_tool`). */
-export async function importStock(session: EditorSession, item: StockItem, placement: Placement): Promise<void> {
-  const host = createToolHost(session, async () => []);
+export async function importStock(session: EditorSession, item: StockItem, placement: Placement, options: ImportStockOptions = {}): Promise<void> {
+  const { onProgress, signal = new AbortController().signal } = options;
+  const host = createToolHost(session, async () => [], { onDownload: onProgress && ((p) => onProgress(p.total ? Math.min(1, p.loaded / p.total) : null)) });
   const args: Record<string, unknown> =
     item.kind === "pexels"
       ? { source: "pexels", link: pexelsLink(item.video), video_id: String(item.video.id) }
       : { source: "freesound", preview_url: item.sound.previews.hq_mp3 || item.sound.previews.lq_mp3, sound_id: String(item.sound.id) };
   if (placement && placement !== "end") args.position_seconds = String(placement.position);
-  const wire = await runAssistantTool(session, host, "import_stock_media_tool", args, new AbortController().signal);
-  if (wire.result.startsWith("Error")) toast.error("Import failed", { description: wire.result.replace(/^Error:\s*/, "") });
+  const wire = await runAssistantTool(session, host, "import_stock_media_tool", args, signal);
+  if (signal.aborted) toast.info("Import cancelled");
+  else if (tools.isErrorResult(wire.result)) toast.error("Import failed", { description: wire.result.replace(/^Error:\s*/, "") });
   else toast.success(item.kind === "pexels" ? "Stock video imported" : "Stock audio imported");
 }
