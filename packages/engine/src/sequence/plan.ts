@@ -6,8 +6,8 @@
  *                starts where the last one was heading), the shape and
  *                layout carry (match on shape), the subject sits where the
  *                eye already is, the colour holds, the motion keeps its
- *                direction and, with shot embeddings, the next shot shows
- *                what the last one ended on (look); the next moment of the
+ *                direction and, with shot embeddings (look), the next shot
+ *                shows what the last one ended on; the next moment of the
  *                same source costs least
  *   duplicates   the same picture twice in a row costs a lot
  *   energy arc   shots are ranked by energy (motion, contrast) and pulled
@@ -25,7 +25,7 @@
  * three shots (or-opt, runs reversed too). Pure: numbers in, plan out.
  */
 
-import { cosine, NEAR_DUPLICATE, type Vector } from "../shots/vectors.js";
+import { cosine, type Vector } from "../shots/vectors.js";
 import { meanAbsDistance, shapeDistance, type Flow, type ShotFeatures } from "./features.js";
 
 export const ENERGY_ARCS = ["build", "peak", "release", "flat"] as const;
@@ -93,9 +93,11 @@ export interface SequencePlan {
 
 /**
  * Weights of the cut-cost parts, each part scaled by its median over all
- * pairs first. Look (1 - cosine of shot embeddings, tail to head) alone
- * recovers 38 % of editors' neighbouring shots on the re-edit bench
- * (filename order 14 %), so it weighs as much as shape.
+ * pairs first. Look (1 - cosine of shot embeddings, tail to head), when the
+ * shots carry them: on 10 re-edit bench bins it raises the editors'
+ * neighbouring shots recovered from 32 % to 38 % and lowers the order's
+ * Kendall tau from +0.07 to 0.00 (weight 2 does no better), so the tool
+ * adds it only when asked or for match-cut chains.
  */
 const W = { shape: 1, colour: 0.6, extrapolate: 0.6, focus: 0.3, flow: 0.3, look: 1 };
 /** Normalised shape distance below which two frames are the same picture. */
@@ -236,10 +238,10 @@ export function cutMatrix(shots: readonly SequenceShotInput[]): CutMatrix {
       }
       const fa = a.features;
       const fb = b.features;
-      // The same picture twice: alike at the head and in the middle, or (embeddings) at both ends (not the next moment of one source).
-      const sameLook = looks && cosine(a.look!.head, b.look!.head) >= NEAR_DUPLICATE && cosine(a.look!.tail, b.look!.tail) >= NEAR_DUPLICATE;
-      const samePicture = (shapeDistance(fa.head, fb.head) < DUPLICATE && shapeDistance(fa.middle, fb.middle) < DUPLICATE) || sameLook;
-      if (!sameSource && a.speechAt === undefined && b.speechAt === undefined && samePicture) {
+      // The same picture twice: alike at the head and in the middle (not the next moment of one source).
+      // Not by look: editors cut between shots that look this alike (a new angle on one scene), and a
+      // duplicate cost on them pushes apart the very shots the look term joins (re-edit bench).
+      if (!sameSource && a.speechAt === undefined && b.speechAt === undefined && shapeDistance(fa.head, fb.head) < DUPLICATE && shapeDistance(fa.middle, fb.middle) < DUPLICATE) {
         duplicate[i * n + j] = 1;
         c += DUPLICATE_COST;
       }

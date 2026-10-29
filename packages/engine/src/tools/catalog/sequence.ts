@@ -67,6 +67,10 @@ const input = z.strictObject({
   voice_file_id: z.string().min(1).optional().describe("The voice-over / dialogue in the media bin that speaker shots sync to (speech_at, says; a clip of this same file syncs by itself)."),
   voice_at: z.number().min(0).optional().describe("Timeline seconds where voice_file_id's audio starts (default: where a clip of it plays it, else the sequence start)."),
   position: z.number().min(0).optional().describe("File shots: timeline seconds the sequence starts at (default 0)."),
+  look: z
+    .boolean()
+    .optional()
+    .describe("true: also weigh how alike the shots look across each cut (the shot model, when installed: embed_media_tool). Joins more of the shots an editor puts side by side, at some cost to the overall order; best for montages and match cuts. Default false."),
   dry_run: z.boolean().optional().describe("Only plan: return the order (data.file_ids feeds match_cut_montage_tool or build_reel_tool) without changing the timeline."),
 });
 type Input = z.output<typeof input>;
@@ -163,7 +167,7 @@ export function inBinOrder(project: Project, ids: readonly string[]): boolean {
  * the caller keeps its order with (the frames cannot be read), null where
  * this surface reads no frames at all.
  */
-export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal: SequenceGoal, keepFlag: string): Promise<{ ids: string[]; note: string } | { warning: string } | null> {
+export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal: SequenceGoal, keepFlag: string, look = false): Promise<{ ids: string[]; note: string } | { warning: string } | null> {
   const project = call.doc.project;
   if (!call.host.frames) return null;
   const unordered = (why: string) => ({ warning: `The files are in bin order and could not be ordered (${why}): order them with sequence_shots_tool, or pass ${keepFlag}: true.` });
@@ -179,7 +183,7 @@ export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal
     if (typeof frames === "string") return unordered(frames.replace(/^Error: /, ""));
     shots.push({ features: shotFeatures(frames), seconds: end, ...(still ? { still: true } : {}) });
   }
-  const looks = await shotLooks(call, ids.map((id, k) => ({ file: project.files.find((f) => String(f.id) === id)!, start: 0, end: shots[k]!.seconds })));
+  const looks = look ? await shotLooks(call, ids.map((id, k) => ({ file: project.files.find((f) => String(f.id) === id)!, start: 0, end: shots[k]!.seconds }))) : null;
   looks?.forEach((look, k) => (shots[k]!.look = look));
   const plan = planSequence(shots, goal);
   const out = plan.order.map((k) => ids[k]!);
@@ -197,7 +201,7 @@ export const sequenceTools: CatalogTool[] = [
       "Order (and trim to slots) candidate shots the way an editor cuts them, instead of bin order: each cut carries something across (the action continues, the same shape and position, the subject where the eye already is, the colour, the motion's direction), " +
       "an energy arc (peak: build, peak, release), no near-duplicate back to back, the strongest shot held for the payoff, and speaker shots on their own words in the voice-over (speech_at, or says + a transcribed voice_file_id). " +
       "Reorders timeline clips in place (shots of clip_ids, or every clip on a track) or lays bin files / windows on a track; dry_run returns the order only (data.file_ids for match_cut_montage_tool / build_reel_tool). " +
-      "With the shot model installed (embed_media_tool) the next shot also shows what the last one ended on (data.look). One undo step; data.cuts says why each cut joins (match 0-1, reasons) and how the order compares with the given one.",
+      "look=true (shot model installed) also weighs how alike shots look across each cut (data.look). One undo step; data.cuts says why each cut joins (match 0-1, reasons) and how the order compares with the given one.",
     input,
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     requires: ["frames"],
@@ -264,7 +268,7 @@ export const sequenceTools: CatalogTool[] = [
         });
       }
       // What each shot opens and ends on, when the shot model is installed: the look term of the cut costs.
-      const looks = await shotLooks(call, cands.map((c) => c.window));
+      const looks = args.look ? await shotLooks(call, cands.map((c) => c.window)) : null;
       looks?.forEach((look, k) => (shots[k]!.look = look));
       const goal: SequenceGoal = {
         ...(args.arc ? { arc: args.arc } : {}),
@@ -313,7 +317,7 @@ export const sequenceTools: CatalogTool[] = [
         file_ids: rows.map((r) => r.file_id),
         cuts,
         dropped: plan.dropped.map((d) => ({ id: idOf(cands[d.index]!), why: d.why })),
-        // Whether the shot model's look term was in the cut costs (installed on this host).
+        // Whether the shot model's look term was in the cut costs (look=true and the model installed).
         look: looks !== null,
         arc: plan.arc,
         close: plan.close ? { id: idOf(cands[plan.close.index]!), why: plan.close.why } : null,
