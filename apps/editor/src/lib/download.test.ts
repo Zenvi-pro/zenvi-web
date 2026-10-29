@@ -15,6 +15,8 @@ interface Server {
   refuseRange?: boolean;
   /** Never finish bodies after this many bytes. */
   stallAfter?: number;
+  /** End ranges starting here this many bytes early (a connection cut mid-part). */
+  shortAt?: { start: number; missing: number };
 }
 
 function server(file: Uint8Array, opts: Server = {}) {
@@ -38,8 +40,9 @@ function server(file: Uint8Array, opts: Server = {}) {
       return new Response(body(file), { status: 200, headers: { "content-type": "audio/mpeg", "content-length": String(file.length) } });
     }
     const start = Number(match[1]);
+    if (start >= file.length) return new Response(null, { status: 416, headers: { "content-range": `bytes */${file.length}` } });
     const end = Math.min(file.length - 1, match[2] ? Number(match[2]) : file.length - 1);
-    const slice = file.subarray(start, end + 1);
+    const slice = file.subarray(start, end + 1 - (opts.shortAt?.start === start ? opts.shortAt.missing : 0));
     const headers: Record<string, string> = { "content-type": "audio/mpeg", "content-length": String(slice.length) };
     if (!opts.hideContentRange) headers["content-range"] = `bytes ${start}-${end}/${file.length}`;
     return new Response(body(slice), { status: 206, headers });
@@ -116,6 +119,20 @@ describe("downloadFile", () => {
     await same((await downloadFile("https://x/a", { fetch: s.fetch, onProgress: (p) => progress.push(p) })).blob, file);
     expect(s.requests).toEqual([`bytes=0-${FIRST_RANGE_BYTES - 1}`, `bytes=${FIRST_RANGE_BYTES}-`]);
     expect(progress.at(-1)).toEqual({ loaded: file.length, total: file.length });
+  });
+
+  it("ends at the first range for a file of exactly its size whose Content-Range is hidden (416 for the rest)", async () => {
+    const file = bytes(FIRST_RANGE_BYTES);
+    const s = server(file, { hideContentRange: true });
+    await same((await downloadFile("https://x/a", { fetch: s.fetch })).blob, file);
+    expect(s.requests).toEqual([`bytes=0-${FIRST_RANGE_BYTES - 1}`, `bytes=${FIRST_RANGE_BYTES}-`]);
+  });
+
+  it("fails instead of returning a file with a hole when a part arrives short", async () => {
+    const file = bytes(2_000_000);
+    const [, [start]] = splitRanges(FIRST_RANGE_BYTES, file.length);
+    const s = server(file, { shortAt: { start, missing: 10 } });
+    await expect(downloadFile("https://x/a", { fetch: s.fetch })).rejects.toThrow(`cut short (${file.length - 10} of ${file.length} bytes)`);
   });
 
   it("falls back to a plain request when the ranged one is refused", async () => {

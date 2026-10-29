@@ -90,7 +90,9 @@ export async function importStock(session: EditorSession, item: StockItem, place
       : { source: "freesound", preview_url: item.sound.previews.hq_mp3 || item.sound.previews.lq_mp3, sound_id: String(item.sound.id) };
   if (placement && placement !== "end") args.position_seconds = String(placement.position);
   const wire = await runAssistantTool(session, host, "import_stock_media_tool", args, signal);
-  if (signal.aborted) toast.info("Import cancelled");
-  else if (tools.isErrorResult(wire.result)) toast.error("Import failed", { description: wire.result.replace(/^Error:\s*/, "") });
-  else toast.success(item.kind === "pexels" ? "Stock video imported" : "Stock audio imported");
+  // A cancel after the download finished does not stop the import (hashing, storing, probing).
+  if (tools.isErrorResult(wire.result)) {
+    if (signal.aborted) toast.info("Import cancelled");
+    else toast.error("Import failed", { description: wire.result.replace(/^Error:\s*/, "") });
+  } else toast.success(item.kind === "pexels" ? "Stock video imported" : "Stock audio imported");
 }

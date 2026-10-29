@@ -36,10 +36,10 @@ const sound: FreesoundSound = {
   images: { waveform_m: "", waveform_l: "" },
 };
 
-function session() {
+function session(probe: () => Promise<ReaderInfo> = async () => reader) {
   const project = createProject({ profile: findProfile("HD Vertical 1080p 30 fps") ?? findProfile("HD 1080p 30 fps")! });
   const meta = { id: "local1", name: "Test", createdAt: 0, updatedAt: 0, width: 1080, height: 1920, fps: { num: 30, den: 1 }, duration: 0, clipCount: 0, fileCount: 0 };
-  const media = new MediaLibrary({ store: async () => new MemoryMediaStore(), probe: vi.fn(async () => reader) });
+  const media = new MediaLibrary({ store: async () => new MemoryMediaStore(), probe: vi.fn(probe) });
   return new EditorSession({ meta, project, repository: new MemoryProjectRepository(), media, cloud: () => null });
 }
 
@@ -93,11 +93,27 @@ describe("importStock", () => {
           init?.signal?.addEventListener("abort", abort);
         })));
     const s = session();
+    const steps = s.doc.undoLabels.length;
     const controller = new AbortController();
     const done = importStock(s, { kind: "freesound", sound }, null, { signal: controller.signal });
     controller.abort();
     await done;
     expect(s.project.files).toEqual([]);
+    expect(s.doc.undoLabels.length).toBe(steps);
     expect(toasts()).toEqual(["info: Import cancelled"]);
+  });
+
+  it("says imported, not cancelled, when the cancel comes after the download finished", async () => {
+    vi.stubGlobal("fetch", cdn(new Uint8Array(3_069_708).fill(7)));
+    const controller = new AbortController();
+    // The click lands while the file is being probed: too late to stop the import.
+    const s = session(async () => {
+      controller.abort();
+      return reader;
+    });
+    await importStock(s, { kind: "freesound", sound }, null, { signal: controller.signal });
+    expect(controller.signal.aborted).toBe(true);
+    expect(s.project.files.map((f) => f.name)).toEqual(["freesound_871400.mp3"]);
+    expect(toasts()).toEqual(["success: Stock audio imported"]);
   });
 });

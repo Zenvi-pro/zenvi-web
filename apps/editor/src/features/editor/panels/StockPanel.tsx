@@ -26,6 +26,10 @@ function percent(job: Importing): string {
   return job.fraction === null ? "" : `${Math.round(job.fraction * 100)}%`;
 }
 
+function importingLabel(job: Importing): string {
+  return job.fraction === null ? "Importing" : `Importing ${percent(job)}`;
+}
+
 function VideoResult({ video, onImport, job }: { video: PexelsVideo; onImport: (toTimeline: boolean) => void; job: Importing | undefined }) {
   const busy = job !== undefined;
   const [hover, setHover] = useState(false);
@@ -42,7 +46,7 @@ function VideoResult({ video, onImport, job }: { video: PexelsVideo; onImport: (
         {preview ? <video src={preview} muted autoPlay loop playsInline className="absolute inset-0 h-full w-full object-cover" /> : null}
         <span className="absolute bottom-1 right-1 rounded-[3px] bg-black/70 px-1 text-[10px] font-medium tnum text-fg-muted">{formatDuration(video.duration)}</span>
         {job ? (
-          <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/50" role="status" aria-label={`Importing ${percent(job)}`}>
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/50" role="status" aria-label={importingLabel(job)}>
             <Spinner size={16} className="text-fg" />
             <span className="text-2xs tnum text-fg">{percent(job)}</span>
           </span>
@@ -88,8 +92,7 @@ function AudioResult({ sound, playing, onToggle, onImport, job }: { sound: Frees
       {job ? (
         <button
           type="button"
-          role="status"
-          aria-label={`Importing ${percent(job)}, cancel`}
+          aria-label={`${importingLabel(job)}, cancel`}
           title="Cancel import"
           onClick={() => job.controller.abort()}
           className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-sm px-1 text-2xs tnum text-fg-subtle outline-none hover:bg-white/[0.08] hover:text-fg"
