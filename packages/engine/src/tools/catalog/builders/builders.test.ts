@@ -253,9 +253,10 @@ describe("the builders' one undo step", () => {
     const doc = project();
     const host = fakeHost();
     const abort = new AbortController();
-    const write = host.media.writeGenerated!;
-    host.media.writeGenerated = async (name, bytes) => {
-      const path = await write(name, bytes);
+    const media = host.media!;
+    const write = media.writeGenerated!.bind(media);
+    media.writeGenerated = async (name, bytes, type) => {
+      const path = await write(name, bytes, type);
       abort.abort();
       return path;
     };
