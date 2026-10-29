@@ -162,10 +162,11 @@ describe("planReelGrid length", () => {
     expect(grid.lengthNote).toBe("8.00s, ends on a bar line at 120 BPM, as asked");
   });
 
-  it("takes the nearest bar line when the music ends before the next one", () => {
+  it("ends on the last beat before the target, not a bar early, when the music covers the target but not the next bar line", () => {
+    // Round 7: the bar line before the target left a 30 s ask at 26.2 s.
     const grid = planReelGrid({ music: steady(120, 9.5), seconds: 9, fallbackBpm: 120 });
-    expect(grid.duration).toBe(8);
-    expect(grid.lengthNote).toMatch(/^8\.00s, ends on a bar line at 120 BPM: the (nearest one to|music runs out before) the 9s asked for$/);
+    expect(grid.duration).toBe(9);
+    expect(grid.lengthNote).toBe("9.00s, ends on the last beat at or before the 9s asked for (no bar line fits)");
   });
 });
 

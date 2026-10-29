@@ -36,14 +36,15 @@ const BARS_PER_PHRASE = 4;
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 
 /**
- * `music` looped to last at least `seconds` plus a bar (the reel may end on
- * the bar line after its target), or null when it is long enough already or
- * has no bar lines to loop on.
+ * `music` shorter than `seconds` looped to last at least `seconds` plus a bar
+ * (the reel may end on the bar line after its target), or null when it covers
+ * the target already or has no bar lines to loop on.
  */
 export function loopMusic(music: MusicBeats, seconds: number): LoopedMusic | null {
   // A bar of four beats: the slack planReelGrid may run past its target.
   const bar = (4 * 60) / Math.max(1, music.bpm);
-  if (music.duration >= seconds + bar - EPS) return null;
+  // Music that covers the target ends on its last beat before it (planReelGrid); only shorter music loops.
+  if (music.duration >= seconds - EPS) return null;
   const downs = music.downbeats.filter((t) => t >= -EPS && t <= music.duration + EPS);
   if (downs.length < 2) return null;
   const last = downs[downs.length - 1]!;
@@ -98,8 +99,7 @@ export function segmentsBetween(segments: readonly MusicSegment[], start: number
 export function loopNote(original: MusicBeats, loop: LoopedMusic, seconds: number): string {
   const from = loop.segments[1]!.from;
   const bars = Math.round((loop.loopSeconds * original.bpm) / 240);
-  const why = original.duration < seconds ? `shorter than the ${round3(seconds)} s asked` : `too short to end on the bar line after the ${round3(seconds)} s asked`;
-  return `The music is ${round3(original.duration)} s, ${why}: ${bars} bar(s) from ${round3(from)} s repeat ${loop.repeats === 1 ? "once" : `${loop.repeats} times`}, cut on bar lines, so the reel runs the full length.`;
+  return `The music is ${round3(original.duration)} s, shorter than the ${round3(seconds)} s asked: ${bars} bar(s) from ${round3(from)} s repeat ${loop.repeats === 1 ? "once" : `${loop.repeats} times`}, cut on bar lines, so the reel runs the full length.`;
 }
 
 /** File times (hits, onsets) on the looped clock: each stretch carries the times inside it. */
