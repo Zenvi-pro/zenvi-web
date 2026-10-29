@@ -138,6 +138,20 @@ describe("gather_stock_footage_tool", () => {
       expect(result.data?.warnings?.join(" ")).toMatch(/1 clip\(s\) are off the set's look/);
     });
 
+    it("does not take a clip off the look for a search that already has a shot while others still fit", async () => {
+      const doc = fixtureDoc();
+      const mixed = {
+        "coffee pour": [video(1, "Ann", "coffee-pour"), video(2, "Bo", "coffee-pour"), video(3, "Cy", "coffee-pour"), video(10, "Di", "coffee-pour")],
+        "latte art": [video(4, "Ann", "latte-art"), video(5, "Fay", "latte-art"), video(6, "Gus", "latte-art"), video(11, "Hal", "latte-art")],
+      };
+      const h: ToolHost = { ...host(mixed), frames: pixelFrameHost(tinted({ 1: WARM, 2: COOL, 3: COOL, 10: COOL, 4: WARM, 5: WARM, 6: WARM, 11: WARM })) };
+      const result = await runTool({ doc, host: h }, "gather_stock_footage_tool", { queries: Object.keys(mixed), count: 5, coherence: "shoot" });
+      const data = result.data?.data as { files: { pexels_id: number }[]; skipped: Record<string, number> };
+      expect(data.files.map((f) => f.pexels_id)).toEqual([1, 4, 5, 6, 11]);
+      expect(data.skipped.off_look).toBe(3);
+      expect(result.data?.warnings ?? []).not.toContainEqual(expect.stringMatching(/off the set's look/));
+    });
+
     it("matches the person's footage when match_file_id names it", async () => {
       const doc = fixtureDoc();
       const result = await runTool({ doc, host: coherentHost() }, "gather_stock_footage_tool", {

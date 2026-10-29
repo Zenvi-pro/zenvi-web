@@ -52,6 +52,11 @@ describe("generate_broll_set_tool", () => {
     const h = host();
     const args = { shots: SHOTS.slice(0, 2), style: "warm tungsten interior" };
     await runTool({ doc, host: h }, "generate_broll_set_tool", args);
+    // No reference file: the first still is the second's reference, and both come from one image model.
+    const images = h.backendCalls.filter((c) => c.path === "/api/v1/generation/image").map((c) => c.body as Record<string, unknown>);
+    expect(images.map((b) => b.provider)).toEqual(["gemini", "gemini"]);
+    expect(images[0]!.reference_image_url).toBeUndefined();
+    expect(images[1]!.reference_image_url).toMatch(/^data:image\//);
     const paid = h.backendCalls.length;
     const again = await runTool({ doc, host: h }, "generate_broll_set_tool", args);
     expect(again.data?.status).toBe("unchanged");

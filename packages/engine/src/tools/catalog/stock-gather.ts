@@ -259,6 +259,11 @@ export const stockGatherTools: CatalogTool[] = [
               held.push({ ...c, media: result, distance });
               const own = held.filter((h) => h.query === c.query);
               if (own.length <= OFF_LOOK_PER_QUERY) continue;
+              // A search that already has a shot stops downloading: its held clips wait as fillers behind every clip that fits.
+              if (taken.some((t) => t.query === c.query)) {
+                lists[queries.indexOf(c.query)]!.length = 0;
+                continue;
+              }
               // This search has no clip near the look: its closest one stands in.
               const closest = own.reduce((a, b) => (b.distance! < a.distance! ? b : a));
               held.splice(held.indexOf(closest), 1);
@@ -283,7 +288,7 @@ export const stockGatherTools: CatalogTool[] = [
           const [most, n] = [...per].sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
           if (n < 2) break;
           const last = taken.map((t) => t.query).lastIndexOf(most);
-          held.push(...taken.splice(last, 1));
+          taken.splice(last, 1);
         }
         const closest = mine.reduce((a, b) => (b.distance! < a.distance! ? b : a));
         held.splice(held.indexOf(closest), 1);

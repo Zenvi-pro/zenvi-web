@@ -127,3 +127,19 @@ describe("get_brief_tool's footage plan", () => {
     expect((result.data?.data as { footage: { counts: Record<string, number> } }).footage.counts.fetch).toBe(1);
   });
 });
+
+describe("footageCoverage stand-ins", () => {
+  it("lets every word match pick its file before a row without one takes the next file as a stand-in", () => {
+    const doc = fixtureDoc();
+    doc.transaction("stock", (tx) => {
+      addFile(tx, { path: "/downloads/pexels_11.mp4", info: videoInfo("/downloads/pexels_11.mp4", 8) }, { id: "FILESTOCKA" });
+      tx.update(["files", { id: "FILESTOCKA" }], { ai_metadata: { source: "pexels", query: "harbour at dusk", creator: "Ann", pexels_id: 11 } });
+      addFile(tx, { path: "/downloads/pexels_12.mp4", info: videoInfo("/downloads/pexels_12.mp4", 8) }, { id: "FILESTOCKB" });
+    });
+    const coverage = footageCoverage(doc.project, brief([row(0, "abstract light leaks", "stock"), row(3, "harbour at dusk, boats", "stock")]));
+    expect(coverage.shots.map((s) => [s.picture, s.file_id, s.reason])).toEqual([
+      ["abstract light leaks", "FILESTOCKB", "assumed: name its file_id in the storyboard"],
+      ["harbour at dusk, boats", "FILESTOCKA", undefined],
+    ]);
+  });
+});
