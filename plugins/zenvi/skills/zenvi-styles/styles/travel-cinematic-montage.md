@@ -122,6 +122,7 @@ set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volum
 set_keyframes_tool {"timeline_clip_id": "<skyline wide>", "property": "scale_x", "points": [{"timeline_seconds": 12, "value": 1}, {"timeline_seconds": 15.5, "value": 2.2}], "ease": "ease_in_quart"}
 set_keyframes_tool {"timeline_clip_id": "<skyline wide>", "property": "scale_y", "points": [{"timeline_seconds": 12, "value": 1}, {"timeline_seconds": 15.5, "value": 2.2}], "ease": "ease_in_quart"}
 set_keyframes_tool {"timeline_clip_id": "<release>", "property": "scale_x", "points": [{"timeline_seconds": 24, "value": 1}, {"timeline_seconds": 28.5, "value": 1.06}]}
+set_keyframes_tool {"timeline_clip_id": "<release>", "property": "scale_y", "points": [{"timeline_seconds": 24, "value": 1}, {"timeline_seconds": 28.5, "value": 1.06}]}
 unify_grade_tool {"look": "warm_cinema", "look_intensity": 0.45}
 add_kinetic_title_tool {"text": "<PLACE>", "position_seconds": 28.5, "duration_seconds": 1.5, "style": "documentary", "animation": "fade", "emphasis": "none", "text_size": 0.13, "background": "#000000", "stagger_seconds": 0}
 add_clip_to_timeline_tool {"file_id": "<music>", "position_seconds": 0, "start_seconds": 0.836, "end_seconds": 30.836, "track": "5"}

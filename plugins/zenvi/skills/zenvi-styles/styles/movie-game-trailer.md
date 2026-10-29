@@ -130,8 +130,10 @@ set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volum
 unify_grade_tool {"look": "teal_cinema", "look_intensity": 0.35}
 color_grade_clip_tool {"timeline_clip_ids": ["<act 2 clips>"], "saturation": 0.55, "contrast": 0.2, "shadows": -0.3}
 add_vignette_tool {"amount": 0.2, "feather": 0.85}
-fade_clip_tool {"clip_id": "<first shot>", "fade_in_seconds": 1.2}
+fade_clip_tool {"clip_id": "<first shot>", "fade_in_seconds": 0.3}
 set_clip_properties_tool {"timeline_clip_ids": ["<explosion>"], "properties": {"composite": "screen"}}
+set_keyframes_tool {"timeline_clip_id": "<held face>", "property": "scale_x", "points": [{"timeline_seconds": 16.9, "value": 1}, {"timeline_seconds": 21.4, "value": 1.08}]}
+set_keyframes_tool {"timeline_clip_id": "<held face>", "property": "scale_y", "points": [{"timeline_seconds": 16.9, "value": 1}, {"timeline_seconds": 21.4, "value": 1.08}]}
 set_keyframes_tool {"timeline_clip_id": "<explosion>", "property": "alpha", "points": [{"timeline_seconds": 17.4, "value": 0}, {"timeline_seconds": 21.3, "value": 1}], "ease": "ease_in_quad"}
 apply_motion_transition_tool {"preset": "flash_white", "clip1_id": "<last climax shot>", "clip2_id": "<dark insert>", "duration": 0.2}
 add_kinetic_title_tool {"text": "<TAGLINE>", "position_seconds": 9, "duration_seconds": 2.6, "style": "documentary", "animation": "fade", "emphasis": "none", "text_size": 0.045, "background": "#000000", "stagger_seconds": 0}

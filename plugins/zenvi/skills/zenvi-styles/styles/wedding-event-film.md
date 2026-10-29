@@ -8,7 +8,7 @@ pace: calm
 mood: [romantic, warm, joyful, intimate]
 aspect: ["16:9", "2.39:1", "9:16", "4:5"]
 pairs_with: [diegetic-sound-carries-the-cut, white-flash-or-light-leak-join, dissolve-on-calm-hard-cut-on-action, tighten-then-release-into-held-payoff, soft-bloom-lifted-shadow-grade, l-cut-audio-carrying-over-a-cutaway, restrained-title-card-on-black]
-avoid_with: [whip-and-match-cut-chain, staccato-sub-second-shot-burst, giant-word-kinetic-statement, glitch-transitions, commentary-hits-with-dense-designed-cues]
+avoid_with: [whip-and-match-cut-chain, staccato-sub-second-shot-burst, giant-word-kinetic-statement, commentary-hits-with-dense-designed-cues]
 needs: [music-structure-detect]
 ---
 
@@ -123,16 +123,19 @@ detect_beats_tool {"file_id": "<music>"}
 Shots back to back on the downbeats (97.5 bpm: a bar every 2.46 s), times
 on whole frames. `apply_transition_tool` pulls the second clip back by the
 overlap and leaves a gap after it, so add dissolves before placing the
-later clips (or re-place them):
+later clips (or re-place them). Fill and mute (`scope` `all`) once the
+last shot is down, before the music:
 
 ```json
-add_clip_to_timeline_tool {"file_id": "<rings>", "position_seconds": 0, "start_seconds": 1, "end_seconds": 3.47, "track": "1"}
-set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volume": 0}}
+add_clip_to_timeline_tool {"file_id": "<rings>", "position_seconds": 0, "start_seconds": 1, "end_seconds": 3.458, "track": "1"}
+add_clip_to_timeline_tool {"file_id": "<makeup>", "position_seconds": 2.458, "start_seconds": 1, "end_seconds": 3.5, "track": "1"}
 apply_transition_tool {"clip1_id": "<rings>", "clip2_id": "<makeup>", "duration": 0.6}
+set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volume": 0}}
 apply_motion_transition_tool {"preset": "flash_white", "clip1_id": "<car aerial>", "clip2_id": "<couple outdoors>", "duration": 0.4, "intensity": 0.8}
 unify_grade_tool {"look": "romantic_cinema", "look_intensity": 0.5}
 add_vignette_tool {"amount": 0.15, "feather": 0.9}
 set_keyframes_tool {"timeline_clip_id": "<payoff>", "property": "scale_x", "points": [{"timeline_seconds": 24.75, "value": 1}, {"timeline_seconds": 30, "value": 1.05}]}
+set_keyframes_tool {"timeline_clip_id": "<payoff>", "property": "scale_y", "points": [{"timeline_seconds": 24.75, "value": 1}, {"timeline_seconds": 30, "value": 1.05}]}
 add_kinetic_title_tool {"text": "<Name & Name>", "position_seconds": 8.2, "duration_seconds": 3.3, "style": "editorial", "animation": "rise", "emphasis": "none", "text_size": 0.09, "stagger_seconds": 0.15}
 add_clip_to_timeline_tool {"file_id": "<music>", "position_seconds": 0, "start_seconds": 0.72, "end_seconds": 30.72, "track": "5"}
 search_sfx_tool {"query": "car engine start", "count": 6}
