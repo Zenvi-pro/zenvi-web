@@ -27,6 +27,7 @@ const effectProp: ToolSpec = {
   needsChange: true,
 };
 const updateEffect: ToolSpec = { tool: "update_effect_tool", args: { timeline_clip_id: A, effect: "Brightness" }, setup: [{ tool: "add_effect_tool", args: { timeline_clip_id: A, effect: "Brightness" } }], needsChange: true };
+const BRIGHTNESS_RAMP = [{ time: 0, value: -0.5 }, { time: 1, value: 0.5 }];
 const props: ToolSpec = { tool: "set_clip_properties_tool", args: { timeline_clip_ids: [A] } };
 const updateTransition: ToolSpec = { tool: "update_transition_tool", args: { between_clip_ids: [A, B] }, clips: CUT, setup: [fadeBetween], probe: at(0.6), needsChange: true };
 const preset: ToolSpec = { tool: "apply_clip_preset_tool", args: { timeline_clip_ids: [A] }, probe: at(0.2) };
@@ -83,6 +84,22 @@ export const EDIT_TOOL_CASES: readonly TruthCase[] = [
   param(effectProp, "frame", 28, { with: { value: 0.8 }, setup: [{ tool: "set_effect_property_tool", args: { effect_id: "@effect:Brightness", property: "brightness", value: -0.5, frame: 1 } }] }),
   param(effectProp, "property", "contrast", { with: { value: 60 }, base: "brightness", label: "contrast" }),
   param(updateEffect, "properties", { brightness: 0.5 }, { expect: [up("luma")] }),
+  // interpolation: a point shapes the segment that ends at it (libopenshot KeyFrame.cpp, the right point's
+  // interpolation), so a new point at 0.2 s is probed at 0.1 s: constant holds the earlier value.
+  param(prop, "interpolation", "constant", {
+    with: { value: 0, at_seconds: 0.2 },
+    setup: [{ tool: "set_keyframes_tool", args: { timeline_clip_id: A, property: "alpha", points: [{ seconds: 0, value: 0.6 }, { seconds: 1, value: 1 }] } }],
+    probe: at(0.1),
+    expect: [up("luma")],
+  }),
+  param(effectProp, "interpolation", "constant", {
+    with: { value: -0.8, at_seconds: 0.2 },
+    setup: [{ tool: "set_effect_property_tool", args: { effect_id: "@effect:Brightness", property: "brightness", value: 0.5, frame: 30 } }],
+    probe: at(0.1),
+    expect: [up("luma")],
+  }),
+  param(updateEffect, "interpolation", "constant", { with: { properties: { brightness: BRIGHTNESS_RAMP } }, expect: [down("luma")] }),
+  param({ tool: "add_effect_tool", args: { timeline_clip_id: A, effect: "Brightness", properties: { brightness: BRIGHTNESS_RAMP } } }, "interpolation", "constant", { expect: [down("luma")] }),
 
   // Transitions after the fact.
   param(updateTransition, "mask", "wipe_left_to_right"),
