@@ -125,6 +125,28 @@ export function bundledFamily(name: string | null | undefined): FontFamilyId | n
 }
 
 /**
+ * The bundled family that stands in for a font a brief or a template names
+ * but no surface has for sure ("Arial", "serif", "condensed"), by its kind:
+ * without it the renderer falls back to DejaVu Sans (bench round 7). Null
+ * for a name with no clear kind.
+ */
+export function fallbackFamily(name: string | null | undefined): FontFamilyId | null {
+  const n = (name ?? "").toLowerCase().replace(/['"]/g, "").trim();
+  if (!n) return null;
+  const rules: [RegExp, FontFamilyId][] = [
+    [/mono|courier|menlo|consolas|monaco|code/, "space-mono"],
+    [/condensed|narrow|compressed|impact|oswald|league gothic|bebas|gothic/, "anton"],
+    [/^(?!.*sans).*serif|times|georgia|garamond|playfair|didot|baskerville|bodoni|cambria|book|merriweather|lora/, "instrument-serif"],
+    [/rounded|nunito|quicksand|comfortaa/, "varela-round"],
+    [/hand|script|marker|brush|cursive/, "caveat-brush"],
+    [/pixel|8.?bit|arcade/, "silkscreen"],
+    [/black|heavy|ultra|display/, "archivo-black"],
+    [/arial|helvetica|sans|roboto|open sans|montserrat|poppins|segoe|sf pro|system-ui|lato|grotesk|grotesque|neue|inter|verdana|tahoma|futura|avenir|proxima/, "inter"],
+  ];
+  return rules.find(([re]) => re.test(n))?.[1] ?? null;
+}
+
+/**
  * The file of `family` for a weight and slant: the variable face, else the
  * static face of the same slant nearest in weight (an upright face when the
  * family has no italic: the typesetter slants it).

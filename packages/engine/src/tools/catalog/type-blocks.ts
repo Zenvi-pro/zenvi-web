@@ -30,9 +30,9 @@ import {
   type TypeBlockBase,
   type TypeBlockOutput,
 } from "../../motion/typeblocks/index.js";
-import { bundledFamily, type FontFamilyId } from "../../typography/families.js";
+import type { FontFamilyId } from "../../typography/families.js";
 import { directTool, unavailable, type CatalogTool } from "../define.js";
-import { FONT_FAMILY_LIST, loadFamilies, missingGlyphWarnings, unknownFamily } from "../fonts.js";
+import { FONT_FAMILY_LIST, familyArg, loadFamilies, missingGlyphWarnings, unknownFamily } from "../fonts.js";
 import { ASSET_KEY, generatedSvg, maskReaderOf } from "../mattes.js";
 import { applied, failed, refused } from "../receipt.js";
 import { colorHexAlpha, projectSize, snapToFrame, trackInfo } from "../titles-text.js";
@@ -75,7 +75,7 @@ const input = z.strictObject({
   text: z.string().max(200).optional().describe("The type: the ring's line, the words to write, the stencil title (1-2 words), the echoed line, or the strobe's words (split at spaces when there is no `words`)."),
   position_seconds: z.number().min(0).optional().describe("Timeline start, seconds (default 0)."),
   duration_seconds: z.number().min(0.2).max(30).optional().describe("Length, seconds (default: text_on_path 3, write_on 2.5, stencil 2.4, echo_stack 1.8, paper 2.4, strobe the words' holds + 1.2 s of lockup, wheel its turns + 1 s)."),
-  font_family: z.string().max(40).optional().describe(`A bundled family, drawn as outlines (same on every surface): ${FONT_FAMILY_LIST}. Default: write_on instrument-serif; text_on_path, wheel and paper archivo-black; the others anton.`),
+  font_family: z.string().max(40).optional().describe(`A bundled family, drawn as outlines (same on every surface): ${FONT_FAMILY_LIST}; a font by kind (Arial, serif, condensed, mono) takes the bundled face of that kind. Default: write_on instrument-serif; text_on_path, wheel and paper archivo-black; the others anton.`),
   font_weight: z.number().int().min(100).max(900).optional().describe("Weight for families that have several (inter): 100-900."),
   ink: z.string().max(40).optional().describe("Colour of the type, all but stencil (default white; paper: the paper, default cream)."),
   ground: z.string().max(40).optional().describe("stencil: the card's colour (default near-black); strobe: the first ground (default near-black; it flips with ink and accent)."),
@@ -160,7 +160,7 @@ export const typeBlockTools: CatalogTool[] = [
       }
       let family: FontFamilyId = FAMILY[block];
       if (args.font_family !== undefined) {
-        const named = bundledFamily(args.font_family);
+        const named = familyArg(args.font_family);
         if (!named) return refused(TOOL, unknownFamily(args.font_family));
         family = named;
       }

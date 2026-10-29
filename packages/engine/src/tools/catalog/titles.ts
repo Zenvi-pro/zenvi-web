@@ -64,7 +64,7 @@ import {
   type ScreenPosition,
 } from "../titles-text.js";
 import { text } from "./common.js";
-import { missingGlyphWarnings, outlineTitle, titleFontFamilies } from "../fonts.js";
+import { outlineTitle, titleFontFamilies, titleFontWarnings } from "../fonts.js";
 import { TitleStyle, assignTexts, fieldRows, readProjectSvg, writeTitle } from "./title-templates.js";
 
 /** #183's add_title_tool tried these in order when no template was named (titles_text.DEFAULT_TEMPLATES). */
@@ -266,7 +266,7 @@ async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) 
   if (warnings.length > 0) data.warnings = warnings;
   return applied(tool, summaryLine(summary + warningNote(warnings)), {
     data,
-    warnings: [...warnings, ...missingGlyphWarnings(outlined.missing)],
+    warnings: [...warnings, ...titleFontWarnings(outlined)],
   });
 }
 
