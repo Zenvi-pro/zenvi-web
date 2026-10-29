@@ -560,6 +560,14 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { path: "/out/captions.srt", clipId: "NOPE" }, summary: /^Error: Unknown clipId 'NOPE'\.$/ },
   },
   detect_beats_tool: { happy: { args: { fileId: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
+  detect_onsets_tool: {
+    happy: { args: { file_id: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { clip_id: "NOPE" }, status: "refused", summary: /^Error: No timeline clip with id='NOPE'\.$/ },
+  },
+  snap_cuts_to_onsets_tool: {
+    happy: { args: { track: "1" }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { onsets_from: "clip" }, status: "refused", summary: /^Error: onsets_from=clip needs onset_clip_id\.$/ },
+  },
   diarize_media_tool: { happy: { args: { fileId: IDS.interview }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
   search_media_local_tool: { happy: { args: { query: "dog" }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
 

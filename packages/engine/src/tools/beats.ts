@@ -1,10 +1,12 @@
 /**
  * Beats of a project file's audio: the host decodes (`AudioHost.decodePcm`:
  * ffmpeg on the CLI and in Zenvi Cloud), the engine tracks (analysis/beats.ts).
- * Shared by detect_beats_tool and build_reel_tool.
+ * Shared by detect_beats_tool and build_reel_tool; transients alone
+ * (`onsetsOfFile`) by detect_onsets_tool, snap_cuts_to_onsets_tool and the
+ * shot-length ramp.
  */
 
-import { BEAT_SAMPLE_RATE, EDIT_BPM_MAX, detectBeats, type BeatAnalysis, type BeatOptions } from "../analysis/beats.js";
+import { BEAT_SAMPLE_RATE, EDIT_BPM_MAX, detectBeats, detectOnsets, type BeatAnalysis, type BeatOptions, type Onset, type OnsetOptions } from "../analysis/beats.js";
 import type { ProjectFile } from "../model/types.js";
 import type { ToolCall } from "./define.js";
 
@@ -35,6 +37,27 @@ export async function beatsOfFile(call: ToolCall, file: ProjectFile, options: Be
     call.host.log?.(`decodePcm(${path}) failed: ${message}`);
     return /no audio stream/i.test(message) ? `Error: ${file.id} has no audio.` : `Error: Beat detection failed: ${message}`;
   }
+}
+
+/** Decode `file`'s audio (the first ten minutes) or explain why not, like `beatsOfFile`. */
+async function pcmOfFile(call: ToolCall, file: ProjectFile): Promise<{ samples: Float32Array; sampleRate: number } | string> {
+  const decode = call.host.audio?.decodePcm;
+  if (!decode) return "Error: this Zenvi surface cannot decode audio.";
+  const path = String(file.path ?? "");
+  if (!path) return `Error: file ${file.id} has no media path.`;
+  try {
+    return await decode(path, { sampleRate: BEAT_SAMPLE_RATE, maxSeconds: MAX_SECONDS, signal: call.signal });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    call.host.log?.(`decodePcm(${path}) failed: ${message}`);
+    return /no audio stream/i.test(message) ? `Error: ${file.id} has no audio.` : `Error: decoding the audio of ${file.id} failed: ${message}`;
+  }
+}
+
+/** Transients of `file`'s audio in file seconds, or why not (a string starting with "Error:"). */
+export async function onsetsOfFile(call: ToolCall, file: ProjectFile, options: OnsetOptions = {}): Promise<Onset[] | string> {
+  const pcm = await pcmOfFile(call, file);
+  return typeof pcm === "string" ? pcm : detectOnsets(pcm.samples, pcm.sampleRate, options);
 }
 
 /** Below this the grid should be checked by ear (analysis/beats.ts, BeatAnalysis.confidence). */

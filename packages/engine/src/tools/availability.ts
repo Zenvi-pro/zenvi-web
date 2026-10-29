@@ -196,6 +196,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
+  detect_onsets_tool: { methods: ["audio.decodePcm"] },
+  snap_cuts_to_onsets_tool: { methods: ["audio.decodePcm"] },
   master_audio_tool: { methods: ["audio.mixPcm"] },
   analyze_mix_tool: { methods: ["audio.mixPcm"] },
   pan_tool: { methods: ["audio.decodePcm", "media.writeGenerated"] },
