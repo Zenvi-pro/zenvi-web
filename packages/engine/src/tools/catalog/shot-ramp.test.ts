@@ -72,7 +72,9 @@ describe("shot_length_ramp_tool", () => {
       audio: "mute",
     });
     expect(data.cuts).toBe(9);
-    expect(data.snapped).toBeGreaterThanOrEqual(7);
+    expect(data.snapped).toBeGreaterThanOrEqual(3);
+    // Snapping never makes a shot longer than the one before it.
+    for (let i = 1; i < data.shots.length; i += 1) expect(data.shots[i]!.length).toBeLessThanOrEqual(data.shots[i - 1]!.length + 1 / 30 + 1e-6);
     // Snapped cuts sit on the 0.5 s grid (the music clip plays from 0 at timeline 0).
     const onBeat = data.shots.slice(1).filter((s) => Math.abs(s.start * 2 - Math.round(s.start * 2)) < 0.02);
     expect(onBeat.length).toBe(data.snapped);

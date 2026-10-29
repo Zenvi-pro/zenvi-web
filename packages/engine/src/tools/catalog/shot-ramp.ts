@@ -144,7 +144,7 @@ export const shotRampTools: CatalogTool[] = [
         const hits = await snapHits(call, snapClip, snap, position);
         if (typeof hits === "string") return failed(TOOL, hits);
         if (hits.length === 0) warnings.push(`${clipTitle(snapClip)} has no ${snap} under the ramp: the cuts follow the curve alone.`);
-        ({ times, snapped } = snapCutTimes(times, hits, g.fps));
+        ({ times, snapped } = snapCutTimes(times, hits, g.fps, lengths.length - ((args.settle_seconds ?? 0) > 0 ? 1 : 0)));
       }
       const filled = fillShots(settle ? times.slice(0, -1) : times, sources, motif ? { source: motif, every: args.motif_every ?? 4 } : undefined);
       if (!Array.isArray(filled)) return refused(TOOL, `Error: no source is long enough for shot ${filled.unfilled + 1} (${filled.length.toFixed(2)} s): add longer footage or shorten first_shot_seconds.`);
@@ -153,7 +153,10 @@ export const shotRampTools: CatalogTool[] = [
         const at = times[times.length - 2]!;
         const length = times[times.length - 1]! - at;
         if (settle.kind === "video" && settle.end - settle.start < length - 1e-9) return refused(TOOL, `Error: the settle shot is ${length.toFixed(2)} s but its file is shorter.`);
-        shots.push({ fileId: settle.fileId, kind: settle.kind, at, length, sourceStart: 0, motif: false });
+        // Fresh footage when the ramp already showed this file: continue after the last part it used.
+        const used = Math.max(settle.start, ...shots.filter((x) => x.fileId === settle.fileId && !x.motif).map((x) => x.sourceStart + x.length));
+        const sourceStart = settle.kind === "video" && used + length <= settle.end + 1e-9 ? used : settle.kind === "video" ? settle.start : 0;
+        shots.push({ fileId: settle.fileId, kind: settle.kind, at, length, sourceStart, motif: false });
       }
 
       const total = times[times.length - 1]!;

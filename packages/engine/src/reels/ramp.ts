@@ -95,20 +95,40 @@ export interface SnappedCuts {
 /**
  * Move each inner cut (not the start or the end) to the nearest hit (seconds
  * from the ramp's start) within SNAP_SHARE of its shorter neighbour, keeping
- * every shot at least MIN_SHOT_FRAMES long. Left to right, so each cut sees
- * where the one before it landed.
+ * every shot at least MIN_SHOT_FRAMES long. Inside the ramp (the first
+ * `rampShots` shots; the rest is the settle) a snap must keep the ramp
+ * going one way: the shots on both sides of the cut stay in order with the
+ * shot before and the planned shot after (a frame of slack), so a shortening ramp never
+ * lengthens to reach a beat. Left to right, so each cut sees where the one
+ * before it landed.
  */
-export function snapCutTimes(times: readonly number[], hits: readonly number[], fps: number): SnappedCuts {
+export function snapCutTimes(times: readonly number[], hits: readonly number[], fps: number, rampShots = times.length - 1): SnappedCuts {
   const out = [...times];
   const snapped: boolean[] = [];
-  const minShot = MIN_SHOT_FRAMES / fps;
+  const frame = 1 / fps;
+  const minShot = MIN_SHOT_FRAMES * frame;
   const sorted = [...hits].sort((a, b) => a - b);
+  const planned = (k: number) => times[k + 1]! - times[k]!;
+  const direction = rampShots >= 2 ? Math.sign(planned(rampShots - 1) - planned(0)) : 0;
+  // Whether shot i-1, ending at `t`, keeps the ramp's direction.
+  const keepsShape = (i: number, t: number) => {
+    if (direction === 0 || i >= rampShots) return true;
+    const length = t - out[i - 1]!;
+    const before = i >= 2 ? out[i - 1]! - out[i - 2]! : undefined;
+    // The shot the cut starts, until the next cut where it is now.
+    const after = out[i + 1]! - t;
+    // The shot after that, as planned: the next cut may not move.
+    const next = i + 1 < rampShots ? out[i + 2]! - out[i + 1]! : undefined;
+    const slack = frame + 1e-9;
+    if (direction < 0) return (before === undefined || length <= before + slack) && length >= after - slack && (next === undefined || after >= next - slack);
+    return (before === undefined || length >= before - slack) && length <= after + slack && (next === undefined || after <= next + slack);
+  };
   for (let i = 1; i + 1 < out.length; i += 1) {
     const reach = SNAP_SHARE * Math.min(times[i]! - times[i - 1]!, times[i + 1]! - times[i]!);
     let best: number | null = null;
     for (const h of sorted) {
       const t = Math.round(h * fps) / fps;
-      if (Math.abs(t - out[i]!) > reach + 1e-9 || t < out[i - 1]! + minShot - 1e-9 || t > out[i + 1]! - minShot + 1e-9) continue;
+      if (Math.abs(t - out[i]!) > reach + 1e-9 || t < out[i - 1]! + minShot - 1e-9 || t > out[i + 1]! - minShot + 1e-9 || !keepsShape(i, t)) continue;
       if (best === null || Math.abs(t - out[i]!) < Math.abs(best - out[i]!)) best = t;
     }
     snapped.push(best !== null);

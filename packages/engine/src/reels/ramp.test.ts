@@ -44,6 +44,18 @@ describe("cutTimes and snapCutTimes", () => {
   });
 });
 
+describe("snapCutTimes keeps a ramp's shape", () => {
+  it("never lets a shortening ramp lengthen to reach a beat, and leaves the settle cut to the plain rule", () => {
+    const lengths = rampLengths({ first: 1.5, last: 0.25, curve: "exponential", shots: 14, settle: 2 });
+    const times = cutTimes(lengths, 30);
+    const beats = Array.from({ length: 40 }, (_, k) => k * 0.5);
+    const { times: out, snapped } = snapCutTimes(times, beats, 30, 14);
+    const shots = out.slice(1).map((t, i) => t - out[i]!);
+    for (let i = 1; i < 14; i += 1) expect(shots[i]!).toBeLessThanOrEqual(shots[i - 1]! + 1 / 30 + 1e-9);
+    expect(snapped.filter(Boolean).length).toBeGreaterThanOrEqual(4);
+  });
+});
+
 describe("fillShots", () => {
   const a = { fileId: "A", kind: "video" as const, start: 0, end: 5 };
   const b = { fileId: "B", kind: "video" as const, start: 0, end: 1 };
