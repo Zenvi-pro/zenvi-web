@@ -69,16 +69,22 @@ the MCP copy (CI fails when either is stale):
 
 ```yaml
 ---
-id: flash-frames            # = the file name
-kind: technique             # style | technique
+id: flash-frames
+kind: technique
 summary: When to use it first, at most 120 characters
 categories: [sports-hype-edit]
-tools: [apply_motion_transitions_tool]   # exact Zenvi tool names
-pace: fast                  # calm | medium | fast | frantic
+tools: [apply_motion_transitions_tool]
+pace: fast
 mood: [intense]
-aspect: ["9:16", "16:9"]    # quoted: YAML reads 9:16 as a number otherwise
-pairs_with: []              # technique ids
+aspect: ["9:16", "16:9"]
+pairs_with: []
 avoid_with: []
-needs: []                   # missing tool ids from GAPS.md, if any
+needs: []
 ---
 ```
+
+`id` is the file name; `kind` is `style` or `technique`; `tools` are exact
+Zenvi tool names; `pace` is `calm`, `medium`, `fast` or `frantic`; aspects
+are quoted (YAML reads 9:16 as a number otherwise); `pairs_with` and
+`avoid_with` are technique ids; `needs` lists missing tool ids from
+`GAPS.md`, if any. The generator does not read `#` comments: keep them out.

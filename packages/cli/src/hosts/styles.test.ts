@@ -49,6 +49,12 @@ describe("zenvi-styles index", () => {
     expect(indexTable(library)).toContain("- [method-motif](METHOD-motif.md)");
   });
 
+  it("the front-matter example in SKILL.md is one the generator accepts", () => {
+    const skill = readFileSync(path.join(ROOT, "plugins/zenvi/skills/zenvi-styles/SKILL.md"), "utf8");
+    const example = /```yaml\n([\s\S]*?)```/.exec(skill)![1]!;
+    expect(parseFrontMatter(example)?.meta).toMatchObject({ id: "flash-frames", kind: "technique", pace: "fast", tools: ["apply_motion_transitions_tool"], aspect: ["9:16", "16:9"] });
+  });
+
   it("reads flow and block lists, quoted aspects and colons inside values", () => {
     const parsed = parseFrontMatter('---\nid: a\nsummary: When x - then y: z\naspect: ["9:16", "1:1"]\ntools:\n  - add_sfx_tool\n  - "speed_ramp_tool"\n---\n# Body\n');
     expect(parsed?.meta).toEqual({ id: "a", summary: "When x - then y: z", aspect: ["9:16", "1:1"], tools: ["add_sfx_tool", "speed_ramp_tool"] });
@@ -58,12 +64,16 @@ describe("zenvi-styles index", () => {
   it("refuses an invalid or duplicate entry with the file and the reason", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "zenvi-styles-"));
     const recipes = path.join(dir, "recipes");
-    for (const sub of ["styles", "techniques", "recipes"]) mkdirSync(path.join(dir, sub));
+    for (const sub of ["styles", "techniques", "recipes", "families"]) mkdirSync(path.join(dir, sub));
     writeFileSync(path.join(dir, "techniques", "flash.md"), "---\nid: flash\nkind: technique\nsummary: When the drop lands\npace: fast\ntools: [add_sfx_tool]\n---\n");
     writeFileSync(path.join(dir, "techniques", "bad.md"), "---\nid: bad\nkind: style\nsummary: x\npace: slow\n---\n");
     writeFileSync(path.join(dir, "styles", "flash.md"), "---\nid: flash\nkind: style\nsummary: s\npace: calm\n---\n");
+    writeFileSync(path.join(dir, "families", "brief.md"), "# Brief family\n");
+    writeFileSync(path.join(dir, "families", "flash.md"), "# Flash family\n");
     const library = readLibrary(dir, recipes);
     expect(library.entries.map((e) => e.id)).toEqual(["flash", "flash"]);
+    expect(library.errors.join("\n")).toMatch(/families\/brief\.md: id brief is reserved/);
+    expect(library.errors.join("\n")).toMatch(/families\/flash\.md: id flash is also/);
     expect(library.errors.join("\n")).toMatch(/techniques\/bad\.md: a file in techniques\/ must be kind technique; pace must be/);
     expect(library.errors.join("\n")).toMatch(/id flash is also/);
   });
@@ -72,6 +82,9 @@ describe("zenvi-styles index", () => {
 describe("the styles on MCP", () => {
   it("serves the index, the brief compiler and every file as zenvi://styles resources", () => {
     expect(guideText("zenvi://styles")).toContain("## The index");
+    // The served index links to resources a client can read, not to plugin paths.
+    expect(guideText("zenvi://styles")).toContain("| [hype-reel](zenvi://styles/hype-reel) |");
+    expect(guideText("zenvi://styles")).not.toContain("](../");
     expect(guideText("zenvi://styles/brief")).toContain("# The brief compiler");
     for (const file of STYLE_FILES) expect(guideText(`zenvi://styles/${file.id}`), file.id).toBe(file.markdown);
     const listed = new Set(RESOURCES.map((r) => r.uri));

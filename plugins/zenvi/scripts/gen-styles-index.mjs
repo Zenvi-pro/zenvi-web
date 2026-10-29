@@ -147,7 +147,11 @@ export function readLibrary(styles = STYLES, recipes = RECIPES) {
     path: path.relative(styles, file).split(path.sep).join("/"),
     markdown: readFileSync(file, "utf8"),
   }));
-  for (const f of families) if (seen.has(f.id)) errors.push(`${f.path}: id ${f.id} is also ${seen.get(f.id)}`);
+  for (const f of families) {
+    if (RESERVED.has(f.id)) errors.push(`${f.path}: id ${f.id} is reserved`);
+    else if (seen.has(f.id)) errors.push(`${f.path}: id ${f.id} is also ${seen.get(f.id)}`);
+    else seen.set(f.id, f.path);
+  }
   // Methods (METHOD-<name>.md: how to plan, not a look) are served as zenvi://styles/method-<name>.
   const methods = existsSync(styles)
     ? readdirSync(styles)
@@ -155,6 +159,7 @@ export function readLibrary(styles = STYLES, recipes = RECIPES) {
         .sort()
         .map((name) => ({ id: name.slice(0, -3).toLowerCase(), path: name, markdown: readFileSync(path.join(styles, name), "utf8") }))
     : [];
+  for (const m of methods) if (seen.has(m.id)) errors.push(`${m.path}: id ${m.id} is also ${seen.get(m.id)}`);
   return { entries, families, methods, errors };
 }
 
@@ -199,6 +204,13 @@ function stripFrontMatter(markdown) {
   return markdown.replace(/^---\n[\s\S]*?\n---\n+/, "");
 }
 
+/** The index as MCP serves it: its links point at zenvi://styles/<id>, which a client can read, not at plugin paths. */
+function withResourceLinks(skill, files) {
+  let out = skill.replaceAll("](BRIEF.md)", "](zenvi://styles/brief)");
+  for (const f of files) out = out.replaceAll(`](${f.path})`, `](zenvi://styles/${f.id})`);
+  return out;
+}
+
 /** library.gen.ts: what the MCP servers serve as zenvi://styles resources. */
 export function libraryModule(skill, brief, { entries, families, methods = [] }) {
   const files = [
@@ -210,7 +222,7 @@ export function libraryModule(skill, brief, { entries, families, methods = [] })
     "// Generated from plugins/zenvi/skills/zenvi-styles by plugins/zenvi/scripts/gen-styles-index.mjs. Do not edit.",
     "",
     "/** zenvi-styles SKILL.md without its front matter: the one index (zenvi://styles). */",
-    `export const STYLES_INDEX: string = ${JSON.stringify(stripFrontMatter(skill))};`,
+    `export const STYLES_INDEX: string = ${JSON.stringify(withResourceLinks(stripFrontMatter(skill), files))};`,
     "",
     "/** BRIEF.md: the brief compiler, step 0 of every edit (zenvi://styles/brief). */",
     `export const STYLES_BRIEF: string = ${JSON.stringify(stripFrontMatter(brief))};`,
@@ -246,7 +258,10 @@ if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
   const check = process.argv.includes("--check");
   const out = generate();
   for (const error of out.errors) console.error(`error: ${error}`);
+  // A file with bad front matter is left out of the outputs: keep the last good ones rather than write a shorter index.
   if (out.errors.length > 0) process.exitCode = 1;
-  sync(path.join(STYLES, "SKILL.md"), out.skill, check);
-  sync(LIBRARY_TARGET, out.module, check);
+  else {
+    sync(path.join(STYLES, "SKILL.md"), out.skill, check);
+    sync(LIBRARY_TARGET, out.module, check);
+  }
 }
