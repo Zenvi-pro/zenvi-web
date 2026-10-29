@@ -11,6 +11,7 @@ import chartBuild from "./blocks/chart_build/block.json" with { type: "json" };
 import chatThread from "./blocks/chat_thread/block.json" with { type: "json" };
 import codeCard from "./blocks/code_card/block.json" with { type: "json" };
 import counter from "./blocks/counter/block.json" with { type: "json" };
+import dataClock from "./blocks/data_clock/block.json" with { type: "json" };
 import dockMagnify from "./blocks/dock_magnify/block.json" with { type: "json" };
 import dotGridReveal from "./blocks/dot_grid_reveal/block.json" with { type: "json" };
 import geoMap from "./blocks/geo_map/block.json" with { type: "json" };
@@ -37,7 +38,7 @@ import textScramble from "./blocks/text_scramble/block.json" with { type: "json"
 import togglePanel from "./blocks/toggle_panel/block.json" with { type: "json" };
 import wordRotator from "./blocks/word_rotator/block.json" with { type: "json" };
 
-export const BLOCKS: readonly BlockManifest[] = [promptBar, kineticHeadline, wordRotator, counter, textScramble, hudCallouts, gradientField, glassCards, particleBurst, hyperspace, dotGridReveal, liquidGlass, masonryGrid, dockMagnify, rippleLogo, cardShuffle, chartBuild, notificationStack, chatThread, togglePanel, cursorPath, codeCard, lowerThird, logoRevealEnd, shapeMorph, typeMorph, lineTrails, logoBuild, geoMap, pictogramMorph, barRace] as BlockManifest[];
+export const BLOCKS: readonly BlockManifest[] = [promptBar, kineticHeadline, wordRotator, counter, textScramble, hudCallouts, gradientField, glassCards, particleBurst, hyperspace, dotGridReveal, liquidGlass, masonryGrid, dockMagnify, rippleLogo, cardShuffle, chartBuild, notificationStack, chatThread, togglePanel, cursorPath, codeCard, lowerThird, logoRevealEnd, shapeMorph, typeMorph, lineTrails, logoBuild, geoMap, pictogramMorph, barRace, dataClock] as BlockManifest[];
 
 export function getBlock(id: string): BlockManifest | undefined {
   return BLOCKS.find((b) => b.id === id);
