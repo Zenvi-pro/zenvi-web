@@ -564,6 +564,14 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { file_id: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ },
     failure: { args: { clip_id: "NOPE" }, status: "refused", summary: /^Error: No timeline clip with id='NOPE'\.$/ },
   },
+  shot_length_ramp_tool: {
+    happy: {
+      args: { file_ids: [IDS.broll, IDS.logo], shots: "6", first_shot_seconds: "2", last_shot_seconds: "0.5", position: "30", track: "1" },
+      summary: /^Cut a 6-shot ramp from 2\.00 s to 0\.50 s on track 1, 30\.00-\d+\.\d\d s\.$/,
+      check: ({ doc }) => expect(doc.project.clips.filter((c) => c.position >= 30)).toHaveLength(6),
+    },
+    failure: { args: { file_ids: ["NOPE"] }, status: "refused", summary: /^Error: Unknown file_id 'NOPE'\.$/ },
+  },
   snap_cuts_to_onsets_tool: {
     happy: { args: { track: "1" }, status: "refused", summary: /not available in this Zenvi surface/ },
     failure: { args: { onsets_from: "clip" }, status: "refused", summary: /^Error: onsets_from=clip needs onset_clip_id\.$/ },

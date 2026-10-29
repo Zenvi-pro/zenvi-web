@@ -198,6 +198,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   detect_beats_tool: { methods: ["audio.decodePcm"] },
   detect_onsets_tool: { methods: ["audio.decodePcm"] },
   snap_cuts_to_onsets_tool: { methods: ["audio.decodePcm"] },
+  shot_length_ramp_tool: { optional: ["audio.decodePcm"], partialNote: "without audio decoding snap=beats and snap=onsets are refused; the curve, the motif and the settle shot always work" },
   master_audio_tool: { methods: ["audio.mixPcm"] },
   analyze_mix_tool: { methods: ["audio.mixPcm"] },
   pan_tool: { methods: ["audio.decodePcm", "media.writeGenerated"] },
