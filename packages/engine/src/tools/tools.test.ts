@@ -1508,6 +1508,14 @@ const SPECS: Record<string, Spec> = {
     happy: { args: { track: String(L1), style: "hype" }, summary: /^Added 2 motion transition\(s\) on track 1 \(hype\): whip@10\.00s, whip@15\.00s\.$/ },
     failure: { args: { track: String(L1), preset: "whip", style: "hype" }, status: "refused", summary: /^Error: give preset or style/ },
   },
+  apply_matched_dissolve_tool: {
+    happy: {
+      args: { clip1_id: IDS.clipA, duration: "1" },
+      summary: /^Added a 1s dissolve between interview\.mp4 and broll\.mp4, both pushing in at 0\.03 a second through it\.$/,
+      check: ({ receipt }) => expect((receipt.data as { drifted_clip_ids: string[] }).drifted_clip_ids).toHaveLength(2),
+    },
+    failure: { args: { clip1_id: "NOPE" }, status: "refused", summary: /^Error: no clip with id NOPE\.$/ },
+  },
   remove_motion_transition_tool: {
     happy: {
       setup: async (doc, host) => {

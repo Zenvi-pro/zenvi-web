@@ -155,6 +155,9 @@ review_edit_tool {}
 
 `chart_build` counts its big number *up* to the highlighted value: chart
 a metric that rises (hours saved, deploys a week), not one that falls.
+Over footage (`placement: "over_video"`) it sits on a glass plate (`plate`),
+never an opaque full-frame donut cut into a glass reel. A status board or a
+plan comparison is `data_table` (rows build, status chips pop), not toggles.
 Over a bright plate, `glass_cards`' white headline needs a darker or
 warmer plate (exposure 0, not +0.3). Read each block's click and typing times off its frames (`preview_frame`)
 before placing the sounds; the times above are this layout's. The music

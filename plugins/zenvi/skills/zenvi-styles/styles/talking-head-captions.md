@@ -93,7 +93,9 @@ No transcript (TTS or script only): cues per phrase in timeline seconds.
 7. Optional: `generate_subject_matte_tool` on the A-roll (CLI/cloud).
 8. `kinetic_captions_tool {"timeline_clip_ids": ["<all picture>"], "style": "creator",
    "animation": "pop", "emphasis": ["<3-6 words>"], "text_size": 0.06, "y": 0.64,
-   "placement": "style"}` (with a matte: leave `placement` and `y` out).
+   "placement": "style"}` (with a matte: leave `placement` and `y` out). Emphasis words
+   turned a few degrees: `"rotation": 6`. Placement auto also keeps clear of type
+   already burnt into the footage (the receipt says where it found it).
 9. `add_kinetic_title_tool {"text": <hook topic>, "style": "creator", "emphasis":
    [1 word], "text_size": 0.05, "y": 0.14, "position_seconds": 0, "duration_seconds": 3}`.
 10. Sound: `add_sfx_tool whoosh_short -22` at each insert, `pop -20` on 2-3

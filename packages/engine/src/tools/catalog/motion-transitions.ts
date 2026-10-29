@@ -26,6 +26,7 @@ import {
   type MotionTransitionResult,
 } from "../../ops/motion-transitions.js";
 import { rateOf } from "../../ops/internal.js";
+import { DISSOLVE_DRIFTS, applyMatchedDissolve } from "../../ops/matched-dissolve.js";
 import { readBrief } from "../../brief/brief.js";
 import {
   MOTION_DIRECTIONS,
@@ -111,6 +112,14 @@ const removeInput = z.strictObject({
   track: z.string().max(64).optional().describe("Or: remove every motion transition on this track."),
 });
 
+const dissolveInput = z.strictObject({
+  clip1_id: z.string().max(64).describe("Outgoing clip."),
+  clip2_id: z.string().max(64).optional().describe("Incoming clip (default: the next clip on clip1_id's track); it moves back to overlap by duration, as apply_transition_tool does."),
+  duration: z.number().min(0.2).max(3).optional().describe("Blend length, seconds (default 0.8)."),
+  drift: z.enum(DISSOLVE_DRIFTS).optional().describe("The move both shots share through the blend: push_in (default, a slow push) or pull_out."),
+  speed: z.number().min(0.005).max(0.1).optional().describe("Scale change per second, both clips alike (default 0.03: a 3 % push a second)."),
+});
+
 type ApplyArgs = z.output<typeof applyInput>;
 
 const round = (t: number): number => Math.round(t * 1000) / 1000;
@@ -174,6 +183,7 @@ const LIST = "list_motion_transitions_tool";
 const APPLY = "apply_motion_transition_tool";
 const APPLY_ALL = "apply_motion_transitions_tool";
 const REMOVE = "remove_motion_transition_tool";
+const DISSOLVE = "apply_matched_dissolve_tool";
 
 
 /**
@@ -338,6 +348,48 @@ export const motionTransitionTools: CatalogTool[] = [
         warnings,
         data: { track: layer === undefined ? "all" : trackName(after, layer), ...(style ? { style } : {}), hard_cuts: hard, transitions: results.map((r) => resultData(after, r)), sfx_cues: results.flatMap((r) => r.sfxCues) },
       });
+    },
+  }),
+
+  directTool({
+    name: DISSOLVE,
+    title: "Apply a motion-matched dissolve",
+    description:
+      "A dissolve between two clips through which both pictures keep moving the same way at one speed (a slow push in or pull out, linear on both): the blend reads as one camera move instead of two stills crossing (wedding, travel, brand films; dissolves only between calm, similar shots). " +
+      "The incoming clip moves back to overlap like apply_transition_tool; clips with their own scale animation keep it. One undo step; the receipt lists the transition and the clips that drift.",
+    input: dissolveInput,
+    annotations: WRITE,
+    run: (call, args) => {
+      const project = call.doc.project;
+      const clip = project.clips.find((c) => c.id === args.clip1_id);
+      if (!clip) return refused(DISSOLVE, `Error: no clip with id ${args.clip1_id}.`);
+      let inId = args.clip2_id;
+      if (!inId) {
+        const end = Number(clip.position) + Number(clip.end) - Number(clip.start);
+        const next = project.clips
+          .filter((c) => c.id !== clip.id && c.layer === clip.layer && Number(c.position) >= end - 1e-6)
+          .sort((a, b) => Number(a.position) - Number(b.position))[0];
+        if (!next) return refused(DISSOLVE, `Error: no clip follows ${clip.id} on its track; give clip2_id.`);
+        inId = next.id;
+      }
+      const input = { outClipId: clip.id, inClipId: inId, duration: args.duration ?? 0.8, drift: args.drift ?? "push_in", rate: args.speed ?? 0.03 } as const;
+      let r: ReturnType<typeof applyMatchedDissolve>;
+      try {
+        r = call.commit((tx) => applyMatchedDissolve(tx, input), "Motion-matched dissolve");
+      } catch (error) {
+        if (isOpError(error)) return refused(DISSOLVE, `Error: ${error.message}`);
+        throw error;
+      }
+      const after = call.doc.project;
+      const blend = round(Number(r.transition.end) - Number(r.transition.start));
+      return applied(
+        DISSOLVE,
+        `Added a ${blend}s dissolve between ${titleOf(after, clip.id)} and ${titleOf(after, inId)}, both ${input.drift === "push_in" ? "pushing in" : "pulling out"} at ${input.rate} a second through it.`,
+        {
+          warnings: r.kept.map((id) => `${titleOf(after, id)} keeps its own scale animation (no drift added).`),
+          data: { transition_id: r.transition.id, position: round(Number(r.transition.position)), duration: blend, drift: input.drift, speed: input.rate, drifted_clip_ids: r.drifted, kept_clip_ids: r.kept, ...(r.movedClip ? { moved_clip_id: r.movedClip.id } : {}) },
+        },
+      );
     },
   }),
 

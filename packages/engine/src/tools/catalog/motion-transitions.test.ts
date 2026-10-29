@@ -156,6 +156,24 @@ describe("motion transition tools", () => {
     expect(JSON.stringify(whips.data)).toMatch(/whip on all 8 cuts reads as a template/);
   });
 
+  it("dissolves with both shots pushing in at one speed, in one undo step", async () => {
+    const doc = editDoc();
+    const result = await call(doc, "apply_matched_dissolve_tool", { clip1_id: "CLIP0", duration: 0.5, speed: 0.04 });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Motion-matched dissolve"]);
+    expect((dataOf(result) as { transition_id: string }).transition_id).toBeTruthy();
+    const slope = (id: string) => {
+      const pts = (doc.project.clips.find((c) => c.id === id) as unknown as { scale_x: { Points: { co: { X: number; Y: number } }[] } }).scale_x.Points;
+      return (pts[1]!.co.Y - pts[0]!.co.Y) / ((pts[1]!.co.X - pts[0]!.co.X) / 30);
+    };
+    // Same velocity on both sides of the blend: the move reads as one.
+    expect(slope("CLIP0")).toBeCloseTo(0.04, 2);
+    expect(slope("CLIP1")).toBeCloseTo(0.04, 2);
+    const again = await call(doc, "apply_matched_dissolve_tool", { clip1_id: "LATE" });
+    expect(again.ok).toBe(false);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
   it("says which track has the cuts when the named one has none", async () => {
     // Agents pass track 1 after build_reel_tool, which puts the music there and the shots on track 2.
     const doc = editDoc();
