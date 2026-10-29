@@ -88,6 +88,7 @@ export interface CaseOutcome {
   change: number;
   metrics: { base: Record<string, number>; variant: Record<string, number> };
   frames?: { base: RgbaImage; variant: RgbaImage };
+  mixes?: { base: MixPcm; variant: MixPcm };
   desktop?: { checked: boolean; change?: number; correlation?: number; propertiesChanged?: string[]; warnings?: string[] };
 }
 
@@ -97,6 +98,11 @@ export const FPS = 30;
 /** `A` → `CLIPA00001` (10-character ids like the desktop's). */
 export function clipId(short: string): string {
   return `CLIP${short}`.padEnd(10, "0").slice(0, 10);
+}
+
+/** File name for a case's frames and sounds (the report script finds them by it). */
+export function caseSlug(id: string): string {
+  return id.replace(/[^A-Za-z0-9_.=-]+/g, "_").slice(0, 120);
 }
 
 export function fullMode(): boolean {
@@ -270,6 +276,7 @@ export async function runCase(session: TruthSession, c: TruthCase): Promise<Case
   let change: number;
   let metrics: CaseOutcome["metrics"];
   let frames: CaseOutcome["frames"];
+  let mixes: CaseOutcome["mixes"];
   if (base.rendered.kind === "picture" && variant.rendered.kind === "picture") {
     const diff = pictureDiff(base.rendered.image, variant.rendered.image);
     change = diff.meanAbs;
@@ -279,6 +286,7 @@ export async function runCase(session: TruthSession, c: TruthCase): Promise<Case
   } else if (base.rendered.kind === "sound" && variant.rendered.kind === "sound") {
     change = soundResidualDb(base.rendered.mix, variant.rendered.mix);
     metrics = { base: soundMetrics(base.rendered.mix), variant: soundMetrics(variant.rendered.mix) };
+    mixes = { base: base.rendered.mix, variant: variant.rendered.mix };
     if (soundChanged(change) === Boolean(c.inert)) failures.push(c.inert ? `render-node mix changed (residual ${change.toFixed(1)} dB) although the case says: ${c.inert}` : `render-node mix did not change (residual ${change.toFixed(1)} dB)`);
   } else {
     throw new Error(`${c.id}: probe kinds differ`);
@@ -289,7 +297,7 @@ export async function runCase(session: TruthSession, c: TruthCase): Promise<Case
     const ok = e.direction === "up" ? delta > eps : delta < -eps;
     if (!ok) failures.push(`${e.metric} should go ${e.direction}: ${fmt(metrics.base[e.metric])} → ${fmt(metrics.variant[e.metric])}`);
   }
-  const outcome: CaseOutcome = { failures, change, metrics, frames };
+  const outcome: CaseOutcome = { failures, change, metrics, frames, mixes };
   if (fullMode() && c.desktop !== false) outcome.desktop = await desktopCheck(c, base.desktopProject, variant.desktopProject, frames, failures);
   return outcome;
 }
