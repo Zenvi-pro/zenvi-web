@@ -867,6 +867,67 @@ export interface MatteHost {
   generate(path: string, request: MatteRequest): Promise<GeneratedMatte>;
 }
 
+/** The image–text model a `ShotHost` runs. */
+export interface ShotModelInfo {
+  name: string;
+  version: string;
+  /** SPDX licence of the weights. */
+  license: string;
+  /** Length of an embedding. */
+  dims: number;
+  /** Image–text head: match probability = sigmoid(cosine × logitScale + logitBias) (shots/vectors.ts). */
+  logitScale: number;
+  logitBias: number;
+}
+
+/** Whether a `ShotHost` can embed right now. */
+export interface ShotModelStatus {
+  ready: boolean;
+  /** One sentence: what is installed, or what is missing and what fixes it. */
+  detail: string;
+  /** Size of the one-time download `setup` makes, when the model is missing. */
+  downloadMb?: number;
+}
+
+/** Keyframe embeddings of one file. */
+export interface ShotEmbeddings {
+  /** Source seconds of each keyframe, ascending. */
+  times: number[];
+  /** Unit vectors (`model.dims` long), one per keyframe. */
+  vectors: Float32Array[];
+  /** Read from the host's cache rather than computed now. */
+  cached: boolean;
+}
+
+export interface ShotEmbedRequest {
+  /** Keyframe spacing, seconds (keyframes at 0, interval, 2 × interval…). */
+  interval: number;
+  /** Return null instead of computing when the cache has no embeddings for the file. */
+  cachedOnly?: boolean;
+  signal?: AbortSignal;
+}
+
+/**
+ * Shot understanding (`embed_media_tool`, `find_shots_tool`,
+ * `shot_similarity_tool`, the near-duplicate check of review_edit_tool, the
+ * look order of match_cut_montage_tool): an image–text embedding model on
+ * this computer. Embeddings are cached per file content, so a file is
+ * embedded once. The model is a one-time download made only by `setup`
+ * (the person's consent: embed_media_tool with download=true, or
+ * `zenvi shots setup`).
+ */
+export interface ShotHost {
+  readonly model: ShotModelInfo;
+  status(): Promise<ShotModelStatus>;
+  setup?(signal?: AbortSignal): Promise<ShotModelStatus>;
+  /** Keyframe embeddings of the media at `path` (a still image has one keyframe at 0). Rejects in words. */
+  embedFile(path: string, request: ShotEmbedRequest): Promise<ShotEmbeddings | null>;
+  /** Embeddings of the frames at `times` (source seconds), not cached: for rendered files. */
+  embedFrames(path: string, times: readonly number[], signal?: AbortSignal): Promise<Float32Array[]>;
+  /** Unit text embeddings, one per text. */
+  embedText(texts: readonly string[], signal?: AbortSignal): Promise<Float32Array[]>;
+}
+
 /** One parameter of a Zenvi Motion block (its block.json entry). */
 export interface MotionBlockParam {
   name: string;
@@ -979,6 +1040,7 @@ export interface ToolHost {
   audio?: AudioHost;
   assets?: AssetHost;
   mattes?: MatteHost;
+  shots?: ShotHost;
   motion?: MotionHost;
   scenes3d?: Scene3dHost;
   fx?: FxHost;
