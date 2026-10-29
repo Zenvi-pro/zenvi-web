@@ -584,12 +584,23 @@ export const montageGrid: TemplateSpec = {
         }
         elements.push({ ...el, cue: at });
         current.push(el);
+        // Still short of its tile at 1/16 (a 2-frame flash shot): the clip loops, the tile at rest, so no tile goes blank.
+        let loopFrom = el.to;
+        for (let k = 1; media0.kind === "video" && start === undefined && loopFrom < to && k <= 8; k += 1) {
+          const settled = [...keys].sort((x, y) => x.frame - y.frame);
+          if (settled[settled.length - 1]!.frame > loopFrom || r.reveal === "wipe") break;
+          let again = mediaCard(`tile-${s + 1}-${i + 1}-loop${k}`, track0 + i, loopFrom, to, media0, fps, { width: drawn.w, radius: r.radius, ...(crop ? { crop } : {}), minSpeed: TILE_MIN_SPEED }, [key(loopFrom, settled[settled.length - 1]!.pose)]);
+          if (flip && (flip.x || flip.y)) again = { ...again, source: { ...(again.source as MediaSource), flip } };
+          if (camera) again = drifted(again, camera);
+          elements.push({ ...again, cue: at });
+          loopFrom = again.to;
+        }
       });
       before = current;
     }
     if (finish) cues.add(actionAt);
     if (held.length > 0) {
-      warnings.push(`${held.length} clip(s) are shorter than their tiles (${held.join(", ")}): slowed down (to 1/16 at most) so each tile stays up; give longer clips for real motion in the tiles`);
+      warnings.push(`${held.length} clip(s) are shorter than their tiles (${held.join(", ")}): slowed down (to 1/16 at most, then looped) so each tile stays up; give longer clips for real motion in the tiles`);
     }
     return { elements, cues: [...cues], ...(warnings.length > 0 ? { warnings } : {}) };
   },

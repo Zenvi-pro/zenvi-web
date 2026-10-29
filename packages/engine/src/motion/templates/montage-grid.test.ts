@@ -601,5 +601,20 @@ describe("grid tiles from clips shorter than their tile", () => {
     // 0.2 s at 1/16 is 3.2 s: the tile stays up to the end of the 4 s grid less the frames before it arrives.
     expect(tile.frames / 30).toBeGreaterThan(3);
     expect(plan.warnings?.join(" ")).toMatch(/FLASH00001\): slowed down/);
+    // Longer than 16 × the clip: it loops on the tile's track, the tile never empty.
+    const long = buildMotionTemplate({
+      template: "grid",
+      frame: FRAMES.landscape!,
+      start: 2,
+      seconds: 8,
+      grid: tempo,
+      palette: PALETTES.ui_dark,
+      media: new Map([...MEDIA_BY_ID, [tiny.fileId, tiny]]),
+      content: { fileIds: ["FLASH00001", "VIDEO00001"], grid: { layout: "mosaic", tiles: 3, pace: "beat" } },
+    });
+    const pieces = long.layers.filter((l) => l.name.startsWith("tile-1-1")).sort((a, b) => a.start - b.start);
+    expect(pieces.length).toBeGreaterThan(1);
+    for (let k = 1; k < pieces.length; k += 1) expect(pieces[k]!.start).toBe(pieces[k - 1]!.start + pieces[k - 1]!.frames);
+    expect(pieces.at(-1)!.start + pieces.at(-1)!.frames).toBe(long.frames);
   });
 });
