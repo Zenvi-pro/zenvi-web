@@ -24,7 +24,9 @@ function stripes(period: number, invert = false): { width: number; height: numbe
   const data = new Uint8ClampedArray(16 * 16 * 4);
   for (let i = 0; i < 256; i += 1) {
     const on = Math.floor((i % 16) / period) % 2 === (invert ? 1 : 0);
-    data.set([on ? 230 : 20, on ? 230 : 20, on ? 230 : 20, 255], i * 4);
+    // Footage's grain: neighbouring pixels never quite match.
+    const grain = ((i * 7 + Math.floor(i / 16) * 13) % 5) * 6 - 12;
+    data.set([(on ? 230 : 20) + grain, (on ? 230 : 20) + grain, (on ? 230 : 20) + grain, 255], i * 4);
   }
   return { width: 16, height: 16, data };
 }
@@ -83,6 +85,11 @@ describe("repeated shots", () => {
     expect(flatGround(stripes(4))).toBe(false);
     const card = { width: 10, height: 10, data: new Uint8Array(400).map((_, i) => (i % 4 === 3 ? 255 : Math.floor(i / 4) % 10 < 2 ? 250 : 12)) };
     expect(flatGround(card)).toBe(true);
+    // A vignetted ground: no one grey covers it, but it is smooth.
+    const vignette = { width: 32, height: 32, data: new Uint8Array(32 * 32 * 4).map((_, i) => (i % 4 === 3 ? 255 : 230 - Math.hypot((Math.floor(i / 4) % 32) - 16, Math.floor(i / 128) - 16) * 2)) };
+    expect(flatGround(vignette)).toBe(true);
+    const grain = { width: 32, height: 32, data: new Uint8Array(32 * 32 * 4).map((_, i) => (i % 4 === 3 ? 255 : 128 + ((Math.floor(i / 4) * 2654435761) % 41) - 20)) };
+    expect(flatGround(grain)).toBe(false);
   });
 });
 
