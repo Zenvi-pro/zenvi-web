@@ -21,6 +21,8 @@ import { binFacts, routeRequest, type Route } from "./route.js";
 const GOAL_CHARS = 300;
 /** How a compiled brief's critique starts, so the director knows it may replace it. */
 const AUTO_MARK = "Compiled by the director";
+/** The longest brief (brief.ts `length_seconds`). */
+const BRIEF_MAX_SECONDS = 600;
 
 /** The brief aspect nearest a frame. */
 export function nearestAspect(width: number, height: number): BriefAspect {
@@ -97,5 +99,7 @@ export function minimalBrief(project: Project, request: string, seconds?: number
   const bin = binFacts(inventoryFiles(project).map((f) => inventoryEntry(project, f)));
   const route = routeRequest({ request, bin });
   const aspect = nearestAspect(project.width, project.height);
-  return compileBrief({ request, facts, route, aspect, seconds: seconds ?? facts.seconds ?? route.rule.seconds, missing: [] });
+  // A brief holds 1-600 s (brief.ts length_seconds); the call's own arguments are checked by its tool, not here.
+  const length = Math.min(BRIEF_MAX_SECONDS, Math.max(1, seconds ?? facts.seconds ?? route.rule.seconds));
+  return compileBrief({ request, facts, route, aspect, seconds: length, missing: [] });
 }

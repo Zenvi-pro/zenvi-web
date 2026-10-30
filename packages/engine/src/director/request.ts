@@ -35,7 +35,7 @@ export interface RequestFacts {
 
 const QUOTED = /['"‘“]([^'"’”\n]{2,90})['"’”]/g;
 const STOP = new Set(
-  "a an the of for to and or with in on at by from about into over under is are be it its this that these those make made create video edit reel promo clip film second seconds sec s long short vertical landscape square deliver mp4 please some one two three four five my our your their me us like style fps".split(" "),
+  "a an the of for to and or with in on at by from about into over under is are be it its this that these those make made create video edit reel promo clip film second seconds sec s long short vertical landscape square deliver mp4 please some one two three four five my our your their me us like style fps called named titled".split(" "),
 );
 const PLATFORMS: readonly [RegExp, string][] = [
   [/\btik ?tok\b/i, "TikTok"],

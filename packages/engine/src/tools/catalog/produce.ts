@@ -48,6 +48,9 @@ const SET_PICTURES = 6;
 const MIN_GATHER = 2;
 const MAX_GATHER = 12;
 const SUMMARY_CHARS = 220;
+/** The lengths the builders cut (build_reel_tool's duration_seconds). */
+const MIN_SECONDS = 4;
+const MAX_SECONDS = 120;
 /** Frame sizes for an aspect the request names without a size. */
 const FRAME: Record<BriefAspect, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 },
@@ -83,7 +86,7 @@ const input = z.strictObject({
     .enum(STYLE_RULES.map((r) => r.id) as [string, ...string[]])
     .optional()
     .describe("A style of the styles index instead of the one the request reads as."),
-  length_seconds: z.coerce.number().min(4).max(120).optional().describe("Target length, seconds (default: the request's, else the style's)."),
+  length_seconds: z.coerce.number().min(MIN_SECONDS).max(MAX_SECONDS).optional().describe("Target length, seconds (default: the request's, else the style's)."),
   title: z.string().trim().min(1).max(80).optional().describe("The product, film or brand name (product launch, trailer); default: the name the request quotes after 'called' / 'named'."),
   hook: z.string().trim().min(1).max(120).optional().describe("The opening line (default: a quoted headline in the request)."),
   features: z.array(feature).min(1).max(5).optional().describe("Product launch / SaaS promo: one feature per bar ('Title: detail' or {title, detail}). Without them a launch is cut as a motion reel."),
@@ -263,12 +266,15 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   let plan = route(style);
   const rule = plan.rule;
   const seconds = args.length_seconds ?? facts.seconds ?? saved?.length_seconds ?? rule.seconds;
+  // A length the builders cannot cut is refused before anything changes, not cut short.
+  if (seconds < MIN_SECONDS || seconds > MAX_SECONDS) return { receipt: refused(TOOL, `Error: the request asks for ${seconds} s; produce_video_tool cuts ${MIN_SECONDS}-${MAX_SECONDS} s, nothing changed. Pass length_seconds (${MIN_SECONDS}-${MAX_SECONDS}), or cut it in parts.`) };
   const projectAspect = nearestAspect(project().width, project().height);
   const aspect: BriefAspect = facts.aspect ?? (facts.size ? nearestAspect(facts.size.width, facts.size.height) : null) ?? saved?.aspect ?? projectAspect;
-  const missing = [
-    ...(plan.fallback ? [`${plan.fallback.wanted}: ${plan.fallback.why}`] : []),
+  const missingFor = (route: Route): string[] => [
+    ...(route.fallback ? [`${route.fallback.wanted}: ${route.fallback.why}`] : []),
     ...(!name && (rule.builder.tool === "build_product_launch_tool" || rule.builder.tool === "build_trailer_tool") ? ["the product or film name"] : []),
   ];
+  let missing = missingFor(plan);
 
   // 1. The brief: the saved one leads; else the director compiles a minimal one (one undo step).
   let brief: Brief | null = saved;
@@ -285,10 +291,12 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   // 2. The frame the request names, while the timeline is empty.
   const frame = facts.size ?? FRAME[aspect];
   if (director.wants("format")) {
-    const same = project().width === frame.width && project().height === frame.height;
-    if (same || (!facts.size && aspect === projectAspect)) director.pass("format", `the project is already ${project().width}x${project().height}`);
+    const sameFrame = (project().width === frame.width && project().height === frame.height) || (!facts.size && aspect === projectAspect);
+    const rate = projectFps(project());
+    const sameRate = !facts.fps || Math.abs(rate.num / rate.den - facts.fps) < 0.01;
+    if (sameFrame && sameRate) director.pass("format", `the project is already ${project().width}x${project().height}`);
     else if (project().clips.length > 0) director.pass("format", `the timeline has clips: the frame stays ${project().width}x${project().height}`);
-    else await director.run("format", "set_project_setting_tool", { width: frame.width, height: frame.height, ...(facts.fps ? { fps: facts.fps } : {}) });
+    else await director.run("format", "set_project_setting_tool", { ...(sameFrame ? {} : { width: frame.width, height: frame.height }), ...(sameRate ? {} : { fps: facts.fps }) });
   }
 
   // 3. Footage: stock when the bin is short of pictures for the style.
@@ -333,6 +341,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
 
   // 5. The builder: the whole first cut in one undo step. Routed again: the bin may have grown.
   plan = { ...route(rule.id), why: plan.why, runnersUp: plan.runnersUp };
+  missing = missingFor(plan);
   let built: ToolReceipt | null = null;
   if (director.wants("build")) {
     const bin = binFacts(entries());
@@ -473,7 +482,8 @@ export const produceTools: CatalogTool[] = [
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     stages: true,
     run: async (call, args: Input) => {
-      if (call.doc.project.clips.length > 0 && args.replace === undefined && !(args.skip ?? []).includes("build")) {
+      // replace=false on a full timeline is the same refusal: the builder would refuse after the brief, footage and music stages changed the project.
+      if (call.doc.project.clips.length > 0 && args.replace !== true && !(args.skip ?? []).includes("build")) {
         return refused(TOOL, `Error: the timeline already has ${call.doc.project.clips.length} clip(s), nothing changed. Pass replace=true to cut a new edit over it, or skip=["brief","footage","music","build"] to only finish, render and review this one.`);
       }
       const brief = readBrief(call.doc.project);
