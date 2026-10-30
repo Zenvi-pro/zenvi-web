@@ -266,7 +266,7 @@ function clipLocalFrameNumber(clip: Pick<Clip, "position" | "start" | "end">, ti
 }
 
 /** `_framescope_from_frame` + scope_from_raw_video (clipped values as shares of the frame, see the module comment). */
-export function scopesOf(pixels: Parameters<typeof analyzeFrameScope>[0]): Json {
+function scopesOf(pixels: Parameters<typeof analyzeFrameScope>[0]): Json {
   const scope = analyzeFrameScope(pixels, { vectorscopeSize: 96 });
   if (!scope) return { present: false };
   const area = Math.max(1, pixels.width * pixels.height);

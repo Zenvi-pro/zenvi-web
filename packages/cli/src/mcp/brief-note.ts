@@ -26,7 +26,6 @@ const STARTS_A_VIDEO = new Set([
   "add_3d_scene_tool",
   "generate_image_and_add_to_timeline_tool",
   "generate_video_and_add_to_timeline_tool",
-  "generate_broll_set_tool",
   "generate_tts_and_add_to_timeline_tool",
 ]);
 
