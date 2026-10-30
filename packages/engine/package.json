@@ -10,7 +10,6 @@
     ".": "./src/index.ts",
     "./tools": "./src/tools/index.ts",
     "./render": "./src/render/index.ts",
-    "./styles": "./src/styles/index.ts",
     "./assets/*": "./assets/*"
   },
   "scripts": {
