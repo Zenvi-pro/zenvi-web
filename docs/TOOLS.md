@@ -294,7 +294,7 @@ Availability follows each tool's required host capabilities and the host methods
 
 ### produce_video_tool
 
-**Produce a whole video** (direct tool). Call this FIRST for any whole video (reel, ad, promo, trailer, explainer, montage, a reference to recreate): from the request and the media bin it saves a brief (when none is saved), picks ONE style of the styles index and its one-call builder (build_reel_tool, match_cut_montage_tool, build_trailer_tool, build_explainer_tool, build_talking_head_tool, build_product_launch_tool), sets the frame the request names, gathers stock footage and music at the style's tempo when the bin is short, cuts the edit, finishes it (unify_grade_tool, apply_motion_transitions_tool by the style's rules, auto_sound_design_tool, master_audio_tool iterate), renders it and runs review_render_tool and watch_render_tool.
+**Produce a whole video** (direct tool). Call this FIRST for any whole video (reel, ad, promo, trailer, explainer, montage, a reference to recreate), even from a detailed brief: request = the whole brief as written, output = the delivery file; do not search, import or set the frame before it.
 
 Surfaces: mcp, cli, editor. edits, open world.
 
@@ -302,7 +302,7 @@ Availability: editor partial (without stock search the edit uses only the bin; w
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `request` | string | yes | The person's request as they wrote it (a brief, a reference to recreate, 'a reel of my trip'). Its length, frame, tempo, quoted names, headline, URL and suggested searches are read from it. |
+| `request` | string |  | The person's request as they wrote it (a brief, a reference to recreate, 'a reel of my trip'). Its length, frame, tempo, quoted names, headline, URL and suggested searches are read from it. Optional once a brief is saved (re-runs: its goal and style). |
 | `style` | "match-cut-montage" \| "flash-montage" \| "movie-game-trailer" \| "kinetic-captions" \| "documentary" \| "saas-ui-promo" \| "3d-product-ad" \| "product-launch-film" \| "editorial-type" \| "tutorial" \| "travel-cinematic-montage" \| "hype-reel" |  | A style of the styles index instead of the one the request reads as. |
 | `length_seconds` | number |  | Target length, seconds (default: the request's, else the style's). (min 4, max 120) |
 | `title` | string |  | The product, film or brand name (product launch, trailer); default: the name the request quotes after 'called' / 'named'. |
@@ -310,7 +310,7 @@ Availability: editor partial (without stock search the edit uses only the bin; w
 | `features` | (string \| object)[] |  | Product launch / SaaS promo: one feature per bar ('Title: detail' or {title, detail}). Without them a launch is cut as a motion reel. |
 | `script` | string |  | Voice-led styles with no voice-over in the bin: the narration, timed at reading pace and captioned. |
 | `end_card` | string |  | The closing card (default: a URL in the request). |
-| `stock_queries` | string[] |  | Stock searches when the bin is short of footage (default: the searches the request suggests, else its subject). |
+| `stock_queries` | string[] |  | Stock searches when the bin is short of footage, one per shot idea (the first 12 are searched; default: the searches the request suggests, else its subject). |
 | `music_query` | string |  | Freesound search for the music when the bin has none (default: the request's, else the style's). |
 | `bpm` | number |  | Music tempo wanted (default: the request's, else the style's). (min 40, max 220) |
 | `output` | string |  | Render path (default produce.mp4 in the project's folder). |
