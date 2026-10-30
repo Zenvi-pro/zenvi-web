@@ -56,14 +56,25 @@ afterAll(async () => {
 });
 
 describe("zenvi mcp", () => {
-  it("saves a minimal brief before the first cut of an unplanned video instead of refusing it", async () => {
+  it("saves a minimal brief with the first cut of an unplanned video, not with a failed call, instead of refusing it", async () => {
     const client = await connect(undefined, { ZENVI_MCP_BRIEF: "on" });
     await call(client, "open_project_file", { path: "gate.zvn" });
-    const first = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
-    expect(first.receipt.summary).not.toMatch(/no brief saved/);
+    // A failed call changes nothing, so it saves no brief either (no undo step for a call that did not happen).
+    const failedCall = await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" });
+    expect(failedCall.receipt.status).toBe("error");
+    expect(failedCall.receipt.notes.join(" ")).not.toMatch(/minimal one/);
+    expect((await call(client, "undo_tool")).receipt.summary).toBe("Nothing to undo");
+    await makeVideo(work, "gate.mp4", { duration: 1, width: 160, height: 90 });
+    const imported = await call(client, "import_files_tool", { paths: JSON.stringify([path.join(work, "gate.mp4")]) });
+    const fileId = (imported.receipt.data as { files: { id: string }[] }).files[0]!.id;
+    const first = await call(client, "add_clip_to_timeline_tool", { file_id: fileId });
+    expect(first.receipt.status).toBe("applied");
     expect(first.receipt.notes.join(" ")).toMatch(/No brief was saved, so a minimal one was \(hype-reel, .*\)\. produce_video_tool/);
+    // The call's own step and its brief's, both in the saved file.
+    expect((first.receipt as Receipt & { undoSteps: number }).undoSteps).toBe(2);
+    expect(JSON.parse(await readFile(path.join(work, "gate.zvn"), "utf8")).settings.zenvi_brief).toMatchObject({ style: "hype-reel" });
     // Saved once: the next call goes through without another brief.
-    expect((await call(client, "add_clip_to_timeline_tool", { file_id: "NOPEXXXXXX" })).receipt.notes.join(" ")).not.toMatch(/minimal one/);
+    expect((await call(client, "add_clip_to_timeline_tool", { file_id: fileId, position_seconds: 1 })).receipt.notes.join(" ")).not.toMatch(/minimal one/);
   });
 
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {

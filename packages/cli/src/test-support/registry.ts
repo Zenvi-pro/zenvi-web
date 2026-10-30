@@ -4,7 +4,7 @@
  * depending on the full catalog. Test-only.
  */
 
-import { addClip, addFile, addMarker, createProject, removeMarkers, type ImportedMedia, type ToolContext, type ToolResult } from "@zenvi/engine";
+import { addClip, addFile, addMarker, BRIEF_KEY, createProject, removeMarkers, type ImportedMedia, type ToolContext, type ToolResult } from "@zenvi/engine";
 import { applied, failed, refused, unchanged, type ToolReceipt } from "@zenvi/engine/tools";
 import type { JsonSchema } from "@zenvi/engine/tools";
 import { createRegistry, type Registry, type RegistryTool } from "../engine/registry.js";
@@ -86,6 +86,10 @@ export function testRegistry(): Registry {
     tool("undo_tool", { steps: { type: ["string", "number"] } }, (ctx, args) => {
       const done = ctx.doc.undo(Number(args.steps ?? 1));
       return done.length ? applied("undo_tool", `Undid ${done.join(", ")}`, {}, done.length) : unchanged("undo_tool", "Nothing to undo");
+    }),
+    tool("save_brief_tool", {}, (ctx, args) => {
+      ctx.doc.transaction("Save brief", (tx) => tx.update(["settings"], { [BRIEF_KEY]: args }));
+      return applied("save_brief_tool", "Saved the brief");
     }),
     tool("new_project_tool", {}, (ctx) => {
       ctx.doc.load(createProject());

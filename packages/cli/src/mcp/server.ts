@@ -37,7 +37,7 @@ import {
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { HOST_IDS } from "@zenvi/adobe-link";
-import { BRIEF_KEY, readBrief, type Brief, type ToolImage } from "@zenvi/engine";
+import { readBrief, type Brief, type ToolImage } from "@zenvi/engine";
 import { DIRECTOR_CARD, failed, parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import type { CommandContext } from "../commands/context.js";
 import { adobeToolDefinitions, callAdobeTool, hostOfTool, hostRefusal, isOkHostStatus } from "../hosts/adobe-tools.js";
@@ -180,19 +180,29 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
         if (receipt) return toCallResult(receipt, outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...(outcome.ok ? {} : { isError: true }) };
       }
-      const saved: Brief | null = ctx.env.ZENVI_MCP_BRIEF !== "off" ? autoBrief(name, state.session.doc.project, args) : null;
-      if (saved) state.session.doc.transaction("Save brief", (tx) => tx.update(["settings"], { [BRIEF_KEY]: saved }));
+      // Owed is decided on the project before the call (it may lay down many clips); saved only after the call changed it,
+      // through save_brief_tool (the session's lock and save), so a refused or failed call adds no undo step.
+      const owed: Brief | null = ctx.env.ZENVI_MCP_BRIEF !== "off" ? autoBrief(name, state.session.doc.project, args) : null;
       state.notePortableCall();
       const { result } = await state.session.run(name, args, extra.signal);
       const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text);
       if (!receipt) return { content: [{ type: "text", text: result.text }], ...(result.ok ? {} : { isError: true }) };
+      let autoSaved: Brief | null = null;
+      if (owed && receipt.undoSteps > 0 && !readBrief(state.session.doc.project)) {
+        const briefed = await state.session.run("save_brief_tool", owed);
+        if ((briefed.result.data as ToolReceipt | undefined)?.status === "applied") {
+          autoSaved = owed;
+          // The receipt's undo steps cover the whole call, its brief included.
+          receipt.undoSteps += 1;
+        }
+      }
       if (name === "review_edit_tool" && result.ok) state.noteReview();
       if (name === "save_brief_tool" && receipt.status === "applied") {
         const saved = readBrief(state.session.doc.project);
         const repeated = saved ? await recordDirection(ctx.config.configDir, saved, String(state.session.doc.project.id)) : [];
         if (repeated.length > 0) receipt.warnings = [...receipt.warnings, `The direction repeats the last edit's picks on ${repeated.join(", ")}: draw those differently (read_director_recipe {styles: "brief"} has a fresh draw) unless the subject needs them, and say why.`];
       }
-      const brief = saved ? autoBriefNote(saved) : isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
+      const brief = autoSaved ? autoBriefNote(autoSaved) : isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
       if (brief) receipt.notes = [...receipt.notes, brief];
       // The first result an agent reads on an empty timeline names the one call a whole video starts with (rounds 6-7: the builders went undiscovered).
       else if (!pointedAtProduce && name !== "produce_video_tool" && state.session.doc.project.clips.length === 0) receipt.notes = [...receipt.notes, PRODUCE_FIRST];

@@ -6,9 +6,10 @@
  * save_brief_tool refusals, 0.8 gather and 0.8 import refusals a run), agents
  * wrote placeholder briefs to pass it and the edits did not improve.
  *
- * Now nothing is refused: the first call that lays down material on an
- * unplanned project saves a minimal brief (the director's, from that call's
- * arguments and the bin: director/brief.ts) in its own undo step, and the
+ * Now nothing is refused: once the first call that lays down material on an
+ * unplanned project has changed it, a minimal brief (the director's, from
+ * that call's arguments and the bin: director/brief.ts) is saved in its own
+ * undo step (a refused or failed call saves none), and the
  * receipt says so and points at produce_video_tool, which compiles one from
  * the request and makes the whole edit. ZENVI_MCP_BRIEF=off turns it off.
  */
@@ -65,7 +66,7 @@ function requestWords(tool: string, args: Readonly<Record<string, unknown>>): st
   return words.join(". ").slice(0, 2000);
 }
 
-/** The minimal brief to save before `tool` lays down material on an unplanned `project`, or null when none is owed. */
+/** The minimal brief owed when `tool` lays down material on an unplanned `project` (saved once the call changed it), or null. */
 export function autoBrief(tool: string, project: Project, args: Readonly<Record<string, unknown>>): Brief | null {
   if (!PLANNED.has(tool) || project.clips.length >= EARLY_CLIPS || readBrief(project)) return null;
   const seconds = Number(args.duration_seconds);
