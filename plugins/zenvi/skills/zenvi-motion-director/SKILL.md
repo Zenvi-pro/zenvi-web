@@ -28,6 +28,7 @@ is the rules every genre shares. Do not plan before you have read it.
 | one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
 | type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
 | tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
+| map, countries, stats, "over the years", data explainer | `recipes/data-explainer.md` | add_motion_block_tool (geo_map, pictogram_morph, bar_race, data_clock, chart_build) |
 | voice-over essay, story, explainer | `recipes/documentary.md` | TTS, kinetic_captions_tool documentary, add_kinetic_title_tool, build_reel_tool cinematic, grid collage |
 | sport, cars, launch hype, "fast", "hype", "trailer", "edit to this song" | `recipes/hype-reel.md` | **build_reel_tool hype first** (ramp, glitch drop, whips, flashes, one look built in), auto_sound_design_tool every_cut, review_edit_tool |
 | how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
@@ -37,9 +38,9 @@ Mixed asks: take the structure from the genre of the *first five seconds*
 and borrow single techniques from the others.
 
 Every recipe ends with **Finish**: sound on every cut, `master_audio_tool`,
-`render_video`, `review_render_tool`, one fix pass. A run that stops before
-it is not done, however good the picture: unmastered edits arrive 9-17 dB
-too quiet and nobody has looked at the file.
+`render_video`, `review_render_tool`, `watch_render_tool` once, one fix
+pass. A run that stops before it is not done, however good the picture:
+unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
 
 ## The director loop
 
@@ -92,11 +93,19 @@ too quiet and nobody has looked at the file.
    (word by word, emphasis words big; a TTS voice-over keeps its script's word
    timings, so pass its clip in `timeline_clip_ids`; `cues` when there is no
    voice to time to, or the TTS receipt says it has no word timings (then say
-   the captions are hand-timed), `text_size`, `animation`); it places each caption in the shot's
+   the captions are hand-timed), `text_size`, `animation`); song lyrics on
+   screen: `align_lyrics_tool` (`text`: the lyrics, one line per sung line;
+   `timeline_clip_id`: the song) first, then the captions and
+   `place_on_word_tool` use the lyrics at their sung times; it places each caption in the shot's
    negative space and, after `generate_subject_matte_tool` on the footage,
    puts emphasis words behind the head. Title cards and word cards:
    `add_kinetic_title_tool` (`animation`: pop, slam, tilt, scramble,
-   letters, typewriter, slide_up, rise; never a bare fade).
+   letters, typewriter, slide_up, rise; never a bare fade). Designed type
+   moves: `add_type_block_tool` (`block`: text_on_path for a spinning ring,
+   write_on for drawn strokes or SVG paths, stencil for the shot inside the
+   letters, echo_stack, strobe for a word every 3-6 frames ending on a
+   lockup, wheel for a word flipper, paper for stop-motion paper type);
+   put a hit on each of its `data.hits`.
    `text_behind_subject_tool` for one full-width hero word; `add_title_tool`
    with a bundled family (`font: "Anton"`, `"Instrument Serif"`, `"Space
    Mono"`...) only for static labels and logo bugs.
@@ -134,13 +143,55 @@ too quiet and nobody has looked at the file.
 11. **Master always last.** Any later audio edit means mastering again. An
     unmastered edit arrives 2-5 LU quiet and clips on the platforms.
 12. **Verify** (below), fix, verify again. Then `render_video` and
-    **review the file**: `review_render_tool` with the path it wrote. One
-    fix pass: every `PROBLEM` line, render again, review again, report.
+    **review the file**: `review_render_tool` with the path it wrote, then
+    **watch it**: `watch_render_tool` once, with the brief. One fix pass:
+    every `PROBLEM` line and every `HIGH` watch issue (each names its shots
+    and tools), render again, review again, watch again at most once, report
+    both watch scores.
 
 Order matters: speed ramps change clip lengths (`ripple: true`), transitions
 read the cuts, sound design reads cuts, transitions and titles. Anything that
 moves a cut after step 6 means removing and re-applying the transitions on
 that track (`remove_motion_transition_tool track=...`) and re-running sound.
+
+## Best of three (when the brief allows)
+
+One run of the same brief swings 12-16 bench points; making three cuts that
+differ on purpose and keeping the best is the cheapest gain. Do it when the
+piece is 60 s or shorter, watching works (`watch_render_tool` was not
+refused), and the person did not ask for one quick version. Skip it for the
+one-call `zenvi-reels` and say so under gaps when you skip.
+
+1. **Base.** Run the loop to a finished edit (sound designed, mastered) and
+   save it. This is variant 1.
+2. **Two deliberate variants, one axis each**, taken from the brief, never
+   random: **pacing** (shots 30 % shorter or longer, a speed ramp into the
+   drop), **type system** (the other family or animation from the style),
+   **grade** (the other look the style allows), or **music** (the second
+   track from the search). Pick the two axes the brief is least sure about.
+   For each: `fork_project_tool {"name": "fast-cuts"}`, `open_project_tool`
+   the path it returns, make the change (a moved cut means re-running
+   transitions and sound), `master_audio_tool` again, and render a proxy:
+   `render_video {"output": "renders/fast-cuts.mp4", "width": 540, "quality": "low"}`.
+   Render the base's proxy the same way.
+3. **Tournament.** `open_project_tool` the base again, then
+   `pick_best_variant_tool` with all three (base first) and the brief: each
+   match is watched side by side in both orders, and the winner becomes the
+   open project in one undo step.
+4. **Refine the winner** with the 3 fixes the receipt lists (each names its
+   tools), render the full-size file, `review_render_tool`, and
+   `watch_render_tool` once. Report the ranking, the winner and both scores.
+
+```json
+fork_project_tool {"name": "warm-grade"}
+pick_best_variant_tool {"brief": "15 s hype reel for a sneaker drop", "variants": [
+  {"name": "base", "project": "reel.zvn", "render": "renders/base.mp4"},
+  {"name": "fast-cuts", "project": "reel-fast-cuts.zvn", "render": "renders/fast-cuts.mp4"},
+  {"name": "warm-grade", "project": "reel-warm-grade.zvn", "render": "renders/warm-grade.mp4"}]}
+```
+
+`compare_renders_tool {"a": ..., "b": ...}` is the same judgment for any two
+renders (before/after a fix pass, two music beds) without changing anything.
 
 ## Non-negotiables
 
@@ -231,12 +282,22 @@ past the last picture and render again; true peak → `master_audio_tool`;
 repeated shot → the `swap_shot_tool` calls it lists (one per repeat; none
 listed means import more footage). Report the final review's numbers.
 
+**Then watch it, once.** Frames and meters cannot hear a silent whip or feel
+a sagging middle. `watch_render_tool` with the path and the brief has an
+editor watch the file with its sound: a 1-10 score per dimension and 3-6
+timestamped issues, each with the shots it falls on and the tools that fix
+it. Fix the `HIGH` ones (and any `MEDIUM` that is one call), render, and
+watch again at most once; report the score before and after. It costs a few
+credits and needs a Zenvi sign-in: refused (signed out, no credits) means
+skip it and say so under gaps, never retry.
+
 The finishing calls, in order (after the picture and the sound are locked):
 
 ```json
 unify_grade_tool {"look": "teal_punch", "look_intensity": 0.6}
 master_audio_tool {"preset": "social", "genre": "hype", "iterate": true}
 review_render_tool {"path": "reel.mp4"}
+watch_render_tool {"path": "reel.mp4", "brief": "15 s hype reel for a sneaker drop"}
 ```
 
 ## When a tool is missing

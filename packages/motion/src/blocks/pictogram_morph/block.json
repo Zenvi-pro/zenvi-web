@@ -1,0 +1,71 @@
+{
+  "id": "pictogram_morph",
+  "version": 1,
+  "title": "Pictogram morph",
+  "description": "A unit-icon chart (each person, house or dot stands for a number of units) that pops in icon by icon and then morphs between layouts, every icon flying to its new slot with a sequenced ease-out: one grid coloured by group, clusters per group, an icon bar chart, everything collapsed into one block, or hold (all but a few icons of the focus group dissolve, along with the backdrop, so the footage under the block shows through around the icons that stay). For \"1 in 4\" stats, share-of-whole explainers and data stories.",
+  "tags": ["pictogram", "isotype", "unit chart", "icons", "data", "infographic", "morph", "chart"],
+  "duration": { "default": 8, "min": 4, "max": 20 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "tokens": { "palette": "dark", "display": "sans", "radius": 999 },
+  "params": {
+    "groups": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 6,
+      "maxLength": 48,
+      "default": ["Online=46", "In store=31", "By phone=23"],
+      "description": "\"Label=value\" per group, in order; the first group (or focus) takes the accent."
+    },
+    "unit": {
+      "type": "number",
+      "min": 0.000001,
+      "max": 1000000000000,
+      "default": 1,
+      "description": "How much one icon stands for (values are divided by it and rounded); at most 400 icons in all."
+    },
+    "icon": {
+      "type": "enum",
+      "options": ["person", "dot", "square", "house", "car", "heart", "drop", "tree"],
+      "default": "person",
+      "aliases": { "people": "person", "user": "person", "circle": "dot", "home": "house", "water": "drop" },
+      "description": "The unit icon."
+    },
+    "layouts": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 6,
+      "maxLength": 12,
+      "default": ["grid", "groups", "bars"],
+      "description": "The layouts in order, each morphing into the next: grid, groups (a cluster per group), bars (icon columns on a baseline), collapse (one tight block) and hold (keep `keep` icons of the focus group in place, dissolve the rest and the backdrop)."
+    },
+    "captions": {
+      "type": "strings",
+      "maxItems": 6,
+      "maxLength": 60,
+      "default": ["How 100 orders arrive", "Grouped by channel", "Online leads"],
+      "description": "Headline per layout (missing or empty: none for that layout)."
+    },
+    "focus": {
+      "type": "integer",
+      "min": 0,
+      "max": 5,
+      "default": 0,
+      "description": "The group in the accent (0-based); the others step down in tone."
+    },
+    "keep": {
+      "type": "integer",
+      "min": 1,
+      "max": 12,
+      "default": 3,
+      "description": "Icons of the focus group that stay through a hold."
+    },
+    "backdrop": {
+      "type": "boolean",
+      "default": true,
+      "description": "Draw the palette's paper behind the chart (a hold dissolves it); false: icons only, over whatever is below."
+    },
+    "prefix": { "type": "string", "maxLength": 4, "default": "", "description": "Before group values, e.g. $." },
+    "suffix": { "type": "string", "maxLength": 6, "default": "%", "description": "After group values, e.g. % or k." }
+  }
+}

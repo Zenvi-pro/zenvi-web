@@ -30,6 +30,7 @@ import type {
 } from "../types.js";
 import { readBundledFont } from "../../typography/test-fonts.js";
 import { backendStock } from "../backend.js";
+import { WATCH_DIMENSION_NAMES, type WatchCritique } from "../../review/watch.js";
 import { fakeMotionHost } from "./fake-motion.js";
 import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
@@ -59,6 +60,8 @@ export type OptionalMethod =
   | "ui.preferences"
   | "ui.clearPlaybackCache"
   | "storage.writeBytes"
+  | "storage.saveCopy"
+  | "storage.readCopy"
   | "storage.exportMedia"
   | "storage.currentPath"
   | "storage.recentProjects"
@@ -621,6 +624,42 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
     };
   }
   if (!without.has("stock") && host.backend) host.stock = backendStock(host.backend);
+  if (!without.has("watch")) {
+    host.watch = {
+      watch: async (path, request) => {
+        calls.push(`watch ${path}`);
+        const scores = Object.fromEntries(WATCH_DIMENSION_NAMES.map((d) => [d, 5])) as WatchCritique["scores"];
+        return {
+          model: "fake-watch",
+          duration: 8,
+          hasAudio: true,
+          verdict: `Watched${request?.brief ? ` for "${request.brief}"` : ""}.`,
+          overall: 5,
+          wouldPost: false,
+          scores,
+          issues: [{ start: 1, end: 1.5, dimension: "sound_design", severity: "high", problem: "The cut is silent.", fix: "Add a whoosh on the cut." }],
+          strengths: [],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          via: "backend",
+        };
+      },
+      compare: async (first, second) => {
+        calls.push(`compare ${first} ${second}`);
+        const scores = (n: number) => Object.fromEntries(WATCH_DIMENSION_NAMES.map((d) => [d, n])) as WatchCritique["scores"];
+        // The first render shown wins every time: the slot bias both orders cancel.
+        return {
+          model: "fake-watch",
+          durations: { A: 8, B: 8 },
+          winner: "A",
+          why: "A lands its cuts.",
+          scores: { A: scores(6), B: scores(5) },
+          fixes: [{ video: "A", start: 1, dimension: "sound_design", problem: "The cut is silent.", fix: "Add a whoosh on the cut." }],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          via: "gemini",
+        };
+      },
+    };
+  }
   if (!without.has("storage")) {
     host.storage = {
       save: async (_project, path) => {
@@ -658,6 +697,24 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         written.set(target, bytes);
         disk?.add(target);
         return target;
+      };
+    }
+    if (!omit.has("storage.saveCopy")) {
+      host.storage.saveCopy = async (project, path, opts) => {
+        const target = resolved(path);
+        calls.push(`saveCopy ${target}`);
+        if (!opts?.overwrite && (written.has(target) || disk?.has(target))) throw Object.assign(new Error(`EEXIST: ${target}`), { code: "EEXIST", path: target });
+        written.set(target, JSON.stringify(project));
+        disk?.add(target);
+        return target;
+      };
+    }
+    if (!omit.has("storage.readCopy")) {
+      host.storage.readCopy = async (path) => {
+        calls.push(`readCopy ${path}`);
+        const saved = written.get(resolved(path));
+        if (typeof saved !== "string") throw new Error(`cannot read ${path} in tests`);
+        return JSON.parse(saved) as Project;
       };
     }
     if (!omit.has("storage.exportMedia")) {
