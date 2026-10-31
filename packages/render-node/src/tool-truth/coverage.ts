@@ -161,6 +161,7 @@ export const OFFSCREEN: Readonly<Record<string, string>> = {
   pick_best_variant_tool: "opens the winning variant's project (like open_project_tool)",
   align_lyrics_tool: "word timings on the file's transcript, read by the caption and word tools",
   detect_music_structure_tool: "the song's sections as snap points and timeline markers",
+  make_transition_mask_tool: "adds a mask image to Project Files, not the timeline",
 };
 
 export interface BacklogEntry {
@@ -219,7 +220,6 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   align_match_cut_tool: { reason: "not proven yet: render-node/src/render/match-cut.test.ts proves the alignment end to end", params: "*" },
   match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety"] },
   unify_grade_tool: { reason: "not proven yet: iterative grade matching across clips", params: ["reference_clip_id", "reference_file_id", "strength", "look", "look_intensity", "samples", "max_iterations"] },
-  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety"] },
   kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["behind_subject", "placement", "language"] },
   add_sfx_tool: { reason: "not proven yet", params: ["provider", "sound_id", "title", "max_seconds", "allow_noncommercial", "kit"] },
   auto_sound_design_tool: { reason: "not proven yet: density and beats need a music bed with several cuts; genre ids to look up", params: ["sources", "kit", "density", "genre", "beats"] },
@@ -246,6 +246,9 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   hold_point_reframe_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
   pin_to_track_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
   screen_zoom_follow_tool: { reason: "not proven yet: needs a screen recording with activity", params: "*" },
+  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety", "sound", "replay", "states"] },
+  add_plate_wipe_tool: { reason: "not proven yet", params: "*" },
+  add_shape_mask_tool: { reason: "not proven yet: polygon points", params: ["points"] },
 };
 
 export function paramNoteKeys(): string[] {
