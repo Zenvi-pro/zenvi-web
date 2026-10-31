@@ -32,6 +32,8 @@ export interface StrobeOptions extends TypeBlockBase {
   layouts: readonly StrobeLayout[];
   /** Flip the ground on every cut even past 3 flashes a second (WCAG 2.3.1); the user asked for a strobe. */
   allowStrobe?: boolean;
+  /** Flash changes already on the timeline around the block, in seconds from its start: the flips count them too. */
+  flashes?: readonly number[];
 }
 
 function luminance(hex: string): number {
@@ -99,7 +101,7 @@ export function buildStrobe(o: StrobeOptions): TypeBlockOutput {
     if (previous >= 0 && isFlashChange(relativeLuminance(grounds[previous]!.ground), relativeLuminance(grounds[g]!.ground))) {
       const t = o.starts[i]! / frame.fps;
       // Evenly: a flip at least MIN_CHANGE_GAP after the last, not bursts of six and a hold.
-      if (o.allowStrobe || (t - (flips.at(-1) ?? -Infinity) >= MIN_CHANGE_GAP - 1e-6 && fitsFlashLimit(flips, [t]))) flips.push(t);
+      if (o.allowStrobe || (t - (flips.at(-1) ?? -Infinity) >= MIN_CHANGE_GAP - 1e-6 && fitsFlashLimit([...(o.flashes ?? []), ...flips], [t]))) flips.push(t);
       else {
         g = previous;
         held += 1;
@@ -164,6 +166,6 @@ export function buildStrobe(o: StrobeOptions): TypeBlockOutput {
     elements[elements.length - 1]!.to = Math.max(elements[elements.length - 1]!.to, o.frames);
   }
   const plan = planOf("type_strobe", o.frames, elements, [...o.starts], frame);
-  const warnings = held > 0 ? [`the ground holds on ${held} of ${o.words.length} cuts: flipping it every cut makes more than 3 flashes in a second, which can trigger seizures (WCAG 2.3.1); hold_frames ${Math.ceil(frame.fps / 6)}+ flips every cut, allow_strobe=true only when the user asks for a strobe`] : [];
+  const warnings = held > 0 ? [`the ground holds on ${held} of ${o.words.length} cuts: flipping it every cut makes more than 3 flashes in a second${(o.flashes ?? []).length > 0 ? " with the flashes already on the timeline" : ""}, which can trigger seizures (WCAG 2.3.1); hold_frames ${Math.ceil(frame.fps / 6)}+ flips every cut (away from other flashes), allow_strobe=true only when the user asks for a strobe`] : [];
   return { plan, masks: [], hits: elements.map((e) => e.from), missing: [...missing], warnings };
 }
