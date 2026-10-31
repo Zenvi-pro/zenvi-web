@@ -269,6 +269,33 @@
     out.globalAlpha = 1;
   }
 
+  // packages/engine/src/review/flashing.ts
+  var MAX_FLASHES = 3;
+  var FLASH_WINDOW_SECONDS = 1;
+  var MAX_CHANGES = 2 * MAX_FLASHES;
+  var MIN_CHANGE_GAP = FLASH_WINDOW_SECONDS / MAX_CHANGES;
+  function flashViolations(changes) {
+    const t = [...changes].sort((a, b) => a - b);
+    const out = [];
+    let j = 0;
+    for (let i = 0; i < t.length; i += 1) {
+      if (j < i) j = i;
+      while (j + 1 < t.length && t[j + 1] - t[i] < FLASH_WINDOW_SECONDS - 1e-9) j += 1;
+      const count = j - i + 1;
+      if (count <= MAX_CHANGES) continue;
+      const flashes = Math.ceil(count / 2);
+      const last = out[out.length - 1];
+      if (last && t[i] <= last.end) {
+        last.end = Math.max(last.end, t[j]);
+        last.flashes = Math.max(last.flashes, flashes);
+      } else out.push({ start: t[i], end: t[j], flashes });
+    }
+    return out;
+  }
+  function fitsFlashLimit(kept, changes) {
+    return !flashViolations([...kept, ...changes]).some((w) => changes.some((c) => c >= w.start - 1e-9 && c <= w.end + 1e-9));
+  }
+
   // packages/motion/src/blocks/kinetic_cut_scene/shots.ts
   var ENTRANCES = ["slam", "type", "assemble", "mask", "flip", "stretch", "drop", "count", "strobe", "none"];
   var LAYOUTS = ["center", "left", "right", "bleed", "top", "bottom", "diagonal", "space", "split"];
@@ -347,6 +374,42 @@
       else flashes.push(h.t);
     }
     return hits;
+  }
+  function groundAt(shot, bpm, u) {
+    if (shot.entrance !== "strobe") return shot.ground;
+    const step = strobeStep(shot, bpm);
+    if (step < 1 / 3) return shot.ground;
+    const order = shot.ground === "light" ? ["light", "dark", "accent"] : shot.ground === "accent" ? ["accent", "dark", "light"] : ["dark", "light", "accent"];
+    return order[Math.floor(u / step) % order.length];
+  }
+  function groundChanges(shots, bpm) {
+    const out = [];
+    let previous;
+    for (const shot of shots) {
+      const step = shot.entrance === "strobe" ? strobeStep(shot, bpm) : Infinity;
+      for (let u = 0; shot.start + u < shot.end - 1e-6; u += step) {
+        const ground = groundAt(shot, bpm, u);
+        if (previous !== void 0 && ground !== previous) out.push(shot.start + u);
+        previous = ground;
+        if (!Number.isFinite(step)) break;
+      }
+    }
+    return out;
+  }
+  var HIT_FLASH_SECONDS = 0.12;
+  function limitHitFlashes(shots, hits, bpm) {
+    const kept = groundChanges(shots, bpm);
+    let dropped = 0;
+    for (const h of [...hits].sort((a, b) => b.strength - a.strength || a.t - b.t)) {
+      if (h.flash === 0) continue;
+      const changes = [h.t, h.t + HIT_FLASH_SECONDS];
+      if (fitsFlashLimit(kept, changes)) kept.push(...changes);
+      else {
+        h.flash = 0;
+        dropped += 1;
+      }
+    }
+    return dropped;
   }
   function typingSeconds(shot) {
     return Math.min((shot.end - shot.start) * 0.6, Math.max(0.25, shot.lines.join(" ").length / 22));
@@ -454,16 +517,9 @@
     g.fillStyle = color;
     g.fillRect(-sc.W * 0.25, -sc.H * 0.25, sc.W * 1.5, sc.H * 1.5);
   }
-  function groundAt(sc, shot, u) {
-    if (shot.entrance !== "strobe") return shot.ground;
-    const step = strobeStep(shot, sc.bpm);
-    if (step < 1 / 3) return shot.ground;
-    const order = shot.ground === "light" ? ["light", "dark", "accent"] : shot.ground === "accent" ? ["accent", "dark", "light"] : ["dark", "light", "accent"];
-    return order[Math.floor(u / step) % order.length];
-  }
   function drawShot(g, sc, shot, u, uf = u) {
     const len = shot.end - shot.start;
-    const ground = groundAt(sc, shot, uf);
+    const ground = groundAt(shot, sc.bpm, uf);
     const box = layoutBox(sc, shot);
     const ink = sc.inks[ground];
     fill(g, sc, sc.colors[ground]);
@@ -979,6 +1035,7 @@
     const shots = scheduleShots(specs, bpm, ctx.seconds);
     const s = Math.min(W, H) / 1080;
     const hits = shotHits(shots, bpm, s);
+    if (p.allow_strobe !== true) limitHitFlashes(shots, hits, bpm);
     for (const c of shotCues(shots, bpm)) ctx.cue(c.t, c.kind, { weight: c.weight, ...c.until !== void 0 ? { until: c.until } : {}, ...c.rate !== void 0 ? { rate: c.rate } : {} });
     ctx.ownExit = true;
     const dark = palette.dark ? palette.paper : palette.ink;

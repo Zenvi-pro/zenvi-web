@@ -610,6 +610,10 @@ ${error.stack ?? ""}` : String(error);
     const sign = value < 0 && Number(fixed) !== 0 ? "-" : "";
     return `${format2.prefix ?? ""}${sign}${grouped}${frac ? `.${frac}` : ""}${format2.suffix ?? ""}`;
   }
+  function decimalsFor(values, max = 3) {
+    for (let d = 0; d < max; d += 1) if (values.every((v) => Math.abs(Number(v.toFixed(d)) - v) < 1e-9)) return d;
+    return max;
+  }
 
   // packages/motion/src/blocks/ui.ts
   function sixDigits(c) {
@@ -1210,7 +1214,7 @@ ${error.stack ?? ""}` : String(error);
   }
   function legend(ctx, lo, hi, land, accent, ramp, at) {
     const { tl, safe, width: W, height: H, params: p } = ctx;
-    const fmt = { prefix: String(p.prefix ?? ""), suffix: String(p.suffix ?? ""), decimals: Math.abs(hi - lo) < 10 && !Number.isInteger(lo + hi) ? 1 : 0 };
+    const fmt = { prefix: String(p.prefix ?? ""), suffix: String(p.suffix ?? ""), decimals: decimalsFor([lo, hi]) };
     const band = ctx.el("div", "gm-legend");
     const w = Math.min(W - safe.left - safe.right, 760);
     Object.assign(band.style, { left: `${safe.left}px`, top: `${H - safe.bottom - 110}px`, width: `${w}px` });

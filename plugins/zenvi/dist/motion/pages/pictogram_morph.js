@@ -610,6 +610,10 @@ ${error.stack ?? ""}` : String(error);
     const sign = value < 0 && Number(fixed) !== 0 ? "-" : "";
     return `${format2.prefix ?? ""}${sign}${grouped}${frac ? `.${frac}` : ""}${format2.suffix ?? ""}`;
   }
+  function decimalsFor(values, max = 3) {
+    for (let d = 0; d < max; d += 1) if (values.every((v) => Math.abs(Number(v.toFixed(d)) - v) < 1e-9)) return d;
+    return max;
+  }
   function counterValue(t, options) {
     const ease = resolveEase(options.ease ?? "out");
     const p = Math.min(1, Math.max(0, (t - options.at) / (options.duration ?? 1.2)));
@@ -759,6 +763,7 @@ ${error.stack ?? ""}` : String(error);
     const keep = Number(p.keep);
     const captions = p.captions.slice(0, layouts.length);
     const fmt = { prefix: String(p.prefix ?? ""), suffix: String(p.suffix ?? "") };
+    const decimals = decimalsFor(groups.map((g) => g.value));
     const total = groups.reduce((n, g) => n + g.icons, 0);
     const backdrop = p.backdrop ? ctx.el("div", "pm-backdrop") : null;
     if (backdrop) backdrop.style.background = palette.paper;
@@ -846,8 +851,8 @@ ${error.stack ?? ""}` : String(error);
         const el = ctx.el("div", `pm-${label.kind}`);
         Object.assign(el.style, { left: `${label.x - 300}px`, top: `${label.y}px` });
         if (label.kind === "name") el.textContent = g?.label ?? "";
-        else if (g) tl.track(counter(el, { from: 0, to: g.value, at: inAt, duration: 0.7, ease: "out", decimals: Number.isInteger(g.value) ? 0 : 1, ...fmt }));
-        else el.textContent = `${formatNumber(groups.reduce((n, x) => n + x.value, 0), fmt)} in all`;
+        else if (g) tl.track(counter(el, { from: 0, to: g.value, at: inAt, duration: 0.7, ease: "out", decimals, ...fmt }));
+        else el.textContent = `${formatNumber(groups.reduce((n, x) => n + x.value, 0), { ...fmt, decimals })} in all`;
         if (label.group === focus) el.style.color = palette.accent;
         tl.fromTo(el, { opacity: 0, y: 12 }, { opacity: 1, y: 0 }, { at: inAt, duration: 0.45, ease: "out" });
         if (outAt !== void 0) tl.to(el, { opacity: 0 }, { at: outAt, duration: 0.25, ease: "smooth" });
