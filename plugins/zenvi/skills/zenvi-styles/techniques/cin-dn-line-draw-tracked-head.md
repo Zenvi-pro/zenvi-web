@@ -35,7 +35,7 @@ Use when: Growth, price or usage over time; any chart where the trend is the mes
 1. `add_motion_block_tool {"block": "chart_build", "position_seconds": 1.0, "duration_seconds": 5.0, "placement": "full_frame", "params": {"kind": "line", "title": "Weekly active users", "values": ["12", "14", "13", "19", "27", "41"], "labels": ["W1", "W2", "W3", "W4", "W5", "W6"], "highlight": 5, "plate": "none", "caption": "3.4x in six weeks"}}`; the line draws across over 96 f (1.6 s), starting from rest, peaking near 29 % of the draw and creeping the last third into the final point.
 2. The area under the line fades in from 18 % to 0 % opacity in the line's hue; if the block shows no fill, accept the bare line.
 3. The head dot (r 6 px at 1080p with a 2 px ring in the ground colour) is not a block param: add `add_emoji_tool` with a plain dot (or a title bullet) and ride the line with `set_keyframes_tool` on `location_x` and `location_y`, `ease_in_out_sine`, points sampled from the data values, over the same 1.6 s.
-4. When the head lands, the endpoint value rolls in over 14 f (0.23 s): `add_motion_block_tool {"block": "counter", "values": ["41"], "position_seconds": 2.5, "duration_seconds": 2.0}`.
+4. When the head lands, the endpoint value rolls in over 14 f (0.23 s): `add_motion_block_tool {"block": "counter", "params": {"values": ["41"]}, "position_seconds": 2.5, "duration_seconds": 2.0}`.
 5. Short form: 24 f (0.4 s) ease_out_expo draw.
 6. `add_sfx_tool {"recipe": "riser_tonal", "at_seconds": 1.0, "gain_db": -22}`.
 

@@ -27,7 +27,7 @@ Use when: After a graphic build (a bar wall, a stripe or tile field, a filled pa
 
 **Ban-safe variant (the cinetic house default; the draw says `ban_safe_variant`):**
 
-1. Same chart: `add_motion_block_tool {"block": "chart_build", "position_seconds": 0, "duration_seconds": 5, "params": {"kind": "bar", "values": ["30", "55", "80", "100", "70", "45"], "labels": ["A", "B", "C", "D", "E", "F"], "plate": "none", "palette": "<one_hue_palette>", "colors": ["<step1>", "<step2>", "<step3>"]}}` with the bars in tonal steps of one non-banned hue from the stage to a light tint (not a periwinkle-pink-orange spectrum).
+1. Same chart: `add_motion_block_tool {"block": "chart_build", "position_seconds": 0, "duration_seconds": 5, "params": {"kind": "bar", "values": ["30", "55", "80", "100", "70", "45"], "labels": ["A", "B", "C", "D", "E", "F"], "plate": "none", "palette": "<palette>", "accent": "<one non-banned hue>"}}` so the bars stay in one hue against the stage (chart_build takes no per-bar colours; never a periwinkle-pink-orange spectrum).
 2. Keep the blurred-copy crossfade (72 f = 1.2 s), the widen (1 to 1.5x) and the title at 3.6 s from the full build, then lay a slow single-hue `gradient_field` (`style: "aurora"`, `speed: 0.15`) under the title so the softened field becomes a one-hue living stage.
 
 **Full look** (relies on gradient, orange, purple: only when the person's brand supplies that look):

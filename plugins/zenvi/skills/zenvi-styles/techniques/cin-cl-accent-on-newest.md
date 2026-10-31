@@ -25,7 +25,7 @@ Use when: Prompts typing, statements building word by word, AI-generated items a
 
 ## Build it in Zenvi
 
-1. Typing: `add_motion_block_tool {"block": "text_scramble", "position_seconds": 1.0, "duration_seconds": 3.0, "params": {"text": "Build me a launch film", "glyphs": "letters", "highlight": true}, "accent": "<accent>"}`: the accent block rides the decode front, which is the nearest thing to a coloured wake behind the caret.
+1. Typing: `add_motion_block_tool {"block": "text_scramble", "position_seconds": 1.0, "duration_seconds": 3.0, "params": {"text": "Build me a launch film", "glyphs": "letters", "highlight": true}}`: the accent block rides the decode front, which is the nearest thing to a coloured wake behind the caret.
 2. Word-by-word build: `add_kinetic_title_tool {"text": "Make every frame count", "style": "editorial", "animation": "rise", "emphasis": ["count"], "accent": "<accent>", "ink": "#ffffff", "stagger_seconds": 0.27, "position_seconds": 1.0, "duration_seconds": 3.0}`: the last word keeps the accent until the cut.
 3. A generated pill or card: place it with its normal block, then lay an accent-tinted copy of its shape on top and fade it out: `set_keyframes_tool {"timeline_clip_id": "<tint_copy>", "property": "alpha", "points": [{"seconds": 2.0, "value": 1}, {"seconds": 2.5, "value": 0, "ease": "ease_out_expo"}]}` (20-40 f, 0.33-0.67 s).
 4. One accent hue only, no multi-stop hue cycle, no bloom.

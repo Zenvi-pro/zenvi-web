@@ -77,7 +77,7 @@ add_motion_block_tool {"block": "notification_stack", "position_seconds": 0, "du
 review_edit_tool {}
 export_video_tool {}
 review_render_tool {"path": "<render>"}
-save_frame_image_tool {"seconds": 0}
+save_frame_image_tool {"time": 0}
 ```
 
 Check the seam: the last frame and frame 0 side by side in `review_edit_tool {"start": 9.4, "end": 9.6}` and

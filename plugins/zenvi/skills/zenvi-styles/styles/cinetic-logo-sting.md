@@ -81,7 +81,7 @@ master_audio_tool {"target_lufs": -16}
 review_edit_tool {}
 export_video_tool {}
 review_render_tool {"path": "<render>", "loudness_target_lufs": -16}
-save_frame_image_tool {"seconds": 5.9}
+save_frame_image_tool {"time": 5.9}
 ```
 
 With the person's own logo: `logo_reveal_end` with `params.logo` = their file, `glow: false`. An alpha

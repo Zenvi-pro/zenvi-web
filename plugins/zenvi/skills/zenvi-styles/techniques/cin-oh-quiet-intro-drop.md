@@ -59,7 +59,7 @@ This entry is the sound: sparse bed, sub 8-12 f before the cut, kick on the cut 
 
 Found when rendering it (apply before building):
 
-- Step 2: eq_tool preset muffle applies to the whole clip it is given, so split the music at the cut first (split_clips_tool at 1.98) and EQ only the intro piece; do not EQ the full music clip.
+- Step 2: eq_tool preset muffle applies to the whole clip it is given, so split the music at the cut first (split_clip_tool {"clip_id": "<music clip>", "at_seconds": 1.98}) and EQ only the intro piece; do not EQ the full music clip.
 - Step 1: add_clip_to_timeline_tool wants start_seconds + duration_seconds to trim; end_seconds with position_seconds>0 and no start_seconds produced a 5 s clip for end_seconds 3 at position 2 (use duration_seconds).
 
 Translated from cinetic's technique library (`oh-quiet-intro-drop`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.
