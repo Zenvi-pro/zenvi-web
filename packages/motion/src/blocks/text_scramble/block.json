@@ -32,7 +32,7 @@
       "type": "string",
       "maxLength": 160,
       "default": "ALL SYSTEMS READY / 99.9% UPTIME",
-      "description": "The text. '/' breaks a line."
+      "description": "The text. ' / ' (a slash with a space beside it) breaks a line; MB/s and 24/7 stay as written."
     },
     "glyphs": {
       "type": "enum",

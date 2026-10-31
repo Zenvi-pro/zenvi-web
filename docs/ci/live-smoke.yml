@@ -1,0 +1,57 @@
+# Copy to .github/workflows/live-smoke.yml (needs a token with the `workflow` scope).
+name: Live smoke
+
+# The public editor after a deploy (Zenvi-pro/zenvi-pro azure-deploy.yml can
+# send `repository_dispatch: editor-deployed`), and once a day. Read-only.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Editor URL
+        default: https://zenvi.pro/editor/
+  repository_dispatch:
+    types: [editor-deployed]
+  schedule:
+    - cron: "17 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test
+        env:
+          ZENVI_LIVE_URL: ${{ inputs.url || 'https://zenvi.pro/editor/' }}
+        run: npx playwright test -c apps/editor/e2e/live.config.ts
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: live-smoke-results
+          path: /tmp/zenvi-live-smoke-results
+          retention-days: 7

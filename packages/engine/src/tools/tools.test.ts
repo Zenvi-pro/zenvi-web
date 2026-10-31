@@ -276,7 +276,7 @@ const SPECS: Record<string, Spec> = {
   separate_clip_audio_tool: {
     happy: {
       args: { timeline_clip_ids: IDS.clipB },
-      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) on track\(s\) 1; the originals are muted\.$/,
+      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) \([A-Z0-9]{10}\) on track\(s\) 1; the originals are muted\.$/,
       check: ({ receipt }) => expect(receipt.createdTracks).toHaveLength(1),
     },
     failure: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Error: 'logo\.png' has no audio to separate$/ },
@@ -1185,6 +1185,52 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for review_render_tool/ },
   },
+  watch_render_tool: {
+    happy: {
+      args: { path: "/out/reel.mp4", brief: "a reel" },
+      summary: /^Watched \/out\/reel\.mp4 \(8\.00s, with sound\) via the Zenvi backend: overall 5\/10, would not post yet\. Watched for "a reel"\./,
+      check: ({ host }) => expect(host.calls).toContain("watch /out/reel.mp4"),
+    },
+    failure: { args: { path: "" }, status: "refused", summary: /^Error: pass either path \(the rendered file\) or render_id/ },
+  },
+  fork_project_tool: {
+    happy: {
+      args: { name: "fast-cuts" },
+      summary: /^Kept the edit \(\d+ clips\) as variant "fast-cuts" at \/projects\/current-fast-cuts\.zvn\. The open project is unchanged\./,
+      check: ({ host, receipt }) => {
+        expect(host.calls).toContain("saveCopy /projects/current-fast-cuts.zvn");
+        expect(receipt.undoSteps).toBe(0);
+      },
+    },
+    failure: { args: { name: "Fast Cuts" }, status: "refused", summary: /^Error: Invalid arguments for fork_project_tool/ },
+  },
+  compare_renders_tool: {
+    happy: {
+      args: { a: "/out/a.mp4", b: "/out/b.mp4" },
+      // The fake judge prefers whichever render is shown first: both orders disagree, the scores tie, a is kept.
+      summary: /^\/out\/a\.mp4 is the better edit \(a tie in both orders and scores; margin \+0 for \/out\/a\.mp4\)\./,
+      check: ({ host }) => expect(host.calls.filter((c) => c.startsWith("compare "))).toEqual(["compare /out/a.mp4 /out/b.mp4", "compare /out/b.mp4 /out/a.mp4"]),
+    },
+    failure: { args: { a: "/out/a.mp4", b: "/out/a.mp4" }, status: "refused", summary: /same render/ },
+  },
+  pick_best_variant_tool: {
+    happy: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      setup: (doc, host) => {
+        host.storage!.readCopy = async (path) => ({ ...structuredClone(doc.project), clips: path.endsWith("a.zvn") ? [] : doc.project.clips });
+      },
+      summary: /^Best of 2: a\.zvn \(\/out\/a\.mp4\)\. a\.zvn is now the open project/,
+      check: ({ doc, receipt }) => {
+        expect(doc.project.clips).toEqual([]);
+        expect(receipt.undoSteps).toBe(1);
+      },
+    },
+    failure: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      status: "refused",
+      summary: /^Error: could not open variant a\.zvn/,
+    },
+  },
   swap_shot_tool: {
     happy: {
       args: { clip_id: IDS.clipB },
@@ -1207,6 +1253,49 @@ const SPECS: Record<string, Spec> = {
       args: { style: "karaoke", start_seconds: "0", accent: "#00ff88" },
       summary: /^Added \d+ karaoke caption group\(s\) \(\d+ words\) at [\d.]+-[\d.]+s on 2 track\(s\)\.$/,
       check: ({ host }) => expect([...host.written.keys()].some((p) => p.startsWith("/generated/captions-karaoke-"))).toBe(true),
+    },
+    failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
+  },
+
+  align_lyrics_tool: {
+    happy: {
+      args: { timeline_clip_id: IDS.clipA, text: "Hello and welcome,\ntoday we talk about cameras!" },
+      summary: /^Aligned 8 words in 2 line\(s\) to clip CLIPINTV01: 100% heard \(whisper-1\)\.$/,
+      check: ({ receipt, doc }) => {
+        const file = doc.project.files.find((f) => f.id === IDS.interview)!;
+        const asr = (file.ai_metadata as { asr: { transcriptionSource: string; words: { text: string }[] } }).asr;
+        expect(asr.transcriptionSource).toBe("aligned_text");
+        expect(asr.words.map((w) => w.text)).toContain("cameras!");
+        expect(receipt.data).toMatchObject({ lines: [{ text: "Hello and welcome,", start: 0.5, end: 2 }, { text: "today we talk about cameras!", start: 3, end: 4.6 }] });
+        expect(doc.undoLabels).toHaveLength(0);
+      },
+    },
+    failure: { args: { text: "words" }, status: "refused", summary: /^Error: pass timeline_clip_id or file_id \(one of them\)\.$/ },
+  },
+
+  place_on_word_tool: {
+    happy: {
+      args: { word: "today", what: "cut" },
+      summary: /^Placed 1 cut\(s\) on "today" at 2\.\d\ds, each on its word's frame\.$/,
+      check: ({ doc }) => {
+        expect(doc.undoLabels.at(-1)).toBe('Place cut on "today"');
+        expect(doc.project.clips.filter((c) => c.file_id === IDS.interview)).toHaveLength(3);
+      },
+    },
+    failure: { args: { word: "zebra", what: "cut" }, status: "refused", summary: /^Error: "zebra" is not said in the speech searched\./ },
+  },
+
+  insert_broll_on_words_tool: {
+    happy: {
+      args: { keywords: ["cameras"] },
+      summary: /^Inserted 1 B-roll cutaway\(s\) on track \d+, muted:\n {2}\d+\.\d\ds "cameras" 1\.2s {2}file_id=FILEBROL01/,
+      check: ({ receipt, doc }) => {
+        const id = (receipt.data as { created: string[] }).created[0]!;
+        const clip = doc.project.clips.find((c) => c.id === id)!;
+        expect(clip.start).toBe(1);
+        expect((clip.volume as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y).toBe(0);
+        expect(doc.undoLabels.at(-1)).toBe("Insert B-roll on words (1)");
+      },
     },
     failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
   },
