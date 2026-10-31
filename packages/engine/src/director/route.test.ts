@@ -79,6 +79,18 @@ describe("readRequest", () => {
   it("does not read apostrophes inside words as quotes", () => {
     expect(readRequest("A hype reel that says it's game day, don't miss it").headline).toBeNull();
     expect(readRequest("A 20 s promo called 'Island Control' for the city's port").name).toBe("Island Control");
+    expect(readRequest(`A promo called "Joe's Diner" for the city's port`).name).toBe("Joe's Diner");
+    expect(readRequest("A promo called 'Joe's Diner', 20 s").name).toBe("Joe's Diner");
+    expect(readRequest("A trailer for “Dune” with the line ‘it's time’").headline).toBe("it's time");
+  });
+
+  it("reads the first length stated, not a decade or the footage's length", () => {
+    expect(readRequest("make an 80s retro synthwave reel").seconds).toBeNull();
+    expect(readRequest("a 90s hip hop vibe edit, 20 s").seconds).toBe(20);
+    expect(readRequest("a 60s ad for the bakery").seconds).toBe(60);
+    expect(readRequest("a 30 second reel from my 5 minutes of drone footage").seconds).toBe(30);
+    expect(readRequest("my 5 minutes of drone footage as a 30s reel").seconds).toBe(30);
+    expect(readRequest("a 20 minute film").seconds).toBe(1200);
   });
 
   it("reads minutes, vertical frames and sizes", () => {

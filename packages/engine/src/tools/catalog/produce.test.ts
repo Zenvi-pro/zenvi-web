@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { STYLE_RULES } from "../../director/route.js";
+import { ProjectDocument } from "../../history/document.js";
 import { createProject } from "../../model/defaults.js";
+import { addClip } from "../../ops/clips.js";
+import { addFile } from "../../ops/files.js";
 import { readBrief } from "../../brief/brief.js";
 import { projectFps } from "../frame-time.js";
 import { runTool } from "../registry.js";
 import { fakeHost } from "../test-support/fake-host.js";
-import { fixtureDoc } from "../test-support/fixture.js";
+import { audioInfo, fixtureDoc, media } from "../test-support/fixture.js";
 
 type Stage = { stage: string; tool: string; outcome: string; summary: string; undo_steps: number };
 
@@ -46,6 +49,32 @@ describe("produce_video_tool", () => {
     const again = await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "A 12 second travel film of Lisbon", skip: ["format", "footage", "music", "build", "render"] });
     expect((again.data?.data as { stages: Stage[] }).stages.find((s) => s.stage === "brief")?.summary).toMatch(/kept the saved brief \(hype-reel/);
     expect(readBrief(doc.project)?.goal).toBe("The agent's plan");
+  });
+
+  it("cuts a saved brief's style that has no builder of its own under its id, whatever the request reads as", async () => {
+    const doc = fixtureDoc(createProject({ id: "PRODUCEGRD" }));
+    const skip = ["format", "footage", "music", "build", "render"];
+    await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "A 12 second grid", skip });
+    doc.setUntracked(["settings"], { ...doc.project.settings, zenvi_brief: { ...readBrief(doc.project)!, auto: false, style: "grid-montage" } });
+    const result = await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "A 12 second travel film of Lisbon", skip });
+    expect(result.data?.summary).toMatch(/^Produced a grid-montage edit/);
+  });
+
+  it("leaves the old timeline alone when the build cuts nothing", async () => {
+    // Only a music bed, on the timeline: every builder refuses (no pictures), so nothing should grade, sound, master or render it.
+    const doc = new ProjectDocument(createProject({ id: "PRODUCEOLD" }));
+    doc.transaction("bed", (tx) => {
+      addFile(tx, media("/media/bed.mp3", audioInfo("/media/bed.mp3", 60)), { id: "BED0000001" });
+      addClip(tx, { fileId: "BED0000001", position: 0, layer: 1, start: 0, end: 12, id: "BEDCLIP001" });
+    });
+    doc.clearHistory();
+    const result = await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "A 12 second hype reel", replace: true });
+    const stages = (result.data?.data as { stages: Stage[] }).stages;
+    for (const stage of ["grade", "transitions", "sound", "master", "render"]) {
+      const s = stages.find((x) => x.stage === stage);
+      if (s) expect(s, stage).toMatchObject({ undo_steps: 0, summary: "the edit was not cut" });
+    }
+    expect(doc.undoLabels).toEqual([]);
   });
 
   it("sets the frame rate the request names even when the frame already matches", async () => {

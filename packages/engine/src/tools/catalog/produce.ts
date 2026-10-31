@@ -272,7 +272,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const name = args.title ?? facts.name;
   const hook = args.hook ?? facts.headline;
   const endCard = args.end_card ?? facts.url;
-  const style = args.style ?? (saved && STYLE_RULES.some((r) => r.id === saved.style) ? saved.style : undefined);
+  // The saved brief's style leads when the index has it, with a builder of its own or not (route.ts ruleFor).
+  const style = args.style ?? (saved && STYLES.some((s) => s.id === saved.style) ? saved.style : undefined);
   const route = (chosen: string | undefined): Route =>
     routeRequest({ request: `${args.request} ${saved && !chosen ? saved.style : ""}`, candidates: STYLES, style: chosen, bin: binFacts(entries()), product: name ?? undefined, features: args.features?.length, script: Boolean(args.script) });
   let plan = route(style);
@@ -383,21 +384,23 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   }
 
   // 6-9. The finish the recipe ends with, only what the edit still owes (review/finish.ts).
-  const hasEdit = project().clips.length > 0;
+  // A build that ran and cut nothing leaves the timeline as it was: the finish is the new edit's, not the old one's.
+  const noEdit = project().clips.length === 0 ? "nothing on the timeline" : director.wants("build") && !built ? "the edit was not cut" : null;
+  const hasEdit = noEdit === null;
   const owed = () => new Set(finishGaps(project()).map((g) => g.kind));
   if (director.wants("grade")) {
-    if (!hasEdit) director.pass("grade", "nothing on the timeline");
+    if (!hasEdit) director.pass("grade", noEdit);
     else if (!owed().has("grade")) director.pass("grade", "the footage already carries a grade, or is one source");
     else await director.run("grade", "unify_grade_tool", rule.look ? { look: rule.look, look_intensity: 0.6 } : {});
   }
   if (director.wants("transitions")) {
-    if (!hasEdit) director.pass("transitions", "nothing on the timeline");
+    if (!hasEdit) director.pass("transitions", noEdit);
     else if (rule.transitions === "none") director.pass("transitions", `${rule.id} keeps its cuts hard (its builder put its own moves on them)`);
     else if (!owed().has("transitions")) director.pass("transitions", "the cuts already move");
     else await director.run("transitions", "apply_motion_transitions_tool", { ...rule.transitions });
   }
   if (director.wants("sound")) {
-    if (!hasEdit) director.pass("sound", "nothing on the timeline");
+    if (!hasEdit) director.pass("sound", noEdit);
     else if (!owed().has("sound")) director.pass("sound", "the cuts already have sound design");
     else {
       const beats = beatsOf(built);
@@ -405,7 +408,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     }
   }
   if (director.wants("master")) {
-    if (!owed().has("master")) director.pass("master", hasEdit ? "the mix is mastered" : "nothing on the timeline");
+    if (!hasEdit) director.pass("master", noEdit);
+    else if (!owed().has("master")) director.pass("master", "the mix is mastered");
     else await director.run("master", "master_audio_tool", { preset: "social", iterate: true, genre: MASTER_GENRE[rule.sound] });
   }
 
@@ -413,7 +417,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   let rendered: { path: string; seconds: number | null } | null = null;
   if (director.wants("render")) {
     const exporter = call.host.exporter;
-    if (!hasEdit) director.pass("render", "nothing on the timeline");
+    if (!hasEdit) director.pass("render", noEdit);
     else if (!exporter) director.pass("render", "this surface has no renderer (render in the editor's Export dialog)");
     else {
       try {

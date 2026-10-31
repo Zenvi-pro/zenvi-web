@@ -353,6 +353,16 @@ describe("flash transitions stay within 3 flashes a second (WCAG 2.3.1)", () => 
     expect(doc.undoLabels).toHaveLength(1);
   });
 
+  it("counts a flash already on a cut it may leave as it was before thinning the earlier cuts", async () => {
+    const doc = fastDoc();
+    expect((await call(doc, "apply_motion_transition_tool", { preset: "flash_white", clip1_id: "FAST03", duration: "0.1" })).ok).toBe(true);
+    const result = await call(doc, "apply_motion_transitions_tool", { track: "1", preset: "flash_white", duration: "0.1" });
+    expect(result.ok, result.text).toBe(true);
+    const cuts = flashCuts(doc);
+    expect(cuts.some((c) => Math.abs(c - 1) < 1e-6)).toBe(true);
+    for (const t of cuts) expect(cuts.filter((c) => c >= t && c < t + 1 - 1e-6).length).toBeLessThanOrEqual(3);
+  });
+
   it("keeps every flash with allow_strobe", async () => {
     const doc = fastDoc();
     const result = await call(doc, "apply_motion_transitions_tool", { track: "1", preset: "flash_white", duration: "0.1", allow_strobe: "true" });
