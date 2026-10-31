@@ -159,6 +159,7 @@ export const OFFSCREEN: Readonly<Record<string, string>> = {
   remove_files_from_project_tool: "Project Files (its clips go too; delete_from_timeline_tool covers removing clips)",
   fork_project_tool: "writes a copy of the project file and stays on the open one",
   pick_best_variant_tool: "opens the winning variant's project (like open_project_tool)",
+  align_lyrics_tool: "word timings on the file's transcript, read by the caption and word tools",
 };
 
 export interface BacklogEntry {
@@ -234,6 +235,8 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   replace_background_tool: { reason: "needs a subject matte (RVM model)", params: ["background", "color", "color2", "blur", "subject"] },
   subject_glow_tool: { reason: "needs a subject matte (RVM model)", params: ["look", "color", "glow_color", "glow", "background", "subject"] },
   pop_out_tool: { reason: "needs a subject matte (RVM model)", params: ["band_aspect", "bar_color", "subject"] },
+  place_on_word_tool: { reason: "needs word timings (speech recognition)", params: "*" },
+  insert_broll_on_words_tool: { reason: "needs word timings (speech recognition)", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {
