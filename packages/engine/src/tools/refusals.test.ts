@@ -29,6 +29,7 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   screen_zoom_follow_tool: { clip_id: IDS.clipA },
   search_pexels_videos_tool: { query: "coffee" },
   gather_stock_footage_tool: { queries: ["coffee"] },
+  generate_broll_set_tool: { shots: ["steam over a coffee cup"], style: "warm tungsten, 35mm" },
   search_freesound_music_tool: { query: "lofi" },
   search_clip_scenes_tool: { query: "cameras" },
   slice_clip_at_best_match_tool: { query: "cameras" },

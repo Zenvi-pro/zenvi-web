@@ -288,6 +288,7 @@ function defaultRoutes(): Record<string, (body: unknown, path: string) => unknow
     "/api/v1/generation/video": () => ({ video_url: "https://cdn.example.com/generated.mp4" }),
     "/api/v1/generation/tts": () => ({ success: true, audio_base64: "SUQzAwAAAAAAAA==" }),
     "/api/v1/generation/image": () => ({ image_base64: PNG_1PX, mime_type: "image/png" }),
+    "/api/v1/generation/morph": () => ({ video_url: "https://cdn.example.com/morph.mp4" }),
     "/api/v1/pexels/search": () => ({
       videos: [{ id: 101, url: "https://www.pexels.com/video/101/", video_files: [{ quality: "hd", link: "https://videos.pexels.com/101-hd.mp4" }] }],
     }),

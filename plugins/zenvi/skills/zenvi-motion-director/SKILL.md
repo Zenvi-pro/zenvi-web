@@ -73,7 +73,11 @@ unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
    beat or shape (`queries: [...]`, `count`, `orientation`, `min_seconds`):
    it searches them all, dedupes and imports the best distinct clips, one
    line each. Use `search_pexels_videos_tool` + `import_stock_media_tool`
-   only to pick one specific shot. One music track
+   only to pick one specific shot. Product, brand and explainer pieces:
+   the brief's footage plan (`get_brief_tool`) says what the person's media
+   lacks; gather it with `coherence: "shoot"` (+ `match_file_id`, their
+   footage) and generate shots as ONE `generate_broll_set_tool` set, so the
+   cut looks like one shoot, then `unify_grade_tool`. One music track
    (`search_freesound_music_tool` with `min_seconds` above the length), AI
    stills only for what stock cannot show. Too few assets is the commonest
    cause of a slideshow: get 1.5x the shots the plan needs. Count before

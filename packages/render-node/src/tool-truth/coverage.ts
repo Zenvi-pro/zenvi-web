@@ -253,6 +253,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   add_type_block_tool: { reason: "not proven yet: one type block per case (text_on_path, write_on, stencil ...)", params: "*" },
   datamosh_cut_tool: { reason: "not proven yet: datamosh_carry needs two clips with motion at the cut", params: "*" },
   sequence_shots_tool: { reason: "not proven yet: reorders shots (sequence tests cover the order)", params: "*" },
+  generate_broll_set_tool: { reason: "generates footage through the Zenvi backend (account, credits)", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {
