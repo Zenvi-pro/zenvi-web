@@ -20,6 +20,11 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   add_kinetic_title_tool: { text: "Title" },
   add_type_block_tool: { block: "write_on", text: "Title" },
   match_cut_montage_tool: { file_ids: [IDS.interview] },
+  track_point_tool: { clip_id: IDS.clipA },
+  pin_to_track_tool: { footage_clip_id: IDS.clipA },
+  add_guide_overlay_tool: { kind: "ring", clip_id: IDS.clipA },
+  hold_point_reframe_tool: { clip_id: IDS.clipA },
+  screen_zoom_follow_tool: { clip_id: IDS.clipA },
   search_pexels_videos_tool: { query: "coffee" },
   gather_stock_footage_tool: { queries: ["coffee"] },
   search_freesound_music_tool: { query: "lofi" },
@@ -56,6 +61,10 @@ const REQUIRED_ARGS: Record<string, Record<string, unknown>> = {
   apply_fx_tool: { clip_id: IDS.clipB, effects: [{ effect: "bloom" }] },
   update_fx_tool: { clip_id: IDS.clipB, amount: 0.8 },
   review_render_tool: { path: "/out/reel.mp4" },
+  watch_render_tool: { path: "/out/reel.mp4" },
+  fork_project_tool: { name: "v1" },
+  compare_renders_tool: { a: "/out/a.mp4", b: "/out/b.mp4" },
+  pick_best_variant_tool: { variants: [{ project: "/p/a.zvn", render: "/out/a.mp4" }, { project: "/p/b.zvn", render: "/out/b.mp4" }] },
 };
 
 async function expectNotAvailable(name: string, args: Record<string, unknown>, host: FakeHostOptions): Promise<void> {

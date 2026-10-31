@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { measureLoudness } from "../mastering/loudness.js";
-import { ROOM_TONE_LUFS, designSound, type DesignInput } from "./design.js";
+import { ROOM_TONE_LUFS, designSound, soloRecipe, type DesignInput } from "./design.js";
 import { PALETTES } from "./palettes.js";
 import { sfxRecipe } from "./recipes.js";
 import { renderSfx } from "./render.js";
@@ -13,6 +13,22 @@ function pt(t: number, kind: HitKind, role: HitRole, extra: Partial<HitPoint> = 
 function input(points: HitPoint[], over: Partial<DesignInput> = {}): DesignInput {
   return { points, palette: PALETTES.hype, intensity: "normal", duration: 12, climax: null, music: true, seed: 1, ...over };
 }
+
+describe("soloRecipe", () => {
+  it("covers a motion block's event with its own sound, not an impact (master_audio_tool iterate)", () => {
+    // Regression (sk2-product-brand): iterate's coverage fix put punches on every block click, swap and toggle.
+    expect(soloRecipe(pt(1, "block", "ui", { event: "click" }))).toBe("mouse_click");
+    expect(soloRecipe(pt(1, "block", "ui", { event: "swap" }))).toBe("keyboard_key");
+    expect(soloRecipe(pt(1, "block", "ui", { event: "type" }))).toBe("typing_burst");
+    expect(soloRecipe(pt(1, "block", "ui", { event: "tick" }))).toBe("ui_tap");
+    expect(soloRecipe(pt(1, "block", "micro", { event: "glint" }))).toBe("sparkle");
+    expect(soloRecipe(pt(1, "block", "move", { event: "whoosh" }))).toBe("whoosh_short");
+    expect(soloRecipe(pt(1, "scene3d", "impact", { event: "land" }))).toBe("impact_thud");
+    expect(soloRecipe(pt(1, "title", "transition"))).toBe("pop");
+    expect(soloRecipe(pt(1, "transition", "transition"))).toBe("whoosh_short");
+    expect(soloRecipe(pt(1, "cut", "hero"))).toBe("impact_punch");
+  });
+});
 
 describe("designSound", () => {
   it("layers a hero: transient, body, sub with its phone harmonic, and a tail in the edit's space, attacks on one sample", () => {

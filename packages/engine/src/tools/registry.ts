@@ -33,6 +33,7 @@ import { exportTools } from "./catalog/export.js";
 import { generationTools } from "./catalog/generation.js";
 import { inspectTools } from "./catalog/inspect.js";
 import { matchCutTools } from "./catalog/match-cut.js";
+import { trackingTools } from "./catalog/tracking.js";
 import { lookMaskTools } from "./catalog/looks-masks.js";
 import { matteTools } from "./catalog/mattes.js";
 import { mediaTools } from "./catalog/media.js";
@@ -47,6 +48,8 @@ import { kineticCaptionTools } from "./catalog/kinetic-captions.js";
 import { kineticTitleTools } from "./catalog/kinetic-titles.js";
 import { typeBlockTools } from "./catalog/type-blocks.js";
 import { motionTransitionTools } from "./catalog/motion-transitions.js";
+import { plateWipeTools } from "./catalog/plate-wipe.js";
+import { transitionMaskTools } from "./catalog/transition-masks.js";
 import { scenes3dTools } from "./catalog/scenes3d.js";
 import { fxTools } from "./catalog/fx.js";
 import { overlayTools } from "./catalog/overlays.js";
@@ -61,13 +64,22 @@ import { reelTools } from "./catalog/reels.js";
 import { colorUnifyTools } from "./catalog/color-unify.js";
 import { reviewTools } from "./catalog/review.js";
 import { reviewRenderTools } from "./catalog/review-render.js";
+import { watchRenderTools } from "./catalog/watch-render.js";
+import { variantTools } from "./catalog/variants.js";
 import { swapShotTools } from "./catalog/swap-shot.js";
 import { searchTools } from "./catalog/search.js";
 import { soundDesignTools } from "./catalog/sound-design.js";
 import { speedRampTools } from "./catalog/speed-ramp.js";
+import { onsetSnapTools } from "./catalog/onset-snap.js";
+import { shotRampTools } from "./catalog/shot-ramp.js";
+import { musicStructureTools } from "./catalog/music-structure.js";
+import { actionFoleyTools } from "./catalog/action-foley.js";
 import { soundKitTools } from "./catalog/sound-kit.js";
 import { soundLibraryTools } from "./catalog/sound-library.js";
 import { speechTools } from "./catalog/speech-tools.js";
+import { alignLyricsTools } from "./catalog/align-lyrics.js";
+import { placeOnWordTools } from "./catalog/place-on-word.js";
+import { brollOnWordsTools } from "./catalog/broll-on-words.js";
 import { stockTools } from "./catalog/stock.js";
 import { stockGatherTools } from "./catalog/stock-gather.js";
 import { timelineTools } from "./catalog/timeline.js";
@@ -78,10 +90,11 @@ import { titleTemplateTools } from "./catalog/title-templates.js";
 import { titleTools } from "./catalog/titles.js";
 import { transitionTools } from "./catalog/transitions.js";
 import { webVideoTools } from "./catalog/web-video.js";
+import { toolAvailability, type AvailabilitySurface } from "./availability.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
 import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
 import { failed, refused, type ToolReceipt } from "./receipt.js";
-import { CONTRACT_TOOL_NAMES } from "./schemas.gen.js";
+import { CONTRACT_TOOL_NAMES, type ContractToolName } from "./schemas.gen.js";
 import type { ToolContext, ToolHost, ToolResult, ToolSurface } from "./types.js";
 
 /** The refusal for a tool this surface does not have (zenvi-backend #40: "Error: … not available"). */
@@ -130,7 +143,7 @@ function buildCatalog(): readonly CatalogTool[] {
     ...projectPrefsTools,
   ];
   const byName = new Map<string, CatalogTool>();
-  for (const tool of [...implemented, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools]) {
+  for (const tool of [...implemented, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...trackingTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...variantTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...alignLyricsTools, ...placeOnWordTools, ...brollOnWordsTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...plateWipeTools, ...transitionMaskTools, ...speedRampTools, ...onsetSnapTools, ...shotRampTools, ...musicStructureTools, ...actionFoleyTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools]) {
     if (byName.has(tool.name)) throw new Error(`tool catalog: ${tool.name} is defined twice`);
     byName.set(tool.name, tool);
   }
@@ -154,7 +167,7 @@ function buildCatalog(): readonly CatalogTool[] {
     }
   }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
-  return [...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...speedRampTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools];
+  return [...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...matchCutTools, ...trackingTools, ...colorUnifyTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...variantTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...alignLyricsTools, ...placeOnWordTools, ...brollOnWordsTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...plateWipeTools, ...transitionMaskTools, ...speedRampTools, ...onsetSnapTools, ...shotRampTools, ...musicStructureTools, ...actionFoleyTools, ...motionBlockTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...matteTools, ...lookMaskTools];
 }
 
 /** Every tool: the ported desktop (contract) tools in the desktop's order, then the direct tools. */
@@ -164,6 +177,22 @@ const TOOLS_BY_NAME: ReadonlyMap<string, CatalogTool> = new Map(allTools.map((to
 
 export function getTool(name: string): CatalogTool | undefined {
   return TOOLS_BY_NAME.get(name);
+}
+
+/**
+ * The Assistant's editor tools (the backend's names, zenvi-core's contract)
+ * a web surface cannot run: not ported, not exposed there, desktop-only
+ * (ComfyUI, recording) or needing what its host lacks. The web editor sends
+ * these with every chat turn, so the backend leaves them out of the agent's
+ * tools instead of letting it call them for a refusal.
+ */
+export function unavailableAssistantTools(surface: Exclude<AvailabilitySurface, "desktop">, host?: ToolHost): ContractToolName[] {
+  return CONTRACT_TOOL_NAMES.filter((name) => {
+    const tool = getTool(name);
+    if (!tool?.contract) return true;
+    if (toolAvailability(tool)[surface] === "no") return true;
+    return host !== undefined && missingCapabilities(tool.requires, host).length > 0;
+  });
 }
 
 export interface ListToolsOptions {

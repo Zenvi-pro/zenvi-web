@@ -9,7 +9,9 @@ import { missingCapabilities } from "../engine/registry.js";
 import { hostOfTool } from "../hosts/adobe-tools.js";
 import { CliError } from "../output.js";
 import { hostOptions, runToolCommand, type CommandContext } from "./context.js";
+import { parseTime } from "./edit.js";
 import { runHostToolCommand } from "./hosts.js";
+import { defaultFramePath, writeTimelineFrame } from "./render.js";
 
 /** `--args '{…}'` merged with `key=value` pairs (values that look like JSON are parsed). */
 export function parseCallArgs(json: string | undefined, pairs: string[]): Record<string, unknown> {
@@ -93,6 +95,7 @@ export function registerToolCommands(program: Command, ctx: CommandContext): voi
       const args = parseCallArgs(opts.args, pairs);
       // ae_* / premiere_* run in After Effects / Premiere Pro through Zenvi Link.
       if (hostOfTool(tool)) await runHostToolCommand(ctx, tool, args);
+      else if (PREVIEW_FRAME_NAMES.has(tool)) await previewFrameCommand(ctx, args, opts.images);
       else {
         const outcome = await runToolCommand(ctx, tool, args);
         if (opts.images) {
@@ -105,4 +108,24 @@ export function registerToolCommands(program: Command, ctx: CommandContext): voi
         }
       }
     });
+}
+
+/** The MCP server's preview_frame (mcp/extra-tools.ts), and the name agents give it by the catalog's habit. */
+const PREVIEW_FRAME_NAMES: ReadonlySet<string> = new Set(["preview_frame", "preview_frame_tool"]);
+
+/** `zenvi call preview_frame seconds=2`: the MCP tool's arguments, the frame written to a file (into --images when given) like `zenvi frame`. */
+async function previewFrameCommand(ctx: CommandContext, args: Record<string, unknown>, imagesDir: string | undefined): Promise<void> {
+  let seconds: number | undefined;
+  try {
+    seconds = parseTime(String(args.seconds ?? args.time_seconds ?? ""));
+  } catch {
+    seconds = undefined;
+  }
+  if (seconds === undefined || !Number.isFinite(seconds) || seconds < 0) throw new CliError("preview_frame needs seconds=<timeline time ≥ 0>.", 2);
+  if (args.format !== undefined && args.format !== "jpeg" && args.format !== "png") throw new CliError(`preview_frame format is jpeg or png, not '${String(args.format)}'.`, 2);
+  const format = args.format === "png" ? "png" : "jpeg";
+  if (imagesDir) await mkdir(path.resolve(ctx.cwd, imagesDir), { recursive: true });
+  const output = imagesDir ? path.join(imagesDir, defaultFramePath(seconds, format)) : undefined;
+  const width = Math.max(64, Math.min(1920, Number(args.width) || 768));
+  await writeTimelineFrame(ctx, seconds, output, { width, format, grid: args.grid === true || args.grid === "true" });
 }

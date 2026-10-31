@@ -1,15 +1,16 @@
 /**
  * Looks made of an effect and a generated mask image: add_vignette_tool
  * (a Brightness effect masked by a radial falloff, looks/masks.ts) and
- * add_shape_mask_tool (a Mask effect reading a feathered rectangle or
- * ellipse drawn as a distance field, so its feather and size keyframe).
+ * add_shape_mask_tool (a Mask effect reading a feathered rectangle, ellipse
+ * or convex polygon drawn as a distance field, so its feather and size
+ * keyframe).
  * Native libopenshot effects and an SVG in the project: the desktop renders
  * the same. One effect of each per clip: running a tool again updates it.
  */
 
 import { z } from "zod";
 import { defaultEffectJson } from "../../effects/registry.js";
-import { SHAPE_FEATHER_RANGE, shapeMaskSettings, shapeMaskSvg, vignetteSvg, type MaskShape } from "../../looks/masks.js";
+import { SHAPE_FEATHER_RANGE, polygonProblem, shapeMaskSettings, shapeMaskSvg, vignetteSvg, type MaskShape } from "../../looks/masks.js";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import { idFactory } from "../../model/ids.js";
 import type { Clip, Effect, Keyframe, Project } from "../../model/types.js";
@@ -98,7 +99,13 @@ const keyframeInput = z.strictObject({
 
 const shapeInput = z.strictObject({
   clip_ids: clipIds,
-  shape: z.enum(["rectangle", "ellipse"]).optional().describe("rectangle (default) or ellipse."),
+  shape: z.enum(["rectangle", "ellipse", "polygon"]).optional().describe("rectangle (default), ellipse, or polygon (give points)."),
+  points: z
+    .array(z.strictObject({ x: z.number().min(-0.5).max(1.5), y: z.number().min(-0.5).max(1.5) }))
+    .min(3)
+    .max(16)
+    .optional()
+    .describe("polygon: 3-16 corners in order, 0-1 of the frame (x from the left, y from the top), convex: a wedge, trapezoid, parallelogram window, light frustum. x, y, width and height do not apply."),
   x: z.number().min(-0.5).max(1.5).optional().describe("Centre, 0-1 of the frame width (default 0.5)."),
   y: z.number().min(-0.5).max(1.5).optional().describe("Centre, 0-1 of the frame height (default 0.5)."),
   width: z.number().min(0.005).max(2).optional().describe("Width, 0-1 of the frame (default 0.6)."),
@@ -137,6 +144,18 @@ export function maskKeyTimes(project: Project, clip: Clip, seconds: readonly num
   if (seconds.every((t) => inside(t, 0, duration))) return { seconds: seconds.map((t) => Math.min(start + t, end)), relative: true };
   const off = seconds.find((t) => !inside(t, start, end))!;
   toolError(`keyframe time ${round(off)}s is outside clip ${clip.id} (it plays ${round(start)}-${round(end)}s on the timeline, ${round(duration)}s long); give timeline seconds inside it`);
+}
+
+/** A polygon's points are checked before its image is written; the other shapes take no points. */
+function polygonArgs(project: Project, shape: MaskShape, input: ShapeInput): void {
+  if (shape !== "polygon") {
+    if (input.points) toolError(`points only apply to shape=polygon (got shape=${shape})`);
+    return;
+  }
+  if (!input.points) toolError("shape=polygon needs points: its corners in order, 0-1 of the frame");
+  const [w, h] = projectSize(project);
+  const problem = polygonProblem(input.points.map((p) => [p.x * w, p.y * h]));
+  if (problem) toolError(`${problem}; give the corners of a convex shape in order round it`);
 }
 
 function shapeEffect(project: Project, clip: Clip, id: string, input: ShapeInput, reader: Record<string, unknown>, hash: string): Effect {
@@ -198,7 +217,7 @@ export const lookMaskTools: CatalogTool[] = [
     name: "add_shape_mask_tool",
     title: "Shape mask",
     description:
-      "Mask clips to a feathered rectangle or ellipse (the inside shows, or the outside with outside=true): a radial mask isolating a centred object on black, a frame within the frame, a soft spotlight, a split-screen strip, a window for the clip below. " +
+      "Mask clips to a feathered rectangle, ellipse or convex polygon (the inside shows, or the outside with outside=true): a radial mask isolating a centred object on black, a frame within the frame, a soft spotlight, a split-screen strip, an angled wedge or trapezoid matte on black, a parallelogram window, a window for the clip below. " +
       "keyframes animate the edge (grow it from nothing for an iris or box reveal, soften it); the feather and size keyframe on the Mask effect, no new image. Running it again replaces the clip's shape mask; remove=true takes it off. One undo step.",
     input: shapeInput,
     annotations: EDIT,
@@ -206,14 +225,15 @@ export const lookMaskTools: CatalogTool[] = [
       guarded("add_shape_mask_tool", async () => {
         const project = call.doc.project;
         const clips = targets(project, input.clip_ids);
-        const shape: MaskShape = input.shape ?? "rectangle";
+        const shape: MaskShape = input.shape ?? (input.points ? "polygon" : "rectangle");
+        if (!input.remove) polygonArgs(project, shape, input);
         // Checked before the mask image is written: a refused time stores nothing.
         const relative = input.keyframes?.length && !input.remove ? clips.filter((c) => maskKeyTimes(project, c, input.keyframes!.map((k) => k.seconds)).relative).map((c) => c.id) : [];
         let make: ((clip: Clip, id: string) => Effect) | null = null;
         if (!input.remove) {
           if (!call.host.media?.writeGenerated) toolError("this Zenvi surface cannot store the mask image");
           const [w, h] = projectSize(project);
-          const asset = await generatedSvg(call, `mask-${shape}`, shapeMaskSvg(w, h, { shape, x: input.x ?? 0.5, y: input.y ?? 0.5, width: input.width ?? 0.6, height: input.height ?? 0.6 }));
+          const asset = await generatedSvg(call, `mask-${shape}`, shapeMaskSvg(w, h, { shape, x: input.x ?? 0.5, y: input.y ?? 0.5, width: input.width ?? 0.6, height: input.height ?? 0.6, ...(input.points ? { points: input.points } : {}) }));
           const reader = maskReaderOf(asset);
           make = (clip, id) => shapeEffect(project, clip, id, input, reader, asset.hash);
         }
@@ -223,7 +243,7 @@ export const lookMaskTools: CatalogTool[] = [
         if (changed.length === 0) return unchanged("add_shape_mask_tool", input.remove ? "No clip has a shape mask to remove." : "Every clip already has this mask.", { data });
         return applied(
           "add_shape_mask_tool",
-          input.remove ? `Removed the shape mask from ${changed.length} clip(s).` : `Masked ${changed.length} clip(s) to ${shape === "ellipse" ? "an ellipse" : "a rectangle"}${input.outside ? " (outside kept)" : ""}${input.keyframes?.length ? `, ${input.keyframes.length} keyframes` : ""}${relative.length ? ` (keyframe times read from the start of clip${relative.length === 1 ? "" : "s"} ${relative.join(", ")}: they fell before ${relative.length === 1 ? "it starts" : "they start"} on the timeline)` : ""}.`,
+          input.remove ? `Removed the shape mask from ${changed.length} clip(s).` : `Masked ${changed.length} clip(s) to ${shape === "ellipse" ? "an ellipse" : shape === "polygon" ? `a ${input.points!.length}-sided polygon` : "a rectangle"}${input.outside ? " (outside kept)" : ""}${input.keyframes?.length ? `, ${input.keyframes.length} keyframes` : ""}${relative.length ? ` (keyframe times read from the start of clip${relative.length === 1 ? "" : "s"} ${relative.join(", ")}: they fell before ${relative.length === 1 ? "it starts" : "they start"} on the timeline)` : ""}.`,
           { data },
         );
       }),

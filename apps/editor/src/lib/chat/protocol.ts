@@ -30,6 +30,12 @@ export interface UserMessageData {
   images?: ChatImage[];
   /** Which editor is talking (the backend ignores unknown fields today). */
   client?: "web";
+  /**
+   * Editor tools this editor cannot run (engine `unavailableAssistantTools`):
+   * desktop-only ones such as ComfyUI, unported ones, and ones the browser
+   * lacks. The backend leaves them out of the agent's tools.
+   */
+  unavailable_tools?: string[];
 }
 
 const CONTEXT_BLOCK_RE = /\[(?:Editor snapshot|Selected timeline clip context)\][\s\S]*?\[\/(?:Editor snapshot|Selected timeline clip context)\]\s*/g;

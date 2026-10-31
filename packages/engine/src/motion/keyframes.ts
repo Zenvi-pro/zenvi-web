@@ -23,6 +23,7 @@
 
 import { makeKeyframePoint } from "../keyframe/edit.js";
 import { defaultEffectJson } from "../effects/registry.js";
+import { shapeMaskSettings, shapeMaskSvg } from "../looks/masks.js";
 import { Gravity, Interpolation, ScaleMode, type Effect, type Keyframe, type KeyframePoint } from "../model/types.js";
 import { KEYFRAME_BEZIER_PRESETS } from "../ops/keyframes.js";
 import type { Ease, Element, Key, MediaSource, MotionFrame, MotionLayer, MotionPlan, Pose, SvgSource } from "./types.js";
@@ -174,6 +175,40 @@ function cropEffect(crop: NonNullable<MediaSource["crop"]>): Omit<Effect, "id"> 
   return { ...json, left: constant(crop.left), top: constant(crop.top), right: constant(crop.right), bottom: constant(crop.bottom), resize: true } as Omit<Effect, "id">;
 }
 
+/** Short side of a window's mask image, px: its field and feather are shares of it, so any size draws the same. */
+const MASK_SHORT = 1080;
+/** A window's field runs 6 % of the picture's short side each way: a split's edge as crisp as 3 px at 1080. */
+const WINDOW_RANGE = 0.06;
+
+/**
+ * A window's mask: the polygon's distance field at the picture's aspect (the
+ * Mask effect stretches it over the source frame) and a Mask effect keeping
+ * the inside, its brightness and contrast keyed at the clip's source frames.
+ */
+function windowMask(el: Element, source: MediaSource, frame: MotionFrame, inFrames: number): NonNullable<MotionLayer["mask"]> {
+  const win = source.window!;
+  const aspect = croppedAspect(source);
+  const w = Math.round(aspect >= 1 ? MASK_SHORT * aspect : MASK_SHORT);
+  const h = Math.round(aspect >= 1 ? MASK_SHORT : MASK_SHORT / aspect);
+  const svg = shapeMaskSvg(w, h, { shape: "polygon", x: 0.5, y: 0.5, width: 1, height: 1, points: win.points, range: WINDOW_RANGE });
+  const keys = [...win.keys].sort((a, b) => a.frame - b.frame);
+  if (keys.length === 0) throw new Error(`element ${el.name}: a window needs at least one key`);
+  const frames = keys.map((k) => k.frame - el.from + 1 + inFrames);
+  const settings = keys.map((k) => shapeMaskSettings(win.feather, k.grow, WINDOW_RANGE));
+  const eases = keys.map((k) => k.ease);
+  const { id: _id, ...json } = defaultEffectJson("Mask", "TEMPLATE00");
+  return {
+    svg,
+    effect: {
+      ...json,
+      // Mask hides white; the field is white inside, so invert keeps the inside.
+      mask_invert: true,
+      brightness: keyframeThrough(frames, settings.map((v) => v.brightness), eases),
+      contrast: keyframeThrough(frames, settings.map((v) => v.contrast), eases),
+    } as Omit<Effect, "id">,
+  };
+}
+
 function mediaLayer(el: Element, source: MediaSource, keys: Key[], frame: MotionFrame): MotionLayer {
   if (keys.some((k) => (k.pose.sy ?? 1) !== 1)) throw new Error(`element ${el.name}: only drawings can be squashed (sy)`);
   // libopenshot evaluates a clip's keyframes at its source frame: round(start × fps) + 1 on its first frame
@@ -221,6 +256,11 @@ function mediaLayer(el: Element, source: MediaSource, keys: Key[], frame: Motion
       props.corner_radius = { Points: [makeKeyframePoint(1, round6(fraction))] };
     }
   }
+  if (source.sound && source.soundTo !== undefined && source.soundTo < el.to) {
+    // A short fade so the hand-over to the next clip's sound does not click.
+    const out = source.soundTo - el.from + 1 + inFrames;
+    props.volume = keyframeThrough([Math.max(1 + inFrames, out - 3), out], [1, 0], ["smooth", "linear"]);
+  }
   const seconds = (el.to - el.from) / frame.fps;
   const effects = [...(source.crop ? [cropEffect(source.crop)] : []), ...(el.effects ?? [])];
   return {
@@ -238,6 +278,7 @@ function mediaLayer(el: Element, source: MediaSource, keys: Key[], frame: Motion
     },
     props,
     effects,
+    ...(source.window ? { mask: windowMask(el, source, frame, inFrames) } : {}),
     cue: el.cue ?? el.from,
     bleed: el.bleed ?? false,
   };
