@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ProjectDocument } from "../history/document.js";
 import { createProject } from "../model/defaults.js";
-import { ensureBrief } from "./auto.js";
+import { ensureBrief, matchStyle } from "./auto.js";
 import { readBrief } from "./brief.js";
 import { STYLE_FILES } from "../styles/library.gen.js";
 import { CINETIC_TECHNIQUES } from "./cinetic-library.js";
@@ -76,6 +76,14 @@ describe("house styles", () => {
     expect(v.format).toBe("vertical");
     expect(v.energy).toBe("calm");
     expect(houseDraw({ style: "cinetic-launch-film", aspect: "16:9", seconds: 20, text: "make it punchy" })!.energy).toBe("high");
+  });
+
+  it("are what a request naming cinetic routes to, by its format's word", () => {
+    expect(matchStyle("a 25-second launch teaser in the cinetic style")).toBe("cinetic-launch-film");
+    expect(matchStyle("a 6-second logo sting, cinetic")).toBe("cinetic-logo-sting");
+    expect(matchStyle("a looping feature animation, cinetic style")).toBe("cinetic-feature-loop");
+    expect(matchStyle("a 12-second vertical product video, cinetic")).toBe("cinetic-launch-film");
+    expect(matchStyle("a movie teaser")).toBe("movie-game-trailer");
   });
 
   it("hold a brief to the cinetic bans only without a brand of the person's", () => {

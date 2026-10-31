@@ -30,6 +30,11 @@ export const AUTO_DEFAULT_STYLE = "hype-reel";
  * beyond their own summaries.
  */
 const STYLE_WORDS: Readonly<Record<string, readonly string[]>> = {
+  // "cinetic" names the house (first, so it wins its ties); the format's own word picks which of its styles.
+  "cinetic-launch-film": ["cinetic"],
+  "cinetic-logo-sting": ["cinetic", "sting", "logo-sting"],
+  "cinetic-ui-walkthrough": ["cinetic", "walkthrough", "walk-through", "onboarding"],
+  "cinetic-feature-loop": ["cinetic", "loop", "looping"],
   "hype-reel": ["hype", "sport", "sports", "car", "cars", "event", "energy", "fast", "song", "beat", "highlights", "gaming"],
   "movie-game-trailer": ["trailer", "teaser", "braam", "braams"],
   "product-launch-film": ["launch", "launching", "promo", "commercial", "ad", "ads"],
@@ -44,10 +49,6 @@ const STYLE_WORDS: Readonly<Record<string, readonly string[]>> = {
   "grid-montage": ["grid", "split", "tiles", "panels", "collage"],
   tutorial: ["tutorial", "how-to", "howto", "tips", "steps", "recipe", "breakdown"],
   "showreel-intro": ["showreel", "intro", "portfolio", "studio", "about"],
-  "cinetic-launch-film": ["cinetic"],
-  "cinetic-logo-sting": ["sting", "logo-sting"],
-  "cinetic-ui-walkthrough": ["walkthrough", "walk-through", "onboarding"],
-  "cinetic-feature-loop": ["loop", "looping"],
 };
 
 const STOP = new Set(["the", "and", "for", "with", "a", "an", "of", "to", "in", "on", "it", "is", "my", "your", "this", "that", "from", "one", "use", "when", "into"]);
