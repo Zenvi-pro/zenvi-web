@@ -194,7 +194,8 @@ export const brollSetTools: CatalogTool[] = [
       const setKey = cacheKey("set", line, refKey);
       const plans: ShotPlan[] = shots.map((shot) => {
         const prompt = `${shot.replace(/[.\s]+$/, "")}. ${line}`;
-        const stillKey = cacheKey("still", prompt, width, height, refKey);
+        // A provider asked for by name makes other stills than the default: its own cache entry.
+        const stillKey = cacheKey("still", prompt, width, height, refKey, ...(args.provider && args.provider !== "auto" ? [args.provider] : []));
         const videoKey = cacheKey("video", stillKey, duration);
         return { shot, prompt, stillKey, videoKey, still: cached(project.files, stillKey), video: animate ? cached(project.files, videoKey) : undefined };
       });
