@@ -259,3 +259,35 @@ describe("add_guide_overlay_tool", { timeout: TRACKING_TIMEOUT_MS }, () => {
     expect(Math.hypot(centre.x - s.x, centre.y - s.y)).toBeLessThan(0.015);
   });
 });
+
+describe("tracking argument errors", { timeout: TRACKING_TIMEOUT_MS }, () => {
+  it("refuse (not fail) a bad region or a time outside the clip, with no undo step", async () => {
+    const calls: [string, Record<string, unknown>][] = [
+      ["track_point_tool", { clip_id: "CSUB", box: startBox(), time: 9 }],
+      ["pin_to_track_tool", { footage_clip_id: "CSUB", point: subjectAt(0), time: 9, label: "SENSOR" }],
+      ["pin_to_track_tool", { footage_clip_id: "CSUB", label: "SENSOR" }],
+      ["add_guide_overlay_tool", { kind: "ring", clip_id: "CSUB", box: startBox(), time: 9, follow: "position" }],
+      ["hold_point_reframe_tool", { clip_id: "CSUB", box: startBox(), time: 9 }],
+      ["hold_point_reframe_tool", { clip_id: "CSUB", point: subjectAt(0), box: startBox() }],
+      ["auto_reframe_tool", { subjects: [{ clip_id: "CSUB", box: startBox(), time: 9 }] }],
+      ["auto_reframe_tool", { subjects: [{ clip_id: "CSUB", box: startBox(), time: 9 }], follow: false }],
+    ];
+    for (const [tool, args] of calls) {
+      const { doc, host } = setup();
+      const result = await runTool({ doc, host }, tool, args);
+      expect(result.data?.status, `${tool} ${result.text}`).toBe("refused");
+      expect(result.data?.summary).toMatch(/^Error: .*(outside clip CSUB's source window|exactly one of point, box or quad)/);
+      expect(doc.undoLabels).toHaveLength(0);
+    }
+  });
+
+  it("still fails when the footage cannot be read", async () => {
+    const { doc, host } = setup();
+    host.frames = pixelFrameHost(() => {
+      throw new Error("decoder gone");
+    });
+    const result = await runTool({ doc, host }, "track_point_tool", { clip_id: "CSUB", box: startBox() });
+    expect(result.data?.status).toBe("error");
+    expect(result.text).toMatch(/could not read the frames of FSUB to track: decoder gone/);
+  });
+});
