@@ -186647,7 +186647,7 @@ var QUOTED, STOP2, PLATFORMS;
 var init_request = __esm({
   "packages/engine/src/director/request.ts"() {
     "use strict";
-    QUOTED = /['"‘“]([^'"’”\n]{2,90})['"’”]/g;
+    QUOTED = /(?<![\p{L}\p{N}])['"‘“]([^'"’”\n]{2,90})['"’”](?![\p{L}\p{N}])/gu;
     STOP2 = new Set(
       "a an the of for to and or with in on at by from about into over under is are be it its this that these those make made create video edit reel promo clip film second seconds sec s long short vertical landscape square deliver mp4 please some one two three four five my our your their me us like style fps called named titled".split(" ")
     );
@@ -186710,8 +186710,11 @@ function missingIngredient(builder, input35) {
       return (input35.features ?? 0) > 0 ? null : "no features (pass features: one per bar)";
     case "match_cut_montage_tool":
       return input35.bin.pictures >= 3 ? null : `${input35.bin.pictures} picture file(s): a match-cut chain needs at least 3`;
+    case "build_trailer_tool":
+      if (!input35.product) return "no film or game title (pass title, or name it in quotes in the request)";
+      return input35.bin.pictures > 0 ? null : "no footage for the trailer";
     default:
-      return input35.bin.pictures > 0 || builder.tool !== "build_trailer_tool" ? null : "no footage for the trailer";
+      return null;
   }
 }
 function fallbackFor(rule) {
