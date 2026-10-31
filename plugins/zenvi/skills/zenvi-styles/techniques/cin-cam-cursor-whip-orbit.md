@@ -25,11 +25,11 @@ Use when: Moving between two distant panels of one product in a single-take or w
 
 ## Build it in Zenvi
 
-1. The cursor leads: `add_motion_block_tool {"block": "cursor_path", "position_seconds": <a-0.08>, "duration_seconds": 1.4, "placement": "over_video", "params": {"points": [[0.25,0.5],[0.75,0.45]], "clicks": true, "zoom": 1.0}}`; it starts 5 f (0.08 s) before the camera and leads by 4-6 f.
+1. The cursor leads: `add_motion_block_tool {"block": "cursor_path", "position_seconds": <a-0.08>, "duration_seconds": 1.4, "placement": "over_video", "params": {"points": [{"x": 0.25, "y": 0.5},{"x": 0.75, "y": 0.45}], "clicks": true, "zoom": 1.0}}`; it starts 5 f (0.08 s) before the camera and leads by 4-6 f.
 2. The whip over 74 f (1.23 s): `set_keyframes_tool {"timeline_clip_id": "<screen>", "property": "location_x", "mode": "replace", "points": [{"seconds": <a>, "value": 0}, {"seconds": <a+1.23>, "value": -0.4, "ease": "ease_in_out_expo"}]}` with `scale_x/scale_y` 1.0 to 0.77, `rotation` 0 to -10 (degrees) and `shear_x` 0 to -0.1 for the yaw, same ease.
 3. Smear the peak (~47 px/f): `apply_fx_tool {"clip_id": "<screen>", "effects": [{"effect": "directional_blur", "amount": 0.6, "params": {"angle": 0}, "start": <a+0.3>, "end": <a+0.8>}]}`; or `apply_motion_transition_tool {"preset": "whip", "direction": "right", "duration": 0.4}` between two crops.
 4. Add a 24-40 px darker side face to the panel (a thin dark strip clip along its right edge) so the yaw reveals thickness.
-5. True 3D version: `add_3d_scene_tool {"scene": "device_mockup", "params": {"motion": "orbit"}}`.
+5. True 3D version: `add_3d_scene_tool {"scene": "device_mockup", "params": {"move": "orbit"}}`.
 
 Fallback: A true yaw with a visible side edge needs the 3D plane; on flat footage the whip, a few degrees of roll and a faint shear sell most of it. Use the device_mockup scene when the thickness matters.
 

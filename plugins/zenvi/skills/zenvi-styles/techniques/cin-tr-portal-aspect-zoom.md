@@ -31,7 +31,7 @@ Use when: The film's energy peak and act break, going inside the product, when t
 4. Tile border leaves the frame near f30 (0.5 s); keep text out until the window fills, then rise scene two's labels on a 4-6 f (0.07-0.10 s) stagger from f30.
 5. Optional lead-in: the words on either side speed inward under the tile over 22 f (0.37 s, ease-in), the tile turns like a cube to a blank accent face (12 f), hold 6 f, then open. `add_sfx_tool {"recipe": "whoosh_rise", "at_seconds": <T>, "gain_db": -10}` and `{"recipe": "impact_slam", "at_seconds": <T+0.65>, "gain_db": -8}`.
 
-Fallback: No true 3D cube turn for the lead-in; use `add_3d_scene_tool {"scene": "cube_cut"}` for a rotating cube, or skip the turn and open the window from the settled tile.
+Fallback: No true 3D cube turn for the lead-in; use `add_3d_scene_tool {"scene": "cube_cut", "params": {"from_clip_id": "<outgoing clip>", "to_clip_id": "<incoming clip>"}}` for a rotating cube, or skip the turn and open the window from the settled tile.
 
 ## Timing & taste rules
 

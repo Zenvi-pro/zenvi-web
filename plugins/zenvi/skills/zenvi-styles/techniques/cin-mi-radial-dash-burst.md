@@ -34,7 +34,7 @@ Use when: A single hero word on a beat needs a physical punch.
 **Full look** (relies on particles, confetti: only when the person's brand supplies that look):
 
 1. The hero word: `add_kinetic_title_tool {"text": "<WORD>", "animation": "pop", "position_seconds": 0.0, "duration_seconds": 1.6}` on the beat.
-2. Full look, the random dash burst: `add_motion_block_tool {"block": "particle_burst", "params": {"shape": "lines", "count": 22, "origin": [[0.5, 0.5]], "gravity": 0, "rings": false}, "position_seconds": 0.0, "duration_seconds": 1.6, "motion_blur": 6}` starting on the beat the word lands: dashes 4x20 px (about 2 % of height long), radius 187 px (0.17 of height) growing 87 px over 16 f (0.27 s), drifting 0.5 px/f for about 50 f (0.83 s), then 176 px further over the last 20 f (0.33 s) as the camera pushes into the cut.
+2. Full look, the random dash burst: `add_motion_block_tool {"block": "particle_burst", "params": {"shape": "lines", "count": 22, "origin": [{"x": 0.5, "y": 0.5}], "gravity": 0, "rings": false}, "position_seconds": 0.0, "duration_seconds": 1.6, "motion_blur": 6}` starting on the beat the word lands: dashes 4x20 px (about 2 % of height long), radius 187 px (0.17 of height) growing 87 px over 16 f (0.27 s), drifting 0.5 px/f for about 50 f (0.83 s), then 176 px further over the last 20 f (0.33 s) as the camera pushes into the cut.
 3. Camera push into the cut: `set_keyframes_tool {"timeline_clip_id": "<word_and_burst>", "property": "scale_x", "points": [{"seconds": 1.27, "value": 1.0}, {"seconds": 1.6, "value": 1.2, "ease": "ease_in_cubic"}]}` (same for scale_y).
 4. `add_sfx_tool {"recipe": "impact_punch", "at_seconds": 0.0, "gain_db": -8}`.
 

@@ -25,7 +25,7 @@ Use when: UI walkthroughs and feature films where a single action is the product
 
 ## Build it in Zenvi
 
-1. Cursor and button on a bare paper stage: `add_motion_block_tool {"block": "cursor_path", "position_seconds": 0, "duration_seconds": 0.75, "placement": "full_frame", "params": {"points": [[0.2,0.25],[0.5,0.56]], "labels": ["Generate"], "clicks": true, "cursor_size": 1.6, "palette": "paper"}}`. The cursor is already mid-path at f0 (clock starts 6 f / 0.1 s early); arrive f18 (0.3 s), press f22 (0.37 s).
+1. Cursor and button on a bare paper stage: `add_motion_block_tool {"block": "cursor_path", "position_seconds": 0, "duration_seconds": 0.75, "placement": "full_frame", "params": {"points": [{"x": 0.2, "y": 0.25},{"x": 0.5, "y": 0.56}], "labels": ["Generate"], "clicks": true, "cursor_size": 1.6, "palette": "porcelain"}}`. The cursor is already mid-path at f0 (clock starts 6 f / 0.1 s early); arrive f18 (0.3 s), press f22 (0.37 s).
 2. Button dip: if the button is a separate title or shape, `set_keyframes_tool {"timeline_clip_id": "<button>", "property": "scale_x", "mode": "replace", "points": [{"seconds": 0.33, "value": 1.0}, {"seconds": 0.37, "value": 0.97}, {"seconds": 0.5, "value": 1.0, "ease": "ease_out_back"}]}` (4 f down, 8 f recoil).
 3. First scene on the track above, masked to a growing circle from the button: `add_clip_to_timeline_tool {"file_id": "<scene1>", "position_seconds": 0.35, "track": 3}` then `add_shape_mask_tool {"clip_ids": ["<scene1>"], "shape": "ellipse", "x": 0.5, "y": 0.56, "width": 0.12, "height": 0.12, "feather": 0.01, "keyframes": [{"seconds": 0.35, "grow": -0.5}, {"seconds": 0.75, "grow": 3.0}]}`, f21-f45 (0.35-0.75 s), ease-out.
 4. Scene live from f45 (0.75 s).

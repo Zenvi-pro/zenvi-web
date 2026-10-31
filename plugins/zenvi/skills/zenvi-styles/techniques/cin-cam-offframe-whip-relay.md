@@ -25,9 +25,9 @@ Use when: A big spatial jump within one product (top bar to bottom bar, one page
 
 ## Build it in Zenvi
 
-1. The product recording on track 1. Cursor exit as a pointer block on an upper track: `add_motion_block_tool {"block": "cursor_path", "position_seconds": <a>, "duration_seconds": 0.4, "placement": "over_video", "params": {"points": [[0.5,0.5],[0.5,-0.1]], "clicks": false, "cursor_size": 1.4}}`: 24 f (0.4 s) on an ease-in (2.5 to 15 px/f), then off screen for 12 f (0.2 s).
+1. The product recording on track 1. Cursor exit as a pointer block on an upper track: `add_motion_block_tool {"block": "cursor_path", "position_seconds": <a>, "duration_seconds": 0.4, "placement": "over_video", "params": {"points": [{"x": 0.5, "y": 0.5},{"x": 0.5, "y": -0.1}], "clicks": false, "cursor_size": 1.4}}`: 24 f (0.4 s) on an ease-in (2.5 to 15 px/f), then off screen for 12 f (0.2 s).
 2. Camera whips while it is hidden, centred on `a + 30 f` (0.5 s), N = 2.86 x D / 75 frames: `set_keyframes_tool {"timeline_clip_id": "<product>", "property": "location_y", "mode": "replace", "points": [{"seconds": <a+0.15>, "value": 0}, {"seconds": <a+0.85>, "value": -0.9, "ease": "ease_in_out_sine"}]}` for D = 900-1400 px (0.8-1.3 of the frame height); 34-54 f (0.57-0.9 s), peak 60-75 px/f. Blur it: `apply_fx_tool {"clip_id": "<product>", "effects": [{"effect": "directional_blur", "amount": 0.6, "params": {"angle": 90}, "start": <a+0.3>, "end": <a+0.7>}]}`.
-3. Cursor entry from the top: `add_motion_block_tool {"block": "cursor_path", "position_seconds": <a+0.6>, "duration_seconds": 0.6, "params": {"points": [[0.5,-0.1],[0.62,0.55]], "clicks": true}}`: 36 f (0.6 s) on an ease-out, entering at ~63 px/f, braking ~x0.92 per frame.
+3. Cursor entry from the top: `add_motion_block_tool {"block": "cursor_path", "position_seconds": <a+0.6>, "duration_seconds": 0.6, "params": {"points": [{"x": 0.5, "y": -0.1},{"x": 0.62, "y": 0.55}], "clicks": true}}`: 36 f (0.6 s) on an ease-out, entering at ~63 px/f, braking ~x0.92 per frame.
 4. While it moves faster than 12 px/f draw a trailing capsule: a thin white pill clip behind the tip at 40 % opacity, length 0.6 x speed (`alpha` 0.4).
 5. `add_sfx_tool {"recipe": "whip", "at_seconds": <a+0.4>, "gain_db": -12}` and `{"recipe": "mouse_click", "at_seconds": <a+1.2>, "gain_db": -10}`.
 

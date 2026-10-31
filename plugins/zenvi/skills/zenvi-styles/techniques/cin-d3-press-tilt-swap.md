@@ -25,7 +25,7 @@ Use when: Clicks, copies, likes and swaps in a UI walkthrough that need tactilit
 
 ## Build it in Zenvi
 
-1. Card with a cursor press at time c = 2.0 s: `add_motion_block_tool {"block": "cursor_path", "position_seconds": 0.5, "duration_seconds": 3, "placement": "over_video", "params": {"background": "<card>", "points": [[0.4, 0.5], [0.62, 0.62]], "clicks": true}}`.
+1. Card with a cursor press at time c = 2.0 s: `add_motion_block_tool {"block": "cursor_path", "position_seconds": 0.5, "duration_seconds": 3, "placement": "over_video", "params": {"background": "<card>", "points": [{"x": 0.4, "y": 0.5}, {"x": 0.62, "y": 0.62}], "clicks": true}}`.
 2. Tilt toward the press point (direction = the press offset from the card centre): amplitude 10 deg, in over 8 f (0.13 s), decay with tau 9 f (0.15 s). 2D approximation: `set_keyframes_tool {"timeline_clip_id": "<card>", "property": "shear_x", "mode": "replace", "points": [{"seconds": 2.0, "value": 0}, {"seconds": 2.13, "value": 0.1, "ease": "ease_out_expo"}, {"seconds": 2.6, "value": 0, "ease": "ease_out_cubic"}]}` plus `scale_y` 1.0, 0.98, 1.0 and `rotation` 0, 1.2, 0 on the same times; under 1 deg by about f30 (0.5 s).
 3. Swap the state on the peak frame c + 8 f (2.13 s): the button fill and label, a photo source, a value. Place the second state as a clip starting exactly there: `add_clip_to_timeline_tool {"file_id": "<card_after>", "position_seconds": 2.13, "duration_seconds": 1.5, "track": 2}` over the first, with no transition.
 4. Quick snap variant: `shear_x` 12 degrees' worth (0.12) with attack 1 f and tau 2.5 f (0.04 s), swap on the peak, repeated every 54 f (0.9 s) as a rhythm.

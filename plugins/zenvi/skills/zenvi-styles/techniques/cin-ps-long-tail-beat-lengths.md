@@ -29,7 +29,7 @@ Use when: Launch films and walkthroughs of 15 s or more with eight or more beats
 2. Example (28.75 s at 120 BPM): 75, 60, 30, 75, 120, 45, 60, 75, 30, 75, 60, 45, 105, 60, 30, 180, 75, 45, 30, 180, 90, 60 f, then a 120 f lockup. In seconds: 1.25, 1.0, 0.5, 1.25, 2.0, 0.75, 1.0, 1.25, 0.5, 1.25, 1.0, 0.75, 1.75, 1.0, 0.5, 3.0, 1.25, 0.75, 0.5, 3.0, 1.5, 1.0, 2.0.
 3. Place each beat: `add_clip_to_timeline_tool {"file_id": "<shot_i>", "position_seconds": "<running sum>", "duration_seconds": 1.25, "track": 1}` for each; put one or two connectors immediately before each hero beat so it lands as a release; never three neighbouring beats within 10 % of each other.
 4. Align cuts to the grid: `snap_cuts_to_beats_tool {"track": 1, "grid": "half_beats", "mode": "roll"}`.
-5. Check the shape with `review_edit_tool {"pace": true}`: max/M 2.5-3.0, min/M 0.16-0.5, no beat longer than 3 s, coefficient of variation 0.4-0.8. Fill each hero beat with continuous action (a camera journey or a UI event at least every 40 f, 0.67 s), never a long hold.
+5. Check the shape with `review_edit_tool {"pace": "medium"}`: max/M 2.5-3.0, min/M 0.16-0.5, no beat longer than 3 s, coefficient of variation 0.4-0.8. Fill each hero beat with continuous action (a camera journey or a UI event at least every 40 f, 0.67 s), never a long hold.
 
 ## Timing & taste rules
 

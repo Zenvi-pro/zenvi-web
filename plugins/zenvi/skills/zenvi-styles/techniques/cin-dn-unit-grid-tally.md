@@ -25,7 +25,7 @@ Use when: Shares and proportions ('3 in 10 teams'), quotas, capacity; making a l
 
 ## Build it in Zenvi
 
-1. `add_motion_block_tool {"block": "pictogram_morph", "position_seconds": 1.0, "duration_seconds": 6.0, "placement": "full_frame", "params": {"groups": ["Teams on it", "Teams not yet"], "unit": 1, "icon": "square", "layouts": ["grid"], "captions": ["3 in 10 teams"], "focus": 0, "keep": 0, "backdrop": false}}`: the squares pop in icon by icon, each standing for a fixed number of units.
+1. `add_motion_block_tool {"block": "pictogram_morph", "position_seconds": 1.0, "duration_seconds": 6.0, "placement": "full_frame", "params": {"groups": ["Teams on it=3", "Teams not yet=7"], "unit": 1, "icon": "square", "layouts": ["grid"], "captions": ["3 in 10 teams"], "focus": 0, "keep": 1, "backdrop": false}}`: the squares pop in icon by icon, each standing for a fixed number of units.
 2. The counter beside it, computed from filled cells x unit: `add_motion_block_tool {"block": "counter", "position_seconds": 1.0, "duration_seconds": 3.0, "placement": "over_video", "params": {"values": ["0", "30"], "suffix": "%", "style": "count", "align": "left"}}`.
 3. The accent cell pulses on the last cell: the block's `focus` icon; if you need an extra beat add a 15 % scale pulse to the clip from 3.0 s, 2 f attack, 8 f decay.
 4. 2 % push through the hold: `set_keyframes_tool` `scale_x/y` 1.0 to 1.02.

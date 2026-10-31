@@ -25,7 +25,7 @@ Use when: Short stings and feature spots under about 15 s, calm or premium tones
 
 ## Build it in Zenvi
 
-1. List the hit points: `spot_sound_tool {"genre": "product", "include_dry": false}`. Place no music bed; at least half the runtime stays silent in gaps of 30-96 f (0.5-1.6 s) between sound clusters.
+1. List the hit points: `spot_sound_tool {"genre": "saas_ui", "include_dry": false}`. Place no music bed; at least half the runtime stays silent in gaps of 30-96 f (0.5-1.6 s) between sound clusters.
 2. Opening cluster, five ticks over 14 f from frame 0 under the opening mechanic: `add_sfx_tool {"recipe": "ui_tap", "at_seconds": 0.0, "gain_db": -16}` and again at 0.067, 0.133, 0.183 and 0.233 s.
 3. One centred tick 1-3 f after every appearance cut: `add_sfx_tool {"recipe": "ui_tap", "at_seconds": "<cut+0.03>", "gain_db": -20, "pan": 0}`; across a run of removals raise each tick about 2 dB (weight x1.26): -22, -20, -18, -16.
 4. The only sustained sound, a low pad under the reveal act: `add_sfx_tool {"recipe": "riser_tonal", "at_seconds": "<act start>", "duration": 3.5, "gain_db": -18, "pitch": -6}` peaking on the first reveal, about 42 f (0.7 s) of plateau, 84 f (1.4 s) ring-out; let `tail_bloom` carry the ring.

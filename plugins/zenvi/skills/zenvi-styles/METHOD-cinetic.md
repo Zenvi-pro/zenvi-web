@@ -140,7 +140,7 @@ with no brand. Other Zenvi styles use serif-italic accents and glass cards on pu
 - Layout: no "text left, UI card right", no small centred card on an empty field; the hero covers 40-70 %
   of the frame; margins 96 px at the sides and 64 px top and bottom (5 % / 6 %); in 9:16 the caption and
   button zones get background, not an empty band. Text never lands on text.
-- After each act: `review_edit_tool {"start": a, "end": b}` and look at its sheet.
+- After each act: `review_edit_tool {"start": <a>, "end": <b>}` and look at its sheet.
 
 - Zenvi facts that rendering 30 of the techniques taught (2026-10-31):
   - `set_keyframes_tool` `seconds` count from the clip's start; on a clip that starts later use

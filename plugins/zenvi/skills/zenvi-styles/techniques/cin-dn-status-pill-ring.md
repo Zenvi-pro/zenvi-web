@@ -32,7 +32,7 @@ Use when: Proving that a real, structured process exists (pipeline, build, deliv
 
 **Full look** (relies on glass, filler-text: only when the person's brand supplies that look):
 
-1. Pill body: `add_type_block_tool {"block": "write_on", "paths": ["M30 0 h340 a30 30 0 0 1 0 60 h-340 a30 30 0 0 1 0 -60z"], "fill": true, "ink": "#1d1f24", "width": 0.3, "x": 0.5, "y": 0.8, "draw_seconds": 0.01, "position_seconds": 2.0, "duration_seconds": 3.0}` on track 4.
+1. Pill body: `add_type_block_tool {"block": "write_on", "paths": ["M30 0 h340 a30 30 0 0 1 0 60 h-340 a30 30 0 0 1 0 -60z"], "fill": true, "ink": "#1d1f24", "width": 0.3, "x": 0.5, "y": 0.8, "draw_seconds": 0.1, "position_seconds": 2.0, "duration_seconds": 3.0}` on track 4.
 2. Ring: `add_type_block_tool {"block": "write_on", "paths": ["M14 0 a14 14 0 1 1 -0.01 0"], "fill": false, "ink": "#4f8cff", "stroke_width": 3, "draw_seconds": 0.5, "x": 0.58, "y": 0.8, "position_seconds": 2.17, "duration_seconds": 2.8}` (fills 4/6 to 5/6 over 30 f, 0.5 s).
 3. Texts: `add_title_tool {"text": "Step 5/6 · Motion", "template": "Standard_1", "font_scale": 0.5, "position_seconds": 2.0, "duration_seconds": 3.0, "track": "6"}` and a small accent dot (`add_emoji_tool` with a plain circle or a title bullet).
 4. Capsule rises 24 px with the others: `set_keyframes_tool {"property": "location_y", "ease": "ease_out_cubic", "points": [{"seconds": 2.0, "value": 0.022}, {"seconds": 2.4, "value": 0}]}` and `alpha` 0 to 1 over 0.17 s on each piece.

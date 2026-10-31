@@ -25,7 +25,7 @@ Use when: The problem beat: money, a message or a task stuck waiting (closed, pe
 
 ## Build it in Zenvi
 
-1. Rail up to the token: `add_type_block_tool {"block": "write_on", "paths": ["M0 0 L0.6 0"], "x": 0.3, "y": 0.5, "width": 0.3, "stroke_width": 3, "position_seconds": 0.0, "duration_seconds": 0.8, "draw_seconds": 0.4}`; the part ahead as a row of dots: `add_title_tool {"text": "· · · · · · ·", "screen_position": "center_right", "position_seconds": 0.0, "duration_seconds": 3.0}`.
+1. Rail up to the token: `add_type_block_tool {"block": "write_on", "paths": ["M0 0 L0.6 0"], "x": 0.3, "y": 0.5, "width": 0.3, "stroke_width": 3, "position_seconds": 0.0, "duration_seconds": 0.8, "draw_seconds": 0.4}`; the part ahead as a row of dots: `add_title_tool {"text": "· · · · · · ·", "screen_position": "center", "position_seconds": 0.0, "duration_seconds": 3.0}`.
 2. On the stall frame the destination dims to 30 % over 8 f (0.13 s): `set_keyframes_tool {"timeline_clip_id": "<destination>", "property": "alpha", "points": [{"seconds": 0.8, "value": 1.0}, {"seconds": 0.93, "value": 0.3, "ease": "ease_in_out_sine"}]}`.
 3. Status words at +6 f (0.10 s), +28 f (0.47 s), +40 f (0.67 s): `add_title_tool {"text": "<word>", "screen_position": "center", "position_seconds": 0.9, "duration_seconds": 2.0, "fade_in_seconds": 0.13}` each with a 6 px (0.006 of height) rise `set_keyframes_tool {"property": "location_y", "points": [{"seconds": 0.9, "value": 0.006}, {"seconds": 1.03, "value": 0, "ease": "ease_out_expo"}]}`.
 4. At +51 f (0.85 s) the first word dims to 40 % (`alpha`, 0.13 s) so the decisive word stands alone.

@@ -26,7 +26,7 @@ Use when: Dense product UI that must be read, walkthroughs, and films where ever
 ## Build it in Zenvi
 
 1. The moves between poses: `screen_zoom_follow_tool {"clip_id": "<screen>", "zoom": 1.3, "ease": "ease_in_out_sine", "min_hold": 2.5}` or by hand `set_keyframes_tool {"timeline_clip_id": "<screen>", "property": "scale_x", "mode": "replace", "points": [{"seconds": 0, "value": 1.0}, {"seconds": 1.4, "value": 1.3, "ease": "ease_in_out_sine"}]}` (moves 56-108 f, 0.93-1.8 s).
-2. At each pose hold exactly: no keyframes after the move's last point, constant scale, 0 px/f. A micro-interaction at move end - 10 f (0.17 s): `add_motion_block_tool {"block": "cursor_path", "position_seconds": 1.2, "duration_seconds": 3.0, "placement": "over_video", "params": {"points": [[0.4, 0.5], [0.62, 0.56]], "labels": ["Save"]}}`.
+2. At each pose hold exactly: no keyframes after the move's last point, constant scale, 0 px/f. A micro-interaction at move end - 10 f (0.17 s): `add_motion_block_tool {"block": "cursor_path", "position_seconds": 1.2, "duration_seconds": 3.0, "placement": "over_video", "params": {"points": [{"x": 0.4, "y": 0.5}, {"x": 0.62, "y": 0.56}], "labels": ["Save"]}}`.
 3. Caption from the move's end minus 25 % of its length: `add_kinetic_title_tool {"text": "<caption>", "style": "documentary", "animation": "rise", "position_seconds": 1.05, "duration_seconds": 2.4}`; it leaves as one block, alpha 1 to 0 over 26-28 f (0.43-0.47 s), `ease_in_out_sine`, ending 0-56 f (0-0.93 s) before the next move.
 4. Ambient life only in the background: a `gradient_field` block or a wash breathing by 3 % opacity on a 4 s sine.
 5. Make sure there is a visible change at least every 40 f (0.67 s).

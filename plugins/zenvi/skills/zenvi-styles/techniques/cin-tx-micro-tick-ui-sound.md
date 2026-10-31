@@ -28,7 +28,7 @@ Use when: Typed prompts, word-by-word builds, cold opens before the beat drops, 
 1. Find where the drums enter: `detect_music_structure_tool {"clip_id": "<music>", "add_markers": true}`. UI ticks stop at that marker.
 2. One tick per word as it becomes legible, not per letter, each a little different: `add_sfx_tool {"recipe": "keyboard_key", "at_seconds": 1.20, "gain_db": -27, "seed": 1}`, `{"recipe": "keyboard_key", "at_seconds": 1.52, "gain_db": -26, "seed": 2}`, ... at least 60 ms (3.6 f) apart, with plus/minus 1 dB gain jitter.
 3. UI appearances get `add_sfx_tool {"recipe": "ui_tap", "at_seconds": 2.4, "gain_db": -28}`; a run of UI ticks climbs about 1 dB per event into the payoff.
-4. File the ticks as sfx and check the level: `set_track_role_tool {"track": "<sfx_track>", "role": "sfx"}`, then `analyze_mix_tool {"detail": "sfx"}`: ticks peak 15-20 dB under the full bed and never brighter than the music above 2 kHz.
+4. File the ticks as sfx and check the level: `set_track_role_tool {"track": "<sfx_track>", "role": "sfx"}`, then `analyze_mix_tool {"detail": "full"}`: ticks peak 15-20 dB under the full bed and never brighter than the music above 2 kHz.
 5. Once the drums run, leave the UI silent (the hats carry the typing).
 
 ## Timing & taste rules

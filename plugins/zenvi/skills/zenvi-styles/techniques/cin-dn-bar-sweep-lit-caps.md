@@ -32,7 +32,7 @@ Use when: Volume, activity or histogram data streaming in; an opening equaliser 
 
 **Full look** (relies on orange, gradient: only when the person's brand supplies that look):
 
-1. `add_motion_block_tool {"block": "chart_build", "position_seconds": 1.0, "duration_seconds": 4.0, "placement": "full_frame", "params": {"kind": "bar", "values": ["22","30","41","35","52","61","58","74","81","77","90","96"], "labels": ["","","","","","","","","","","",""], "highlight": 11, "plate": "none"}}` (12 bars; fewer than 6 reads as ordinary bars).
+1. `add_motion_block_tool {"block": "chart_build", "position_seconds": 1.0, "duration_seconds": 4.0, "placement": "full_frame", "params": {"kind": "bar", "values": ["22","30","41","52","61","74","81","96"], "labels": ["","","","","","","",""], "highlight": 7, "plate": "none"}}` (12 bars; fewer than 6 reads as ordinary bars).
 2. The wave: bars appear 1.6 f (0.027 s) apart, about 25 px/f across a 1080p frame; each grows 12 f (0.2 s) ease_out_expo, and at least 0.09 x its height in px so the top edge never passes 70 px/f.
 3. The lit cap is not a block option: lay a thin accent title bar above each bar? Too many clips. Use the block's `highlight` bar as the one lit cap and accept a single accent that lands on the last bar.
 4. `add_sfx_tool {"recipe": "sparkle", "at_seconds": 1.0, "gain_db": -22}` and one `hit_transient` at -16 dB on the last bar.

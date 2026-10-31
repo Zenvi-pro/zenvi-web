@@ -25,7 +25,7 @@ Use when: AI, search or command products, or any opener whose hook is a question
 
 ## Build it in Zenvi
 
-1. The pill and the typing: `add_motion_block_tool {"block": "prompt_bar", "position_seconds": 0, "duration_seconds": 4.5, "placement": "full_frame", "params": {"prompt": "Why is my deploy slower than yesterday?", "cursor": true, "position": "center", "palette": "ink"}}` (keep the query under ~40 characters).
+1. The pill and the typing: `add_motion_block_tool {"block": "prompt_bar", "position_seconds": 0, "duration_seconds": 4.5, "placement": "full_frame", "params": {"prompt": "Why is my deploy slower than yesterday?", "cursor": true, "position": "center", "palette": "graphite"}}` (keep the query under ~40 characters).
 2. Two-stage push on that clip: `set_keyframes_tool {"timeline_clip_id": "<bar>", "property": "scale_x", "mode": "replace", "points": [{"seconds": 0, "value": 1.0}, {"seconds": 0.4, "value": 1.0}, {"seconds": 1.1, "value": 2.16, "ease": "ease_in_out_sine"}, {"seconds": 1.83, "value": 3.4, "ease": "ease_in_out_cubic"}]}`; same on `scale_y`. Push 1 f24-f66 (0.4-1.1 s), push 2 f66-f110 (1.1-1.83 s).
 3. Keep the caret in frame: `location_x` from 0 to -0.35 and `location_y` to 0 over the second push (the caret sits left of centre), same eases.
 4. Typing starts at about 60 % of push 2, ~f92 (1.5 s); the block's own typing speed should be ~30 characters a second.

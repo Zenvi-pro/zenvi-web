@@ -26,7 +26,7 @@ Use when: Dark UI films with flat cards, panels, device bezels or bevelled brand
 ## Build it in Zenvi
 
 1. The card on a near-black stage, e.g. `add_motion_block_tool {"block": "data_table", "position_seconds": 0, "duration_seconds": 6, "params": {"title": "Pipeline", "columns": ["Name", "Status"], "rows": ["Render|Done"], "plate": "solid"}}`.
-2. Draw its outline as a white 1.5 px hairline: `add_type_block_tool {"block": "write_on", "paths": ["M 120 80 H 1800 Q 1840 80 1840 120 V 960 Q 1840 1000 1800 1000 H 120 Q 80 1000 80 960 V 120 Q 80 80 120 80 Z"], "view_box": "0 0 1920 1080", "stroke_width": 1.5, "ink": "#ffffff", "position_seconds": 0.2, "duration_seconds": 0.4}` then fade the clip to 0.4 alpha.
+2. Draw its outline as a white 1.5 px hairline: `add_type_block_tool {"block": "write_on", "paths": ["M 120 80 H 1800 Q 1840 80 1840 120 V 960 Q 1840 1000 1800 1000 H 120 Q 80 1000 80 960 V 120 Q 80 80 120 80 Z"], "view_box": [0, 0, 1920, 1080], "stroke_width": 1.5, "ink": "#ffffff", "position_seconds": 0.2, "duration_seconds": 0.4}` then fade the clip to 0.4 alpha.
 3. Light only the top-left, fading to nothing by 65 % of the way across: `add_shape_mask_tool {"clip_ids": ["<outline>"], "shape": "polygon", "points": [{"x": 0, "y": 0}, {"x": 0.65, "y": 0}, {"x": 0, "y": 0.65}], "feather": 0.3}` (alpha 0.40 at the corner, 0.10 at 35 %).
 4. When the card tilts or lands, ride its own move: copy the card's `scale_x`/`location_y` keyframes to the outline with `copy_clip_keyframes_tool {"source_clip_id": "<card>", "timeline_clip_ids": ["<outline>"]}`.
 

@@ -31,7 +31,7 @@ Use when: Changing copy inside a continuous environment; cycling examples (photo
 4. Give B its own arrival from `s`: a slam or word reveal, `add_kinetic_title_tool {"text": "...", "animation": "slam", "position_seconds": <s>}`.
 5. Give a kicked card a soft shadow so the tilt reads. Repeat no faster than every 48-54 f (0.8-0.9 s). `add_sfx_tool {"recipe": "swoosh_hit", "at_seconds": <s>, "gain_db": -14}`.
 
-Fallback: A true rotateY card kick needs a 3D scene; the tilt/squash presets are the nearest, and `add_3d_scene_tool {"scene": "cube_cut"}` gives a real turn.
+Fallback: A true rotateY card kick needs a 3D scene; the tilt/squash presets are the nearest, and `add_3d_scene_tool {"scene": "cube_cut", "params": {"from_clip_id": "<outgoing clip>", "to_clip_id": "<incoming clip>"}}` gives a real turn.
 
 ## Timing & taste rules
 

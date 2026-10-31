@@ -25,7 +25,7 @@ Use when: Loops, grids, speed-typed prompts, counters, and any sequence with mor
 
 ## Build it in Zenvi
 
-1. Count visible events with `spot_sound_tool {"genre": "launch"}`; where there are more than about 3 per second (multi-cell loops, speed-typed prompts, counters), do not run `auto_sound_design_tool` over that stretch and delete any per-key, per-tick sound already placed (`delete_from_timeline_tool` on the SFX clips).
+1. Count visible events with `spot_sound_tool {"genre": "saas_ui"}`; where there are more than about 3 per second (multi-cell loops, speed-typed prompts, counters), do not run `auto_sound_design_tool` over that stretch and delete any per-key, per-tick sound already placed (`delete_from_timeline_tool` on the SFX clips).
 2. Let the bed carry the rhythm: `snap_cuts_to_beats_tool {"music_clip_id": "<music>", "grid": "half_beats", "tolerance_frames": 3}` so cuts sit on the 8th grid where the hats already sound; low end in mono.
 3. Allow at most one soft tick per word or label: `add_sfx_tool {"recipe": "ui_tap", "at_seconds": 4.2, "gain_db": -22, "brightness": 0.8, "seed": 3}` high-passed above 2-3 kHz with `eq_tool {"clip_ids": ["<tick>"], "preset": "air"}`; 18-24 dB under the bed, 40-80 ms decay, vary gain by +/-2 dB and pitch by +/-80 cents (`pitch` +/-0.8) from clip to clip.
 4. Save 6-8 accent ticks per 45 s for real clicks (a press, a toggle) at -18 dB.

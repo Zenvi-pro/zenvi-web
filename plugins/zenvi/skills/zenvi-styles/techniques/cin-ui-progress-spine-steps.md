@@ -27,14 +27,14 @@ Use when: An agent, build, deploy, import or onboarding process working through 
 
 **Ban-safe variant (the cinetic house default; the draw says `ban_safe_variant`):**
 
-1. Same spine and rows, but the head is a flat dot: `add_emoji_tool {"emoji": "black circle", "size": 0.015}` with no `apply_fx_tool`, no bloom, no halo.
+1. Same spine and rows, but the head is a flat dot: `add_emoji_tool {"emoji": "black circle", "size": 0.02}` with no `apply_fx_tool`, no bloom, no halo.
 2. State by size only: scale 1.2 (12 px) while travelling, 1.0 (10 px) while waiting, via `set_keyframes_tool` on `scale_x`/`scale_y`.
 3. The spine, step states, scroll follow and every timing are unchanged.
 
 **Full look** (relies on glow: only when the person's brand supplies that look):
 
 1. Spine, one write-on segment per step so the line and the dot stay in step: `add_type_block_tool {"block": "write_on", "paths": ["M0 0 L0 1"], "x": 0.2, "y": <step_mid>, "width": 0.002, "stroke_width": 2, "position_seconds": <travel_start>, "duration_seconds": 0.67, "draw_seconds": 0.67}` (40 f = 0.67 s of travel per step pitch). Draw a 1.5 px hairline of the whole route first for the guide.
-2. Head: `add_emoji_tool {"emoji": "black circle", "size": 0.015, "position_seconds": 0.0, "duration_seconds": 8.0}` with `location_y` keyframes moving down one pitch per step over 0.67 s on `ease_in_out_sine`, holding for each step's work time (24-60 f = 0.4-1.0 s). For a halo, `apply_fx_tool {"clip_id": "<head>", "effects": [{"effect": "bloom", "amount": 0.3}]}`.
+2. Head: `add_emoji_tool {"emoji": "black circle", "size": 0.02, "position_seconds": 0.0, "duration_seconds": 8.0}` with `location_y` keyframes moving down one pitch per step over 0.67 s on `ease_in_out_sine`, holding for each step's work time (24-60 f = 0.4-1.0 s). For a halo, `apply_fx_tool {"clip_id": "<head>", "effects": [{"effect": "bloom", "amount": 0.3}]}`.
 3. Step row i appears when the head arrives: `add_title_tool {"text": "<step_i>", "position_seconds": <pass_i>, "duration_seconds": 8.0, "fade_in_seconds": 0.2}` with a 12 px (0.011) `location_y` rise over 12 f (0.2 s) `ease_out_expo`.
 4. While waiting, a spinner: `add_type_block_tool {"block": "text_on_path", "text": "· · · · · · · ·", "shape": "ring", "radius": 0.012, "spin": 450, "position_seconds": <pass_i>, "duration_seconds": <work_time>}` (one turn per 48 f = 0.8 s); a detail line types at about 1.5 characters per frame via `add_motion_block_tool {"block": "text_scramble", ...}` or a typed title.
 5. On the last frame of the wait the spinner clip ends and an accent check draws over 8 f (0.13 s) (`add_type_block_tool` `write_on` of a tick path); a "Done" tag fades in over 8 f; the head leaves on that frame. The list scrolls (`location_y` on every row clip) so the head sits near 40 % of height.

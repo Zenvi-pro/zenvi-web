@@ -29,7 +29,7 @@ Use when: Opening a launch film into a 3D or layered world, or a sting that dive
 2. Foreground object on its own clip above, 300-400 px off the anchor, scaled with a stronger exponent (k ** 1.6): `scale_x/scale_y` `[{"seconds": <a>, "value": 1.0}, {"seconds": <a+1.12>, "value": 5.0, "ease": "ease_in_cubic"}]` with `location_x` sliding out past the frame edge around the push's peak (~f33 / 0.55 s) at 60-80 px/f or less: `[{"seconds": <a+0.3>, "value": 0.2}, {"seconds": <a+0.7>, "value": 0.85, "ease": "ease_in_cubic"}]`.
 3. Streak it with a real blur, not a fake one: `apply_fx_tool {"clip_id": "<fg>", "effects": [{"effect": "directional_blur", "amount": 0.7, "params": {"angle": 0}, "start": 0.4, "end": 0.7}]}` and `{"effect": "radial_blur", "amount": 0.4}` on the world for the peak.
 4. Optional mid and far layers at 1.0x and 0.3x of the world translation add parallax (`location_x` at those ratios).
-5. Quick 3D route: `add_3d_scene_tool {"scene": "floating_cards", "params": {"camera": "surge"}, "duration_seconds": 3}`. `add_sfx_tool {"recipe": "whoosh_medium", "at_seconds": <a+0.2>, "gain_db": -10}`.
+5. Quick 3D route: `add_3d_scene_tool {"scene": "floating_cards", "params": {"fstop": 0.2}, "duration_seconds": 3}`. `add_sfx_tool {"recipe": "whoosh_medium", "at_seconds": <a+0.2>, "gain_db": -10}`.
 
 Fallback: Without separate depth layers, the foreground pass needs a cutout; use a PNG with alpha from the bin or a motion block (`particle_burst`) as the near object.
 

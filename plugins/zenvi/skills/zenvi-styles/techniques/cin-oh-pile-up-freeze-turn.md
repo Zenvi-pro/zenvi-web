@@ -25,7 +25,7 @@ Use when: Problem-first launches whose pain is volume: notifications, tickets, t
 
 ## Build it in Zenvi
 
-1. The pile: `add_motion_block_tool {"block": "notification_stack", "position_seconds": 0, "duration_seconds": 1.7, "params": {"items": ["Invoice overdue","Build failed","New ticket (14)","Reminder: standup","Sync error","Mention in #ops","Payment declined","3 tabs crashed","Alert: CPU 94%","Review requested","Inbox (212)","Policy update","Disk 98%","Re: Re: Fwd"], "style": "notification", "position": "center"}}`: 14 arrivals in ~100 f (1.7 s), gaps 14, 12, 11, 9.5 ... down to 4 f (0.23 s, 0.07 s).
+1. The pile: `add_motion_block_tool {"block": "notification_stack", "position_seconds": 0, "duration_seconds": 1.7, "params": {"items": ["Invoice overdue","Build failed","New ticket (14)","Sync error","Alert: CPU 94%","Inbox (212)"], "style": "notification", "position": "center"}}`: 14 arrivals in ~100 f (1.7 s), gaps 14, 12, 11, 9.5 ... down to 4 f (0.23 s, 0.07 s).
 2. Counter in a corner: `add_motion_block_tool {"block": "counter", "position_seconds": 0, "duration_seconds": 1.7, "params": {"values": ["0","212"], "style": "count", "align": "left"}}`, scaled to 0.4 with `set_keyframes_tool` on `scale_x/y` and `location_x -0.3`, `location_y -0.3`.
 3. Camera creep on the pile: `scale_x/scale_y` `[{"seconds": 0, "value": 1.0}, {"seconds": 1.7, "value": 1.04, "ease": "ease_in_cubic"}]`.
 4. Freeze at peak density: `freeze_frame_tool {"timeline_clip_id": "<pile>", "frame": "last", "hold_seconds": 0.25}`; cut the bed dead: `automate_volume_tool {"role": "music", "shape": "dip", "start_seconds": 1.7, "end_seconds": 1.95, "db": -60, "fade_ms": 10}`.

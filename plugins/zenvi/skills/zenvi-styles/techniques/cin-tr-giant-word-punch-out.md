@@ -25,7 +25,7 @@ Use when: A one-word claim or product name that deserves two beats: read it, the
 
 ## Build it in Zenvi
 
-1. Close-up act (18-22 f / 0.3-0.37 s): `add_kinetic_title_tool {"text": "FASTER", "position_seconds": 0, "duration_seconds": 0.35, "style": "stack", "animation": "letters", "stagger_seconds": 0.033, "text_size": 0.45, "y": 0.5}` at 2-2.5x its final size, cropped by the frame.
+1. Close-up act (18-22 f / 0.3-0.37 s): `add_kinetic_title_tool {"text": "FASTER", "position_seconds": 0, "duration_seconds": 0.4, "style": "stack", "animation": "letters", "stagger_seconds": 0.033, "text_size": 0.3, "y": 0.5}` at 2-2.5x its final size, cropped by the frame.
 2. The slide brakes by x0.92 per frame (70 px/f falling to ~18 px/f by f16): `set_keyframes_tool {"timeline_clip_id": "<close>", "property": "location_x", "mode": "replace", "points": [{"seconds": 0, "value": 0.35}, {"seconds": 0.35, "value": 0.0, "ease": "ease_out_expo"}]}`. Letters resolve over 12 f (0.2 s) with a 2 f (0.033 s) stagger from f4; the first letter is sharp by f16 (0.27 s). Cut while the word still moves at 13-20 px/f.
 3. Wide act: `add_kinetic_title_tool {"text": "FASTER", "position_seconds": 0.35, "duration_seconds": 1.2, "style": "stack", "animation": "slam", "text_size": 0.18}` with `scale_x/scale_y` `[{"seconds": 0.35, "value": 1.38}, {"seconds": 0.85, "value": 1.0, "ease": "ease_out_expo"}]` (30 f).
 4. Wide-tracking smear: `apply_fx_tool {"clip_id": "<wide>", "effects": [{"effect": "directional_blur", "amount": 0.7, "params": {"angle": 0}, "start": 0, "end": 0.3}]}` gone by 60 % of the move; opacity `alpha` `[{"seconds": 0.35, "value": 0.5}, {"seconds": 0.48, "value": 1.0}]`.

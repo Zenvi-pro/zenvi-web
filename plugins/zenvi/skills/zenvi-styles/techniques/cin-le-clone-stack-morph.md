@@ -32,7 +32,7 @@ Use when: Turning a big brand shape or frame into the CTA container. Mechanical,
 
 **Full look** (relies on glow: only when the person's brand supplies that look):
 
-1. The big shape: `add_type_block_tool {"block": "write_on", "paths": ["M0 0 H300 V150 H0 Z"], "fill": true, "ink": "#1d1f24", "width": 0.98, "draw_seconds": 0.01, "x": 0.5, "y": 0.5, "position_seconds": 2.0, "duration_seconds": 4.0}` on track 3.
+1. The big shape: `add_type_block_tool {"block": "write_on", "paths": ["M0 0 H300 V150 H0 Z"], "fill": true, "ink": "#1d1f24", "width": 0.98, "draw_seconds": 0.1, "x": 0.5, "y": 0.5, "position_seconds": 2.0, "duration_seconds": 4.0}` on track 3.
 2. Collapse into the pill over 48 f (0.8 s): `set_keyframes_tool {"timeline_clip_id": "<shape>", "property": "scale_y", "ease": "ease_in_out_sine", "points": [{"seconds": 2.0, "value": 1.0}, {"seconds": 2.8, "value": 0.23}]}` and `scale_x` 1.0 to 0.53 (983 to 227 px high, 1878 to 997 px wide); a pill needs an outline path with rounded ends, so use a pill path for the end state and crossfade the last 4 f.
 3. Seven echoes: `duplicate_clips_tool {"timeline_clip_ids": ["<shape>"], "copies": 7, "to_track": "2"}`, switch each to a 1.5 px stroke (`fill` false) with `alpha` 0.6 x (1 - k/9), then `copy_clip_keyframes_tool {"source_clip_id": "<shape>", "timeline_clip_ids": ["<echo_k>"], "timing": "offset"}` delayed 2k f (0.033 k s) so copy k follows the leader k x 2 frames later.
 4. URL swaps in at the morph start (8 f fade, 0.13 s): `add_title_tool {"text": "zenvi.com", "template": "Standard_1", "position_seconds": 2.0, "duration_seconds": 3.0, "fade_in_seconds": 0.13, "track": "5"}`; it stays still after the pill lands.
