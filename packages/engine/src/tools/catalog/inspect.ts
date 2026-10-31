@@ -166,7 +166,8 @@ export const inspectTools: CatalogTool[] = [
       let startFrame = input.startFrame;
       let endFrame = input.endFrame;
       const clipId = text(input.clipId);
-      if (clipId && (input.start !== undefined || input.end !== undefined)) {
+      // A clip alone is its whole span (the desktop refuses it; the Assistant asks for it that way).
+      if (clipId && (input.start !== undefined || input.end !== undefined || startFrame === undefined)) {
         const clip = (project.clips ?? []).find((c) => String(c.id) === clipId);
         if (!clip) return refused(tool, `Error: Unknown clipId '${clipId}'.`);
         const position = Number(clip.position) || 0;

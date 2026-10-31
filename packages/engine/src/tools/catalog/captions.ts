@@ -58,6 +58,7 @@ import {
   type OverlayCarrier,
 } from "../titles-text.js";
 import { buildTrackStack } from "../tracks.js";
+import { TTS_SCRIPT_SOURCE } from "../tts-words.js";
 import { clipTarget, isWordSource, mediaPathOf, untargetedTranscription, wordsFor, type WordSourceFailure } from "../transcripts.js";
 import { resolveClip } from "./common.js";
 
@@ -351,9 +352,11 @@ export const captionTools = [
               continue;
             }
             warnings.push(...got.warnings);
+            if (got.source === TTS_SCRIPT_SOURCE) warnings.push(`clip ${c.id}: word times are the TTS script laid over the voice's pauses`);
             const live = clipById(call.doc.project, c.id) ?? c;
             let cues: Cue[];
-            if (got.exact) {
+            // The index's phrases are cues already; a word list is phrased here, heard or not (a TTS script laid over its voice).
+            if (got.cues === undefined) {
               const [, start, end] = clipWindow(live);
               cues = phraseTimedWords(got.words.filter((w) => w.endSec > start && w.startSec < end), input.maxWords ?? 8, input.maxChars ?? 42);
             } else {

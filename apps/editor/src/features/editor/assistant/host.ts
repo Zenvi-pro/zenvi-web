@@ -8,6 +8,7 @@ import { canExportWith } from "@zenvi/render-web";
 import { backendRequest } from "@/lib/backend";
 import { downloadFile, type DownloadProgress } from "@/lib/download";
 import { config } from "@/lib/env";
+import { generatedMediaDownloadUrl, isGeneratedMediaUrl, withBackendAuth } from "@/lib/generatedMedia";
 import { downloadBlob, safeFileName } from "@/lib/projectFactory";
 import { projectRepository } from "@/lib/storage/projects";
 import { savePanels } from "../session/uiStore";
@@ -27,7 +28,13 @@ const MAX_TEXT_BYTES = 16 * 1024 * 1024;
 async function fileFromUrl(url: string, filename: string | undefined, signal?: AbortSignal, onProgress?: (progress: DownloadProgress) => void): Promise<File> {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error("Only http(s) URLs can be imported.");
-  const { blob, type } = await downloadFile(parsed.href, { signal, onProgress, maxBytes: MAX_URL_IMPORT_BYTES });
+  const generated = isGeneratedMediaUrl(parsed);
+  const { blob, type } = await downloadFile(generated ? generatedMediaDownloadUrl(parsed.href) : parsed.href, {
+    signal,
+    onProgress,
+    maxBytes: MAX_URL_IMPORT_BYTES,
+    ...(generated ? { fetch: withBackendAuth() } : {}),
+  });
   const name = filename || decodeURIComponent(parsed.pathname.split("/").pop() || "download");
   return new File([blob], name, { type: type || contentTypeFor(name) });
 }

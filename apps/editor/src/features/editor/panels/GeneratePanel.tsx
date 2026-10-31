@@ -138,7 +138,7 @@ export function GeneratePanel() {
         ) : null}
       </PanelHeader>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-        <Card icon={<Sparkles size={15} />} title="AI video" hint="Kling O1 from a text prompt. Takes one to three minutes.">
+        <Card icon={<Sparkles size={15} />} title="AI video" hint="From a text prompt. Takes one to three minutes.">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
