@@ -72,8 +72,10 @@ export async function installSpeechRuntime(options: { env?: NodeJS.ProcessEnv; s
   await mkdir(dir, { recursive: true });
   const manifest = path.join(dir, "package.json");
   if (!existsSync(manifest)) await writeFile(manifest, `${JSON.stringify({ name: "zenvi-speech-runtime", private: true }, null, 2)}\n`);
-  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  await runBinary(npm, ["install", "--prefix", dir, "--no-audit", "--no-fund", "--ignore-scripts", "--omit=dev", `${TRANSFORMERS_PACKAGE}@${TRANSFORMERS_VERSION}`], {
+  // npm is npm.cmd on Windows, which Node refuses to spawn without a shell (CVE-2024-27980);
+  // the npm-cli.js Node's installer puts beside node.exe needs none.
+  const [npm, ...npmArgs] = process.platform === "win32" ? [process.execPath, path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npm-cli.js")] : ["npm"];
+  await runBinary(npm!, [...npmArgs, "install", "--prefix", dir, "--no-audit", "--no-fund", "--ignore-scripts", "--omit=dev", `${TRANSFORMERS_PACKAGE}@${TRANSFORMERS_VERSION}`], {
     signal: options.signal,
     what: `Installing ${TRANSFORMERS_PACKAGE} with npm failed`,
   });

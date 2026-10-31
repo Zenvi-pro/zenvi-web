@@ -140,6 +140,9 @@ describe("Zenvi FX renderer", () => {
   }, 60_000);
 
   describe("datamosh carry", () => {
+    // A frame the carry has left differs from the source by codec noise only: under 2.5 on ffmpeg 7+,
+    // 2.9 on Ubuntu 24.04's ffmpeg 6.1 (CI). The carried frames differ by more than 6.
+    const CLEAN = 3.5;
     const mosh = (params: Record<string, unknown>, at = 1.5) => stack([{ effect: "datamosh_carry", params: { length: 0.5, ...params, carry: { file_id: "A", at } } }], 2);
 
     it("pushes the clip's first frames along the motion before the cut, then lands clean", async () => {
@@ -150,17 +153,17 @@ describe("Zenvi FX renderer", () => {
       expect(audio).toMatchObject({ codec_type: "audio", codec_name: "pcm_s16le" });
       expect(await frameDiff(r.path, clip, 0.1)).toBeGreaterThan(6);
       // 0.5 s is 15 frames: from the 16th on the clip is untouched.
-      expect(await frameDiff(r.path, clip, 0.7)).toBeLessThan(2.5);
-      expect(await frameDiff(r.path, clip, 1.5)).toBeLessThan(2.5);
+      expect(await frameDiff(r.path, clip, 0.7)).toBeLessThan(CLEAN);
+      expect(await frameDiff(r.path, clip, 1.5)).toBeLessThan(CLEAN);
     }, 60_000);
 
     it("has nothing to carry from footage that stands still, unless the last frame lingers", async () => {
       const fx = renderer("mosh-still");
       const bare = await fx.render({ path: clip, start: 0, end: 2, effects: mosh({ ghost: 0 }), carry: { path: still, at: 1.5 } });
-      expect(await frameDiff(bare.path, clip, 0.1)).toBeLessThan(2.5);
+      expect(await frameDiff(bare.path, clip, 0.1)).toBeLessThan(CLEAN);
       const ghost = await fx.render({ path: clip, start: 0, end: 2, effects: mosh({ ghost: 1 }), carry: { path: still, at: 1.5 } });
       expect(await frameDiff(ghost.path, clip, 0.03)).toBeGreaterThan(20);
-      expect(await frameDiff(ghost.path, clip, 0.7)).toBeLessThan(2.5);
+      expect(await frameDiff(ghost.path, clip, 0.7)).toBeLessThan(CLEAN);
     }, 60_000);
 
     it("moves alpha with the picture, and the ghost does not fill in transparent pixels", async () => {

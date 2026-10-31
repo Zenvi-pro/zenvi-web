@@ -507,7 +507,7 @@ const montageTool = directTool({
       if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
       else ids = order.map((i) => ids[i]!);
     } else if (!args.keep_order && inBinOrder(project, ids)) {
-      const ordered = await sequenceFiles(call, ids, { arc: "flat", continuity: 2 }, "keep_order", true);
+      const ordered = await sequenceFiles(call, ids, { arc: "flat", continuity: 2 }, "keep_order");
       if (ordered && "ids" in ordered) {
         ids = ordered.ids;
         notes.push(ordered.note);

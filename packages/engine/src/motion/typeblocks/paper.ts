@@ -52,6 +52,9 @@ function random(seed: number): () => number {
   };
 }
 
+/** Most distinct poses one paper block draws. */
+const MAX_POSES = 120;
+
 export function buildPaper(o: PaperOptions): TypeBlockOutput {
   const { frame } = o;
   const text = o.text.trim();
@@ -67,15 +70,17 @@ export function buildPaper(o: PaperOptions): TypeBlockOutput {
   const ox = (width - block.width) / 2;
   const oy = (height - block.height) / 2;
   const rand = random(o.seed);
-  const poses = Math.max(1, Math.ceil(o.frames / o.hold));
+  // A long block boils slower instead of growing without bound (30 s at hold 1 was 900 poses, 5 MB of SVG).
+  const hold = Math.max(o.hold, Math.ceil(o.frames / MAX_POSES));
+  const poses = Math.max(1, Math.ceil(o.frames / hold));
   const elements: Element[] = [];
   // Orbiting marks: where each sits on an ellipse round the word, and how fast it goes round.
   const marks = o.marks
     ? Array.from({ length: 5 }, (_, i) => ({ kind: i % 3, phase: (i / 5) * 2 * Math.PI + rand() * 0.6, speed: (0.04 + rand() * 0.03) * (i % 2 ? 1 : -1), size: em * (0.26 + rand() * 0.1) }))
     : [];
   for (let p = 0; p < poses; p += 1) {
-    const from = p * o.hold;
-    const to = Math.min(o.frames, from + o.hold);
+    const from = p * hold;
+    const to = Math.min(o.frames, from + hold);
     // Each glyph nudged and turned about its own middle: the boil.
     const cut: PathCommand[] = glyphs.flatMap((g) => {
       const mx = ox + g.x + g.advance / 2;

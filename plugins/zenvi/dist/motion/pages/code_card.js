@@ -1,4 +1,216 @@
 (() => {
+  // packages/motion/src/blocks/ui.ts
+  var ICONS = {
+    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
+    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
+    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
+    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
+    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
+    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
+    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
+    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
+    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
+    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
+    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
+    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
+    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
+    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
+    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+  };
+  function icon(ctx, name, className, parent) {
+    const el = ctx.el("span", `icon ${className}`, parent);
+    el.innerHTML = ICONS[name];
+    return el;
+  }
+
+  // packages/motion/src/blocks/code_card/syntax.ts
+  var KEYWORDS = {
+    ts: new Set("import export from const let var function return await async if else for while of in new class extends interface type true false null undefined this try catch throw default as".split(" ")),
+    python: new Set("import from as def return await async if elif else for while in not and or class with try except raise True False None self lambda yield pass".split(" ")),
+    shell: new Set("if then else fi for do done in case esac export echo cd sudo".split(" ")),
+    json: new Set("true false null".split(" "))
+  };
+  var COMMENT = {
+    ts: /^\/\/.*/,
+    python: /^#.*/,
+    shell: /^#.*/,
+    json: /^$a/
+  };
+  function codeText(raw) {
+    const text = raw.includes("\n") ? raw : raw.replace(/\\n/g, "\n");
+    return text.replace(/\t/g, "  ");
+  }
+  function tokenizeLine(line, lang) {
+    const out = [];
+    const push = (kind, text) => {
+      const last = out[out.length - 1];
+      if (last && last.kind === kind) last.text += text;
+      else out.push({ kind, text });
+    };
+    let i = 0;
+    while (i < line.length) {
+      const rest = line.slice(i);
+      const comment = COMMENT[lang].exec(rest);
+      if (comment) {
+        push("comment", comment[0]);
+        break;
+      }
+      const str = /^(["'`])(?:\\.|(?!\1).)*\1?/.exec(rest);
+      if (str) {
+        push("string", str[0]);
+        i += str[0].length;
+        continue;
+      }
+      const num = /^\d[\d_]*(?:\.\d+)?/.exec(rest);
+      if (num && !/[\w$]/.test(line[i - 1] ?? "")) {
+        push("number", num[0]);
+        i += num[0].length;
+        continue;
+      }
+      const word = /^[A-Za-z_$@][\w$-]*/.exec(rest);
+      if (word) {
+        let w = word[0];
+        if (lang !== "shell") w = /^[A-Za-z_$@][\w$]*/.exec(rest)[0];
+        const next = line.slice(i + w.length).trimStart()[0];
+        const kind = KEYWORDS[lang].has(w) ? "keyword" : next === "(" ? "function" : /^[A-Z]/.test(w) ? "type" : lang === "shell" && out.length === 0 ? "function" : "plain";
+        push(kind, w);
+        i += w.length;
+        continue;
+      }
+      const ch = line[i];
+      push(/\s/.test(ch) ? "plain" : /[{}()[\];,.:=<>+\-*/!?&|]/.test(ch) ? "punct" : "plain", ch);
+      i += 1;
+    }
+    return out;
+  }
+  function typeTimes(code, cps, at) {
+    const times = [];
+    let t = at;
+    let lineStart = true;
+    for (const ch of Array.from(code)) {
+      if (ch === "\n") {
+        t += 0.1;
+        times.push(t);
+        lineStart = true;
+        continue;
+      }
+      if (lineStart && ch === " ") {
+        times.push(t);
+        continue;
+      }
+      lineStart = false;
+      t += 1 / cps;
+      times.push(t);
+    }
+    return times;
+  }
+  function typeSeconds(code, cps) {
+    const times = typeTimes(code, cps, 0);
+    return times[times.length - 1] ?? 0;
+  }
+
+  // packages/motion/src/blocks/code_card/block.ts
+  var MAX_LINES = 16;
+  function build(ctx) {
+    const { tl, params: p, width: W, height: H, safe } = ctx;
+    const lang = String(p.language);
+    const code = codeText(String(p.code)).split("\n").slice(0, MAX_LINES).join("\n");
+    const lines = code.split("\n");
+    const output = String(p.output ?? "");
+    const S = ctx.seconds;
+    const winW = W <= H * 1.3 ? W - safe.left - safe.right + 60 : Math.min(1380, W * 0.68);
+    const win = ctx.el("div", "cc-win");
+    win.style.width = `${winW}px`;
+    const bar = ctx.el("div", "cc-bar", win);
+    for (let i = 0; i < 3; i += 1) ctx.el("span", "cc-dot", bar);
+    if (p.filename) ctx.el("span", "cc-tab", bar, String(p.filename));
+    const body = ctx.el("div", "cc-body", win);
+    const lit = ctx.el("div", "cc-lit", body);
+    const chars = [];
+    const codeEls = [];
+    lines.forEach((line, i) => {
+      const row = ctx.el("div", "cc-line", body);
+      ctx.el("span", "cc-num", row, String(i + 1));
+      const host = ctx.el("span", "cc-code", row);
+      codeEls.push(host);
+      for (const token of tokenizeLine(line, lang)) {
+        const span = ctx.el("span", `t-${token.kind}`, host);
+        for (const c of Array.from(token.text)) chars.push(ctx.el("span", "", span, c));
+      }
+      if (i < lines.length - 1) chars.push(ctx.el("span", "", host, ""));
+    });
+    const caret = ctx.el("span", "cc-caret", body);
+    const cols = Math.max(20, ...lines.map((l) => l.length));
+    const size = Math.max(18, Math.min(ctx.portrait ? 32 : 36, (winW - 40 - 3.4 * 30) / (cols * 0.6 + 1)));
+    body.style.fontSize = `${size}px`;
+    let run = null;
+    let runH = 0;
+    if (output) {
+      run = ctx.el("div", "cc-run", win);
+      const out = ctx.el("div", "cc-out", run);
+      icon(ctx, "check", "", out);
+      ctx.el("span", "", out, output);
+      runH = run.getBoundingClientRect().height;
+    }
+    const winH = win.getBoundingClientRect().height;
+    Object.assign(win.style, { left: `${(W - winW) / 2}px`, top: `${Math.max(safe.top, (H - winH) / 2 - (ctx.portrait ? 40 : 0))}px` });
+    const bodyRect = body.getBoundingClientRect();
+    const lineH = size * 1.6;
+    const pos = chars.map((c) => {
+      const r = c.getBoundingClientRect();
+      return { x: r.right - bodyRect.left, y: r.top - bodyRect.top };
+    });
+    const lineStarts = codeEls.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left - bodyRect.left, y: r.top - bodyRect.top };
+    });
+    const typeAt = 0.75;
+    const tail = (run ? 0.45 + 0.5 + 0.9 : 0.9) + (p.exit === false ? 0 : 0.4);
+    const pauses = typeSeconds(code, 1e9);
+    const typed = Array.from(code.replace(/\n\s*/g, "\n")).filter((c) => c !== "\n").length;
+    const cps = Math.min(90, Math.max(16, typed / Math.max(0.6, S - typeAt - tail - pauses)));
+    const times = typeTimes(code, cps, typeAt);
+    const typedEnd = times[times.length - 1] ?? typeAt;
+    const lineOf = [];
+    lines.forEach((line, i) => {
+      for (let k = 0; k < Array.from(line).length + (i < lines.length - 1 ? 1 : 0); k += 1) lineOf.push(i);
+    });
+    tl.track((t) => {
+      let shown = 0;
+      while (shown < times.length && times[shown] <= t) shown += 1;
+      chars.forEach((c, i) => {
+        const v = i < shown ? "visible" : "hidden";
+        if (c.style.visibility !== v) c.style.visibility = v;
+      });
+      const last = shown - 1;
+      const onNewline = last >= 0 && chars[last].textContent === "";
+      const line = last < 0 ? 0 : onNewline ? lineOf[last] + 1 : lineOf[last];
+      const at = last < 0 || onNewline ? { x: lineStarts[line]?.x ?? 0, y: lineStarts[line]?.y ?? 0 } : pos[last];
+      caret.style.left = `${at.x + 2}px`;
+      caret.style.top = `${at.y}px`;
+      lit.style.top = `${lineStarts[line]?.y ?? 0}px`;
+      const blinkOn = t < typeAt || t > typedEnd + 0.05 ? Math.floor(t * 2) % 2 === 0 : true;
+      caret.style.visibility = blinkOn ? "visible" : "hidden";
+    });
+    lit.style.height = `${lineH}px`;
+    tl.fromTo(win, { y: H * 0.04, scale: 0.97, opacity: 0, blur: 12 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.7, ease: "out" });
+    ctx.cue(0, "pop", { weight: 0.4, at: win });
+    if (typedEnd > typeAt) ctx.cue(typeAt, "type", { weight: 0.2, at: body, until: typedEnd, rate: cps });
+    if (run) {
+      const runAt = typedEnd + 0.45;
+      tl.fromTo(run, { height: 0 }, { height: runH }, { at: runAt, duration: 0.5, ease: "in-out" });
+      ctx.cue(runAt, "pop", { weight: 0.45, at: run });
+      const out = run.firstElementChild;
+      tl.fromTo(out, { y: -16, opacity: 0 }, { y: 0, opacity: 1 }, { at: runAt + 0.15, duration: 0.45, ease: "out" });
+      tl.to(lit, { opacity: 0 }, { at: runAt, duration: 0.3, ease: "smooth" });
+    }
+  }
+
   // packages/motion/src/runtime/easing.ts
   function cubicBezier(x1, y1, x2, y2) {
     const cx = 3 * x1;
@@ -218,9 +430,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -534,218 +746,6 @@
 ${error.stack ?? ""}` : String(error);
       rejectReady(error);
     });
-  }
-
-  // packages/motion/src/blocks/ui.ts
-  var ICONS = {
-    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
-    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
-    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
-    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
-    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
-    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
-    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
-    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
-    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
-    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
-    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
-    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
-    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
-    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
-    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
-    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
-    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
-    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
-    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
-    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
-  };
-  function icon(ctx, name, className, parent) {
-    const el = ctx.el("span", `icon ${className}`, parent);
-    el.innerHTML = ICONS[name];
-    return el;
-  }
-
-  // packages/motion/src/blocks/code_card/syntax.ts
-  var KEYWORDS = {
-    ts: new Set("import export from const let var function return await async if else for while of in new class extends interface type true false null undefined this try catch throw default as".split(" ")),
-    python: new Set("import from as def return await async if elif else for while in not and or class with try except raise True False None self lambda yield pass".split(" ")),
-    shell: new Set("if then else fi for do done in case esac export echo cd sudo".split(" ")),
-    json: new Set("true false null".split(" "))
-  };
-  var COMMENT = {
-    ts: /^\/\/.*/,
-    python: /^#.*/,
-    shell: /^#.*/,
-    json: /^$a/
-  };
-  function codeText(raw) {
-    const text = raw.includes("\n") ? raw : raw.replace(/\\n/g, "\n");
-    return text.replace(/\t/g, "  ");
-  }
-  function tokenizeLine(line, lang) {
-    const out = [];
-    const push = (kind, text) => {
-      const last = out[out.length - 1];
-      if (last && last.kind === kind) last.text += text;
-      else out.push({ kind, text });
-    };
-    let i = 0;
-    while (i < line.length) {
-      const rest = line.slice(i);
-      const comment = COMMENT[lang].exec(rest);
-      if (comment) {
-        push("comment", comment[0]);
-        break;
-      }
-      const str = /^(["'`])(?:\\.|(?!\1).)*\1?/.exec(rest);
-      if (str) {
-        push("string", str[0]);
-        i += str[0].length;
-        continue;
-      }
-      const num = /^\d[\d_]*(?:\.\d+)?/.exec(rest);
-      if (num && !/[\w$]/.test(line[i - 1] ?? "")) {
-        push("number", num[0]);
-        i += num[0].length;
-        continue;
-      }
-      const word = /^[A-Za-z_$@][\w$-]*/.exec(rest);
-      if (word) {
-        let w = word[0];
-        if (lang !== "shell") w = /^[A-Za-z_$@][\w$]*/.exec(rest)[0];
-        const next = line.slice(i + w.length).trimStart()[0];
-        const kind = KEYWORDS[lang].has(w) ? "keyword" : next === "(" ? "function" : /^[A-Z]/.test(w) ? "type" : lang === "shell" && out.length === 0 ? "function" : "plain";
-        push(kind, w);
-        i += w.length;
-        continue;
-      }
-      const ch = line[i];
-      push(/\s/.test(ch) ? "plain" : /[{}()[\];,.:=<>+\-*/!?&|]/.test(ch) ? "punct" : "plain", ch);
-      i += 1;
-    }
-    return out;
-  }
-  function typeTimes(code, cps, at) {
-    const times = [];
-    let t = at;
-    let lineStart = true;
-    for (const ch of Array.from(code)) {
-      if (ch === "\n") {
-        t += 0.1;
-        times.push(t);
-        lineStart = true;
-        continue;
-      }
-      if (lineStart && ch === " ") {
-        times.push(t);
-        continue;
-      }
-      lineStart = false;
-      t += 1 / cps;
-      times.push(t);
-    }
-    return times;
-  }
-  function typeSeconds(code, cps) {
-    const times = typeTimes(code, cps, 0);
-    return times[times.length - 1] ?? 0;
-  }
-
-  // packages/motion/src/blocks/code_card/block.ts
-  var MAX_LINES = 16;
-  function build(ctx) {
-    const { tl, params: p, width: W, height: H, safe } = ctx;
-    const lang = String(p.language);
-    const code = codeText(String(p.code)).split("\n").slice(0, MAX_LINES).join("\n");
-    const lines = code.split("\n");
-    const output = String(p.output ?? "");
-    const S = ctx.seconds;
-    const winW = W <= H * 1.3 ? W - safe.left - safe.right + 60 : Math.min(1380, W * 0.68);
-    const win = ctx.el("div", "cc-win");
-    win.style.width = `${winW}px`;
-    const bar = ctx.el("div", "cc-bar", win);
-    for (let i = 0; i < 3; i += 1) ctx.el("span", "cc-dot", bar);
-    if (p.filename) ctx.el("span", "cc-tab", bar, String(p.filename));
-    const body = ctx.el("div", "cc-body", win);
-    const lit = ctx.el("div", "cc-lit", body);
-    const chars = [];
-    const codeEls = [];
-    lines.forEach((line, i) => {
-      const row = ctx.el("div", "cc-line", body);
-      ctx.el("span", "cc-num", row, String(i + 1));
-      const host = ctx.el("span", "cc-code", row);
-      codeEls.push(host);
-      for (const token of tokenizeLine(line, lang)) {
-        const span = ctx.el("span", `t-${token.kind}`, host);
-        for (const c of Array.from(token.text)) chars.push(ctx.el("span", "", span, c));
-      }
-      if (i < lines.length - 1) chars.push(ctx.el("span", "", host, ""));
-    });
-    const caret = ctx.el("span", "cc-caret", body);
-    const cols = Math.max(20, ...lines.map((l) => l.length));
-    const size = Math.max(18, Math.min(ctx.portrait ? 32 : 36, (winW - 40 - 3.4 * 30) / (cols * 0.6 + 1)));
-    body.style.fontSize = `${size}px`;
-    let run = null;
-    let runH = 0;
-    if (output) {
-      run = ctx.el("div", "cc-run", win);
-      const out = ctx.el("div", "cc-out", run);
-      icon(ctx, "check", "", out);
-      ctx.el("span", "", out, output);
-      runH = run.getBoundingClientRect().height;
-    }
-    const winH = win.getBoundingClientRect().height;
-    Object.assign(win.style, { left: `${(W - winW) / 2}px`, top: `${Math.max(safe.top, (H - winH) / 2 - (ctx.portrait ? 40 : 0))}px` });
-    const bodyRect = body.getBoundingClientRect();
-    const lineH = size * 1.6;
-    const pos = chars.map((c) => {
-      const r = c.getBoundingClientRect();
-      return { x: r.right - bodyRect.left, y: r.top - bodyRect.top };
-    });
-    const lineStarts = codeEls.map((el) => {
-      const r = el.getBoundingClientRect();
-      return { x: r.left - bodyRect.left, y: r.top - bodyRect.top };
-    });
-    const typeAt = 0.75;
-    const tail = (run ? 0.45 + 0.5 + 0.9 : 0.9) + (p.exit === false ? 0 : 0.4);
-    const pauses = typeSeconds(code, 1e9);
-    const typed = Array.from(code.replace(/\n\s*/g, "\n")).filter((c) => c !== "\n").length;
-    const cps = Math.min(90, Math.max(16, typed / Math.max(0.6, S - typeAt - tail - pauses)));
-    const times = typeTimes(code, cps, typeAt);
-    const typedEnd = times[times.length - 1] ?? typeAt;
-    const lineOf = [];
-    lines.forEach((line, i) => {
-      for (let k = 0; k < Array.from(line).length + (i < lines.length - 1 ? 1 : 0); k += 1) lineOf.push(i);
-    });
-    tl.track((t) => {
-      let shown = 0;
-      while (shown < times.length && times[shown] <= t) shown += 1;
-      chars.forEach((c, i) => {
-        const v = i < shown ? "visible" : "hidden";
-        if (c.style.visibility !== v) c.style.visibility = v;
-      });
-      const last = shown - 1;
-      const onNewline = last >= 0 && chars[last].textContent === "";
-      const line = last < 0 ? 0 : onNewline ? lineOf[last] + 1 : lineOf[last];
-      const at = last < 0 || onNewline ? { x: lineStarts[line]?.x ?? 0, y: lineStarts[line]?.y ?? 0 } : pos[last];
-      caret.style.left = `${at.x + 2}px`;
-      caret.style.top = `${at.y}px`;
-      lit.style.top = `${lineStarts[line]?.y ?? 0}px`;
-      const blinkOn = t < typeAt || t > typedEnd + 0.05 ? Math.floor(t * 2) % 2 === 0 : true;
-      caret.style.visibility = blinkOn ? "visible" : "hidden";
-    });
-    lit.style.height = `${lineH}px`;
-    tl.fromTo(win, { y: H * 0.04, scale: 0.97, opacity: 0, blur: 12 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.7, ease: "out" });
-    ctx.cue(0, "pop", { weight: 0.4, at: win });
-    if (typedEnd > typeAt) ctx.cue(typeAt, "type", { weight: 0.2, at: body, until: typedEnd, rate: cps });
-    if (run) {
-      const runAt = typedEnd + 0.45;
-      tl.fromTo(run, { height: 0 }, { height: runH }, { at: runAt, duration: 0.5, ease: "in-out" });
-      ctx.cue(runAt, "pop", { weight: 0.45, at: run });
-      const out = run.firstElementChild;
-      tl.fromTo(out, { y: -16, opacity: 0 }, { y: 0, opacity: 1 }, { at: runAt + 0.15, duration: 0.45, ease: "out" });
-      tl.to(lit, { opacity: 0 }, { at: runAt, duration: 0.3, ease: "smooth" });
-    }
   }
 
   // packages/motion/src/blocks/code_card/code_card-entry.ts

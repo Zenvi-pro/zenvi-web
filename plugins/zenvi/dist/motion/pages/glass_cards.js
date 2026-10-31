@@ -1,4 +1,179 @@
 (() => {
+  // packages/motion/src/blocks/ui.ts
+  var ICONS = {
+    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
+    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
+    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
+    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
+    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
+    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
+    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
+    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
+    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
+    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
+    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
+    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
+    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
+    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
+    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+  };
+  function icon(ctx, name, className, parent) {
+    const el = ctx.el("span", `icon ${className}`, parent);
+    el.innerHTML = ICONS[name];
+    return el;
+  }
+  function pointer(ctx, from, at, size = 64) {
+    const el = ctx.el("div", "cursor");
+    el.innerHTML = ICONS.pointer;
+    const ringSize = Math.round(size * 1.3);
+    if (size !== 64) Object.assign(el.style, { width: `${size}px`, height: `${size}px` });
+    const ring = ctx.el("div", "cursor-ring");
+    Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: `${ringSize}px`, height: `${ringSize}px`, marginLeft: `${-ringSize / 2}px`, marginTop: `${-ringSize / 2}px`, borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
+    const tip = (x, y) => ({ x: x - Math.round(size * 6 / 28), y: y - Math.round(size * 3.5 / 28) });
+    let last = from;
+    ctx.tl.fromTo(el, { ...tip(from.x, from.y), opacity: 0, scale: 0.8 }, { ...tip(from.x, from.y), opacity: 1, scale: 1 }, { at, duration: 0.3, ease: "out" });
+    return {
+      el,
+      moveTo(x, y, start, duration = 0.7) {
+        ctx.tl.to(el, tip(x, y), { at: start, duration, ease: "in-out" });
+        last = { x, y };
+      },
+      click(when, sound = "click") {
+        if (sound) ctx.cue(when, sound, { weight: 0.35, at: last });
+        ctx.tl.to(el, { scale: 0.86 }, { at: when, duration: 0.08, ease: "out" });
+        ctx.tl.to(el, { scale: 1 }, { at: when + 0.08, duration: 0.22, ease: "out" });
+        const p = last;
+        ctx.tl.set(ring, { x: p.x, y: p.y }, when);
+        ctx.tl.fromTo(ring, { scale: 0.3, opacity: 0.9 }, { scale: 1.4, opacity: 0 }, { at: when, duration: 0.5, ease: "out" });
+      }
+    };
+  }
+  function parseRich(text) {
+    return text.split(/\s*(?:\/|\n)\s*/).filter((line) => line.trim().length > 0).map((line) => {
+      const runs = [];
+      line.split(/(\*[^*]+\*)/).forEach((part) => {
+        if (!part) return;
+        const em = part.startsWith("*") && part.endsWith("*") && part.length > 2;
+        runs.push({ text: em ? part.slice(1, -1) : part, em });
+      });
+      return runs;
+    });
+  }
+  function fitWidth(el, lines, maxWidth, maxSize, minSize = 24) {
+    const probe = 100;
+    el.style.fontSize = `${probe}px`;
+    const widest = Math.max(1, ...lines.map((l) => l.scrollWidth || l.getBoundingClientRect().width));
+    const size = Math.max(minSize, Math.min(maxSize, probe * maxWidth / widest));
+    el.style.fontSize = `${size}px`;
+    return size;
+  }
+
+  // packages/motion/src/blocks/glass_cards/block.ts
+  var ICON_FILLS = ["var(--accent)", "var(--secondary)", "#1E1E24", "#2BB673"];
+  var CARD_ICONS = ["film", "note", "captions", "layers"];
+  function build(ctx) {
+    const { tl, params: p, width: W, height: H, safe } = ctx;
+    const titles = p.cards;
+    const details = p.details;
+    const S = ctx.seconds;
+    const back = ctx.el("div", "gc-stage");
+    const bg = ctx.mediaImg("background", "gc-bg", back);
+    if (!bg) {
+      ctx.el("div", "gc-sky", back);
+      for (const [x, y, w, h] of [[0.1, 0.62, 0.7, 0.2], [0.55, 0.7, 0.6, 0.22], [-0.1, 0.8, 0.8, 0.3], [0.6, 0.18, 0.35, 0.08]]) {
+        const c = ctx.el("div", "gc-cloud", back);
+        Object.assign(c.style, { left: `${x * W}px`, top: `${y * H}px`, width: `${w * W}px`, height: `${h * H}px` });
+      }
+    }
+    ctx.el("div", "gc-shade", back);
+    tl.fromTo(back, { scale: 1.08 }, { scale: 1 }, { at: 0, duration: S, ease: "out" });
+    let headlineBottom = safe.top;
+    const headline = p.headline ? ctx.el("div", "gc-headline") : null;
+    const headWords = [];
+    if (headline) {
+      const lines = parseRich(String(p.headline));
+      const inners = lines.map((runs) => {
+        const line = ctx.el("div", "", headline);
+        const inner = ctx.el("span", "", line);
+        inner.style.whiteSpace = "nowrap";
+        runs.forEach(
+          (run) => run.text.split(/(\s+)/).forEach((tok) => {
+            if (!tok) return;
+            if (/^\s+$/.test(tok)) inner.append(ctx.doc.createTextNode(" "));
+            else headWords.push(ctx.el("span", run.em ? "word em" : "word", inner, tok));
+          })
+        );
+        return inner;
+      });
+      fitWidth(headline, inners, W - safe.left - safe.right, ctx.portrait ? 104 : 96);
+      headline.style.top = `${safe.top}px`;
+      headlineBottom = safe.top + headline.getBoundingClientRect().height;
+      tl.fromTo(headWords, { yPercent: 40, opacity: 0, blur: 12 }, { yPercent: 0, opacity: 1, blur: 0 }, { at: 0.1, duration: 0.7, ease: "out", stagger: 0.06 });
+    }
+    const row = ctx.el("div", "gc-cards");
+    row.style.flexDirection = ctx.portrait ? "column" : "row";
+    const n = titles.length;
+    const cardW = ctx.portrait ? Math.min(760, W - safe.left - safe.right) : Math.min(540, (W - safe.left - safe.right - 28 * (n - 1)) / n);
+    const toggles = [];
+    const cards = titles.map((title, i) => {
+      const card = ctx.el("div", "gc-card glass", row);
+      card.style.width = `${cardW}px`;
+      if (ctx.portrait) Object.assign(card.style, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" });
+      const top2 = ctx.el("div", "gc-top", card);
+      const ic = ctx.el("div", "gc-icon", top2);
+      icon(ctx, CARD_ICONS[i % CARD_ICONS.length], "", ic);
+      ic.style.background = `linear-gradient(145deg, ${ICON_FILLS[i % ICON_FILLS.length]}, color-mix(in srgb, ${ICON_FILLS[i % ICON_FILLS.length]} 70%, #000))`;
+      const text = ctx.el("div", "", ctx.portrait ? top2 : card);
+      if (ctx.portrait) text.style.marginLeft = "26px";
+      ctx.el("div", "gc-title", text, title);
+      const detail = ctx.el("div", "gc-detail", text);
+      const off = ctx.el("span", "", detail, details[i] ?? "");
+      const on = ctx.el("span", "on", detail);
+      icon(ctx, "check", "", on);
+      ctx.el("span", "", on, String(p.status));
+      on.style.position = "absolute";
+      tl.set(on, { opacity: 0 }, 0);
+      const toggleTrack = ctx.el("div", "gc-toggle", ctx.portrait ? card : top2);
+      const knob = ctx.el("div", "gc-knob", toggleTrack);
+      const ring = ctx.el("div", "gc-ring", card);
+      toggles.push({ knob, track: toggleTrack, detail: off, on, ring, card });
+      return card;
+    });
+    const rowRect = row.getBoundingClientRect();
+    const free = H - safe.bottom - headlineBottom;
+    const top = headlineBottom + Math.max(40, (free - rowRect.height) / 2);
+    Object.assign(row.style, { left: `${(W - rowRect.width) / 2}px`, top: `${top}px` });
+    const cardsAt = 0.45;
+    const cardStagger = 0.12;
+    tl.fromTo(cards, { y: 120, rotateX: 28, scale: 0.92, opacity: 0, blur: 14 }, { y: 0, rotateX: 0, scale: 1, opacity: 1, blur: 0 }, { at: cardsAt, duration: 0.9, ease: "out", stagger: cardStagger });
+    cards.forEach((card, i) => ctx.cue(cardsAt + i * cardStagger, "pop", { weight: 0.45, at: card }));
+    const target = Number(p.click);
+    if (target >= 0 && target < n) {
+      const t = toggles[target];
+      const rect = t.track.getBoundingClientRect();
+      const x = rect.left + rect.width * 0.7;
+      const y = rect.top + rect.height / 2;
+      const clickAt = Math.min(S - 1.4, cardsAt + n * cardStagger + 1.5);
+      const ptr = pointer(ctx, { x: x + 220, y: y + 260 }, clickAt - 1.1);
+      ptr.moveTo(x, y, clickAt - 0.85, 0.75);
+      ptr.click(clickAt, null);
+      ctx.cue(clickAt + 0.03, "toggle", { weight: 0.4, at: t.knob });
+      tl.to(ptr.el, { x: x + 120, y: y + 140, opacity: 0 }, { at: clickAt + 0.7, duration: 0.5, ease: "in-out" });
+      tl.to(t.knob, { x: 40 }, { at: clickAt + 0.03, duration: 0.35, ease: "back-out" });
+      tl.to(t.track, { backgroundColor: "#34C759" }, { at: clickAt + 0.03, duration: 0.25, ease: "smooth" });
+      tl.to(t.detail, { opacity: 0, y: -10 }, { at: clickAt + 0.1, duration: 0.25, ease: "exit" });
+      tl.fromTo(t.on, { opacity: 0, y: 12 }, { opacity: 1, y: 0 }, { at: clickAt + 0.25, duration: 0.4, ease: "out" });
+      tl.fromTo(t.ring, { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1 }, { at: clickAt + 0.1, duration: 0.4, ease: "out" });
+      tl.to(t.card, { scale: 0.98 }, { at: clickAt, duration: 0.08, ease: "out" });
+      tl.to(t.card, { scale: 1.02 }, { at: clickAt + 0.08, duration: 0.35, ease: "back-out" });
+    }
+  }
+
   // packages/motion/src/runtime/easing.ts
   function cubicBezier(x1, y1, x2, y2) {
     const cx = 3 * x1;
@@ -218,9 +393,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -534,186 +709,6 @@
 ${error.stack ?? ""}` : String(error);
       rejectReady(error);
     });
-  }
-
-  // packages/motion/src/runtime/text.ts
-  function textLines(text) {
-    return text.split(/\s*\n\s*|\s+\/\s*|\s*\/\s+/).filter(Boolean);
-  }
-
-  // packages/motion/src/blocks/ui.ts
-  var ICONS = {
-    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
-    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
-    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
-    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
-    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
-    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
-    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
-    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
-    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
-    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
-    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
-    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
-    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
-    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
-    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
-    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
-    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
-    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
-    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
-    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
-  };
-  function icon(ctx, name, className, parent) {
-    const el = ctx.el("span", `icon ${className}`, parent);
-    el.innerHTML = ICONS[name];
-    return el;
-  }
-  function pointer(ctx, from, at, size = 64) {
-    const el = ctx.el("div", "cursor");
-    el.innerHTML = ICONS.pointer;
-    const ringSize = Math.round(size * 1.3);
-    if (size !== 64) Object.assign(el.style, { width: `${size}px`, height: `${size}px` });
-    const ring = ctx.el("div", "cursor-ring");
-    Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: `${ringSize}px`, height: `${ringSize}px`, marginLeft: `${-ringSize / 2}px`, marginTop: `${-ringSize / 2}px`, borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
-    const tip = (x, y) => ({ x: x - Math.round(size * 6 / 28), y: y - Math.round(size * 3.5 / 28) });
-    let last = from;
-    ctx.tl.fromTo(el, { ...tip(from.x, from.y), opacity: 0, scale: 0.8 }, { ...tip(from.x, from.y), opacity: 1, scale: 1 }, { at, duration: 0.3, ease: "out" });
-    return {
-      el,
-      moveTo(x, y, start, duration = 0.7) {
-        ctx.tl.to(el, tip(x, y), { at: start, duration, ease: "in-out" });
-        last = { x, y };
-      },
-      click(when, sound = "click") {
-        if (sound) ctx.cue(when, sound, { weight: 0.35, at: last });
-        ctx.tl.to(el, { scale: 0.86 }, { at: when, duration: 0.08, ease: "out" });
-        ctx.tl.to(el, { scale: 1 }, { at: when + 0.08, duration: 0.22, ease: "out" });
-        const p = last;
-        ctx.tl.set(ring, { x: p.x, y: p.y }, when);
-        ctx.tl.fromTo(ring, { scale: 0.3, opacity: 0.9 }, { scale: 1.4, opacity: 0 }, { at: when, duration: 0.5, ease: "out" });
-      }
-    };
-  }
-  function parseRich(text) {
-    return textLines(text).filter((line) => line.trim().length > 0).map((line) => {
-      const runs = [];
-      line.split(/(\*[^*]+\*)/).forEach((part) => {
-        if (!part) return;
-        const em = part.startsWith("*") && part.endsWith("*") && part.length > 2;
-        runs.push({ text: em ? part.slice(1, -1) : part, em });
-      });
-      return runs;
-    });
-  }
-  function fitWidth(el, lines, maxWidth, maxSize, minSize = 24) {
-    const probe = 100;
-    el.style.fontSize = `${probe}px`;
-    const widest = Math.max(1, ...lines.map((l) => l.scrollWidth || l.getBoundingClientRect().width));
-    const size = Math.max(minSize, Math.min(maxSize, probe * maxWidth / widest));
-    el.style.fontSize = `${size}px`;
-    return size;
-  }
-
-  // packages/motion/src/blocks/glass_cards/block.ts
-  var ICON_FILLS = ["var(--accent)", "var(--secondary)", "#1E1E24", "#2BB673"];
-  var CARD_ICONS = ["film", "note", "captions", "layers"];
-  function build(ctx) {
-    const { tl, params: p, width: W, height: H, safe } = ctx;
-    const titles = p.cards;
-    const details = p.details;
-    const S = ctx.seconds;
-    const back = ctx.el("div", "gc-stage");
-    const bg = ctx.mediaImg("background", "gc-bg", back);
-    if (!bg) {
-      ctx.el("div", "gc-sky", back);
-      for (const [x, y, w, h] of [[0.1, 0.62, 0.7, 0.2], [0.55, 0.7, 0.6, 0.22], [-0.1, 0.8, 0.8, 0.3], [0.6, 0.18, 0.35, 0.08]]) {
-        const c = ctx.el("div", "gc-cloud", back);
-        Object.assign(c.style, { left: `${x * W}px`, top: `${y * H}px`, width: `${w * W}px`, height: `${h * H}px` });
-      }
-    }
-    ctx.el("div", "gc-shade", back);
-    tl.fromTo(back, { scale: 1.08 }, { scale: 1 }, { at: 0, duration: S, ease: "out" });
-    let headlineBottom = safe.top;
-    const headline = p.headline ? ctx.el("div", "gc-headline") : null;
-    const headWords = [];
-    if (headline) {
-      const lines = parseRich(String(p.headline));
-      const inners = lines.map((runs) => {
-        const line = ctx.el("div", "", headline);
-        const inner = ctx.el("span", "", line);
-        inner.style.whiteSpace = "nowrap";
-        runs.forEach(
-          (run) => run.text.split(/(\s+)/).forEach((tok) => {
-            if (!tok) return;
-            if (/^\s+$/.test(tok)) inner.append(ctx.doc.createTextNode(" "));
-            else headWords.push(ctx.el("span", run.em ? "word em" : "word", inner, tok));
-          })
-        );
-        return inner;
-      });
-      fitWidth(headline, inners, W - safe.left - safe.right, ctx.portrait ? 104 : 96);
-      headline.style.top = `${safe.top}px`;
-      headlineBottom = safe.top + headline.getBoundingClientRect().height;
-      tl.fromTo(headWords, { yPercent: 40, opacity: 0, blur: 12 }, { yPercent: 0, opacity: 1, blur: 0 }, { at: 0.1, duration: 0.7, ease: "out", stagger: 0.06 });
-    }
-    const row = ctx.el("div", "gc-cards");
-    row.style.flexDirection = ctx.portrait ? "column" : "row";
-    const n = titles.length;
-    const cardW = ctx.portrait ? Math.min(760, W - safe.left - safe.right) : Math.min(540, (W - safe.left - safe.right - 28 * (n - 1)) / n);
-    const toggles = [];
-    const cards = titles.map((title, i) => {
-      const card = ctx.el("div", "gc-card glass", row);
-      card.style.width = `${cardW}px`;
-      if (ctx.portrait) Object.assign(card.style, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" });
-      const top2 = ctx.el("div", "gc-top", card);
-      const ic = ctx.el("div", "gc-icon", top2);
-      icon(ctx, CARD_ICONS[i % CARD_ICONS.length], "", ic);
-      ic.style.background = `linear-gradient(145deg, ${ICON_FILLS[i % ICON_FILLS.length]}, color-mix(in srgb, ${ICON_FILLS[i % ICON_FILLS.length]} 70%, #000))`;
-      const text = ctx.el("div", "", ctx.portrait ? top2 : card);
-      if (ctx.portrait) text.style.marginLeft = "26px";
-      ctx.el("div", "gc-title", text, title);
-      const detail = ctx.el("div", "gc-detail", text);
-      const off = ctx.el("span", "", detail, details[i] ?? "");
-      const on = ctx.el("span", "on", detail);
-      icon(ctx, "check", "", on);
-      ctx.el("span", "", on, String(p.status));
-      on.style.position = "absolute";
-      tl.set(on, { opacity: 0 }, 0);
-      const toggleTrack = ctx.el("div", "gc-toggle", ctx.portrait ? card : top2);
-      const knob = ctx.el("div", "gc-knob", toggleTrack);
-      const ring = ctx.el("div", "gc-ring", card);
-      toggles.push({ knob, track: toggleTrack, detail: off, on, ring, card });
-      return card;
-    });
-    const rowRect = row.getBoundingClientRect();
-    const free = H - safe.bottom - headlineBottom;
-    const top = headlineBottom + Math.max(40, (free - rowRect.height) / 2);
-    Object.assign(row.style, { left: `${(W - rowRect.width) / 2}px`, top: `${top}px` });
-    const cardsAt = 0.45;
-    const cardStagger = 0.12;
-    tl.fromTo(cards, { y: 120, rotateX: 28, scale: 0.92, opacity: 0, blur: 14 }, { y: 0, rotateX: 0, scale: 1, opacity: 1, blur: 0 }, { at: cardsAt, duration: 0.9, ease: "out", stagger: cardStagger });
-    cards.forEach((card, i) => ctx.cue(cardsAt + i * cardStagger, "pop", { weight: 0.45, at: card }));
-    const target = Number(p.click);
-    if (target >= 0 && target < n) {
-      const t = toggles[target];
-      const rect = t.track.getBoundingClientRect();
-      const x = rect.left + rect.width * 0.7;
-      const y = rect.top + rect.height / 2;
-      const clickAt = Math.min(S - 1.4, cardsAt + n * cardStagger + 1.5);
-      const ptr = pointer(ctx, { x: x + 220, y: y + 260 }, clickAt - 1.1);
-      ptr.moveTo(x, y, clickAt - 0.85, 0.75);
-      ptr.click(clickAt, null);
-      ctx.cue(clickAt + 0.03, "toggle", { weight: 0.4, at: t.knob });
-      tl.to(ptr.el, { x: x + 120, y: y + 140, opacity: 0 }, { at: clickAt + 0.7, duration: 0.5, ease: "in-out" });
-      tl.to(t.knob, { x: 40 }, { at: clickAt + 0.03, duration: 0.35, ease: "back-out" });
-      tl.to(t.track, { backgroundColor: "#34C759" }, { at: clickAt + 0.03, duration: 0.25, ease: "smooth" });
-      tl.to(t.detail, { opacity: 0, y: -10 }, { at: clickAt + 0.1, duration: 0.25, ease: "exit" });
-      tl.fromTo(t.on, { opacity: 0, y: 12 }, { opacity: 1, y: 0 }, { at: clickAt + 0.25, duration: 0.4, ease: "out" });
-      tl.fromTo(t.ring, { opacity: 0, scale: 1.04 }, { opacity: 1, scale: 1 }, { at: clickAt + 0.1, duration: 0.4, ease: "out" });
-      tl.to(t.card, { scale: 0.98 }, { at: clickAt, duration: 0.08, ease: "out" });
-      tl.to(t.card, { scale: 1.02 }, { at: clickAt + 0.08, duration: 0.35, ease: "back-out" });
-    }
   }
 
   // packages/motion/src/blocks/glass_cards/glass_cards-entry.ts

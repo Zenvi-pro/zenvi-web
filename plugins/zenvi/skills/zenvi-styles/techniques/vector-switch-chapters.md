@@ -34,9 +34,13 @@ and confirm on the frames. Then lay the cuts on the beat grid
 ```json
 add_clip_to_timeline_tool {"file_id": "<walk-away 1>", "position_seconds": 0, "start_seconds": 5, "end_seconds": 6, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<walk-away 2>", "position_seconds": 1, "start_seconds": 6, "end_seconds": 7, "track": "1"}
-add_clip_to_timeline_tool {"file_id": "<walk-away 3..5>", "position_seconds": 2, "start_seconds": 1.5, "end_seconds": 2.5, "track": "1"}
+add_clip_to_timeline_tool {"file_id": "<walk-away 3>", "position_seconds": 2, "start_seconds": 1.5, "end_seconds": 2.5, "track": "1"}
+add_clip_to_timeline_tool {"file_id": "<walk-away 4>", "position_seconds": 3, "start_seconds": 1.5, "end_seconds": 2.5, "track": "1"}
+add_clip_to_timeline_tool {"file_id": "<walk-away 5>", "position_seconds": 4, "start_seconds": 1.5, "end_seconds": 2.5, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<profile L-R 1>", "position_seconds": 5, "start_seconds": 1.7, "end_seconds": 2.7, "track": "1"}
-add_clip_to_timeline_tool {"file_id": "<profile L-R 2..4>", "position_seconds": 6, "start_seconds": 0.5, "end_seconds": 1.5, "track": "1"}
+add_clip_to_timeline_tool {"file_id": "<profile L-R 2>", "position_seconds": 6, "start_seconds": 0.5, "end_seconds": 1.5, "track": "1"}
+add_clip_to_timeline_tool {"file_id": "<profile L-R 3>", "position_seconds": 7, "start_seconds": 0.5, "end_seconds": 1.5, "track": "1"}
+add_clip_to_timeline_tool {"file_id": "<profile L-R 4>", "position_seconds": 8, "start_seconds": 0.5, "end_seconds": 1.5, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<toward camera>", "position_seconds": 9, "start_seconds": 3.5, "end_seconds": 4.5, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<portrait>", "position_seconds": 10, "start_seconds": 3, "end_seconds": 4, "track": "1"}
 add_clip_to_timeline_tool {"file_id": "<held figure>", "position_seconds": 11, "start_seconds": 4, "end_seconds": 7, "track": "1"}

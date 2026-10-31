@@ -60,6 +60,7 @@ async function checkLengths(call: ToolCall, tool: string, paths: readonly string
     } catch (error) {
       return refused(tool, `Error: could not read ${p}: ${message(error)}`);
     }
+    if (!(seconds > 0)) return refused(tool, `Error: could not read the length of ${p}.`);
     if (seconds > COMPARE_MAX_SECONDS + 0.5) {
       return refused(tool, `Error: ${p} is ${fmt(seconds)} long; comparing takes renders of at most ${COMPARE_MAX_SECONDS} s. Render the variants as short proxies (or the part that differs) and compare those.`);
     }

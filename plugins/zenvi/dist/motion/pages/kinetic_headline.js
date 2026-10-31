@@ -1,4 +1,102 @@
 (() => {
+  // packages/motion/src/blocks/ui.ts
+  function parseRich(text) {
+    return text.split(/\s*(?:\/|\n)\s*/).filter((line) => line.trim().length > 0).map((line) => {
+      const runs = [];
+      line.split(/(\*[^*]+\*)/).forEach((part) => {
+        if (!part) return;
+        const em = part.startsWith("*") && part.endsWith("*") && part.length > 2;
+        runs.push({ text: em ? part.slice(1, -1) : part, em });
+      });
+      return runs;
+    });
+  }
+  function fitWidth(el, lines, maxWidth, maxSize, minSize = 24) {
+    const probe = 100;
+    el.style.fontSize = `${probe}px`;
+    const widest = Math.max(1, ...lines.map((l) => l.scrollWidth || l.getBoundingClientRect().width));
+    const size = Math.max(minSize, Math.min(maxSize, probe * maxWidth / widest));
+    el.style.fontSize = `${size}px`;
+    return size;
+  }
+
+  // packages/motion/src/blocks/kinetic_headline/block.ts
+  function build(ctx) {
+    const { tl, params: p, width: W, height: H, safe } = ctx;
+    const style = String(p.style);
+    const lines = parseRich(String(p.text));
+    const box = ctx.el("div", `kh kh-${p.emphasis} kh-${style}`);
+    box.style.alignItems = p.align === "left" ? "flex-start" : "center";
+    box.style.textAlign = p.align === "left" ? "left" : "center";
+    if (p.kicker) ctx.el("div", "kh-kicker", box, String(p.kicker));
+    const text = ctx.el("div", "kh-text", box);
+    const inners = [];
+    const words = [];
+    const chars = [];
+    for (const runs of lines) {
+      const line = ctx.el("span", "kh-line", text);
+      const inner = ctx.el("span", "kh-inner", line);
+      inners.push(inner);
+      const lineWords = [];
+      const lineChars = [];
+      for (const run of runs) {
+        for (const token of run.text.split(/(\s+)/)) {
+          if (!token) continue;
+          if (/^\s+$/.test(token)) {
+            inner.append(ctx.doc.createTextNode(" "));
+            continue;
+          }
+          const word = ctx.el("span", run.em ? "word em" : "word", inner);
+          if (style === "pop") for (const c of Array.from(token)) lineChars.push(ctx.el("span", "char", word, c));
+          else word.textContent = token;
+          if (style === "pop") for (const c of word.children) c.style.display = "inline-block";
+          lineWords.push(word);
+        }
+      }
+      words.push(lineWords);
+      chars.push(lineChars);
+    }
+    const maxWidth = W - safe.left - safe.right;
+    fitWidth(text, inners, maxWidth, Number(p.max_size));
+    const rect = box.getBoundingClientRect();
+    const left = p.align === "left" ? safe.left : (W - rect.width) / 2;
+    const usable = H - safe.top - safe.bottom;
+    const top = p.position === "upper" ? safe.top : p.position === "lower" ? H - safe.bottom - rect.height : safe.top + (usable - rect.height) / 2;
+    Object.assign(box.style, { left: `${left}px`, top: `${top}px` });
+    const kicker = box.querySelector(".kh-kicker");
+    if (kicker) tl.fromTo(kicker, { y: 16, opacity: 0 }, { y: 0, opacity: 1 }, { at: 0, duration: 0.5, ease: "out" });
+    const start = kicker ? 0.15 : 0;
+    let at = start;
+    const CHAR_EACH = 0.025;
+    const WORD_EACH = style === "blur" ? 0.07 : 0.06;
+    lines.forEach((_, i) => {
+      const lw = words[i];
+      switch (style) {
+        case "blur":
+          tl.fromTo(lw, { opacity: 0, blur: 22, scale: 1.12, y: 10 }, { opacity: 1, blur: 0, scale: 1, y: 0 }, { at, duration: 0.8, ease: "out", stagger: WORD_EACH });
+          break;
+        case "pop":
+          tl.fromTo(chars[i], { opacity: 0, scale: 0.3, y: 30 }, { opacity: 1, scale: 1, y: 0 }, { at, duration: 0.45, ease: "back-out", stagger: CHAR_EACH });
+          break;
+        case "wipe":
+          tl.fromTo(inners[i], { clipPath: "inset(0% 100% 0% 0%)", x: -30 }, { clipPath: "inset(0% 0% 0% 0%)", x: 0 }, { at, duration: 0.8, ease: "in-out" });
+          break;
+        default:
+          tl.fromTo(lw, { yPercent: 110, rotate: 4 }, { yPercent: 0, rotate: 0 }, { at, duration: 0.75, ease: "out", stagger: WORD_EACH });
+      }
+      ctx.cue(at, "whoosh", { weight: 0.3, at: inners[i] });
+      let first = 0;
+      lw.forEach((word, j) => {
+        const wordAt = style === "wipe" ? at : style === "pop" ? at + first * CHAR_EACH : at + j * WORD_EACH;
+        first += word.children.length;
+        if (word.classList.contains("em")) ctx.cue(wordAt, "impact", { weight: 0.8, at: word });
+      });
+      const perLine = style === "pop" ? chars[i].length * CHAR_EACH : style === "wipe" ? 0.25 : lw.length * WORD_EACH;
+      at += 0.12 + perLine;
+    });
+    tl.fromTo(text, { scale: 1 }, { scale: 1.03 }, { at: 0, duration: ctx.seconds, ease: "in-out" });
+  }
+
   // packages/motion/src/runtime/easing.ts
   function cubicBezier(x1, y1, x2, y2) {
     const cx = 3 * x1;
@@ -218,9 +316,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -534,109 +632,6 @@
 ${error.stack ?? ""}` : String(error);
       rejectReady(error);
     });
-  }
-
-  // packages/motion/src/runtime/text.ts
-  function textLines(text) {
-    return text.split(/\s*\n\s*|\s+\/\s*|\s*\/\s+/).filter(Boolean);
-  }
-
-  // packages/motion/src/blocks/ui.ts
-  function parseRich(text) {
-    return textLines(text).filter((line) => line.trim().length > 0).map((line) => {
-      const runs = [];
-      line.split(/(\*[^*]+\*)/).forEach((part) => {
-        if (!part) return;
-        const em = part.startsWith("*") && part.endsWith("*") && part.length > 2;
-        runs.push({ text: em ? part.slice(1, -1) : part, em });
-      });
-      return runs;
-    });
-  }
-  function fitWidth(el, lines, maxWidth, maxSize, minSize = 24) {
-    const probe = 100;
-    el.style.fontSize = `${probe}px`;
-    const widest = Math.max(1, ...lines.map((l) => l.scrollWidth || l.getBoundingClientRect().width));
-    const size = Math.max(minSize, Math.min(maxSize, probe * maxWidth / widest));
-    el.style.fontSize = `${size}px`;
-    return size;
-  }
-
-  // packages/motion/src/blocks/kinetic_headline/block.ts
-  function build(ctx) {
-    const { tl, params: p, width: W, height: H, safe } = ctx;
-    const style = String(p.style);
-    const lines = parseRich(String(p.text));
-    const box = ctx.el("div", `kh kh-${p.emphasis} kh-${style}`);
-    box.style.alignItems = p.align === "left" ? "flex-start" : "center";
-    box.style.textAlign = p.align === "left" ? "left" : "center";
-    if (p.kicker) ctx.el("div", "kh-kicker", box, String(p.kicker));
-    const text = ctx.el("div", "kh-text", box);
-    const inners = [];
-    const words = [];
-    const chars = [];
-    for (const runs of lines) {
-      const line = ctx.el("span", "kh-line", text);
-      const inner = ctx.el("span", "kh-inner", line);
-      inners.push(inner);
-      const lineWords = [];
-      const lineChars = [];
-      for (const run of runs) {
-        for (const token of run.text.split(/(\s+)/)) {
-          if (!token) continue;
-          if (/^\s+$/.test(token)) {
-            inner.append(ctx.doc.createTextNode(" "));
-            continue;
-          }
-          const word = ctx.el("span", run.em ? "word em" : "word", inner);
-          if (style === "pop") for (const c of Array.from(token)) lineChars.push(ctx.el("span", "char", word, c));
-          else word.textContent = token;
-          if (style === "pop") for (const c of word.children) c.style.display = "inline-block";
-          lineWords.push(word);
-        }
-      }
-      words.push(lineWords);
-      chars.push(lineChars);
-    }
-    const maxWidth = W - safe.left - safe.right;
-    fitWidth(text, inners, maxWidth, Number(p.max_size));
-    const rect = box.getBoundingClientRect();
-    const left = p.align === "left" ? safe.left : (W - rect.width) / 2;
-    const usable = H - safe.top - safe.bottom;
-    const top = p.position === "upper" ? safe.top : p.position === "lower" ? H - safe.bottom - rect.height : safe.top + (usable - rect.height) / 2;
-    Object.assign(box.style, { left: `${left}px`, top: `${top}px` });
-    const kicker = box.querySelector(".kh-kicker");
-    if (kicker) tl.fromTo(kicker, { y: 16, opacity: 0 }, { y: 0, opacity: 1 }, { at: 0, duration: 0.5, ease: "out" });
-    const start = kicker ? 0.15 : 0;
-    let at = start;
-    const CHAR_EACH = 0.025;
-    const WORD_EACH = style === "blur" ? 0.07 : 0.06;
-    lines.forEach((_, i) => {
-      const lw = words[i];
-      switch (style) {
-        case "blur":
-          tl.fromTo(lw, { opacity: 0, blur: 22, scale: 1.12, y: 10 }, { opacity: 1, blur: 0, scale: 1, y: 0 }, { at, duration: 0.8, ease: "out", stagger: WORD_EACH });
-          break;
-        case "pop":
-          tl.fromTo(chars[i], { opacity: 0, scale: 0.3, y: 30 }, { opacity: 1, scale: 1, y: 0 }, { at, duration: 0.45, ease: "back-out", stagger: CHAR_EACH });
-          break;
-        case "wipe":
-          tl.fromTo(inners[i], { clipPath: "inset(0% 100% 0% 0%)", x: -30 }, { clipPath: "inset(0% 0% 0% 0%)", x: 0 }, { at, duration: 0.8, ease: "in-out" });
-          break;
-        default:
-          tl.fromTo(lw, { yPercent: 110, rotate: 4 }, { yPercent: 0, rotate: 0 }, { at, duration: 0.75, ease: "out", stagger: WORD_EACH });
-      }
-      ctx.cue(at, "whoosh", { weight: 0.3, at: inners[i] });
-      let first = 0;
-      lw.forEach((word, j) => {
-        const wordAt = style === "wipe" ? at : style === "pop" ? at + first * CHAR_EACH : at + j * WORD_EACH;
-        first += word.children.length;
-        if (word.classList.contains("em")) ctx.cue(wordAt, "impact", { weight: 0.8, at: word });
-      });
-      const perLine = style === "pop" ? chars[i].length * CHAR_EACH : style === "wipe" ? 0.25 : lw.length * WORD_EACH;
-      at += 0.12 + perLine;
-    });
-    tl.fromTo(text, { scale: 1 }, { scale: 1.03 }, { at: 0, duration: ctx.seconds, ease: "in-out" });
   }
 
   // packages/motion/src/blocks/kinetic_headline/kinetic_headline-entry.ts

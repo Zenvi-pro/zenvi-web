@@ -550,7 +550,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       stock: "the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY",
       mattes: "onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)",
       motion: "the image has chrome-headless-shell (one block renders at a time)",
-      watch: "the server calls the Zenvi backend and has ffmpeg; the render must be media in the project's bin",
+      watch: "the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin",
     },
     hidden: [
       "new_project_tool",

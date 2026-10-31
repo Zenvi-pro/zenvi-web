@@ -11,7 +11,7 @@ Every whole video starts here, before the first edit:
    `inspect_media_bin_tool`, the creative-direction draw, 8-12 motifs with
    a through-line, a storyboard that does not repeat itself, the reskin test
    and the self-critique against the style's checklist, then
-   `save_brief_tool` (it refuses a whole video planned without them). The
+   `save_brief_tool`. Only goal, frame, length, style, hook and beats are required; the rest is advice for pieces of 20 s or more. Nothing waits for it: an agent that skips it gets a minimal auto brief on its first cut. The
    motif method is `METHOD-motif.md`; credits in `NOTICE`. A few minutes here is
    the difference between a reel and a slideshow.
 2. **Pick ONE style** from the table below: the row whose "use when" matches

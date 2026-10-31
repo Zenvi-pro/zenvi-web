@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { fakeShotHost } from "../test-support/fake-shots.js";
 import type { TimedText } from "../../analysis/transcription.js";
 import { pickBrollWords } from "../broll-words.js";
 import { EditHarness } from "../test-support/edit-harness.js";
@@ -153,21 +152,6 @@ describe("insert_broll_on_words_tool", () => {
     if (glacier) expect(glacier.file_id).toBe(sources[0]);
     ed.doc.undo();
     expect(ed.doc.project.clips).toHaveLength(1);
-  });
-
-  it("with the shot model installed, picks the file whose picture shows the word, from that moment", async () => {
-    const text = "we went out early today and later that evening we walked the dog for a long time and we sat outside on the porch together and watched the moon rise over the hills";
-    const { ed, clip } = harness(spoken(text, 0.5, 0.45));
-    const ids = ["a.mp4", "b.mp4", "c.mp4"].map((name) => ed.addFile("video", { name, duration: 8 }));
-    const path = (id: string) => ed.doc.project.files.find((f) => f.id === id)!.path;
-    // Neutral names: only the picture says which file shows what. b.mp4 shows a dog from 4 s.
-    ed.host.shots = fakeShotHost({ [path(ids[0]!)]: [[0, "city"]], [path(ids[1]!)]: [[0, "city"], [4, "dog"]], [path(ids[2]!)]: [[0, "moon"]] });
-    const receipt = await ed.call("insert_broll_on_words_tool", { timeline_clip_ids: [clip], keywords: ["dog", "moon"] });
-    expect(receipt.status, receipt.summary).toBe("applied");
-    const inserts = (receipt.data as { inserts: { word: string; file_id: string; source_in: number; picked_by?: string }[] }).inserts;
-    expect(inserts.map((r) => [r.word, r.file_id, r.picked_by])).toEqual([["dog", ids[1], "picture"], ["moon", ids[2], "picture"]]);
-    // The dog cutaway is centred on the dog (4 s on), not the file's first second.
-    expect(inserts[0]!.source_in).toBeGreaterThanOrEqual(3);
   });
 
   it("finds stock for each keyword with stock=true", async () => {

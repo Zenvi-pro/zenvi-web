@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { shotFeatures, THUMB_H, THUMB_W, type ShotFrames } from "./features.js";
-import { normalize } from "../shots/vectors.js";
 import { arcTarget, planSequence, ranks, type SequenceShotInput } from "./plan.js";
 
 /** A frame of one continuous take: a bright square at column x on a dark ramp, tinted per take. */
@@ -93,20 +92,6 @@ describe("planSequence", () => {
     expect(plan.lengths).toEqual([1]);
     expect(plan.close).toBeNull();
     expect(() => planSequence(shots, { open: 0, close: 2, slots: [1] })).toThrow(/pinned/);
-  });
-
-  it("with shot embeddings, cuts to the shot that shows what the last one ended on", () => {
-    // Five shots of one picture in five tints; their embeddings sit along an arc, given out of order.
-    const angles = [0.9, 0, 1.2, 0.3, 0.6];
-    const look = (a: number) => normalize([Math.cos(a), Math.sin(a)]);
-    const tints: [number, number, number][] = [[0, 0, 20], [20, 0, 0], [0, 20, 0], [10, 10, 0], [0, 10, 10]];
-    const shots = angles.map((a, i) => shot(take(0, 8, tints[i]), 1, { look: { head: look(a), tail: look(a) } }));
-    const plan = planSequence(shots, { arc: "flat", open: 1, close: null });
-    expect(plan.order.map((i) => angles[i])).toEqual([0, 0.3, 0.6, 0.9, 1.2]);
-    expect(plan.cuts.every((c) => c.reasons.includes("looks alike"))).toBe(true);
-    // Without embeddings on every shot the look term is off: one shot without one changes nothing else.
-    const partial = planSequence(shots.map((s, i) => (i === 2 ? { ...s, look: undefined } : s)), { arc: "flat", open: 1, close: null });
-    expect(partial.cuts.some((c) => c.reasons.includes("looks alike"))).toBe(false);
   });
 
   it("refuses impossible goals as programmer errors", () => {

@@ -122,6 +122,7 @@ async function previewFrameCommand(ctx: CommandContext, args: Record<string, unk
     seconds = undefined;
   }
   if (seconds === undefined || !Number.isFinite(seconds) || seconds < 0) throw new CliError("preview_frame needs seconds=<timeline time ≥ 0>.", 2);
+  if (args.format !== undefined && args.format !== "jpeg" && args.format !== "png") throw new CliError(`preview_frame format is jpeg or png, not '${String(args.format)}'.`, 2);
   const format = args.format === "png" ? "png" : "jpeg";
   if (imagesDir) await mkdir(path.resolve(ctx.cwd, imagesDir), { recursive: true });
   const output = imagesDir ? path.join(imagesDir, defaultFramePath(seconds, format)) : undefined;

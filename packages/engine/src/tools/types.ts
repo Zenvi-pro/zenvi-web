@@ -1100,6 +1100,11 @@ export interface WatchHost {
   /** Seconds of the file `watch` would open (the same path resolution); absent = the tool asks `media.probe`. */
   length?(path: string, signal?: AbortSignal): Promise<number>;
   /**
+   * Watch a render this host made of the open project, by its id (Zenvi
+   * Cloud: what render_project returned). Absent = renders are watched by path.
+   */
+  watchRender?(renderId: string, request?: WatchRequest): Promise<WatchCritique>;
+  /**
    * Watch two renders in one go, `first` shown as A (review/compare.ts).
    * One order per call; the tools run both. Absent = compared from two
    * separate `watch` calls.

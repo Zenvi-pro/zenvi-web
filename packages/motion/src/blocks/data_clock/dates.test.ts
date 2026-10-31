@@ -56,5 +56,7 @@ describe("dates", () => {
     expect(checkParams(m, { start: "2006-02-05", end: "2006-01-20" })).toMatchObject({ ok: false, error: expect.stringContaining("after start") });
     expect(checkParams(m, { legends: ["Heat=0..1@rainbow"] })).toMatchObject({ ok: false, error: expect.stringContaining("rainbow") });
     expect(checkParams(m, { legends: ["Heat 0 to 1"] })).toMatchObject({ ok: false });
+    // A name Object.prototype has is not a ramp (it threw in the renderer).
+    expect(checkParams(m, { legends: ["Heat=0..1@constructor"] })).toMatchObject({ ok: false, error: expect.stringContaining("constructor") });
   });
 });

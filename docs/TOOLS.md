@@ -19,7 +19,7 @@ Availability follows each tool's required host capabilities and the host methods
 
 - **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, stock, storage, assets, audio, library; methods media.importUrl, media.pickFiles, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, ui.openExportDialog, audio.decodePcm, audio.mixPcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode, ui.layout, ui.preferences, ui.clearPlaybackCache, exporter.supports; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi), stock (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, stock, assets, mattes, shots, motion, scenes3d, fx, library, watch; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, media.missing, media.fetchWebVideo, media.kitSample, media.inspectRender, media.decodeLuma, storage.open, storage.readText, storage.writeText, storage.writeBytes, storage.saveCopy, storage.readCopy, storage.exportMedia, storage.currentPath, storage.recentProjects, storage.recoveryCopies, storage.customProfiles, media.collect, audio.decodePcm, audio.mixPcm, audio.transcribe, audio.generateSfx, exporter.supports, frames.fontFamilies, frames.renderSheet, frames.sampleFrames, audio.measureMix; only sometimes: backend (signed in with zenvi login), stock (signed in with zenvi login), media.fetchWebVideo (yt-dlp is installed; zenvi doctor checks), audio.generateSfx (ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan), mattes (onnxruntime-node is installed; the matting model downloads on first use), audio.transcribe (zenvi speech setup ran (on device, free), else signed in with zenvi login), shots (onnxruntime-node is installed; the SigLIP model (about 213 MB) downloads once when the person agrees (zenvi shots setup, or embed_media_tool download=true)), motion (headless Chrome is installed: zenvi motion setup), scenes3d (Blender 4.2+ is installed (or ZENVI_BLENDER points to it)), fx (ffmpeg is installed (ZENVI_FX=0 turns it off)), watch (signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, stock, exporter, mattes, motion, watch; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.mixPcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), audio.mixPcm (ffprobe is available), backend (the server is set up to call the Zenvi backend), stock (the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY), mattes (onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)), motion (the image has chrome-headless-shell (one block renders at a time)), watch (the server calls the Zenvi backend and has ffmpeg; the render must be media in the project's bin); hides 17 local-app tools.
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, stock, exporter, mattes, motion, watch; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.mixPcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), audio.mixPcm (ffprobe is available), backend (the server is set up to call the Zenvi backend), stock (the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY), mattes (onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)), motion (the image has chrome-headless-shell (one block renders at a time)), watch (the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin); hides 17 local-app tools.
 
 ## Matrix
 
@@ -3645,7 +3645,6 @@ Availability: editor partial (without frame sampling each shot is compared on a 
 | `voice_file_id` | string |  | The voice-over / dialogue in the media bin that speaker shots sync to (speech_at, says; a clip of this same file syncs by itself). |
 | `voice_at` | number |  | Timeline seconds where voice_file_id's audio starts (default: where a clip of it plays it, else the sequence start). (min 0) |
 | `position` | number |  | File shots: timeline seconds the sequence starts at (default 0). (min 0) |
-| `look` | boolean |  | true: also weigh how alike the shots look across each cut (the shot model, when installed: embed_media_tool). Joins more of the shots an editor puts side by side, at some cost to the overall order; best for montages and match cuts. Default false. |
 | `dry_run` | boolean |  | Only plan: return the order (data.file_ids feeds match_cut_montage_tool or build_reel_tool) without changing the timeline. |
 
 ### track_point_tool
@@ -3848,6 +3847,8 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `checklist` | string[] |  | The style's finish checklist, the lines review checks before done. (default []) |
 | `critique` | string |  | What the self-critique against the style's best-vs-average list changed. |
 | `missing` | string[] |  | Facts the person must supply (brand name, URL, price): never invented. (default []) |
+| `auto` | boolean |  | Set by Zenvi when the first cut saved a minimal brief for an agent that had none; a brief you save yourself leaves it out. |
+| `check_method` | boolean |  | true lists where the brief falls short of the motif method at any length (default: from 20 s). |
 
 ### get_brief_tool
 
@@ -3898,11 +3899,12 @@ Availability: editor — (needs reading a rendered file with ffmpeg (the zenvi C
 
 Surfaces: mcp, cli, editor. read-only, open world. Needs: watch.
 
-Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; the render must be media in the project's bin); desktop — (web-only direct tool).
+Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `path` | string | yes | The rendered video to watch, as render/export wrote it (a path relative to the project's folder, or absolute). |
+| `path` | string |  | The rendered video to watch, as render/export wrote it (a path relative to the project's folder, or absolute). |
+| `render_id` | string |  | Zenvi Cloud: the render_id render_project returned, once get_render_status says done (instead of path). |
 | `brief` | string |  | What the edit was asked to be, in a sentence or two; the critic judges against it. |
 | `focus` | ("hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending")[] |  | Dimensions to weigh most, e.g. ["sound_design", "mix"] after sound design. |
 
@@ -3926,7 +3928,7 @@ Availability: editor — (needs saving a copy of the project as another project)
 
 Surfaces: mcp, cli, editor. read-only, open world. Needs: watch.
 
-Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; the render must be media in the project's bin); desktop — (web-only direct tool).
+Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -4080,7 +4082,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 ### insert_broll_on_words_tool
 
-**Insert B-roll on words** (direct tool). Cut away from a speaker to B-roll on the words a viewer wants to see (names, places, things, numbers; or the keywords you give), one cutaway every 5-8 s, 0.8-1.5 s each, never the same source twice: footage from the media bin (a file whose name or tags mention the word goes there; with the shot model installed, the file whose picture shows it best, from that moment), or stock found for each word (stock=true).
+**Insert B-roll on words** (direct tool). Cut away from a speaker to B-roll on the words a viewer wants to see (names, places, things, numbers; or the keywords you give), one cutaway every 5-8 s, 0.8-1.5 s each, never the same source twice: footage from the media bin (a file whose name or tags mention the word goes there), or stock found for each word (stock=true).
 
 Surfaces: mcp, cli, editor. edits, open world.
 
@@ -4159,7 +4161,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `gap_frames` | integer |  | echo_stack: frames between one pair of copies and the next (default 2). (min 1, max 12) |
 | `words` | string[] |  | strobe: the words, one per cut; wheel: the drum's lines in order, 2-12 (default: text split at spaces). |
 | `lockup` | string |  | strobe: the held end card (default: the text, none when `words` come without it; empty string: none, the last word holds 0.4 s). |
-| `hold_frames` | integer |  | strobe: frames each word holds (default 4, ~0.13 s at 30 fps: a strobe; 8-12 for a staccato list); wheel: frames each word rests before the drum turns (default 0.7 s); paper: frames per stop-motion pose (default 2). (min 1, max 90) |
+| `hold_frames` | integer |  | strobe: frames each word holds (default 4, ~0.13 s at 30 fps: a strobe; 8-12 for a staccato list); wheel: frames each word rests before the drum turns (default 0.7 s); paper: frames per stop-motion pose (default 2; a long block holds longer, at most 120 poses). (min 1, max 90) |
 | `beats` | number[] |  | strobe: timeline seconds to cut on instead of hold_frames (detect_beats_tool's beats moved to the music's position); a word per beat from the first one at or after position_seconds, the lockup on the next. wheel: the drum turns on these beats (the first n-1 after position_seconds). |
 | `seed` | integer |  | paper: seed of the boil (default 1): the same seed boils the same. (min 0, max 2147483648) |
 | `marks` | boolean |  | paper: the hand-drawn marks orbiting the word (default true). |

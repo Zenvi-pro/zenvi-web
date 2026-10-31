@@ -46,7 +46,7 @@ import { APP_LABEL, type FamilyDecision, type FamilyDecisions } from "../hosts/p
 import { findProject } from "../project/select.js";
 import { unknownArgumentsMessage } from "../util/unknown-args.js";
 import { VERSION } from "../version.js";
-import { BRIEF_GATE, briefGate, briefNote } from "./brief-note.js";
+import { autoBriefFor } from "./brief-note.js";
 import { recordDirection } from "./directions.js";
 import { extraTools, type ExtraTool } from "./extra-tools.js";
 import { HANDOFF_TOOL_NAMES, hostTools } from "./host-tools.js";
@@ -178,9 +178,6 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
         if (receipt) return toCallResult(receipt, outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...(outcome.ok ? {} : { isError: true }) };
       }
-      if (ctx.env.ZENVI_MCP_BRIEF !== "off" && briefGate(name, state.session.doc.project)) {
-        return toCallResult(refused(name, BRIEF_GATE), undefined, { engine: "portable" });
-      }
       state.notePortableCall();
       const { result } = await state.session.run(name, args, extra.signal);
       const receipt = (result.data as ToolReceipt | undefined) ?? parseReceipt(result.text);
@@ -191,7 +188,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
         const repeated = saved ? await recordDirection(ctx.config.configDir, saved, String(state.session.doc.project.id)) : [];
         if (repeated.length > 0) receipt.warnings = [...receipt.warnings, `The direction repeats the last edit's picks on ${repeated.join(", ")}: draw those differently (read_director_recipe {styles: "brief"} has a fresh draw) unless the subject needs them, and say why.`];
       }
-      const brief = isOkHostStatus(receipt.status) ? briefNote(name, state.session.doc.project) : undefined;
+      const brief = ctx.env.ZENVI_MCP_BRIEF !== "off" && isOkHostStatus(receipt.status) ? autoBriefFor(name, state.session.doc, JSON.stringify(args ?? {})) : undefined;
       if (brief) receipt.notes = [...receipt.notes, brief];
       if (!state.session.file && receipt.undoSteps > 0) {
         receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];

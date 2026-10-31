@@ -47,7 +47,7 @@ None of its own; it sets up `cinematic-trailer-sound`.
 ## Common mistakes
 
 - 2.39 bars on top of footage that is already letterboxed (double bars) - crop-fill first
-  (`set_clip_property_tool {"property": "scale", "value": 0}`).
+  (`set_clip_property_tool {"clip_id": "<clip>", "property": "scale", "value": 0}`).
 - Text in the bars (looks like a broadcast ticker).
 
 ## Verified

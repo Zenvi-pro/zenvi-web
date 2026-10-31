@@ -47,7 +47,8 @@ export function build(ctx: BlockContext): void {
   } else {
     // The band: about a tenth of the frame, legends at the left, the stamp at the right, the slider along its top.
     const bandH = Math.max(120, Math.round(Math.min(W, H) * 0.12));
-    const lift = ctx.portrait ? safe.bottom * 0.7 : 0;
+    // Portrait: the whole band above the bottom safe margin, clear of the platform's controls.
+    const lift = ctx.portrait ? safe.bottom : 0;
     const band = ctx.el("div", "dc-band");
     Object.assign(band.style, { height: `${bandH}px`, bottom: `${lift}px` });
     ctx.root.insertBefore(band, stamp);

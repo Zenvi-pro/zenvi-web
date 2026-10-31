@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -537,9 +537,6 @@ ${error.stack ?? ""}` : String(error);
   }
 
   // packages/motion/src/runtime/text.ts
-  function textLines(text) {
-    return text.split(/\s*\n\s*|\s+\/\s*|\s*\/\s+/).filter(Boolean);
-  }
   var SCRAMBLE_GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=<>/\\[]{}";
   function scrambledText(text, t, options) {
     const chars = Array.from(text);
@@ -568,7 +565,7 @@ ${error.stack ?? ""}` : String(error);
   };
   function build(ctx) {
     const { tl, params: p, width: W, height: H, safe } = ctx;
-    const lines = textLines(String(p.text));
+    const lines = String(p.text).split(/\s*(?:\/|\n)\s*/).filter(Boolean);
     const box = ctx.el("div", "ts");
     const align = p.align === "left" ? "flex-start" : "center";
     box.style.alignItems = align;

@@ -125,7 +125,7 @@ export function planClock(params: Params, seconds: number): ClockPlan | { error:
     const m = /^(.*?)\s*=\s*(.+?)\s*\.\.\s*(.+?)\s*(?:@\s*([a-z]+))?\s*$/i.exec(entry);
     if (!m) return { error: `data_clock legends: "${entry}" is not "Label=min..max" (optionally "@thermal")` };
     const ramp = (m[4] ?? Object.keys(RAMPS)[legends.length % Object.keys(RAMPS).length]!).toLowerCase();
-    if (!RAMPS[ramp]) return { error: `data_clock legends: no colour ramp "${m[4]}" (${Object.keys(RAMPS).join(", ")})` };
+    if (!Object.hasOwn(RAMPS, ramp)) return { error: `data_clock legends: no colour ramp "${m[4]}" (${Object.keys(RAMPS).join(", ")})` };
     legends.push({ label: m[1]!, min: m[2]!, max: m[3]!, ramp });
   }
   return { start, step, count, rate, legends };

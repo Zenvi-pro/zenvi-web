@@ -228,9 +228,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -724,10 +724,10 @@ ${error.stack ?? ""}` : String(error);
   }
 
   // packages/motion/src/blocks/liquid_glass/block.ts
-  var clamp013 = (u) => Math.min(1, Math.max(0, u));
-  var out = (u) => 1 - (1 - clamp013(u)) ** 4;
+  var clamp012 = (u) => Math.min(1, Math.max(0, u));
+  var out = (u) => 1 - (1 - clamp012(u)) ** 4;
   var inOut = (u) => {
-    const x = clamp013(u);
+    const x = clamp012(u);
     return x < 0.5 ? 8 * x ** 4 : 1 - (-2 * x + 2) ** 4 / 2;
   };
   function backdrop(source, sw, sh, W, H, blur, doc) {
@@ -806,7 +806,7 @@ ${error.stack ?? ""}` : String(error);
           const value = sample(bd.sharp, qx, qy, c) * (1 - mixF) + sample(bd.frost, qx, qy, c) * mixF;
           data[o + c] = value * tint + spec + (d < 1.5 ? 40 : 0);
         }
-        data[o + 3] = Math.round(255 * clamp013(d + 0.5));
+        data[o + 3] = Math.round(255 * clamp012(d + 0.5));
       }
     }
   }

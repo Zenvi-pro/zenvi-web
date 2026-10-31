@@ -6,8 +6,7 @@
  * never opened the recipe left grade and sound to chance. It must stay under
  * 400 tokens: 366 on Claude Sonnet 5.5 at 926 characters (Bedrock
  * converse usage, 2026-10-28), so the CLI's test bounds it at 1000
- * characters; the brief step took the recipe hints' place (895), and the
- * ORDER line, watch_render_tool and data-explainer bring it to 995. The
+ * characters; the brief step took the recipe hints' place. The
  * recipes keep the craft. DIRECTOR_CARD and DIRECTOR_START go
  * out only from the CLI's `zenvi mcp`, where render_video and
  * read_director_recipe exist; FINISH_HINT is in engine tool descriptions on
@@ -16,7 +15,7 @@
 
 /** The finish, for the descriptions of the tools that start a whole video (on every surface: Zenvi Cloud renders with render_project). */
 export const FINISH_HINT =
-  "Then finish, in order, skipping what its receipt says it did: unify_grade_tool, apply_motion_transitions_tool, spot_sound_tool and auto_sound_design_tool, master_audio_tool iterate=true, render (render_video; Zenvi Cloud: render_project), review_render_tool, watch_render_tool once (fix its HIGH issues, render, watch again at most once).";
+  "Then finish, in order, skipping what its receipt says it did: unify_grade_tool, apply_motion_transitions_tool, spot_sound_tool and auto_sound_design_tool, master_audio_tool iterate=true, render (render_video; Zenvi Cloud: render_project), review_render_tool where available, watch_render_tool once on the render (its path; Zenvi Cloud: the render_id) where available: fix its HIGH issues, render, watch again at most once.";
 
 /** The genre router: which recipe to read (the styles index has a line on each). */
 const RECIPES =
@@ -24,7 +23,7 @@ const RECIPES =
   "saas-ui-promo, 3d-product-ad, editorial-type, grid-montage, data-explainer, tutorial, showreel-intro.";
 
 /** Step 0 (plugins/zenvi/skills/zenvi-styles/BRIEF.md): the brief picks the style and the recipe. */
-const BRIEF = 'First the brief: get_brief_tool; if none, inspect_media_bin_tool, read_director_recipe {styles: "brief"} and follow it, save_brief_tool.';
+const BRIEF = 'A brief first helps: get_brief_tool; to plan one, read_director_recipe {styles: "brief"}, then save_brief_tool (nothing waits for it: the first cut saves a minimal one).';
 
 /** The finish every recipe ends with, in order. */
 const FINISH =
@@ -35,16 +34,16 @@ const FINISH =
  * Re-edit bench (2026-10-28): agents given a bin of finished shots cut them in
  * bin order (Kendall tau -0.14 against the editor's) and never opened a skill.
  */
-const ORDER = "Given shots to re-edit: sequence_shots_tool first.";
+const ORDER = "Shots to re-edit: sequence_shots_tool first.";
 
 export const DIRECTOR_CARD: string = [
-  `Whole videos (reel, ad, promo, montage, a reference to recreate): ${BRIEF} Then read its style's recipe, read_director_recipe {recipe}. ${RECIPES}`,
+  `Whole videos (reel, ad, promo, montage, a remake): ${BRIEF} Then its style's recipe: read_director_recipe {recipe}. ${RECIPES}`,
   ORDER,
   FINISH,
-  "TTS captions: kinetic_captions_tool timeline_clip_ids=[the TTS clip] uses its word timings.",
+  "TTS captions: kinetic_captions_tool timeline_clip_ids=[TTS clip] uses its word timings.",
 ].join("\n");
 
-/** The one-call builders (P4): only here, the card is at its budget. A whole first cut in one undo step, then the recipe's fixes and the finish. */
+/** The one-call builders: a whole first cut in one undo step, then the recipe's fixes and the finish. */
 const BUILDERS =
   "A whole first cut in one call (one undo step, every decision in its receipt), then fix single shots and finish: build_reel_tool (cut to music), build_trailer_tool (movie or game trailer), " +
   "build_explainer_tool (voice-over explainer, documentary, video essay), build_talking_head_tool (someone talking to camera), build_product_launch_tool (product launch, SaaS or app promo).";
