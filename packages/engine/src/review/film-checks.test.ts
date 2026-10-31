@@ -31,8 +31,11 @@ describe("motion speed (cinetic measure-speed, px/f at 1080p60)", () => {
     expect(speeds.map((s) => s.clipId)).toEqual(["C1", "C0"]);
     expect(speeds[1]!.peak).toBeCloseTo(32, 0);
     expect(speeds[0]!.peak).toBeCloseTo(160, 0);
-    const codes = filmChecks({ project: p, brief: null, titles: [], svgs: new Map(), textBoxes: [] }).map((x) => x.code);
+    const codes = filmChecks({ project: p, brief: brief("cinetic-launch-film"), titles: [], svgs: new Map(), textBoxes: [] }).map((x) => x.code);
     expect(codes).toEqual(expect.arrayContaining(["motion-too-fast", "needs-motion-blur"]));
+    // Other styles are not held to the house's finishing pass.
+    expect(filmChecks({ project: p, brief: brief("hype-reel"), titles: [], svgs: new Map(), textBoxes: [] })).toEqual([]);
+    expect(filmChecks({ project: p, brief: null, titles: [], svgs: new Map(), textBoxes: [] })).toEqual([]);
   });
 });
 

@@ -44,6 +44,7 @@ import { BANDED_AREA, bandingOf } from "../../review/banding.js";
 import { renderCauses, sfxHits, syncMisses, timelineCauses } from "../../review/av-sync.js";
 import { filmChecks } from "../../review/film-checks.js";
 import { readBrief } from "../../brief/brief.js";
+import { houseStyle } from "../../brief/house.js";
 import { fpsFloat } from "../../timeline/time.js";
 import { textBoxesOf } from "./review.js";
 import type { Vector } from "../../shots/vectors.js";
@@ -383,12 +384,16 @@ export const reviewRenderTools: CatalogTool[] = [
       const warnings: string[] = [];
       const flashes = await flashing(call, inspection, warnings);
       problems.push(...flashProblems(flashes ?? []));
-      problems.push(...(await bandingProblems(call, solo, shots, inspection.width)));
-      problems.push(...syncProblems(project, inspection));
+      // A house style's finishing pass (cinetic's forensics and AV-sync audit); other styles are not held to it.
+      const brief = readBrief(project);
+      if (brief && houseStyle(brief.style)) {
+        problems.push(...(await bandingProblems(call, solo, shots, inspection.width)));
+        problems.push(...syncProblems(project, inspection));
+      }
       // The open project's own finishing checks (motion speed, text overlap, a house style's copy and bans), as warnings.
       const timeline = reviewTimeline(project);
       const { boxes, svgs } = await textBoxesOf(call, timeline.titleClips);
-      for (const p of filmChecks({ project, brief: readBrief(project), titles: timeline.titleClips, svgs, textBoxes: boxes })) {
+      for (const p of filmChecks({ project, brief, titles: timeline.titleClips, svgs, textBoxes: boxes })) {
         if (p.code === "sound-without-cause") continue; // measured on the render itself above
         problems.push({ kind: p.code.startsWith("house-ban") ? "house_ban" : p.code.startsWith("copy-") ? "copy_pacing" : p.code === "text-overlap" ? "text_overlap" : "too_fast", severity: "warning", at: p.at, message: `${p.message} Fix: ${p.fix}` });
       }

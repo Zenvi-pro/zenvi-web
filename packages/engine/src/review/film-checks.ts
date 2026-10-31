@@ -1,11 +1,12 @@
 /**
  * The finishing checks cinetic runs on every film (MIT, (c) 2026 Leonxlnx:
  * measure-speed, av-audit, layout-audit, grid-check's text flow, lint-film's
- * hard bans), on the open project: how fast things move, whether every
- * sound has a visible cause, text that overlaps text, and, for a cinetic
- * house style, the copy's pacing and the house bans (not when the person
- * gave a brand: theirs wins). review_edit_tool and review_render_tool list
- * them with their own problems.
+ * hard bans), on the open project of a house style: how fast things move,
+ * whether every sound has a visible cause, text that overlaps text, the
+ * copy's pacing and the house bans (not when the person gave a brand:
+ * theirs wins). Other styles are not held to them: their builders' title
+ * entrances run 70-117 px/f by design (fleet review rv-x2). review_edit_tool
+ * and review_render_tool list them with their own problems.
  */
 
 import type { Brief } from "../brief/brief.js";
@@ -83,6 +84,7 @@ const list = (xs: readonly string[], n = 4): string => xs.slice(0, n).join(", ")
 
 export function filmChecks(input: FilmCheckInput): ReviewProblem[] {
   const { project, brief } = input;
+  if (!brief || !houseStyle(brief.style)) return [];
   const out: ReviewProblem[] = [];
   const titleIds = new Set(input.titles.map((t) => t.clipId));
 
@@ -127,14 +129,12 @@ export function filmChecks(input: FilmCheckInput): ReviewProblem[] {
   }
   if (collisions.length > 0) out.push({ code: "text-overlap", severity: "medium", at: 0, message: `Text lands on text: ${list(collisions)}.`, fix: "Move one title (set_clip_property_tool location_y) or let one clear before the next arrives." });
 
-  if (brief && houseStyle(brief.style)) {
-    const pace = brief.draw?.energy === "high" ? "crisp" : "calm";
-    const end = Math.max(brief.length_seconds, ...project.clips.map((c) => c.position + (c.end - c.start)));
-    for (const issue of copyPacing(copyFragments(project, input.titles, input.svgs), end, pace)) {
-      out.push({ code: issue.code, severity: issue.code === "copy-fragment-long" || issue.code === "copy-crowded" ? "medium" : "low", at: issue.at, ...(issue.until !== undefined ? { until: issue.until } : {}), message: `${issue.message} (${brief.style}, ${pace} copy)`, fix: issue.fix });
-    }
+  const pace = brief.draw?.energy === "high" ? "crisp" : "calm";
+  const end = Math.max(brief.length_seconds, ...project.clips.map((c) => c.position + (c.end - c.start)));
+  for (const issue of copyPacing(copyFragments(project, input.titles, input.svgs), end, pace)) {
+    out.push({ code: issue.code, severity: issue.code === "copy-fragment-long" || issue.code === "copy-crowded" ? "medium" : "low", at: issue.at, ...(issue.until !== undefined ? { until: issue.until } : {}), message: `${issue.message} (${brief.style}, ${pace} copy)`, fix: issue.fix });
   }
-  if (brief && tasteProfile(brief)) {
+  if (tasteProfile(brief)) {
     for (const f of houseBanFindings({ project, svgs: input.svgs, textBoxes: input.textBoxes })) {
       out.push({ code: `house-ban-${f.ban}`, severity: "medium", at: f.at, message: `${f.message} (${brief.style} house ban; a brand of the person's would win: save_brief_tool brand)`, fix: f.fix });
     }
