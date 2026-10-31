@@ -258,6 +258,12 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
       "without speech recognition the takes' words come from the media index (a take with none is jump-cut on its loudness, with no captions, keyword B-roll or punch-ins); without subject matting the hook is set over the speaker instead of behind them; without the bundled fonts there are no captions and no hook over the speaker (the receipt lists each fallback)",
     webNote: SERVER_ASR,
   },
+  produce_video_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["stock", "exporter", "media.inspectRender", "watch", "audio.decodePcm", "motion", "assets"],
+    partialNote:
+      "without stock search the edit uses only the bin; without a renderer it stops before the render and review (render it from the Export dialog); without watching the review is the detectors' only; each builder's own fallbacks are in its stage",
+  },
   build_trailer_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm", "assets"],

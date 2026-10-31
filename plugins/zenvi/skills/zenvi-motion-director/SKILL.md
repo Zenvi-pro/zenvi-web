@@ -12,6 +12,12 @@ this skill is for edits that must hold up next to a professional one.
 
 ## Start here: the brief, then its style's recipe
 
+**One call first, for a whole video:** `produce_video_tool` with `request`
+(the person's words) and `output` (the delivery file) makes the edit (brief, style,
+builder, stock, music, cut, finish, render, review) and lists its findings
+with the next calls. Fix those; read the recipe below to layer on its cut,
+or to build by hand.
+
 **Step 0 is the brief**, on the project it belongs to: editing an existing
 `.zvn`, `open_project_file` it first (opening a file replaces the session's
 project, brief and all). `get_brief_tool`; when there is none, load the

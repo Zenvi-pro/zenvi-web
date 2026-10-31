@@ -25,6 +25,13 @@ const RECIPES =
 /** Step 0 (plugins/zenvi/skills/zenvi-styles/BRIEF.md): the brief picks the style and the recipe. */
 const BRIEF = 'A brief first helps: get_brief_tool; to plan one, read_director_recipe {styles: "brief"}, then save_brief_tool (nothing waits for it: the first cut saves a minimal one).';
 
+/**
+ * The director as code (bench rounds 6-7: a recipe read in 6 of 52 runs, a
+ * builder called once, the review tools never): one call makes the edit,
+ * the agent's turns go to its findings.
+ */
+const PRODUCE = "produce_video_tool {request: the person's words, output} does it in one call (brief, style, stock, music, cut, finish, render, review), then fix its findings.";
+
 /** The finish every recipe ends with, in order. */
 const FINISH =
   "Finish, in order: unify_grade_tool; apply_motion_transitions_tool (no track = every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
@@ -37,7 +44,7 @@ const FINISH =
 const ORDER = "Shots to re-edit: sequence_shots_tool first.";
 
 export const DIRECTOR_CARD: string = [
-  `Whole videos (reel, ad, promo, montage, a remake): ${BRIEF} Then its style's recipe: read_director_recipe {recipe}. ${RECIPES}`,
+  `Whole videos (reel, ad, promo, montage, a remake): ${PRODUCE} To layer or build by hand: read_director_recipe {recipe}. ${RECIPES}`,
   ORDER,
   FINISH,
   "TTS captions: kinetic_captions_tool timeline_clip_ids=[TTS clip] uses its word timings.",
@@ -53,4 +60,4 @@ const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
 /** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
-export const DIRECTOR_START: string = `A new edit: ${BRIEF} Then read its style's recipe, read_director_recipe {recipe}. ${RECIPES} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;
+export const DIRECTOR_START: string = `A new edit: ${PRODUCE} By hand instead: ${BRIEF} Then read its style's recipe, read_director_recipe {recipe}. ${RECIPES} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;
