@@ -130,3 +130,16 @@ export function onColor(bg: string): string {
   // Contrast against white (1.05 / (l + 0.05)) vs black ((l + 0.05) / 0.05).
   return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
 }
+
+/** #rgb (and #rgba) as #rrggbb, the form mixHex reads; longer forms unchanged. */
+function sixDigits(c: string): string {
+  return /^#[0-9a-f]{3,4}$/i.test(c) ? `#${[...c.slice(1, 4)].map((d) => d + d).join("")}` : c;
+}
+
+/** Two colours (#rgb, #rrggbb or #rrggbbaa; alpha ignored) mixed, `k` of the way from a to b, as #rrggbb. */
+export function mixHex(a: string, b: string, k: number): string {
+  const pa = parseInt(sixDigits(a).slice(1, 7), 16);
+  const pb = parseInt(sixDigits(b).slice(1, 7), 16);
+  const ch = (s: number): number => Math.round(((pa >> s) & 255) * (1 - k) + ((pb >> s) & 255) * k);
+  return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, "0")).join("")}`;
+}
