@@ -48,6 +48,19 @@ describe("generate_tts_and_add_to_timeline_tool word timings", () => {
     expect(JSON.stringify(transcript.data)).toContain("Welcome");
   });
 
+  it("add_captions_tool captions a voiceover from its script's words (zenvi.pro: 'no speech was found')", async () => {
+    for (const omit of [[], ["audio.transcribe"]] as const) {
+      const ed = new EditHarness({ host: { omit: [...omit] } });
+      ed.addClip(ed.addFile("video"), { position: 0, end: 6 });
+      const summary = (await ed.call("generate_tts_and_add_to_timeline_tool", { text: "Captions should follow every word of this voiceover.", position_seconds: "1" })).summary;
+      const clipId = /timeline_clip_id=(\w+)\./.exec(summary)![1]!;
+      const captions = await ed.call("add_captions_tool", { timeline_clip_id: clipId, style: "classic" });
+      expect(captions.status, captions.summary).toBe("applied");
+      expect(captions.summary).toMatch(/^Added \d+ caption\(s\) from the transcript/);
+      expect(captions.warnings).toContain(`clip ${clipId}: word times are the TTS script laid over the voice's pauses`);
+    }
+  });
+
   it("spreads the words over the voice's length when its pauses cannot be measured", async () => {
     const ed = new EditHarness({ host: { without: ["audio"] } });
     ed.addClip(ed.addFile("video"), { position: 0, end: 6 });

@@ -23,6 +23,7 @@ import { isOpError } from "../ops/errors.js";
 import { contractInputs, contractMeta, type ContractInput, type ContractToolName } from "./schemas.gen.js";
 import type { JsonSchemaObject } from "./json-schema.js";
 import { aliasArguments } from "./aliases.js";
+import { assistantArguments } from "./assistant-arguments.js";
 import { invalidArgumentsMessage, normalizeArgs } from "./coerce.js";
 import { coerceEditorArgs, isEditorToolHandler } from "./editor-args.js";
 import { pendingArgumentIn, pendingArgumentMessage } from "./pending.js";
@@ -183,8 +184,9 @@ function receiptForError(tool: string, error: unknown, host: ToolHost): ToolRece
 
 /**
  * Run one tool: the whole desktop execute_tool pipeline. Never throws for
- * user errors. A wrong argument name with one reading (`clip_id` for
- * `timeline_clip_id`) is accepted and named in the receipt's warnings.
+ * user errors. The Assistant's names for a desktop argument are read as the
+ * contract's (assistant-arguments.ts). A wrong argument name with one reading
+ * (`clip_id` for `timeline_clip_id`) is accepted and named in the receipt's warnings.
  */
 export async function executeTool<I extends z.ZodType>(
   tool: CatalogTool<I>,
@@ -192,11 +194,13 @@ export async function executeTool<I extends z.ZodType>(
   ctx: ToolContext,
   rawArgs: unknown,
 ): Promise<ToolResult<ToolReceipt>> {
-  const aliased = aliasArguments(tool.inputSchema, rawArgs);
+  const assistant = assistantArguments(tool.name, rawArgs);
+  const aliased = aliasArguments(tool.inputSchema, assistant.args);
   const result = await runPipeline(tool, impl, ctx, aliased.args);
-  if (aliased.notes.length === 0 || !result.data) return result;
+  const notes = [...assistant.notes, ...aliased.notes];
+  if (notes.length === 0 || !result.data) return result;
   const receipt = result.data;
-  receipt.warnings = [...aliased.notes, ...receipt.warnings];
+  receipt.warnings = [...notes, ...receipt.warnings];
   return { ...result, text: JSON.stringify(receipt) };
 }
 
