@@ -41,7 +41,7 @@ import { onsetRatios, rhythmReview } from "../../review/rhythm.js";
 import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
 import { BANDED_AREA, bandingOf } from "../../review/banding.js";
-import { renderCauses, sfxHits, syncMisses } from "../../review/av-sync.js";
+import { renderCauses, sfxHits, syncMisses, timelineCauses } from "../../review/av-sync.js";
 import { filmChecks } from "../../review/film-checks.js";
 import { readBrief } from "../../brief/brief.js";
 import { fpsFloat } from "../../timeline/time.js";
@@ -239,14 +239,20 @@ async function bandingProblems(call: ToolCall, solo: Project, shots: readonly Sh
   ];
 }
 
-/** Sound effects of the open project whose transient lands more than a frame from any jump in the rendered picture. */
+/**
+ * Sound effects of the open project whose transient lands more than a frame
+ * from any visible cause: a jump in the rendered picture, or the timeline's
+ * own changes (a keystroke's title, a keyframe), which are often too small
+ * to stand out of the render's motion but are still seen.
+ */
 function syncProblems(project: Project, inspection: RenderInspection): Problem[] {
   const hits = sfxHits(project);
   const end = Math.max(0, ...project.clips.map((c) => c.position + (c.end - c.start)));
   // Only a render of this project from its start lines up with its timeline.
   if (!inspection.picture || hits.length === 0 || Math.abs(end - inspection.duration) > 0.5) return [];
   const rate = fpsFloat(project.fps) || inspection.fps;
-  const misses = syncMisses(hits, renderCauses(inspection.picture, inspection.cuts.map((c) => c.time)), 1 / Math.max(1, Math.min(rate, inspection.picture.fps)));
+  const causes = [...renderCauses(inspection.picture, inspection.cuts.map((c) => c.time)), ...timelineCauses(project)];
+  const misses = syncMisses(hits, causes, 1 / Math.max(1, Math.min(rate, inspection.picture.fps)));
   if (misses.length === 0) return [];
   return [
     {
