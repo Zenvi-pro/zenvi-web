@@ -42,17 +42,30 @@ function words(text: string): string[] {
 }
 
 /**
- * The style `text` points at: the seeded styles' words count three, a word
- * of any style's id or summary in `candidates` (the styles index) one.
+ * Every style's score for `text` and the words that scored: the seeded
+ * styles' words count three, a word of any style's id or summary in
+ * `candidates` (the styles index) one.
  */
-export function matchStyle(text: string, candidates: readonly { id: string; summary: string }[] = []): string {
+export function styleScores(text: string, candidates: readonly { id: string; summary: string }[] = []): Map<string, { score: number; words: string[] }> {
   const said = new Set(words(text));
-  const score = new Map<string, number>();
-  for (const [id, list] of Object.entries(STYLE_WORDS)) score.set(id, list.filter((w) => said.has(w)).length * 3);
-  for (const c of candidates) score.set(c.id, (score.get(c.id) ?? 0) + new Set(words(`${c.id.replace(/-/g, " ")} ${c.summary}`).filter((w) => said.has(w))).size);
+  const scores = new Map<string, { score: number; words: string[] }>();
+  for (const [id, list] of Object.entries(STYLE_WORDS)) {
+    const hit = list.filter((w) => said.has(w));
+    scores.set(id, { score: hit.length * 3, words: hit });
+  }
+  for (const c of candidates) {
+    const hit = [...new Set(words(`${c.id.replace(/-/g, " ")} ${c.summary}`).filter((w) => said.has(w)))];
+    const prev = scores.get(c.id) ?? { score: 0, words: [] };
+    scores.set(c.id, { score: prev.score + hit.length, words: [...new Set([...prev.words, ...hit])] });
+  }
+  return scores;
+}
+
+/** The style `text` points at (styleScores' best; the default when no word matches). */
+export function matchStyle(text: string, candidates: readonly { id: string; summary: string }[] = []): string {
   let best = AUTO_DEFAULT_STYLE;
   let top = 0;
-  for (const [id, n] of score) if (n > top) [best, top] = [id, n];
+  for (const [id, { score }] of styleScores(text, candidates)) if (score > top) [best, top] = [id, score];
   return best;
 }
 
