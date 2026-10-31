@@ -1,0 +1,41 @@
+@zenvi/engine includes code adapted from third-party projects:
+
+Tweenkit — kinetic-cut-video skill (https://github.com/wmzspace/claude-motion-skills),
+MIT License, Copyright (c) 2026 wmzspace: the motif method's rules and the
+creative-direction draw (src/brief/method.ts) and its QA report
+(src/review/rhythm.ts). Its licence text is in
+plugins/zenvi/skills/zenvi-styles/NOTICE.
+
+cinetic (https://github.com/Leonxlnx/cinetic, commit ecfa660), MIT License,
+Copyright (c) 2026 Leonxlnx:
+- scripts/pick.py's technique draw in src/brief/draw.ts and src/brief/house.ts,
+  and its library's draw metadata (assets/library/techniques.json: category,
+  role, energy, formats, evidence, banned looks) in src/brief/cinetic-library.ts;
+- the hard bans of SKILL.md and scripts/lint-film.mjs in src/review/taste.ts;
+- scripts/measure-speed.py's thresholds in src/review/motion-speed.ts, the
+  AV-sync audit of scripts/av-audit.py in src/review/av-sync.ts, the text-flow
+  gate of scripts/grid-check.ts in src/review/copy-pacing.ts, the banding
+  tiles of scripts/forensics.py in src/review/banding.ts, and their use in
+  src/review/film-checks.ts.
+
+MIT License
+
+Copyright (c) 2026 Leonxlnx
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

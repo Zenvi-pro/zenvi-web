@@ -108,6 +108,7 @@ const CAPABILITY_NAMES: Record<HostCapability, string> = {
   fx: "Zenvi FX (ffmpeg renders on this computer)",
   library: "the public sound libraries (Openverse)",
   watch: "watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)",
+  draws: "the memory of recent technique draws (the zenvi CLI)",
 };
 
 /**

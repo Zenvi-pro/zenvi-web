@@ -9,6 +9,7 @@ import { z } from "zod";
 import { BRIEF_KEY, briefSchema, briefShape, briefSummary, readBrief, type Brief } from "../../brief/brief.js";
 import { checkBrief } from "../../brief/check.js";
 import { coverageLines, footageCoverage } from "../../brief/coverage.js";
+import { drawForBrand, drawProblem, houseDraw, houseStyle } from "../../brief/house.js";
 import { methodProblems } from "../../brief/method.js";
 import {
   brightnessOf,
@@ -176,9 +177,23 @@ export const briefTools: CatalogTool[] = [
       "Replaces the saved brief (one undo step); review_edit_tool, render receipts and get_brief_tool then check the edit against it. Never invent brand facts: list them in missing.",
     input: saveInput,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-    run: (call, args: SaveInput) => {
+    run: async (call, args: SaveInput) => {
       const { check_method: checkMethod, auto: _auto, ...fields } = args;
-      const brief = briefSchema.parse(fields);
+      let brief = briefSchema.parse(fields);
+      // A house style keeps the draw it was given for the same film (style, frame and length); else it draws now, away from recent films.
+      let drawn = false;
+      if (brief.draw) {
+        const problem = drawProblem(brief.draw, brief.style);
+        if (problem) return refused(SAVE, `Error: draw: ${problem} Nothing changed.`);
+        brief = { ...brief, draw: drawForBrand(brief.draw, brief.style, brief.brand) };
+      } else if (houseStyle(brief.style)) {
+        const before = readBrief(call.doc.project);
+        const same = before?.style === brief.style && before.aspect === brief.aspect && before.length_seconds === brief.length_seconds;
+        const kept = before?.draw && same ? drawForBrand(before.draw, brief.style, brief.brand) : null;
+        const draw = kept ?? houseDraw({ style: brief.style, aspect: brief.aspect, seconds: brief.length_seconds, text: `${brief.goal}\n${brief.hook}`, avoid: (await call.host.draws?.recent().catch(() => [])) ?? [], brand: brief.brand });
+        if (draw) brief = { ...brief, draw };
+        drawn = !kept && Boolean(draw);
+      }
       let previous: { name: string; start: number } | undefined;
       for (const beat of brief.beats) {
         if (beat.end <= beat.start) return refused(SAVE, `Error: beat "${beat.name}" ends at ${beat.end} s, not after its start ${beat.start} s.`);
@@ -201,6 +216,7 @@ export const briefTools: CatalogTool[] = [
       const warnings = unknownFiles.length > 0 ? [`Shot plan names files not in the bin: ${[...new Set(unknownFiles)].join(", ")} (inspect_media_bin_tool lists the ids).`] : [];
       if (problems.length > 0) warnings.push(`Advice, the motif method (BRIEF.md 4-6; saved anyway): ${problems.join(" ")}`);
       call.commit((tx) => tx.update(["settings"], { [BRIEF_KEY]: brief }), "Save brief");
+      if (drawn && brief.draw) await call.host.draws?.remember(brief.draw.picks.map((p) => p.technique), call.doc.project.id).catch(() => undefined);
       const { lines } = checkLines(call, brief);
       const footage = footageCoverage(call.doc.project, brief);
       return applied(SAVE, [briefSummary(brief), ...lines, ...coverageLines(footage, call.doc.project), ...musicLine].join("\n"), { data: { brief, footage, ...(musicSearch ? { music_search: musicSearch } : {}) }, warnings });

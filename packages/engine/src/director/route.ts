@@ -165,6 +165,29 @@ export const STYLE_RULES: readonly StyleRule[] = [
     coherent: true,
     beats: LAUNCH_BEATS,
   },
+  // The cinetic styles (zenvi-styles styles/cinetic-*.md): hard cuts on the grid, the drawn techniques do the transitions.
+  ...(
+    [
+      ["cinetic-launch-film", 30, 100, "medium", "subtle"],
+      ["cinetic-teaser", 20, 120, "high", "normal"],
+      ["cinetic-feature-loop", 10, 100, "medium", "subtle"],
+      ["cinetic-logo-sting", 6, 120, "medium", "subtle"],
+      ["cinetic-ui-walkthrough", 45, 90, "low", "subtle"],
+    ] as const
+  ).map(
+    ([id, seconds, bpm, energy, intensity]): StyleRule => ({
+      id,
+      builder: { tool: "build_product_launch_tool" },
+      sound: "saas_ui",
+      intensity,
+      transitions: "none",
+      look: null,
+      seconds,
+      music: { query: "minimal electronic pulse", bpm, energy },
+      coherent: true,
+      beats: LAUNCH_BEATS,
+    }),
+  ),
   {
     id: "editorial-type",
     builder: { tool: "build_reel_tool", style: "editorial" },
