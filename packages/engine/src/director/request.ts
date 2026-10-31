@@ -33,7 +33,8 @@ export interface RequestFacts {
   subject: string;
 }
 
-const QUOTED = /['"‘“]([^'"’”\n]{2,90})['"’”]/g;
+/** A quoted phrase; an apostrophe inside a word (it's, don't, the city's) opens or closes nothing. */
+const QUOTED = /(?<![\p{L}\p{N}])['"‘“]([^'"’”\n]{2,90})['"’”](?![\p{L}\p{N}])/gu;
 const STOP = new Set(
   "a an the of for to and or with in on at by from about into over under is are be it its this that these those make made create video edit reel promo clip film second seconds sec s long short vertical landscape square deliver mp4 please some one two three four five my our your their me us like style fps called named titled".split(" "),
 );
