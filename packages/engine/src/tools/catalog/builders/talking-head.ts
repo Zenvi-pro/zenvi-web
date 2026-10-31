@@ -179,6 +179,7 @@ export const talkingHeadTools: CatalogTool[] = [
 
       c.suggest("auto_sound_design_tool", { genre: "talking_head" }, "a whoosh into each B-roll cut and a hit under each punch-in");
       c.suggest("master_audio_tool", { preset: "social", iterate: true }, "the speech on top, the loudness set last");
+      await c.followStyle("talking-head-captions");
       return c.finish(
         "Build talking head",
         `Built a talking head: ${round3(cut.duration)} s from ${takes.length} take(s), ${cut.segments.length} segment(s) (${round3(cut.removed)} s cut), ${placed.punched.length} word punch-in(s), ${placed.broll.length} B-roll cutaway(s).`,

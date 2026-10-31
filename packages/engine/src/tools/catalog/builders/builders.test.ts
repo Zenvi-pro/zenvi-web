@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BRIEF_KEY } from "../../../brief/brief.js";
 import { ProjectDocument } from "../../../history/document.js";
 import { createProject } from "../../../model/defaults.js";
 import { findProfile } from "../../../model/profiles.js";
@@ -40,7 +41,7 @@ function project(): ProjectDocument {
 interface Built {
   decisions: BuildDecision[];
   fallbacks: number;
-  next_calls: { tool: string }[];
+  next_calls: { tool: string; args: Record<string, unknown>; why: string }[];
   [key: string]: unknown;
 }
 
@@ -81,7 +82,12 @@ describe("build_talking_head_tool", () => {
     ]);
     expect(hook[1]!.instead_of).toBe("text behind the subject");
     expect(step(data, "captions")).toMatchObject({ outcome: "skipped" });
-    expect(data.next_calls.map((c) => c.tool)).toEqual(["auto_sound_design_tool", "master_audio_tool"]);
+    // The talking-head-captions style shapes the finish: its look goes before mastering, its loudness merges under the builder's.
+    expect(data.next_calls.map((c) => c.tool)).toEqual(["auto_sound_design_tool", "unify_grade_tool", "master_audio_tool"]);
+    expect(data.next_calls[1]).toMatchObject({ args: { look: "warm_pop", look_intensity: 0.35 }, why: "the talking-head-captions style's look" });
+    expect(data.next_calls[2]).toMatchObject({ args: { preset: "social", iterate: true } });
+    expect(step(data, "style")).toMatchObject({ tool: "get_style_tool", outcome: "applied", args: { style: "talking-head-captions" } });
+    expect((data.style as { id: string; checklist: string[] }).checklist.length).toBeGreaterThan(3);
 
     // One undo puts the empty timeline back.
     doc.undo();
@@ -154,6 +160,17 @@ describe("build_explainer_tool", () => {
 });
 
 describe("build_trailer_tool", () => {
+  it("follows the saved brief's style over its own: the brief's look is the next grade", async () => {
+    const doc = project();
+    doc.setUntracked(["settings"], { ...(doc.project.settings ?? {}), [BRIEF_KEY]: { goal: "g", platform: "p", aspect: "16:9", length_seconds: 30, style: "sports-hype-edit", techniques: [], hook: "h", beats: [{ start: 0, end: 30, name: "all" }], shots: [], motifs: [], storyboard: [], direction: [], checklist: [], missing: [] } });
+    const data = await build(doc, "build_trailer_tool", { file_ids: ["ROCKET0001", "OCEAN00001", "CITY000001"], title: "The Long Way", duration_seconds: 30 });
+    expect(step(data, "style")).toMatchObject({ args: { style: "sports-hype-edit" } });
+    expect(data.next_calls.find((c) => c.tool === "unify_grade_tool")).toMatchObject({ args: { look: "teal_cinema", look_intensity: 0.5 } });
+    // The builder's own sound arguments win over the style's where both set one.
+    expect(data.next_calls.find((c) => c.tool === "auto_sound_design_tool")).toMatchObject({ args: { genre: "hype", intensity: "hype", density: "every_cut" } });
+    expect(data.next_calls[data.next_calls.length - 1]!.tool).toBe("master_audio_tool");
+  });
+
   it("cuts three acts faster and faster, falls silent before the title, and puts braams on the act changes", async () => {
     const doc = project();
     const data = await build(doc, "build_trailer_tool", { file_ids: ["ROCKET0001", "OCEAN00001", "CITY000001"], title: "The Long Way", act_cards: ["THIS WINTER"], end_card: "SOON", duration_seconds: 30 });

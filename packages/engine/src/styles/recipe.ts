@@ -227,8 +227,13 @@ export interface StyleCall {
   args: Record<string, unknown>;
 }
 
-/** The style's own finish calls: the first `tool {json}` the file writes for each finish tool. */
-export function styleFinishCalls(file: StyleFile): StyleCall[] {
+/**
+ * The style's own finish calls: the first `tool {json}` the file writes for
+ * each finish tool. A look written in prose ("`unify_grade_tool`, `warm_pop`
+ * 0.3-0.4") becomes the call when `isLook` knows the id (the LUT table is the
+ * tools'); the intensity is the middle of the range written after it.
+ */
+export function styleFinishCalls(file: StyleFile, isLook: (id: string) => boolean = () => false): StyleCall[] {
   const found = new Map<string, Record<string, unknown>>();
   // `tool {json}` (the styles) or `tool` `{json}` (the director recipes).
   for (const m of file.markdown.matchAll(/`([a-z_]+_tool)(?:`\s*`|\s*)(\{[^`]*\})`/g)) {
@@ -236,10 +241,22 @@ export function styleFinishCalls(file: StyleFile): StyleCall[] {
     if (!(FINISH_TOOLS as readonly string[]).includes(tool) || found.has(tool)) continue;
     try {
       const args = JSON.parse(m[2]!.replace(/\s+/g, " ")) as unknown;
-      if (args && typeof args === "object" && !Array.isArray(args)) found.set(tool, args as Record<string, unknown>);
+      // Placeholders (`"<head clip>"`) are the reader's to fill: the call keeps the rest.
+      if (args && typeof args === "object" && !Array.isArray(args)) found.set(tool, Object.fromEntries(Object.entries(args).filter(([, v]) => !(typeof v === "string" && /^<.*>$/.test(v)))));
     } catch {
-      // Written with placeholders (`<drop>`): not a call to copy.
+      // Unquoted placeholders (`<drop>`): not a call to copy.
     }
+  }
+  const look = findSection(sections(splitFrontMatter(file.markdown).body).sections, /^Look/);
+  if (!found.has("unify_grade_tool") && look && look.text.includes("`unify_grade_tool")) {
+    const text = look.text.replace(/\s+/g, " ");
+    const named = [...text.matchAll(/`([a-z0-9_]+)`(?:\s*(?:at|@)?\s*(\d?\.\d+)(?:\s*-\s*(\d?\.\d+))?)?/g)].find((m) => !m[1]!.endsWith("_tool") && isLook(m[1]!));
+    const args: Record<string, unknown> = {};
+    if (named) {
+      args.look = named[1]!;
+      if (named[2]) args.look_intensity = Math.round(((Number(named[2]) + Number(named[3] ?? named[2])) / 2) * 100) / 100;
+    }
+    found.set("unify_grade_tool", args);
   }
   return FINISH_TOOLS.flatMap((tool) => (found.has(tool) ? [{ tool, args: found.get(tool)! }] : []));
 }

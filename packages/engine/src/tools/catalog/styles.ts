@@ -17,6 +17,7 @@ import { styleLibrary } from "../../styles/load.js";
 import { compactStyle, compactTechnique, nearestIds, rankStyles, styleChecklist, styleFinishCalls, type BinSignals, type StyleFile } from "../../styles/recipe.js";
 import { timelineEnd } from "../../timeline/queries.js";
 import { directTool, type CatalogTool } from "../define.js";
+import { isLookId } from "../luts.js";
 import { applied, refused } from "../receipt.js";
 
 const FIND = "find_style_tool";
@@ -114,7 +115,7 @@ export const styleTools: CatalogTool[] = [
         return refused(GET, `Error: no style ${id}.${near(id, files, ["style"])} find_style_tool picks one for the request.`);
       }
       const seconds = askedSeconds(call.doc.project, args.length_seconds);
-      return applied(GET, compactStyle(file, seconds), { data: { style: file.id, length_seconds: seconds, finish_calls: styleFinishCalls(file), checklist: styleChecklist(file), uri: `zenvi://styles/${file.id}` } }, 0);
+      return applied(GET, compactStyle(file, seconds), { data: { style: file.id, length_seconds: seconds, finish_calls: styleFinishCalls(file, isLookId), checklist: styleChecklist(file), uri: `zenvi://styles/${file.id}` } }, 0);
     },
   }),
   directTool({
