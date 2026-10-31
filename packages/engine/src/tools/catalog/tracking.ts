@@ -677,6 +677,8 @@ const zoomTool = directTool({
       stops = planZoomStops(samples, (cursor ?? []).map((c) => ({ time: c.t, x: c.x, y: c.y })), { minHold: args.min_hold ?? 1.2 });
     }
     if (stops.length === 0) return unchanged(ZOOM, `Found nothing to zoom on in ${args.clip_id} (no focused activity); nothing changed. Give cursor positions or stops.`, { data: { clip_id: args.clip_id, stops: [] } });
+    // grayFrames stops early on cancel: partial activity must not become zoom stops.
+    if (call.signal?.aborted) return refused(ZOOM, "Error: cancelled; nothing changed");
     const result = call.commit((tx: Transaction) => zoomFollow(tx, { clipId: args.clip_id, stops, zoom: args.zoom ?? 1.3, ease: args.ease ?? 0.45 }), "Screen zoom follow");
     if (result.frames.length === 0) return unchanged(ZOOM, `No stop falls inside ${args.clip_id}'s window; nothing changed.`, { data: { clip_id: args.clip_id, stops: [] } });
     return applied(ZOOM, `Zoomed ${args.clip_id} onto ${result.stops.length} stop(s) from the ${from} (${args.zoom ?? 1.3}×, ${result.frames.length} keyframes).`, {
