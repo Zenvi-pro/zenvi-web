@@ -95,8 +95,9 @@ describe("the cinetic house bans", () => {
   });
 
   it("read the face of an outlined kinetic title from its style tag", () => {
-    const p = project([{ position: 0, end: 3, zenvi_kinetic_title: { text: "Introducing Kiln", style: "editorial", animation: "rise" } } as never]);
-    expect(houseBanFindings({ project: p }).map((f) => f.ban)).toEqual(expect.arrayContaining(["serif", "italic", "introducing"]));
+    const tag = { text: "Introducing Kiln", style: "editorial", animation: "rise" };
+    const p = project([{ position: 0, end: 3, zenvi_kinetic_title: tag } as never, { position: 0.1, end: 3, zenvi_kinetic_title: tag } as never]);
+    expect(houseBanFindings({ project: p }).map((f) => f.ban).sort()).toEqual(["introducing", "italic", "serif"]);
   });
 
   it("hold only a cinetic style without a brand of the person's", () => {

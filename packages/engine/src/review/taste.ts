@@ -99,7 +99,8 @@ export function houseBanFindings(input: TasteInput): TasteFinding[] {
   const out: TasteFinding[] = [];
   const seen = new Set<string>();
   const add = (f: TasteFinding) => {
-    const key = `${f.ban}:${f.clipId ?? ""}`;
+    // One finding per thing on screen: the word clips of one kinetic title share their message.
+    const key = `${f.ban}:${f.message}`;
     if (!seen.has(key)) {
       seen.add(key);
       out.push(f);
