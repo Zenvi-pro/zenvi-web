@@ -63,3 +63,49 @@ distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 License for the specific language governing permissions and limitations
 under the License.
+
+--------------------------------------------------------------------------
+
+METHOD-cinetic.md, styles/cinetic-*.md, techniques/cin-*.md and CINETIC.md
+are adapted from cinetic (https://github.com/Leonxlnx/cinetic, commit
+ecfa660: skills/cinetic/SKILL.md, references/*.md and the technique library
+assets/library/techniques.json), MIT License, Copyright (c) 2026 Leonxlnx.
+Changes: the method and its formats rewritten as Zenvi tool calls (Zenvi
+uses neither Remotion nor HyperFrames/GSAP), each technique's recipe rebuilt
+with Zenvi tools with its 60 fps timings kept as frames and seconds, and
+techniques that are an existing Zenvi move merged into it (CINETIC.md). No
+cinetic code, starter, script, sound kit, film, image or brand is included.
+
+Zenvi's adaptations of its scripts: the technique draw of scripts/pick.py in
+packages/engine/src/brief/draw.ts, house.ts and cinetic-library.ts (the
+library's categories, roles, energies, formats, evidence and banned looks);
+the hard bans of SKILL.md and scripts/lint-film.mjs in
+packages/engine/src/review/taste.ts; the speed check of measure-speed.py,
+the AV-sync audit of av-audit.py, the text-flow gate of grid-check.ts and
+the banding check of forensics.py in packages/engine/src/review/
+motion-speed.ts, av-sync.ts, copy-pacing.ts, banding.ts and film-checks.ts;
+its dithered gradients (finishing.md) as the deband pass of
+packages/render-node/src/render/encoder.ts. The earshot sound kit cinetic
+uses is not ported.
+
+MIT License
+
+Copyright (c) 2026 Leonxlnx
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

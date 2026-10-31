@@ -153,7 +153,7 @@ export const trailerTools: CatalogTool[] = [
 
       c.suggest("auto_sound_design_tool", { genre: "hype", climax_seconds: round3(plan.silence[1]) }, "whooshes and hits on the escalation's cuts (the braams are placed)");
       c.suggest("master_audio_tool", { preset: "social", iterate: true }, "the loudness set last");
-      c.followStyle("movie-game-trailer");
+      await c.followStyle("movie-game-trailer");
       const esc = plan.shots.filter((x) => x.act === 3).map((x) => x.end - x.start);
       return c.finish(
         "Build trailer",

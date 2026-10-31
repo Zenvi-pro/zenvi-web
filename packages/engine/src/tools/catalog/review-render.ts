@@ -40,6 +40,13 @@ import { MAX_FLASHES, flashingOf, type FlashWindow } from "../../review/flashing
 import { onsetRatios, rhythmReview } from "../../review/rhythm.js";
 import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
+import { BANDED_AREA, bandingOf } from "../../review/banding.js";
+import { renderCauses, sfxHits, syncMisses, timelineCauses } from "../../review/av-sync.js";
+import { filmChecks } from "../../review/film-checks.js";
+import { readBrief } from "../../brief/brief.js";
+import { houseStyle } from "../../brief/house.js";
+import { fpsFloat } from "../../timeline/time.js";
+import { textBoxesOf } from "./review.js";
 import type { Vector } from "../../shots/vectors.js";
 import { FrameRenderError, mediaFileProject, renderPixels, secondsToFrame } from "../color-frames.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
@@ -53,6 +60,8 @@ const HASH_WIDTH = 96;
 const TILE_EDGE = 270;
 /** Shots hashed at most (a montage longer than this is sampled evenly). */
 const MAX_HASHED_SHOTS = 120;
+/** Frames read at full size for the banding check: the longest shots' middles. */
+const BANDING_FRAMES = 4;
 const SHEET_LAYER = 1_000_000;
 const LABEL_LAYER = 2_000_000;
 const FONT = "Lato, Helvetica, Arial, sans-serif";
@@ -206,6 +215,56 @@ async function sheetProject(
   return { project: doc.project, width: cols * tw };
 }
 
+/** Smooth gradients drawn as flat 8-bit bands, on the longest shots' middle frames at full size. */
+async function bandingProblems(call: ToolCall, solo: Project, shots: readonly Shot[], width: number): Promise<Problem[]> {
+  const picks = [...shots].sort((a, b) => b.end - b.start - (a.end - a.start)).slice(0, BANDING_FRAMES);
+  const banded: { at: number; area: number }[] = [];
+  for (const shot of picks) {
+    if (call.signal?.aborted) break;
+    try {
+      const { pixels } = await renderPixels(call, solo, secondsToFrame(solo, shot.mid), Math.min(1920, width));
+      const b = bandingOf(pixels);
+      if (b.area > BANDED_AREA) banded.push({ at: shot.mid, area: b.area });
+    } catch (error) {
+      if (!(error instanceof FrameRenderError)) throw error;
+    }
+  }
+  if (banded.length === 0) return [];
+  return [
+    {
+      kind: "banding",
+      severity: "warning",
+      at: banded[0]!.at,
+      message: `Gradient banding (flat 8-bit plateaus with contour steps) on ${banded.map((b) => `${fmt(b.at)} (${Math.round(b.area * 100)} % of the frame)`).join(", ")}. Render with the encoder's dithered deband pass (zenvi render --deband; a cinetic house style's export does it by itself).`,
+    },
+  ];
+}
+
+/**
+ * Sound effects of the open project whose transient lands more than a frame
+ * from any visible cause: a jump in the rendered picture, or the timeline's
+ * own changes (a keystroke's title, a keyframe), which are often too small
+ * to stand out of the render's motion but are still seen.
+ */
+function syncProblems(project: Project, inspection: RenderInspection): Problem[] {
+  const hits = sfxHits(project);
+  const end = Math.max(0, ...project.clips.map((c) => c.position + (c.end - c.start)));
+  // Only a render of this project from its start lines up with its timeline.
+  if (!inspection.picture || hits.length === 0 || Math.abs(end - inspection.duration) > 0.5) return [];
+  const rate = fpsFloat(project.fps) || inspection.fps;
+  const causes = [...renderCauses(inspection.picture, inspection.cuts.map((c) => c.time)), ...timelineCauses(project)];
+  const misses = syncMisses(hits, causes, 1 / Math.max(1, Math.min(rate, inspection.picture.fps)));
+  if (misses.length === 0) return [];
+  return [
+    {
+      kind: "sound_without_cause",
+      severity: "warning",
+      at: misses[0]!.time,
+      message: `${misses.length} of ${hits.length} sound effects hit more than a frame from anything that changes in the render: ${misses.slice(0, 5).map((m) => `${m.recipe} at ${fmt(m.time)}${m.offset === null ? "" : ` (nearest picture change ${m.offset > 0 ? "+" : ""}${m.offset.toFixed(2)}s)`}`).join(", ")}. Move each onto its cause or remove it.`,
+    },
+  ];
+}
+
 /** One line per problem, problems first. */
 function problemLines(problems: readonly Problem[]): string {
   const ordered = [...problems.filter((p) => p.severity === "problem"), ...problems.filter((p) => p.severity === "warning")];
@@ -325,6 +384,19 @@ export const reviewRenderTools: CatalogTool[] = [
       const warnings: string[] = [];
       const flashes = await flashing(call, inspection, warnings);
       problems.push(...flashProblems(flashes ?? []));
+      // A house style's finishing pass (cinetic's forensics and AV-sync audit); other styles are not held to it.
+      const brief = readBrief(project);
+      if (brief && houseStyle(brief.style)) {
+        problems.push(...(await bandingProblems(call, solo, shots, inspection.width)));
+        problems.push(...syncProblems(project, inspection));
+      }
+      // The open project's own finishing checks (motion speed, text overlap, a house style's copy and bans), as warnings.
+      const timeline = reviewTimeline(project);
+      const { boxes, svgs } = await textBoxesOf(call, timeline.titleClips);
+      for (const p of filmChecks({ project, brief, titles: timeline.titleClips, svgs, textBoxes: boxes })) {
+        if (p.code === "sound-without-cause") continue; // measured on the render itself above
+        problems.push({ kind: p.code.startsWith("house-ban") ? "house_ban" : p.code.startsWith("copy-") ? "copy_pacing" : p.code === "text-overlap" ? "text_overlap" : "too_fast", severity: "warning", at: p.at, message: `${p.message} Fix: ${p.fix}` });
+      }
       const swaps = repeats.length > 0 ? repeatSwaps(project, inspection.duration, shots, repeats, targets.repeatWindowSeconds) : [];
 
       const finish = finishGaps(project);

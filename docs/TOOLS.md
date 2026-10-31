@@ -309,7 +309,7 @@ Availability: editor partial (without stock search the edit uses only the bin; w
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
 | `request` | string |  | The person's request as they wrote it (a brief, a reference to recreate, 'a reel of my trip'). Its length, frame, tempo, quoted names, headline, URL and suggested searches are read from it. Optional once a brief is saved (re-runs: its goal and style). |
-| `style` | "match-cut-montage" \| "flash-montage" \| "movie-game-trailer" \| "kinetic-captions" \| "documentary" \| "saas-ui-promo" \| "3d-product-ad" \| "product-launch-film" \| "editorial-type" \| "tutorial" \| "travel-cinematic-montage" \| "hype-reel" |  | A style of the styles index instead of the one the request reads as. |
+| `style` | "match-cut-montage" \| "flash-montage" \| "movie-game-trailer" \| "kinetic-captions" \| "documentary" \| "saas-ui-promo" \| "3d-product-ad" \| "product-launch-film" \| "cinetic-launch-film" \| "cinetic-teaser" \| "cinetic-feature-loop" \| "cinetic-logo-sting" \| "cinetic-ui-walkthrough" \| "editorial-type" \| "tutorial" \| "travel-cinematic-montage" \| "hype-reel" |  | A style of the styles index instead of the one the request reads as. |
 | `length_seconds` | number |  | Target length, seconds (default: the request's, else the style's). (min 4, max 120) |
 | `title` | string |  | The product, film or brand name (product launch, trailer); default: the name the request quotes after 'called' / 'named'. |
 | `hook` | string |  | The opening line (default: a quoted headline in the request). |
@@ -3877,6 +3877,8 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `checklist` | string[] |  | The style's finish checklist, the lines review checks before done. (default []) |
 | `critique` | string |  | What the self-critique against the style's best-vs-average list changed. |
 | `missing` | string[] |  | Facts the person must supply (brand name, URL, price): never invented. (default []) |
+| `brand` | string |  | The person's own brand as they gave it (colours, fonts, logo, tone). It wins over a style's house taste: with it, a cinetic style's bans do not apply. |
+| `draw` | object |  | A house style's technique draw (cinetic-* styles; Zenvi draws it): build the picks the concept can carry, reroll at most twice by saving another, never add one the draw did not give. |
 | `auto` | boolean |  | Set by Zenvi when the first cut saved a minimal brief for an agent that had none; a brief you save yourself leaves it out. |
 | `check_method` | boolean |  | true lists where the brief falls short of the motif method at any length (default: from 20 s). |
 

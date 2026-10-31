@@ -24,12 +24,13 @@
 
 import { z } from "zod";
 import { ensureBrief, nearestAspect } from "../../brief/auto.js";
+import { houseStyle } from "../../brief/house.js";
 import { briefSummary, readBrief, type Brief, type BriefAspect } from "../../brief/brief.js";
 import { inventoryEntry, inventoryFiles } from "../../brief/inventory.js";
 import { readRequest } from "../../director/request.js";
 import { binFacts, fallbackFor, routeRequest, STYLE_RULES, type BuilderPlan, type Route, type SoundGenre } from "../../director/route.js";
 import { finishGaps } from "../../review/finish.js";
-import { STYLE_FILES } from "../../styles/index.js";
+import { loadStyleFiles } from "../../styles/load.js";
 import type { Problem } from "../../review/render.js";
 import type { ShotSwap } from "../../review/swaps.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
@@ -52,7 +53,8 @@ const MIN_GATHER = 2;
 const MAX_GATHER = 12;
 const SUMMARY_CHARS = 220;
 /** The styles index, as the auto brief and the router match it. */
-const STYLES = STYLE_FILES.filter((f) => f.kind === "style");
+const styleIndex = async (): Promise<StyleEntry[]> => (await loadStyleFiles()).filter((f) => f.kind === "style");
+type StyleEntry = Awaited<ReturnType<typeof loadStyleFiles>>[number];
 /** A brief's longest goal and line (brief.ts). */
 const GOAL_CHARS = 300;
 /** The lengths the builders cut (build_reel_tool's duration_seconds). */
@@ -262,6 +264,7 @@ function watchFindings(receipt: ToolReceipt | null): Finding[] {
 }
 
 async function produce(call: ToolCall, args: Request, requested: boolean): Promise<{ receipt: ToolReceipt; images?: ToolImage[] }> {
+  const indexStyles = await styleIndex();
   const director = new Director(call, args.skip ?? []);
   const project = () => call.doc.project;
   const facts = readRequest(args.request);
@@ -273,9 +276,9 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const hook = args.hook ?? facts.headline;
   const endCard = args.end_card ?? facts.url;
   // The saved brief's style leads when the index has it, with a builder of its own or not (route.ts ruleFor).
-  const style = args.style ?? (saved && STYLES.some((s) => s.id === saved.style) ? saved.style : undefined);
+  const style = args.style ?? (saved && indexStyles.some((s) => s.id === saved.style) ? saved.style : undefined);
   const route = (chosen: string | undefined): Route =>
-    routeRequest({ request: `${args.request} ${saved && !chosen ? saved.style : ""}`, candidates: STYLES, style: chosen, bin: binFacts(entries()), product: name ?? undefined, features: args.features?.length, script: Boolean(args.script) });
+    routeRequest({ request: `${args.request} ${saved && !chosen ? saved.style : ""}`, candidates: indexStyles, style: chosen, bin: binFacts(entries()), product: name ?? undefined, features: args.features?.length, script: Boolean(args.script) });
   let plan = route(style);
   const rule = plan.rule;
   const seconds = args.length_seconds ?? facts.seconds ?? saved?.length_seconds ?? rule.seconds;
@@ -296,7 +299,10 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     else {
       const firstSentence = args.request.split(/(?<=[.!?])\s|\n/)[0] ?? args.request;
       const bpm = args.bpm ?? facts.bpm ?? rule.music.bpm;
-      brief = ensureBrief(call.doc, args.request, STYLES, {
+      // A house style draws its techniques away from what the last films on this host drew.
+      const avoid = houseStyle(rule.id) && call.host.draws ? await call.host.draws.recent().catch(() => []) : [];
+      brief = ensureBrief(call.doc, args.request, indexStyles, {
+        avoid,
         style: rule.id,
         aspect,
         length_seconds: seconds,
@@ -310,6 +316,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
       });
       const auto = brief ?? readBrief(project());
       brief = auto;
+      if (auto?.draw) await call.host.draws?.remember(auto.draw.picks.map((p) => p.technique), project().id).catch(() => undefined);
       director.stages.push({ stage: "brief", tool: TOOL, outcome: "applied", summary: auto ? `saved a minimal brief (auto): ${auto.style}, ${auto.aspect} ${auto.length_seconds}s` : "no brief saved", undo_steps: 0 });
     }
   }
@@ -478,6 +485,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     made,
     `Style: ${rule.id} because ${plan.why}${plan.fallback ? `; ${plan.fallback.wanted} could not run (${plan.fallback.why})` : ""}.`,
     brief ? briefSummary(brief).split("\n")[0]! : "No brief.",
+    ...(brief?.draw ? [`Drawn techniques (${brief.draw.format}, ${brief.draw.energy}): ${brief.draw.picks.map((p) => p.technique).join(", ")}. get_technique_tool each; build the ones the concept carries in the film's own objects, drop the rest with a reason.`] : []),
     `Stages (${undoSteps} undo step${undoSteps === 1 ? "" : "s"}, one per stage): ${director.stages.map((s) => `${s.stage} ${s.outcome === "applied" ? "ok" : s.outcome}${s.tool !== "-" && s.outcome !== "applied" ? ` (${s.tool}: ${s.summary})` : ""}`).join(" · ")}`,
     ...(rendered ? [`Render: ${rendered.path}${rendered.seconds ? ` (${rendered.seconds.toFixed(1)} s)` : ""}.`] : []),
     ...(findings.length > 0

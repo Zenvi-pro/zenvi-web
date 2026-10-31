@@ -52,6 +52,8 @@ import { contractTool, unavailable, type CatalogTool, type ToolCall, type ToolOu
 import { pyFixed, pyFloat } from "../pyfmt.js";
 import type { ToolReceipt } from "../receipt.js";
 import { contractMeta } from "../schemas.gen.js";
+import { readBrief } from "../../brief/brief.js";
+import { houseStyle } from "../../brief/house.js";
 import type { ContainerFormat, ExportHost, ExportResult } from "../types.js";
 import { record, text } from "./common.js";
 import { profileContext } from "./project-export-profiles.js";
@@ -356,6 +358,9 @@ async function exportVideo(call: ToolCall, input: Record<string, unknown>): Prom
   if ((project.files ?? []).some((f) => f.path === plan.path)) throw new ToolError(`${plan.path} is one of the project's input files; choose a different name`);
   const options = exportOptionsForPlan(plan)!;
   if (audioCodec) options.audioCodec = audioCodec;
+  // A cinetic house style ships its gradients dithered (its finishing pass): the brief says which style this is.
+  const brief = readBrief(call.doc.project);
+  if (brief && houseStyle(brief.style)?.profile === "cinetic") options.deband = true;
   if (delivery !== "files" && /[\\/]/.test(plan.path)) {
     const name = baseName(plan.path);
     options.output = name;

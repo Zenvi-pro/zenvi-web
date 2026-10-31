@@ -133,6 +133,8 @@ export function readLibrary(styles = STYLES, recipes = RECIPES) {
       aspect: meta.aspect ?? [],
       categories: meta.categories ?? [],
       needs: meta.needs ?? [],
+      // A drawn library's techniques (drawn: cinetic) are handed out by the brief's draw, not picked from the table.
+      drawn: typeof meta.drawn === "string" ? meta.drawn : null,
       path: rel,
       markdown,
     });
@@ -170,7 +172,9 @@ function cell(text) {
 /** The generated block: a table of styles, a table of techniques, the families. */
 export function indexTable({ entries, families, methods = [] }) {
   const styles = entries.filter((e) => e.kind === "style").sort((a, b) => a.id.localeCompare(b.id));
-  const techniques = entries.filter((e) => e.kind === "technique").sort((a, b) => a.id.localeCompare(b.id));
+  const techniques = entries.filter((e) => e.kind === "technique" && !e.drawn).sort((a, b) => a.id.localeCompare(b.id));
+  const drawn = new Map();
+  for (const e of entries) if (e.kind === "technique" && e.drawn) drawn.set(e.drawn, (drawn.get(e.drawn) ?? 0) + 1);
   const lines = [START, "", `### Styles (${styles.length})`, "", "| style | pace | aspect | use when |", "| --- | --- | --- | --- |"];
   for (const s of styles) lines.push(`| [${s.id}](${s.path}) | ${s.pace} | ${cell(s.aspect.join(" ") || "any")} | ${cell(s.summary)} |`);
   lines.push("", `### Techniques (${techniques.length})`, "");
@@ -180,6 +184,12 @@ export function indexTable({ entries, families, methods = [] }) {
     for (const t of techniques) {
       const needs = t.needs.length > 0 ? ` (needs ${t.needs.join(", ")})` : "";
       lines.push(`| [${t.id}](${t.path}) | ${t.pace} | ${cell(t.tools.join(" "))} | ${cell(t.summary + needs)} |`);
+    }
+  }
+  if (drawn.size > 0) {
+    lines.push("", "### Drawn libraries", "");
+    for (const [library, count] of [...drawn].sort()) {
+      lines.push(`- ${library}: ${count} techniques (front matter \`drawn: ${library}\`), never picked from a table: the brief of a ${library}-* style draws them (its \`draw\`; get_brief_tool, produce_video_tool) and get_technique_tool reads each.`);
     }
   }
   if (families.length > 0) {
