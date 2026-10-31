@@ -83,7 +83,9 @@ then hits sound on cuts.
 - Hard cuts ~70 %; match cuts at the product entrances (device to screen,
   t100; slow-mo subject to its illustration); a whip into a routine
   montage once (t045 burst of 0.5-1 s shots); dissolves only at section
-  ends; 1-3 white flashes per 90 s at most.
+  ends; 1-3 white flashes per 90 s at most. `apply_motion_transitions_tool`
+  `style: "brand"` (or `auto` with this brief saved) keeps that ratio: one
+  move in three cuts, the rest hard, never one whip on every cut.
 - Speed ramp (`speed_ramp_tool` `hero`) on the one slow-motion hero beat.
 
 ## Sound & music

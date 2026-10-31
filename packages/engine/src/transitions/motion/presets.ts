@@ -29,6 +29,7 @@
 export const MOTION_TRANSITION_IDS = [
   "whip",
   "slide",
+  "tilt",
   "zoom_in",
   "zoom_out",
   "zoom_through",
@@ -221,6 +222,7 @@ function axisOf(dir: MotionDirection | null): Axis {
 }
 
 const PAN = ["left", "right", "up", "down"] as const;
+const TILT = ["up", "down"] as const;
 const SPIN = ["cw", "ccw"] as const;
 
 /**
@@ -292,6 +294,22 @@ const PRESETS: readonly PresetDef[] = [
     defaultDirection: "left",
     sfx: ["whoosh"],
     frame: (ctx) => travel(ctx, 0.5, 0.035),
+  },
+  {
+    id: "tilt",
+    title: "Tilt pan",
+    description: "A camera tilt: the picture tilts up (or down) past the cut with a vertical smear and a slight roll about the camera's pivot; the next shot arrives on the same move and settles level.",
+    frames30: 10,
+    directions: TILT,
+    defaultDirection: "up",
+    sfx: ["whoosh"],
+    frame: (ctx) => {
+      const values = travel({ ...ctx, dir: ctx.dir === "down" ? "down" : "up" }, 0.5, 0.06);
+      // The roll keeps one sign of change across the cut (the vector law): out rolls towards +r, in arrives from -r.
+      const roll = (ctx.side === "out" ? 1 : -1) * 3 * Math.min(1.5, ctx.intensity) * ctx.a;
+      const scale = rotationCoverScale(roll, ctx.aspect) * 1.002;
+      return { ...values, rotation: roll, scale_x: scale, scale_y: scale };
+    },
   },
   {
     id: "zoom_in",

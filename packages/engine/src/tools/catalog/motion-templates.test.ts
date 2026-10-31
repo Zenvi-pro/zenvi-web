@@ -185,7 +185,9 @@ describe("add_motion_template_tool", () => {
     expect(sizes(host)).toEqual(sizes(plainHost));
     expect(doc.project.clips.map((c) => [c.position, c.layer])).toEqual(plain.project.clips.map((c) => [c.position, c.layer]));
 
-    const unknown = await runTool({ doc, host }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "Comic Sans" });
+    const arial = await runTool({ doc, host }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "Arial" });
+    expect(arial.ok, arial.text).toBe(true);
+    const unknown = await runTool({ doc, host }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "Wingdings" });
     expect(unknown.ok).toBe(false);
     expect(unknown.text).toContain("bundled families: inter, anton");
     const noFonts = await runTool({ doc: verticalProject(), host: motionHost({ without: ["assets"] }) }, "add_motion_template_tool", { template: "kinetic_type", text: "Hi", font_family: "anton" });

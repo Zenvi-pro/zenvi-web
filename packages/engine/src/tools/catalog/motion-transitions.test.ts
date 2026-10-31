@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ProjectDocument } from "../../history/document.js";
 import { addClip } from "../../ops/clips.js";
 import { listProjectMotionTransitions, motionRecords } from "../../ops/motion-transitions.js";
+import { patchClip } from "../../ops/internal.js";
+import { makeKeyframePoint } from "../../keyframe/edit.js";
+import { Interpolation } from "../../model/types.js";
 import { makeDoc } from "../../ops/testkit.js";
 import { runTool } from "../registry.js";
 import { fakeHost } from "../test-support/fake-host.js";
@@ -30,7 +33,7 @@ describe("motion transition tools", () => {
     expect(result.ok, result.text).toBe(true);
     const data = dataOf(result) as { presets: { preset: string; default_frames: number }[]; styles: Record<string, string[]>; on_timeline: unknown[] };
     expect(data.presets.find((p) => p.preset === "whip")?.default_frames).toBe(8);
-    expect(Object.keys(data.styles)).toEqual(["hype", "cinematic"]);
+    expect(Object.keys(data.styles)).toEqual(["hype", "cinematic", "sport", "flash", "brand", "editorial", "punch", "travel", "gentle"]);
     expect(data.on_timeline).toEqual([]);
     expect(doc.undoLabels).toEqual([]);
   });
@@ -117,6 +120,116 @@ describe("motion transition tools", () => {
     const nothing = await call(doc, "remove_motion_transition_tool", { clip_id: "CLIP1" });
     expect(summaryOf(nothing)).toMatch(/nothing to remove/);
     expect(doc.undoLabels).toHaveLength(3);
+  });
+
+  it("varies the moves by style, leaving most cuts hard, and warns on one preset everywhere", async () => {
+    const long = (): ProjectDocument => {
+      const doc = makeDoc();
+      doc.transaction("clips", (tx) => {
+        for (let i = 0; i < 9; i += 1) addClip(tx, { fileId: "VIDEO00001", position: i, layer: 1, start: 0, end: 1, id: `SHOT${i}` });
+      });
+      doc.clearHistory();
+      return doc;
+    };
+    const brand = long();
+    const result = await call(brand, "apply_motion_transitions_tool", { track: "1", style: "brand" });
+    expect(result.ok, result.text).toBe(true);
+    const data = dataOf(result) as { transitions: { preset: string; cut: number }[]; hard_cuts: number };
+    expect(data.transitions.map((t) => [t.preset, t.cut])).toEqual([
+      ["slide", 3],
+      ["blur_dissolve", 6],
+      ["zoom_through", 8],
+    ]);
+    expect(data.hard_cuts).toBe(5);
+    expect(summaryOf(result)).toMatch(/5 cut\(s\) stay hard/);
+
+    const auto = long();
+    const fallback = await call(auto, "apply_motion_transitions_tool", { track: "1", focus_x: 0.2, focus_y: 0.3 });
+    expect(fallback.ok, fallback.text).toBe(true);
+    expect(summaryOf(fallback)).toMatch(/cinematic, from the brief's style \(none saved\)/);
+    const last = listProjectMotionTransitions(auto.project).find((r) => r.preset === "zoom_through")!;
+    const out = auto.project.clips.find((c) => c.id === last.outClipId)!;
+    // Flying into (0.2, 0.3): the picture moves right and down as it scales, keeping that point still.
+    const lx = (out as unknown as { location_x: { Points: { co: { Y: number } }[] } }).location_x.Points.map((p) => p.co.Y);
+    expect(Math.max(...lx)).toBeGreaterThan(0);
+
+    const same = long();
+    const whips = await call(same, "apply_motion_transitions_tool", { track: "1", preset: "whip" });
+    expect(whips.ok, whips.text).toBe(true);
+    expect(JSON.stringify(whips.data)).toMatch(/whip on all 8 cuts reads as a template/);
+  });
+
+  it("keeps whips and slides on the current after a mix's camera tilt (no flip to the reserved up)", async () => {
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      for (let i = 0; i < 18; i += 1) addClip(tx, { fileId: "VIDEO00001", position: i, layer: 1, start: 0, end: 1, id: `SHOT${i}` });
+    });
+    doc.clearHistory();
+    const result = await call(doc, "apply_motion_transitions_tool", { track: "1", style: "sport" });
+    expect(result.ok, result.text).toBe(true);
+    const records = listProjectMotionTransitions(doc.project);
+    const whips = records.filter((r) => r.preset === "whip");
+    expect(whips.length).toBeGreaterThanOrEqual(2);
+    expect(whips.map((r) => r.direction)).toEqual(whips.map(() => "left"));
+    expect(records.filter((r) => r.preset === "tilt").every((r) => r.direction === "up")).toBe(true);
+  });
+
+  it("drifts a dissolve's clips from their own framing, not from 1", async () => {
+    const doc = editDoc();
+    doc.transaction("frame", (tx) => {
+      patchClip(tx, "CLIP0", { scale_x: { Points: [makeKeyframePoint(1, 1.5, Interpolation.BEZIER)] }, scale_y: { Points: [makeKeyframePoint(1, 1.2, Interpolation.BEZIER)] } });
+    });
+    doc.clearHistory();
+    const result = await call(doc, "apply_matched_dissolve_tool", { clip1_id: "CLIP0", duration: 0.5, speed: 0.04 });
+    expect(result.ok, result.text).toBe(true);
+    const clip = doc.project.clips.find((c) => c.id === "CLIP0") as unknown as Record<"scale_x" | "scale_y", { Points: { co: { X: number; Y: number } }[] }>;
+    expect(clip.scale_x.Points[0]!.co.Y).toBeCloseTo(1.5, 6);
+    expect(clip.scale_y.Points[0]!.co.Y).toBeCloseTo(1.2, 6);
+    expect(clip.scale_x.Points[1]!.co.Y).toBeGreaterThan(1.5);
+    // The last key sits on the clip's last frame (2 s at 30 fps from source start 0), not one past it.
+    expect(clip.scale_x.Points[1]!.co.X).toBe(60);
+  });
+
+  it("dissolves with both shots pushing in at one speed, in one undo step", async () => {
+    const doc = editDoc();
+    const result = await call(doc, "apply_matched_dissolve_tool", { clip1_id: "CLIP0", duration: 0.5, speed: 0.04 });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Motion-matched dissolve"]);
+    expect((dataOf(result) as { transition_id: string }).transition_id).toBeTruthy();
+    const slope = (id: string) => {
+      const pts = (doc.project.clips.find((c) => c.id === id) as unknown as { scale_x: { Points: { co: { X: number; Y: number } }[] } }).scale_x.Points;
+      return (pts[1]!.co.Y - pts[0]!.co.Y) / ((pts[1]!.co.X - pts[0]!.co.X) / 30);
+    };
+    // Same velocity on both sides of the blend: the move reads as one.
+    expect(slope("CLIP0")).toBeCloseTo(0.04, 2);
+    expect(slope("CLIP1")).toBeCloseTo(0.04, 2);
+    const again = await call(doc, "apply_matched_dissolve_tool", { clip1_id: "LATE" });
+    expect(again.ok).toBe(false);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("finds the cut from the time alone", async () => {
+    const doc = editDoc();
+    const result = await call(doc, "apply_motion_transition_tool", { preset: "tilt", time: 4.2 });
+    expect(result.ok, result.text).toBe(true);
+    expect((dataOf(result) as { cut: number; preset: string }).cut).toBe(4);
+    expect(summaryOf(result)).toMatch(/^Added tilt up on the cut at 4\.00s/);
+    const none = await call(doc, "apply_motion_transition_tool", { preset: "whip", time: 8.5 });
+    expect(none.text).toMatch(/no scene change within 0\.5 s of 8\.50s/);
+  });
+
+  it("moves a scene's whole stack when the cut is found from the time alone", async () => {
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      addClip(tx, { fileId: "VIDEO00001", position: 0, layer: 1, start: 0, end: 2, id: "BG1" });
+      addClip(tx, { fileId: "VIDEO00001", position: 0, layer: 2, start: 0, end: 2, id: "HEAD1" });
+      addClip(tx, { fileId: "VIDEO00001", position: 2, layer: 3, start: 0, end: 2, id: "CARDS" });
+    });
+    doc.clearHistory();
+    const result = await call(doc, "apply_motion_transition_tool", { preset: "whip", time: 2.1 });
+    expect(result.ok, result.text).toBe(true);
+    const roles = (dataOf(result) as { clips: { clip_id: string; role: string }[] }).clips.map((c) => `${c.clip_id}:${c.role}`);
+    expect(roles.sort()).toEqual(["BG1:out", "CARDS:in", "HEAD1:out"]);
   });
 
   it("says which track has the cuts when the named one has none", async () => {

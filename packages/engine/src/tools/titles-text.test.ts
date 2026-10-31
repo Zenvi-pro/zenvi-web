@@ -947,7 +947,9 @@ describe("add_title_tool", () => {
 
   it("fonts in edit_title_tool follow the same rule", async () => {
     const { doc, h, clipA } = twoClipTitle({ fonts: ["Arial", "Lato"] });
-    await expectRefusal(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "Georgia" }, "font 'Georgia' is not installed; installed fonts like it: Arial");
+    await expectRefusal(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "Comic Papyrus" }, "font 'Comic Papyrus' is not installed; installed fonts like it: ");
+    // A serif the host lacks is set in the bundled serif, not refused (and not left to DejaVu).
+    expect(data(await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "Georgia" })).font).toBe("Instrument Serif");
     const r = await call(doc, h, "edit_title_tool", { timeline_clip_id: clipA, font: "lato" });
     expect(data(r).font).toBe("Lato");
   });

@@ -266,13 +266,14 @@ export function cutNear(project: Project, layer: number, seconds: number): Motio
  * Current"): the direction of the nearest earlier motion transition on the
  * track that this preset can take, else the preset's default (left; spins
  * clockwise). Never alternates: ping-pong across consecutive cuts reads as an
- * error.
+ * error. A camera tilt is not the current: its up/down would otherwise turn
+ * every later whip and slide of a mix (sport, brand) into the reserved up.
  */
 function autoDirection(project: Project, preset: MotionTransitionId, layer: number, cut: number): MotionDirection | undefined {
   const info = getMotionTransition(preset)!;
   if (info.directions.length === 0) return undefined;
   const earlier = listProjectMotionTransitions(project)
-    .filter((r) => r.layer === layer && r.cut < cut - 1e-6 && r.direction !== null && info.directions.includes(r.direction))
+    .filter((r) => r.layer === layer && r.cut < cut - 1e-6 && r.direction !== null && info.directions.includes(r.direction) && (preset === "tilt" || r.preset !== "tilt"))
     .sort((x, y) => y.cut - x.cut)[0];
   return earlier?.direction ?? info.defaultDirection ?? undefined;
 }

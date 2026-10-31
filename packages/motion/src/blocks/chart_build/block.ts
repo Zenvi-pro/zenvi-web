@@ -41,6 +41,15 @@ export function build(ctx: BlockContext): void {
   const side = W > H * 1.3;
   const contentW = W - safe.left - safe.right;
 
+  // A plate under the whole chart: over footage the donut or bars read on a card, not on the shot (bench round 7, saasui).
+  const plateKind = String(p.plate ?? "auto");
+  if (plateKind === "glass" || plateKind === "solid" || (plateKind === "auto" && ctx.alpha)) {
+    const pad = Math.min(48, safe.left * 0.8, safe.top * 0.8);
+    const plate = ctx.el("div", `cb-plate${plateKind === "solid" ? " is-solid" : ""}`);
+    Object.assign(plate.style, { left: `${safe.left - pad}px`, top: `${safe.top - pad}px`, width: `${contentW + 2 * pad}px`, height: `${H - safe.top - safe.bottom + 2 * pad}px` });
+    tl.fromTo(plate, { y: H * 0.03, scale: 0.98, opacity: 0, blur: 10 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.6, ease: "out" });
+  }
+
   // Head: title, then the big number (a donut keeps its number in the ring).
   const head = ctx.el("div", "cb-head");
   Object.assign(head.style, { left: `${safe.left}px`, top: `${safe.top}px`, width: `${side ? contentW * 0.38 : contentW}px` });

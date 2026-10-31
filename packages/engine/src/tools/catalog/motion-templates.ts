@@ -30,15 +30,14 @@ import { placeOverlayClip } from "../../ops/overlays.js";
 import { buildMotionTemplate } from "../../motion/build.js";
 import { gridFromBeats, tempoGrid } from "../../motion/grid.js";
 import { PALETTES, withAccent } from "../../motion/palettes.js";
-import { GRID_DRIFTS, GRID_REVEALS, MOTION_TEMPLATE_IDS, MotionInputError, type GridOptions, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
+import { GRID_DRIFTS, GRID_PACES, GRID_REVEALS, MOTION_TEMPLATE_IDS, MotionInputError, type GridOptions, type MotionContent, type MotionTemplateId } from "../../motion/template.js";
 import { FIELD_LAYOUTS, GRID_LAYOUTS } from "../../motion/tiles.js";
 import { TEMPLATES } from "../../motion/templates/index.js";
-import { bundledFamily } from "../../typography/families.js";
 import { GRID_TRANSITIONS, fitMontageFrames, gridRecutPresets, type GridTransitions } from "../../transitions/motion/montage.js";
 import { PALETTE_IDS, type BeatGrid, type MotionLayer, type MotionMedia, type MotionPlan, type PaletteId } from "../../motion/types.js";
 import { beatOverrideProblem } from "../beat-override.js";
 import { beatsOfFile, canTrackBeats } from "../beats.js";
-import { FONT_FAMILY_LIST, loadFamilies, missingGlyphWarnings, unknownFamily } from "../fonts.js";
+import { FONT_FAMILY_LIST, familyArg, loadFamilies, missingGlyphWarnings, unknownFamily } from "../fonts.js";
 import { planInTypeface } from "../../motion/typeface.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
@@ -108,7 +107,7 @@ const input = z.strictObject({
   align: z.enum(["left", "center"]).optional().describe("Text alignment (kinetic_type, end_card plain)."),
   position: z.enum(["top", "center", "bottom"]).optional().describe("Where the text sits (kinetic_type)."),
   backdrop: z.boolean().optional().describe("Draw the template's own background (end_card and grid default true; type_search and word_scroll default false)."),
-  font_family: z.string().max(40).optional().describe(`Set the template's type in a bundled family, drawn as outlines (same on every surface): ${FONT_FAMILY_LIST}. A mono family replaces the monospace labels. Default: the system sans.`),
+  font_family: z.string().max(40).optional().describe(`Set the template's type in a bundled family, drawn as outlines (same on every surface): ${FONT_FAMILY_LIST}; a font by kind (Arial, serif, condensed, mono) takes the bundled face of that kind. A mono family replaces the monospace labels. Default: the system sans.`),
   layout: z.enum(GRID_LAYOUTS).optional().describe("grid: grid (2, 3, 4, 6 or 9 tiles), strips_v (vertical strips), strips_h, film_strip (small frames on sprocketed strips, the big frame last), mosaic (irregular, 3-9 tiles), repeat (one clip copied over 2/3/4/6/8/9/12/16 tiles: a multiplicity field), kaleidoscope (one clip in 2/4/6/8 segments, alternate ones mirrored so edges meet round the shot's centre). Default grid."),
   tiles: z.number().int().min(2).max(16).optional().describe("grid: how many tiles (grid 2/3/4/6/9, strips 2-6, film_strip 3-7, mosaic 3-9, repeat 2/3/4/6/8/9/12/16, kaleidoscope 2/4/6/8). Default per layout (repeat 9, kaleidoscope 4). Tiles fill one per beat; a kaleidoscope's all at once."),
   steps: z.array(z.number().int().min(2).max(16)).min(1).max(4).optional().describe("grid: tile counts for layout steps, increasing, e.g. [3, 4, 6]: the grid is re-cut on a beat for each and fills again."),
@@ -121,6 +120,7 @@ const input = z.strictObject({
   phase: z.number().min(0).max(2).optional().describe("grid repeat: seconds each copy runs ahead of the one before, so copies move out of phase (default 0: in step; narrowed when the clip is too short)."),
   mirror: z.boolean().optional().describe("grid repeat: mirror alternate copies so their edges meet as mirrors (a kaleidoscope always is)."),
   drift: z.enum(GRID_DRIFTS).optional().describe("grid: a slow camera move over the whole field for the template's length: in (push in 12 %), out (pull out), left, right, up, down (pan). Not with merge, zoom_into, band or film_strip."),
+  pace: z.enum(GRID_PACES).optional().describe("grid with steps: fill (default) spreads the layout steps over duration_seconds, each layout held longer before the next re-cut (tiles still arrive one per beat of the beat grid), so a 3 → 4 → 6 build fills a 15 s grid; beat re-cuts as soon as a layout is full and holds the last one for the rest."),
   transitions: z
     .enum(GRID_TRANSITIONS)
     .optional()
@@ -134,7 +134,7 @@ const input = z.strictObject({
 type Input = z.infer<typeof input>;
 
 /** Arguments only the grid template reads. */
-const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift", "transitions", "strict_variety"] as const satisfies readonly (keyof Input)[];
+const GRID_ARGS = ["layout", "tiles", "steps", "band", "gutter", "radius", "reveal", "merge", "zoom_into", "phase", "mirror", "drift", "pace", "transitions", "strict_variety"] as const satisfies readonly (keyof Input)[];
 
 function displaySize(file: ProjectFile): { width: number; height: number } | null {
   const w = Number(file.width);
@@ -379,6 +379,7 @@ export const motionTemplateTools: CatalogTool[] = [
               ...(args.phase !== undefined ? { phase: args.phase } : {}),
               ...(args.mirror !== undefined ? { mirror: args.mirror } : {}),
               ...(args.drift ? { drift: args.drift } : {}),
+              ...(args.pace ? { pace: args.pace } : {}),
             }
           : undefined;
       const content: MotionContent = {
@@ -442,7 +443,7 @@ export const motionTemplateTools: CatalogTool[] = [
         return failed(TOOL, `Error: ${error instanceof Error ? error.message : String(error)}`);
       }
       if (args.font_family !== undefined) {
-        const family = bundledFamily(args.font_family);
+        const family = familyArg(args.font_family);
         if (!family) return refused(TOOL, unknownFamily(args.font_family));
         const lib = await loadFamilies(call, [family]);
         if (typeof lib === "string") return refused(TOOL, lib);

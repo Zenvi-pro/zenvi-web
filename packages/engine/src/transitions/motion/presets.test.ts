@@ -86,6 +86,8 @@ describe("motion transition presets", () => {
       ["whip", "up", "Shift.y"],
       ["whip", "down", "Shift.y"],
       ["slide", "left", "Shift.x"],
+      ["tilt", "up", "Shift.y"],
+      ["tilt", "down", "Shift.y"],
       ["squash", "left", "Shift.x"],
       ["spin", "cw", "rotation"],
       ["spin", "ccw", "rotation"],
@@ -139,6 +141,19 @@ describe("motion transition presets", () => {
     const spin = planMotionTransition({ preset: "spin", fps: 30, aspect: ASPECT, direction: "ccw" });
     for (const f of [...spin.out.frames, ...spin.in.frames]) expect(f.scale_x!).toBeGreaterThanOrEqual(rotationCoverScale(f.rotation!, ASPECT));
     expect(spin.out.frames.at(-1)!.rotation).toBeLessThan(0);
+  });
+
+  it("tilts on the vertical axis with a roll that keeps one sign of change and covers the canvas", () => {
+    const tilt = planMotionTransition({ preset: "tilt", fps: 30, aspect: ASPECT, direction: "left" });
+    expect(tilt.direction).toBe("up");
+    // Like a spin, each side turns the same way (the cut is where the next shot picks the roll up mid-flight).
+    for (const side of [tilt.out.frames, tilt.in.frames]) {
+      const rolls = side.map((f) => f.rotation!);
+      for (let i = 1; i < rolls.length; i += 1) expect(rolls[i]! - rolls[i - 1]!).toBeGreaterThanOrEqual(-1e-9);
+    }
+    expect(tilt.in.frames[0]!.rotation).toBeLessThan(0);
+    expect(tilt.in.frames.at(-1)!.rotation).toBe(0);
+    for (const f of [...tilt.out.frames, ...tilt.in.frames]) expect(f.scale_x!).toBeGreaterThanOrEqual(rotationCoverScale(f.rotation!, ASPECT));
   });
 
   it("inverts the frames on either side of the cut", () => {

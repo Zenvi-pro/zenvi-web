@@ -77,8 +77,9 @@ All boundaries sit on bar downbeats or phrase ends of the song.
 
 ## Motion & transitions
 
-- Hard cuts on action; dissolves (0.5-1 s, `apply_transition_tool`) only
-  between calm, similar details in the prep sequence.
+- Hard cuts on action; dissolves (0.5-1 s) only between calm, similar
+  details in the prep sequence, motion-matched (`apply_matched_dissolve_tool`:
+  both shots push in at one speed through the blend), never plain fades.
 - White flash / light leak at a scene boundary only, at most 1-2 per minute
   (`apply_motion_transition_tool` `flash_white`, duration 0.4, intensity
   0.8). Seven in 90 s is judged harsh; the best watched film has none.

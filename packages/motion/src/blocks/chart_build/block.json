@@ -1,8 +1,8 @@
 {
   "id": "chart_build",
-  "version": 2,
+  "version": 3,
   "title": "Chart build",
-  "description": "A bar, line or donut chart that builds itself: bars grow from the baseline, the line draws across, the donut sweeps round, every label counting up. A big number counts to the highlighted value; after a beat of stillness the highlighted bar/point/segment turns the accent, the rest dim, and a change badge lands. For stats, results and growth claims in promos and explainers.",
+  "description": "A bar, line or donut chart that builds itself: bars grow from the baseline, the line draws across, the donut sweeps round, every label counting up. A big number counts to the highlighted value; after a beat of stillness the highlighted bar/point/segment turns the accent, the rest dim, and a change badge lands. For stats, results and growth claims in promos and explainers. Over video (placement over_video) the chart sits on a glass plate so it reads over the footage; plate solid or none to change that.",
   "tags": [
     "chart",
     "data",
@@ -11,7 +11,8 @@
     "bar",
     "line",
     "donut",
-    "infographic"
+    "infographic",
+    "glass"
   ],
   "duration": {
     "default": 5,
@@ -112,6 +113,17 @@
       "type": "color",
       "optional": true,
       "description": "Colour of the bars/line/segments that are not highlighted (default the ink)."
+    },
+    "plate": {
+      "type": "enum",
+      "options": [
+        "auto",
+        "glass",
+        "solid",
+        "none"
+      ],
+      "default": "auto",
+      "description": "A card behind the chart: auto (glass over video, none full frame), glass (translucent, the footage shows through), solid (the palette's paper) or none."
     }
   }
 }

@@ -221,7 +221,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   align_match_cut_tool: { reason: "not proven yet: render-node/src/render/match-cut.test.ts proves the alignment end to end", params: "*" },
   match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety", "keep_order", "order"] },
   unify_grade_tool: { reason: "not proven yet: iterative grade matching across clips", params: ["reference_clip_id", "reference_file_id", "strength", "look", "look_intensity", "samples", "max_iterations"] },
-  kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["behind_subject", "placement", "language"] },
+  kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["behind_subject", "placement", "language", "rotation"] },
   add_sfx_tool: { reason: "not proven yet", params: ["provider", "sound_id", "title", "max_seconds", "allow_noncommercial", "kit"] },
   auto_sound_design_tool: { reason: "not proven yet: density and beats need a music bed with several cuts; genre ids to look up", params: ["sources", "kit", "density", "genre", "beats"] },
   speed_ramp_tool: { reason: "not proven yet: hero hold_seconds moves the slow moment, but no single probed frame has shown it", params: ["hold_seconds"] },
@@ -249,7 +249,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   hold_point_reframe_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
   pin_to_track_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
   screen_zoom_follow_tool: { reason: "not proven yet: needs a screen recording with activity", params: "*" },
-  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety", "sound", "replay", "states"] },
+  add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety", "sound", "replay", "states", "pace"] },
   add_plate_wipe_tool: { reason: "not proven yet", params: "*" },
   add_shape_mask_tool: { reason: "not proven yet: polygon points", params: ["points"] },
   add_type_block_tool: { reason: "not proven yet: one type block per case (text_on_path, write_on, stencil ...)", params: "*" },
@@ -260,6 +260,8 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   build_product_launch_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
   build_talking_head_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
   build_trailer_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  apply_motion_transitions_tool: { reason: "not proven yet: the focus point moves where a zoom or spin transition centres", params: ["focus_x", "focus_y"] },
+  apply_matched_dissolve_tool: { reason: "not proven yet: needs two shots whose subjects line up at the cut", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {

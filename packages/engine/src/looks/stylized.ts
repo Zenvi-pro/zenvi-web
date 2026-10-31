@@ -1,11 +1,11 @@
 /**
  * Stylised looks for apply_look_tool and list_looks_tool: solarise,
- * chrome, bleach bypass, duotones and colour accents. Each is a LUT made
+ * invert, chrome, bleach bypass, duotones and colour accents. Each is a LUT made
  * here (looks/luts.ts) and written into the project when first used, so
  * colours can be any (`duotone #1b1f4a #ffc94a`, `accent #ff2a2a`). Pure.
  */
 
-import { accentLut, bleachBypassLut, chromeLut, duotoneLut, hueOf, solarizeLut } from "./luts.js";
+import { accentLut, bleachBypassLut, chromeLut, duotoneLut, hueOf, invertLut, solarizeLut } from "./luts.js";
 
 export interface StylizedLook {
   id: string;
@@ -63,6 +63,14 @@ export const STYLIZED_LOOKS: readonly StylizedLook[] = [
     make: () => ({ stem: "look-solarize", cube: solarizeLut() }),
   },
   {
+    id: "invert",
+    label: "Invert / negative",
+    description: "A photographic negative of the clip: on a 1-3 frame shot it is the inverted flash frame of a flash montage (the negative flash between hard cuts)",
+    vibe_tags: ["invert", "inverted", "negative", "flash", "strobe", "hype", "stylized"],
+    intensity: 1,
+    make: () => ({ stem: "look-invert", cube: invertLut() }),
+  },
+  {
     id: "chrome",
     label: "Chrome / silver",
     description: "Hard metallic monochrome, the highlights folded to a sheen, a steel-blue cast (solarized chrome riders, product shots)",
@@ -83,6 +91,20 @@ export const STYLIZED_LOOKS: readonly StylizedLook[] = [
 ];
 
 const BY_ID = new Map(STYLIZED_LOOKS.map((l) => [l.id, l]));
+/** Spellings agents use for a look (bench round 7: "solarise" was refused and never retried). */
+const ALIASES: Readonly<Record<string, string>> = {
+  solarise: "solarize",
+  solarized: "solarize",
+  solarised: "solarize",
+  solarization: "solarize",
+  solarisation: "solarize",
+  negative: "invert",
+  inverted: "invert",
+  inverse: "invert",
+  silver: "chrome",
+  "bleach-bypass": "bleach_bypass",
+  "bleach bypass": "bleach_bypass",
+};
 const HEX = "#?([0-9a-fA-F]{6})";
 const CUSTOM_DUOTONE = new RegExp(`^duotone[\\s:]+${HEX}[\\s,:/]+${HEX}$`, "i");
 const CUSTOM_ACCENT = new RegExp(`^accent[\\s:]+${HEX}$`, "i");
@@ -90,7 +112,8 @@ const CUSTOM_ACCENT = new RegExp(`^accent[\\s:]+${HEX}$`, "i");
 /** A stylised look by id, or one with its colours in it ("duotone #1b1f4a #ffc94a", "accent #ff2a2a"); undefined when it is neither. */
 export function stylizedLook(raw: string): StylizedLook | undefined {
   const text = raw.trim();
-  const known = BY_ID.get(text.toLowerCase());
+  const lowered = text.toLowerCase();
+  const known = BY_ID.get(ALIASES[lowered] ?? lowered);
   if (known) return known;
   const duo = CUSTOM_DUOTONE.exec(text);
   if (duo) {

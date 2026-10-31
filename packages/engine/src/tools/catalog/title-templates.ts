@@ -63,7 +63,7 @@ import {
   toolError,
   uiTrackNumber,
 } from "../titles-text.js";
-import { missingGlyphWarnings, outlineTitle, titleFontFamilies } from "../fonts.js";
+import { outlineTitle, titleFontFamilies, titleFontWarnings } from "../fonts.js";
 import { animatedCatalog } from "./animated-titles.js";
 
 /** What each bundled template looks like (titles_text.py TEMPLATE_PURPOSE, from rendering all 50). */
@@ -179,8 +179,9 @@ export class TitleStyle {
 
   /**
    * `resolve_font`: the requested family matched against the host's fonts
-   * (refused when it is not installed); taken as given when the host cannot
-   * list them (`families` null, the browser).
+   * (a bundled face of its kind when it is not installed, else refused);
+   * taken as given when the host cannot list them (`families` null, the
+   * browser).
    */
   resolveFont(families: readonly string[] | null): void {
     if (this.font) this.font = resolveFont(this.font, families);
@@ -597,7 +598,7 @@ export const titleTemplateTools = [
           scopeUsed === "all_clips"
             ? [`The edited title is a new Project Files entry (${result.fileId}) that replaced ${file.id} in every clip; use the new file_id from now on.`]
             : [];
-        return applied(tool, summaryLine(summary), { data, notes, warnings: missingGlyphWarnings(outlined.missing) });
+        return applied(tool, summaryLine(summary), { data, notes, warnings: titleFontWarnings(outlined) });
       }),
   }),
 ];

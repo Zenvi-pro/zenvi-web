@@ -22,6 +22,7 @@ import { snapSeconds } from "../ops/internal.js";
 import { isVisualClip } from "../timeline/export-end.js";
 import type { Transaction } from "../history/document.js";
 import type { ToolCall, ToolOutcome } from "./define.js";
+import { FONT_FAMILIES, fallbackFamily } from "../typography/families.js";
 import { getCloseMatches } from "./difflib.js";
 import { projectFps } from "./frame-time.js";
 import { pyFixed, pyReprString } from "./pyfmt.js";
@@ -230,7 +231,8 @@ function shortest(names: readonly string[]): string {
 /**
  * `resolve_font`: the installed family `name` means (same name ignoring
  * case, else the shortest family starting with it, else the shortest
- * containing it), or a refusal naming installed fonts like it. Any name is
+ * containing it, else the installed bundled face of its kind: fallbackFamily),
+ * or a refusal naming installed fonts like it. Any name is
  * taken as given when the host cannot list its fonts (`families` null).
  */
 export function resolveFont(name: unknown, families: readonly string[] | null): string {
@@ -243,6 +245,9 @@ export function resolveFont(name: unknown, families: readonly string[] | null): 
   if (starts.length > 0) return shortest(starts);
   const contains = families.filter((f) => f.toLowerCase().includes(low));
   if (contains.length > 0) return shortest(contains);
+  // A font this host lacks, of a kind a bundled family covers ("Arial", "condensed"): the bundled face, not a refusal.
+  const stand = fallbackFamily(wanted);
+  if (stand && families.includes(FONT_FAMILIES[stand].name)) return FONT_FAMILIES[stand].name;
   const close = getCloseMatches(wanted, families, 8, 0.5);
   const hint = close.length > 0 ? close.join(", ") : [...families].sort(byCodePoint).slice(0, 8).join(", ");
   return toolError(`font ${pyReprString(wanted)} is not installed; installed fonts like it: ${hint}`);

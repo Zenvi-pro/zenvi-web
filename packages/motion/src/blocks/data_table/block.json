@@ -1,0 +1,82 @@
+{
+  "id": "data_table",
+  "version": 1,
+  "title": "Data table",
+  "description": "A small table that builds row by row on a glass card: a header, rows sliding up in turn, status chips popping in (Done/Live green, In review/Pending amber, Blocked red), then after a beat one row is picked out in the accent and the rest dim. For SaaS dashboards, checklists, plan comparisons and status boards. Over video by default.",
+  "tags": [
+    "ui",
+    "saas",
+    "table",
+    "dashboard",
+    "status",
+    "chips",
+    "data",
+    "glass"
+  ],
+  "duration": {
+    "default": 5,
+    "min": 2.5,
+    "max": 12
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": true,
+  "tokens": {
+    "palette": "light",
+    "radius": 24
+  },
+  "params": {
+    "title": {
+      "type": "string",
+      "maxLength": 48,
+      "default": "Launch checklist",
+      "description": "Above the table (empty: none)."
+    },
+    "columns": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 4,
+      "maxLength": 24,
+      "default": [
+        "Task",
+        "Owner",
+        "Status"
+      ],
+      "description": "Column headings, left to right (the first column is the widest)."
+    },
+    "rows": {
+      "type": "strings",
+      "minItems": 1,
+      "maxItems": 7,
+      "maxLength": 120,
+      "default": [
+        "Brand kit | Maya | [Done]",
+        "Landing page | Leo | [In review]",
+        "Pricing table | Ana | [Done]",
+        "Launch email | Sam | [Scheduled]"
+      ],
+      "description": "One per row, cells separated by |. A cell in [brackets] is a status chip coloured by its word (done, live, shipped, paid: green; review, pending, scheduled, draft: amber; blocked, failed, overdue: red; anything else: the accent)."
+    },
+    "highlight": {
+      "type": "integer",
+      "min": -1,
+      "max": 6,
+      "default": -1,
+      "description": "Row picked out in the accent after a beat while the others dim (0-based; -1: none)."
+    },
+    "plate": {
+      "type": "enum",
+      "options": [
+        "glass",
+        "solid",
+        "none"
+      ],
+      "default": "glass",
+      "description": "The card under the table: glass (translucent, the footage shows through), solid (the palette's surface) or none."
+    }
+  }
+}
