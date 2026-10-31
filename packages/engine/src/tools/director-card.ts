@@ -20,15 +20,18 @@ export const FINISH_HINT =
 /**
  * The style router: the styles library through its tools (styles.ts), on
  * every surface. Fleet ab10: with the recipes named here and read through
- * read_director_recipe, no agent ever opened a zenvi-styles file. Said as
- * the first step with the calls written out: W70's first runs, told only
- * what the tools do, skipped them.
+ * read_director_recipe, no agent ever opened a zenvi-styles file, but 9 of
+ * 12 main runs read the recipe the card named. W70's first runs, sent to
+ * find_style_tool first (two calls, no ids), read nothing: so the card names
+ * the ids again and get_style_tool is one call.
  */
 const STYLE =
-  'Before the first edit: find_style_tool {"request": "<the person\'s words>"}, then get_style_tool {"style": "<its pick>", "length_seconds": <the length>}: the beats timed for that length, look, type, sound, the exact tool calls and the checklist. get_technique_tool for a technique the style borrows.';
+  'Before the first edit, read its style\'s recipe (beats timed for the length, look, type, sound, tool calls, checklist): get_style_tool {"style": "<id>", "length_seconds": <s>}. ' +
+  "Styles: match-cut-montage, flash-montage, hype-reel, movie-game-trailer, documentary, kinetic-captions, saas-ui-promo, 3d-product-ad, editorial-type, grid-montage, data-explainer, tutorial, travel-cinematic-montage; " +
+  'find_style_tool {"request"} ranks all 42; get_technique_tool: a borrowed technique.';
 
-/** The brief (plugins/zenvi/skills/zenvi-styles/BRIEF.md): it lets review check the edit; nothing waits for it. */
-const BRIEF = "A brief lets review check the edit: save_brief_tool, get_brief_tool (nothing waits for it: the first cut saves a minimal one).";
+/** The brief (plugins/zenvi/skills/zenvi-styles/BRIEF.md): it lets review check the edit; nothing waits for it (DIRECTOR_START only: the card is at its budget). */
+const BRIEF = "A brief lets review check the edit: save_brief_tool, get_brief_tool (optional).";
 
 /** The finish every recipe ends with, in order. */
 const FINISH =
@@ -42,7 +45,7 @@ const FINISH =
 const ORDER = "Shots to re-edit: sequence_shots_tool first.";
 
 export const DIRECTOR_CARD: string = [
-  `Whole videos (reel, ad, promo, montage, a remake): ${STYLE} ${BRIEF}`,
+  `Whole videos (reel, ad, promo, montage, a remake): ${STYLE}`,
   ORDER,
   FINISH,
   "TTS captions: kinetic_captions_tool timeline_clip_ids=[TTS clip] uses its word timings.",
