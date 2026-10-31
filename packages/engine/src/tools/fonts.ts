@@ -80,9 +80,12 @@ export async function titleFontFamilies(call: ToolCall): Promise<string[] | null
  */
 export async function outlineTitle(call: ToolCall, svg: string): Promise<{ svg: string; missing: string[]; substituted: string[] } | string> {
   const plain = stripOutlines(svg);
-  const installed = call.host.assets?.readBytes ? await installedFontFamilies(call) : null;
+  const canRead = Boolean(call.host.assets?.readBytes);
+  const installed = canRead ? await installedFontFamilies(call) : null;
   const substituted = new Set<string>();
   const resolve = (css: string): FontFamilyId | null => {
+    // A surface that cannot read the bundled fonts (Zenvi Cloud) keeps unbundled text as text, as before.
+    if (!canRead) return bundledFamily(css);
     const family = titleFamily(css, installed);
     // Generic families and the DejaVu fallback (templates' default) are stood in for silently: nobody chose them.
     if (family && !bundledFamily(css) && !GENERIC.has(css.toLowerCase())) substituted.add(`${css} → ${FONT_FAMILIES[family].name}`);
