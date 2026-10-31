@@ -1,4 +1,4 @@
-import { formatNumber, resolveEase, splitText, type BlockContext } from "../../runtime/index.js";
+import { decimalsFor, formatNumber, resolveEase, splitText, type BlockContext } from "../../runtime/index.js";
 import { mixHex } from "../ui.js";
 import { angleBetween, fitView, globeArc, mixView, projector, ringPoints, slerp, toLonLat, toVec, worldView, type LonLat, type Projected, type ProjectionKind, type View } from "./geo.js";
 import { atlas, planGeoMap, type GeoMarker } from "./plan.js";
@@ -308,7 +308,7 @@ function placeLabels(markers: readonly MarkerEl[], width: number): void {
 
 function legend(ctx: BlockContext, lo: number, hi: number, land: string, accent: string, ramp: (v: number) => string, at: number): void {
   const { tl, safe, width: W, height: H, params: p } = ctx;
-  const fmt = { prefix: String(p.prefix ?? ""), suffix: String(p.suffix ?? ""), decimals: Math.abs(hi - lo) < 10 && !Number.isInteger(lo + hi) ? 1 : 0 };
+  const fmt = { prefix: String(p.prefix ?? ""), suffix: String(p.suffix ?? ""), decimals: decimalsFor([lo, hi]) };
   const band = ctx.el("div", "gm-legend");
   const w = Math.min(W - safe.left - safe.right, 760);
   Object.assign(band.style, { left: `${safe.left}px`, top: `${H - safe.bottom - 110}px`, width: `${w}px` });

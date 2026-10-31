@@ -188,7 +188,14 @@ export const briefTools: CatalogTool[] = [
       }
       const problems = methodProblems(brief, { force: checkMethod === true });
       const project = call.doc.project;
-      if (sameBrief(readBrief(project), brief)) return unchanged(SAVE, "The project already has this brief; nothing changed.", { data: { brief } });
+      // No music yet: the search that measures tempo and energy (round 7: agents searched by words and took the first drone).
+      // A re-save of the same brief (an agent resuming) still gets it.
+      const hasMusic = project.files.some((f) => isAudioOnlyMedia(f) && (Number(f.duration) || 0) >= MUSIC_MIN_DURATION);
+      const musicSearch = !hasMusic && brief.music ? musicSearchFromText(brief.music, brief.length_seconds) : null;
+      const musicLine = musicSearch ? [`No music in the bin: fetch it measured, search_freesound_music_tool ${JSON.stringify(musicSearch)}, and pick by bpm and curve.`] : [];
+      if (sameBrief(readBrief(project), brief)) {
+        return unchanged(SAVE, ["The project already has this brief; nothing changed.", ...musicLine].join("\n"), { data: { brief, ...(musicSearch ? { music_search: musicSearch } : {}) } });
+      }
       const known = new Set(project.files.map((f) => String(f.id)));
       const unknownFiles = [...brief.shots, ...brief.storyboard].filter((s) => s.file_id && !known.has(s.file_id)).map((s) => s.file_id!);
       const warnings = unknownFiles.length > 0 ? [`Shot plan names files not in the bin: ${[...new Set(unknownFiles)].join(", ")} (inspect_media_bin_tool lists the ids).`] : [];
@@ -196,10 +203,6 @@ export const briefTools: CatalogTool[] = [
       call.commit((tx) => tx.update(["settings"], { [BRIEF_KEY]: brief }), "Save brief");
       const { lines } = checkLines(call, brief);
       const footage = footageCoverage(call.doc.project, brief);
-      // No music yet: the search that measures tempo and energy (round 7: agents searched by words and took the first drone).
-      const hasMusic = call.doc.project.files.some((f) => isAudioOnlyMedia(f) && (Number(f.duration) || 0) >= MUSIC_MIN_DURATION);
-      const musicSearch = !hasMusic && brief.music ? musicSearchFromText(brief.music, brief.length_seconds) : null;
-      const musicLine = musicSearch ? [`No music in the bin: fetch it measured, search_freesound_music_tool ${JSON.stringify(musicSearch)}, and pick by bpm and curve.`] : [];
       return applied(SAVE, [briefSummary(brief), ...lines, ...coverageLines(footage, call.doc.project), ...musicLine].join("\n"), { data: { brief, footage, ...(musicSearch ? { music_search: musicSearch } : {}) }, warnings });
     },
   }),

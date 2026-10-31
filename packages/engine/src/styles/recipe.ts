@@ -7,7 +7,7 @@
  * through tools on every surface, at most ~1.5 k tokens a call.
  */
 
-import { styleScores } from "../brief/auto.js";
+import { styleMatch } from "../brief/auto.js";
 
 /** One file of the library (library.gen.ts `STYLE_FILES`). */
 export interface StyleFile {
@@ -339,7 +339,7 @@ const FAST = new Set(["fast", "frantic"]);
  */
 export function rankStyles(request: string, files: readonly StyleFile[], bin: BinSignals, count = 3): StylePick[] {
   const styles = files.filter((f) => f.kind === "style");
-  const words = styleScores(request, styles.map((f) => ({ id: f.id, summary: `${f.summary} ${styleMeta(f).categories.join(" ").replace(/-/g, " ")} ${styleMeta(f).mood.join(" ")}` })));
+  const words = new Map(styleMatch(request, styles.map((f) => ({ id: f.id, summary: `${f.summary} ${styleMeta(f).categories.join(" ").replace(/-/g, " ")} ${styleMeta(f).mood.join(" ")}` }))).ranked.map((m) => [m.id, m]));
   const picks = styles.map((f) => {
     const meta = styleMeta(f);
     const matched = words.get(f.id);

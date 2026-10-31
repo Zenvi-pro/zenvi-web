@@ -26,16 +26,23 @@ export const FINISH_HINT =
  * the ids again and get_style_tool is one call.
  */
 const STYLE =
-  'Before the first edit, read its style\'s recipe (beats timed for the length, look, type, sound, tool calls, checklist): get_style_tool {"style": "<id>", "length_seconds": <s>}. ' +
-  "Styles: match-cut-montage, flash-montage, hype-reel, movie-game-trailer, documentary, kinetic-captions, saas-ui-promo, 3d-product-ad, editorial-type, grid-montage, data-explainer, tutorial, travel-cinematic-montage; " +
-  'find_style_tool {"request"} ranks all 42; get_technique_tool: a borrowed technique.';
+  'Before the first edit, read its style\'s recipe (timed beats, look, sound, calls): get_style_tool {"style": "<id>", "length_seconds": <s>}. ' +
+  "Styles: match-cut-montage, flash-montage, hype-reel, documentary, kinetic-captions, saas-ui-promo, 3d-product-ad, editorial-type, grid-montage, data-explainer, tutorial; " +
+  'find_style_tool {"request"} ranks all 42; get_technique_tool: one technique.';
 
 /** The brief (plugins/zenvi/skills/zenvi-styles/BRIEF.md): it lets review check the edit; nothing waits for it (DIRECTOR_START only: the card is at its budget). */
 const BRIEF = "A brief lets review check the edit: save_brief_tool, get_brief_tool (optional).";
 
+/**
+ * The director as code (bench rounds 6-7: a recipe read in 6 of 52 runs, a
+ * builder called once, the review tools never): one call makes the edit,
+ * the agent's turns go to its findings.
+ */
+const PRODUCE = "produce_video_tool {request: the person's words, output} does it in one call, then fix its findings.";
+
 /** The finish every recipe ends with, in order. */
 const FINISH =
-  "Finish, in order: unify_grade_tool; apply_motion_transitions_tool (no track = every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
+  "Finish, in order: unify_grade_tool; apply_motion_transitions_tool (no track: every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
   "master_audio_tool iterate=true, last; render_video; review_render_tool; watch_render_tool once, fix its HIGH issues. Make the calls receipts say are missing.";
 
 /**
@@ -45,10 +52,10 @@ const FINISH =
 const ORDER = "Shots to re-edit: sequence_shots_tool first.";
 
 export const DIRECTOR_CARD: string = [
-  `Whole videos (reel, ad, promo, montage, a remake): ${STYLE}`,
+  `Whole videos (reel, ad, promo, montage, a remake): ${PRODUCE} By hand: ${STYLE}`,
   ORDER,
   FINISH,
-  "TTS captions: kinetic_captions_tool timeline_clip_ids=[TTS clip] uses its word timings.",
+  "TTS captions: kinetic_captions_tool timeline_clip_ids=[the TTS clip].",
 ].join("\n");
 
 /** The one-call builders: a whole first cut in one undo step, then the recipe's fixes and the finish. */
@@ -61,4 +68,4 @@ const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
 /** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
-export const DIRECTOR_START: string = `A new edit. ${STYLE} ${BRIEF} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;
+export const DIRECTOR_START: string = `A new edit: ${PRODUCE} By hand instead: ${STYLE} ${BRIEF} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;

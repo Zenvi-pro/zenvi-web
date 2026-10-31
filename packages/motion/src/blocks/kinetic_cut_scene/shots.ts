@@ -10,7 +10,8 @@
  */
 
 import type { PictureEventKind } from "@zenvi/engine";
-import type { Hit } from "../../runtime/kinetic.js";
+import { fitsFlashLimit } from "@zenvi/engine/flashing";
+import type { Hit } from "../../runtime/hit.js";
 
 export const ENTRANCES = ["slam", "type", "assemble", "mask", "flip", "stretch", "drop", "count", "strobe", "none"] as const;
 export type Entrance = (typeof ENTRANCES)[number];
@@ -127,6 +128,69 @@ export function shotHits(shots: readonly Shot[], bpm: number, scale = 1): Hit[] 
     else flashes.push(h.t);
   }
   return hits;
+}
+
+/** The ground a shot shows at u s into it: strobe flips its ground with the words, at most 3 flips a second. */
+export function groundAt(shot: Shot, bpm: number, u: number): Ground {
+  if (shot.entrance !== "strobe") return shot.ground;
+  const step = strobeStep(shot, bpm);
+  if (step < 1 / 3) return shot.ground;
+  const order: Ground[] = shot.ground === "light" ? ["light", "dark", "accent"] : shot.ground === "accent" ? ["accent", "dark", "light"] : ["dark", "light", "accent"];
+  return order[Math.floor(u / step) % order.length]!;
+}
+
+/**
+ * Seconds where the ground changes: cuts between shots on different grounds
+ * and a strobe's flips. Every change counts toward a flash whatever the
+ * palette, so the page and the receipt's warning agree.
+ */
+export function groundChanges(shots: readonly Shot[], bpm: number): number[] {
+  const out: number[] = [];
+  let previous: Ground | undefined;
+  for (const shot of shots) {
+    const step = shot.entrance === "strobe" ? strobeStep(shot, bpm) : Infinity;
+    for (let u = 0; shot.start + u < shot.end - 1e-6; u += step) {
+      const ground = groundAt(shot, bpm, u);
+      if (previous !== undefined && ground !== previous) out.push(shot.start + u);
+      previous = ground;
+      if (!Number.isFinite(step)) break;
+    }
+  }
+  return out;
+}
+
+/** A hit's flash fades over about this long (hitEnvelope's decay): its two luminance changes. */
+const HIT_FLASH_SECONDS = 0.12;
+
+/**
+ * Take the flash off the hits (they still punch) that would make more than
+ * 3 flashes in a second (WCAG 2.3.1) with the ground changes and the stronger
+ * hits' flashes. Returns how many lost it.
+ */
+export function limitHitFlashes(shots: readonly Shot[], hits: Hit[], bpm: number): number {
+  const kept = groundChanges(shots, bpm);
+  let dropped = 0;
+  for (const h of [...hits].sort((a, b) => b.strength - a.strength || a.t - b.t)) {
+    if (h.flash === 0) continue;
+    const changes = [h.t, h.t + HIT_FLASH_SECONDS];
+    if (fitsFlashLimit(kept, changes)) kept.push(...changes);
+    else {
+      h.flash = 0;
+      dropped += 1;
+    }
+  }
+  return dropped;
+}
+
+/** The receipt's warning when hits lose their flash: counted on the whole storyboard (the block may cut it shorter). */
+export function flashNote(params: Readonly<Record<string, unknown>>): string | undefined {
+  if (params.allow_strobe === true) return undefined;
+  const bpm = Number(params.bpm) || 120;
+  const specs = ((params.shots as string[] | undefined) ?? []).filter((l) => l.trim()).map(parseShot).filter((s): s is ShotSpec => typeof s !== "string");
+  const shots = scheduleShots(specs, bpm, specs.reduce((t, s) => t + (s.beats * 60) / bpm, 0));
+  const dropped = limitHitFlashes(shots, shotHits(shots, bpm), bpm);
+  if (dropped === 0) return undefined;
+  return `${dropped} hit(s) punch without their flash: with the ground changes they made more than 3 flashes in a second, which can trigger seizures (WCAG 2.3.1); fewer ground changes on fast cuts keep them, allow_strobe=true only when the user asks for a strobe`;
 }
 
 export interface ShotCue {

@@ -81,6 +81,32 @@ describe("fill_to_length_tool", () => {
     expect(picture(doc)).toHaveLength(2);
   });
 
+  it("leaves clips on locked tracks where they are, and refuses a locked picture track up front", async () => {
+    const lockLayerOf = (doc: ProjectDocument, clipId: string) => {
+      const layer = doc.project.clips.find((c) => c.id === clipId)!.layer;
+      const project: Project = structuredClone(doc.project);
+      project.layers.find((l) => l.number === layer)!.lock = true;
+      return new ProjectDocument(project);
+    };
+    const doc = lockLayerOf(lockLayerOf(shortEdit(), "CLIPCARD01"), "CLIPSONG01");
+    const { receipt, data } = await fill(doc, { seconds: 20 });
+    expect(receipt.status, receipt.summary).toBe("applied");
+    expect(data.to_seconds).toBe(20);
+    const card = doc.project.clips.find((c) => c.id === "CLIPCARD01")!;
+    expect(card.position).toBe(6);
+    expect(doc.project.clips.find((c) => c.id === "CLIPSONG01")!.end).toBe(8);
+    expect(data.moved_cards).toEqual([]);
+    expect(data.music).toEqual([]);
+    expect(receipt.warnings.join(" ")).toMatch(/ends at the old end, 8 s, on a locked track/);
+    expect(receipt.warnings.join(" ")).toMatch(/stops at 8 s, before the new end: its track is locked/);
+
+    const pictureLocked = lockLayerOf(shortEdit(), "CLIPAAAAAA");
+    const refused = await fill(pictureLocked, { seconds: 20 });
+    expect(refused.receipt.status).toBe("refused");
+    expect(refused.receipt.summary).toMatch(/^Error: the picture track .* is locked/);
+    expect(pictureLocked.undoLabels).toHaveLength(0);
+  });
+
   it("runs an overlay over the whole edit on to the new end, and mutes added shots under music that already runs past it", async () => {
     const doc = shortEdit(60);
     doc.transaction("overlay and a longer song", (tx) => {

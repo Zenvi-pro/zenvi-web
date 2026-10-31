@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { random01 } from "./rng.js";
-import { formatNumber, odometerPositions, scrambledText, splitText, textLines, typedCount } from "./text.js";
+import { decimalsFor, formatNumber, odometerPositions, scrambledText, splitText, textLines, typedCount } from "./text.js";
 
 describe("text animators", () => {
   it("types at the given rate and erases", () => {
@@ -59,5 +59,16 @@ describe("textLines", () => {
     expect(textLines("ALL SYSTEMS READY / 99.9% UPTIME")).toEqual(["ALL SYSTEMS READY", "99.9% UPTIME"]);
     expect(textLines("1.2 GB/s / LIVE 24/7")).toEqual(["1.2 GB/s", "LIVE 24/7"]);
     expect(textLines("ONE\nTWO")).toEqual(["ONE", "TWO"]);
+  });
+});
+
+describe("decimalsFor", () => {
+  it("shows every value as given, at most 3 decimals", () => {
+    expect(decimalsFor([12, 80])).toBe(0);
+    expect(decimalsFor([0.25, 0.75])).toBe(2);
+    expect(decimalsFor([0.4, 0.35])).toBe(2);
+    expect(decimalsFor([12.5, 80])).toBe(1);
+    expect(decimalsFor([1 / 3])).toBe(3);
+    expect(formatNumber(0.4 + 0.35, { decimals: decimalsFor([0.4, 0.35]) })).toBe("0.75");
   });
 });

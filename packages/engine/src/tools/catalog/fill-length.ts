@@ -34,7 +34,7 @@ import { applied, refused, unchanged } from "../receipt.js";
 import { isRetimed } from "../speech.js";
 import { fileById } from "./common.js";
 import { aspectOf, displayName, usableRange, visualKind } from "./reels.js";
-import { ToolError, clipTitle, gridOf, r3, resolveLayer } from "./timeline-edit-common.js";
+import { ToolError, clipTitle, gridOf, r3, resolveLayer, trackName } from "./timeline-edit-common.js";
 
 const TOOL = "fill_to_length_tool";
 const STEPS = ["hold", "broll", "slow", "repeat"] as const;
@@ -224,6 +224,9 @@ export const fillLengthTools: CatalogTool[] = [
         throw error;
       }
       if (layer === null) return refused(TOOL, "Error: no video on the timeline to extend: build the edit first.");
+      // Validate before the transaction: a locked track would make the whole fill fail inside it.
+      const locked = new Set(project.layers.filter((l) => l.lock).map((l) => l.number));
+      if (locked.has(layer)) return refused(TOOL, `Error: the picture track (${trackName(project, layer)}) is locked: unlock it to fill, or name another track.`);
       const track = project.clips.filter((c) => c.layer === layer && !isAudioOnlyMedia(fileById(project, String(c.file_id ?? "")))).sort((a, b) => a.position - b.position);
       if (track.length === 0) return refused(TOOL, `Error: track ${args.track ?? layer} has no picture clips.`);
       const last = track.reduce((a, b) => (endOf(b) > endOf(a) ? b : a));
@@ -245,7 +248,8 @@ export const fillLengthTools: CatalogTool[] = [
       // Shot length: the track's median, in whole beats of the music when that is known.
       const lengths = track.map(lengthOf).sort((a, b) => a - b);
       let shotLength = Math.max(MIN_SHOT, lengths[Math.floor(lengths.length / 2)]!);
-      const music = await musicToExtend(call, oldEnd, oldEnd + missing, g.frame);
+      // Locked tracks stay as they are: their cards, overlays and music are named in a warning instead.
+      const music = (await musicToExtend(call, oldEnd, oldEnd + missing, g.frame)).filter((m) => !locked.has(m.clip.layer));
       const bpmClip = music[0]?.clip;
       let beat: number | null = null;
       if (bpmClip && canTrackBeats(call)) {
@@ -261,7 +265,8 @@ export const fillLengthTools: CatalogTool[] = [
       const newEnd = oldEnd + missing - plan.short;
       const fresh = plan.shots.filter((s) => !s.repeat);
       const repeats = plan.shots.filter((s) => s.repeat);
-      const ending = project.clips.filter((c) => c.layer !== layer && Math.abs(endOf(c) - oldEnd) <= g.tol && !isAudioOnlyMedia(fileById(project, String(c.file_id ?? ""))));
+      const endingAll = project.clips.filter((c) => c.layer !== layer && Math.abs(endOf(c) - oldEnd) <= g.tol && !isAudioOnlyMedia(fileById(project, String(c.file_id ?? ""))));
+      const ending = endingAll.filter((c) => !locked.has(c.layer));
       // An end card (it starts with the last shot or later) moves to the new end; an overlay over more of the
       // edit (grain, a watermark, a caption bar) runs on to it where its media allows, rather than slide off its start.
       const cards = ending.filter((c) => c.position >= last.position - g.tol);
@@ -284,7 +289,8 @@ export const fillLengthTools: CatalogTool[] = [
       for (const m of music) if (m.loop) warnings.push(`${clipTitle(m.clip)} runs out: its last ${LOOP_BARS} bar(s) from ${r3(m.loop.from)} s repeat on a bar line.`);
       // A bed is a music file: footage whose own sound reads as music is picture, not a bed that stops.
       const musicStops = mixEntries(project).filter((e) => e.mixRole === "music" && !isMuted(e) && isAudioOnlyMedia(e.file) && endOf(e.clip) >= oldEnd - 1 && endOf(e.clip) < newEnd - g.frame && !music.some((m) => m.clip.id === e.clip.id));
-      for (const e of musicStops) warnings.push(`${clipTitle(e.clip)} stops at ${r3(endOf(e.clip))} s, before the new end: extend or replace it.`);
+      for (const e of musicStops) warnings.push(`${clipTitle(e.clip)} stops at ${r3(endOf(e.clip))} s, before the new end: ${locked.has(e.clip.layer) ? "its track is locked; unlock it and extend it" : "extend or replace it"}.`);
+      for (const c of endingAll) if (locked.has(c.layer)) warnings.push(`${clipTitle(c)} ends at the old end, ${r3(oldEnd)} s, on a locked track (${trackName(project, c.layer)}): it stays there.`);
       for (const c of ending) if (!cards.includes(c) && !overlays.includes(c)) warnings.push(`${clipTitle(c)} ends at the old end, ${r3(oldEnd)} s: its media cannot run on to the new end.`);
       const data = {
         from_seconds: r3(oldEnd),

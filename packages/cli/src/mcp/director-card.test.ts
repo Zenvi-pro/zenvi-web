@@ -16,8 +16,8 @@ describe("director card", () => {
     expect(DIRECTOR_CARD.length).toBeLessThanOrEqual(1000);
   });
 
-  it("sends whole videos to the style tools, and names only tools this server lists", () => {
-    expect(DIRECTOR_CARD).toMatch(/Before the first edit, read its style's recipe .*get_style_tool \{"style": "<id>".*Styles: match-cut-montage.*find_style_tool .*get_technique_tool/);
+  it("sends whole videos to produce_video_tool, by hand to the style tools, and names only tools this server lists", () => {
+    expect(DIRECTOR_CARD).toMatch(/produce_video_tool \{request: the person.s words, output\} does it in one call.*By hand: Before the first edit, read its style's recipe .*get_style_tool \{"style": "<id>".*Styles: match-cut-montage.*find_style_tool .*get_technique_tool/);
     // Every style the card names is one get_style_tool knows.
     const named = DIRECTOR_CARD.slice(DIRECTOR_CARD.indexOf("Styles: ") + 8, DIRECTOR_CARD.indexOf(";", DIRECTOR_CARD.indexOf("Styles: "))).split(", ");
     const styles = new Set(STYLE_FILES.filter((f) => f.kind === "style").map((f) => f.id));

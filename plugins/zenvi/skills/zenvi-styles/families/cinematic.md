@@ -30,14 +30,16 @@ Hard rules:
    length, cuts on action (`match-on-action`), scale progression (`shot-scale-grammar`). Snap every
    position and length to whole frames (beat grids are not frame multiples); otherwise neighbours end up
    a frame apart and `apply_motion_transition_tool` refuses ("no clip is cut back to back").
-2. Crop-fill sources that are not 16:9 (`set_clip_property_tool` `scale` 0) before any grade.
+2. Crop-fill sources whose aspect is not the timeline's (16:9, or the 9:16 / 2.39:1 delivery the index
+   lists: `set_clip_property_tool` `scale` 0 fills the timeline's own frame) before any grade.
 3. Retime: `speed_ramp_tool` (changes clip lengths; do it before keyframes and FX).
 4. Grade: `unify_grade_tool` with the family's look (`look`, `look_intensity` 0.4-0.85, `strength` 0.7-1.0),
    then per-look extras (`color_grade_clip_tool` wheels).
 5. Camera keyframes: push-ins, punch-ins, rack focus (`add_effect_tool` Blur keyframes), weave.
 6. Texture: grain (`apply_look_tool` `grain:*`), then ffmpeg FX (`apply_fx_tool` bloom / light_leak /
    chromatic_aberration) - each is a render per clip, so only on the locked cut.
-7. Frame: bars (`add_shape_mask_tool` height 0.744) and the reveal; titles after bars so they stay inside.
+7. Frame: bars on a 16:9 timeline (`add_shape_mask_tool` height 0.744, a 2.39:1 band; a 2.39:1 timeline
+   needs none, and at 9:16 a 2.39:1 band is a strip: skip it) and the reveal; titles after bars so they stay inside.
 8. Transitions: whips, flashes (`apply_motion_transition_tool`).
 9. Sound: music clips (split for a dead stop), J/L cuts, `add_sfx_tool` cues (trailer palette), suck-outs.
 10. Render with `--loudness -16` (social) and watch the whole thing; run the watch judge.
