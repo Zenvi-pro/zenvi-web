@@ -30,7 +30,7 @@ import { inventoryEntry, inventoryFiles } from "../../brief/inventory.js";
 import { readRequest } from "../../director/request.js";
 import { binFacts, fallbackFor, routeRequest, STYLE_RULES, type BuilderPlan, type Route, type SoundGenre } from "../../director/route.js";
 import { finishGaps } from "../../review/finish.js";
-import { STYLE_FILES } from "../../styles/index.js";
+import { loadStyleFiles } from "../../styles/load.js";
 import type { Problem } from "../../review/render.js";
 import type { ShotSwap } from "../../review/swaps.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
@@ -53,7 +53,8 @@ const MIN_GATHER = 2;
 const MAX_GATHER = 12;
 const SUMMARY_CHARS = 220;
 /** The styles index, as the auto brief and the router match it. */
-const STYLES = STYLE_FILES.filter((f) => f.kind === "style");
+const styleIndex = async (): Promise<StyleEntry[]> => (await loadStyleFiles()).filter((f) => f.kind === "style");
+type StyleEntry = Awaited<ReturnType<typeof loadStyleFiles>>[number];
 /** A brief's longest goal and line (brief.ts). */
 const GOAL_CHARS = 300;
 /** The lengths the builders cut (build_reel_tool's duration_seconds). */
@@ -263,6 +264,7 @@ function watchFindings(receipt: ToolReceipt | null): Finding[] {
 }
 
 async function produce(call: ToolCall, args: Request, requested: boolean): Promise<{ receipt: ToolReceipt; images?: ToolImage[] }> {
+  const indexStyles = await styleIndex();
   const director = new Director(call, args.skip ?? []);
   const project = () => call.doc.project;
   const facts = readRequest(args.request);
@@ -274,9 +276,9 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const hook = args.hook ?? facts.headline;
   const endCard = args.end_card ?? facts.url;
   // The saved brief's style leads when the index has it, with a builder of its own or not (route.ts ruleFor).
-  const style = args.style ?? (saved && STYLES.some((s) => s.id === saved.style) ? saved.style : undefined);
+  const style = args.style ?? (saved && indexStyles.some((s) => s.id === saved.style) ? saved.style : undefined);
   const route = (chosen: string | undefined): Route =>
-    routeRequest({ request: `${args.request} ${saved && !chosen ? saved.style : ""}`, candidates: STYLES, style: chosen, bin: binFacts(entries()), product: name ?? undefined, features: args.features?.length, script: Boolean(args.script) });
+    routeRequest({ request: `${args.request} ${saved && !chosen ? saved.style : ""}`, candidates: indexStyles, style: chosen, bin: binFacts(entries()), product: name ?? undefined, features: args.features?.length, script: Boolean(args.script) });
   let plan = route(style);
   const rule = plan.rule;
   const seconds = args.length_seconds ?? facts.seconds ?? saved?.length_seconds ?? rule.seconds;
@@ -299,7 +301,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
       const bpm = args.bpm ?? facts.bpm ?? rule.music.bpm;
       // A house style draws its techniques away from what the last films on this host drew.
       const avoid = houseStyle(rule.id) && call.host.draws ? await call.host.draws.recent().catch(() => []) : [];
-      brief = ensureBrief(call.doc, args.request, STYLES, {
+      brief = ensureBrief(call.doc, args.request, indexStyles, {
         avoid,
         style: rule.id,
         aspect,
