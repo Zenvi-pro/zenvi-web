@@ -82,6 +82,7 @@ const DIRECT_TOOLS = [
   "apply_fx_tool",
   "update_fx_tool",
   "remove_fx_tool",
+  "datamosh_cut_tool",
   "search_sfx_tool",
   "list_credits_tool",
   "create_sound_kit_tool",
