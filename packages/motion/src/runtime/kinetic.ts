@@ -12,17 +12,11 @@
  * function is pure in t, so tabs render frames in any order.
  */
 
+import type { Hit } from "./hit.js";
 import { mulberry32 } from "./rng.js";
 import type { Track } from "./timeline.js";
 
-/** A hit at `t` s: `strength` 1 for a cut, 0.5-0.6 for an off-beat cut, 1.3-1.4 for the climax; `shake` in design px. */
-export interface Hit {
-  t: number;
-  strength: number;
-  shake?: number;
-  /** Scales the hit's flash (default 1); 0 punches without a flash, to keep flashes 3 a second or fewer. */
-  flash?: number;
-}
+export type { Hit } from "./hit.js";
 
 /** How hard hits push the picture. */
 export interface HitLook {

@@ -7,6 +7,7 @@
  * track of back-to-back clips, so the cuts are real cuts.
  */
 
+import { MIN_CHANGE_GAP, fitsFlashLimit, isFlashChange, relativeLuminance } from "../../review/flashing.js";
 import { commandList, mapCommands, rotation, type Affine } from "../../typography/path-data.js";
 import type { PathCommand } from "../../typography/opentype.js";
 import type { TextBlock } from "../../typography/typeset.js";
@@ -29,6 +30,8 @@ export interface StrobeOptions extends TypeBlockBase {
   ink: string;
   accent: string;
   layouts: readonly StrobeLayout[];
+  /** Flip the ground on every cut even past 3 flashes a second (WCAG 2.3.1); the user asked for a strobe. */
+  allowStrobe?: boolean;
 }
 
 function luminance(hex: string): number {
@@ -85,11 +88,23 @@ export function buildStrobe(o: StrobeOptions): TypeBlockOutput {
   };
 
   let previous = -1;
+  // Ground flips that count toward a flash, seconds; a flip past 3 flashes a second holds the ground instead.
+  const flips: number[] = [];
+  let held = 0;
   o.words.forEach((word, i) => {
     const layout = o.layouts[i % o.layouts.length]!;
     // Flip the ground every cut, never twice the same in a row.
     let g = i % grounds.length;
     if (g === previous) g = (g + 1) % grounds.length;
+    if (previous >= 0 && isFlashChange(relativeLuminance(grounds[previous]!.ground), relativeLuminance(grounds[g]!.ground))) {
+      const t = o.starts[i]! / frame.fps;
+      // Evenly: a flip at least MIN_CHANGE_GAP after the last, not bursts of six and a hold.
+      if (o.allowStrobe || (t - (flips.at(-1) ?? -Infinity) >= MIN_CHANGE_GAP - 1e-6 && fitsFlashLimit(flips, [t]))) flips.push(t);
+      else {
+        g = previous;
+        held += 1;
+      }
+    }
     previous = g;
     const { ground, ink } = grounds[g]!;
     let shapes: PathCommand[];
@@ -149,5 +164,6 @@ export function buildStrobe(o: StrobeOptions): TypeBlockOutput {
     elements[elements.length - 1]!.to = Math.max(elements[elements.length - 1]!.to, o.frames);
   }
   const plan = planOf("type_strobe", o.frames, elements, [...o.starts], frame);
-  return { plan, masks: [], hits: elements.map((e) => e.from), missing: [...missing], warnings: [] };
+  const warnings = held > 0 ? [`the ground holds on ${held} of ${o.words.length} cuts: flipping it every cut makes more than 3 flashes in a second, which can trigger seizures (WCAG 2.3.1); hold_frames ${Math.ceil(frame.fps / 6)}+ flips every cut, allow_strobe=true only when the user asks for a strobe`] : [];
+  return { plan, masks: [], hits: elements.map((e) => e.from), missing: [...missing], warnings };
 }

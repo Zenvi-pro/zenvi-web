@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { detectActions } from "@zenvi/engine";
+import { detectActions, flashingOf } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { makeTempDir, removeDir } from "../test-support/fixtures.js";
 import { NoVideoError, decodeLuma } from "./luma.js";
@@ -30,6 +30,22 @@ describe("decodeLuma", () => {
     for (let p = 0; p < 64 * 36; p += 1) if (Math.abs(luma.frames[1]![p]! - luma.frames[0]![p]!) > 8) changed += 1;
     expect(changed).toBeGreaterThan(20);
     expect(Array.isArray(detectActions(luma))).toBe(true);
+  });
+
+  it("feeds the WCAG flash check: a 5 Hz black/white strobe fails, a 1 Hz one passes", async () => {
+    const strobe = async (name: string, period: number): Promise<string> => {
+      const file = path.join(dir, name);
+      // Lit for 2 frames of every `period` at 30 fps.
+      await exec(resolveBinary("ffmpeg"), [
+        "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", `color=c=black:s=160x90:r=30:d=3,format=gray,geq=lum='if(lt(mod(N,${period}),2),235,16)'`,
+        "-pix_fmt", "yuv420p", "-y", file,
+      ]);
+      return file;
+    };
+    const fast = flashingOf(await decodeLuma(await strobe("strobe5.mp4", 6), { width: 48, height: 27, fps: 30 }));
+    expect(fast.length).toBeGreaterThan(0);
+    expect(fast[0]!.flashes).toBeGreaterThanOrEqual(4);
+    expect(flashingOf(await decodeLuma(await strobe("strobe1.mp4", 30), { width: 48, height: 27, fps: 30 }))).toEqual([]);
   });
 
   it("names a file without a picture", async () => {

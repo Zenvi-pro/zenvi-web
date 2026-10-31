@@ -1,4 +1,4 @@
-import { counter, formatNumber, resolveEase, splitText, type BlockContext } from "../../runtime/index.js";
+import { counter, decimalsFor, formatNumber, resolveEase, splitText, type BlockContext } from "../../runtime/index.js";
 import { mixHex } from "../ui.js";
 import { ICONS } from "./icons.js";
 import { layoutIcons, planPictogram, type Layout, type Slot } from "./layout.js";
@@ -20,6 +20,8 @@ export function build(ctx: BlockContext): void {
   const keep = Number(p.keep);
   const captions = (p.captions as string[]).slice(0, layouts.length);
   const fmt = { prefix: String(p.prefix ?? ""), suffix: String(p.suffix ?? "") };
+  // One precision for every group label and the total, so 0.4 + 0.35 reads as 0.40, 0.35 and 0.75 in all.
+  const decimals = decimalsFor(groups.map((g) => g.value));
   const total = groups.reduce((n, g) => n + g.icons, 0);
 
   const backdrop = p.backdrop ? ctx.el("div", "pm-backdrop") : null;
@@ -120,8 +122,8 @@ export function build(ctx: BlockContext): void {
       const el = ctx.el("div", `pm-${label.kind}`);
       Object.assign(el.style, { left: `${label.x - 300}px`, top: `${label.y}px` });
       if (label.kind === "name") el.textContent = g?.label ?? "";
-      else if (g) tl.track(counter(el, { from: 0, to: g.value, at: inAt, duration: 0.7, ease: "out", decimals: Number.isInteger(g.value) ? 0 : 1, ...fmt }));
-      else el.textContent = `${formatNumber(groups.reduce((n, x) => n + x.value, 0), fmt)} in all`;
+      else if (g) tl.track(counter(el, { from: 0, to: g.value, at: inAt, duration: 0.7, ease: "out", decimals, ...fmt }));
+      else el.textContent = `${formatNumber(groups.reduce((n, x) => n + x.value, 0), { ...fmt, decimals })} in all`;
       if (label.group === focus) el.style.color = palette.accent;
       tl.fromTo(el, { opacity: 0, y: 12 }, { opacity: 1, y: 0 }, { at: inAt, duration: 0.45, ease: "out" });
       if (outAt !== undefined) tl.to(el, { opacity: 0 }, { at: outAt, duration: 0.25, ease: "smooth" });

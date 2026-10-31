@@ -146,4 +146,34 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
     const none = (await runTool({ doc: ed.doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
     expect(none.summary).toMatch(/^Error: review_render_tool is not available in this Zenvi surface: reading a rendered file needs ffmpeg/);
   });
+
+  it("flags more than 3 flashes in a second from the decoded picture (WCAG 2.3.1)", async () => {
+    const ed = painted();
+    const clean = { black: [], frozen: [], loudness: { integratedLufs: -14, rangeLu: 3, truePeakDb: -1.5 } };
+    ed.host.media!.inspectRender = async (path) => ({ ...inspection(path), ...clean });
+    const asked: { width: number; height: number; fps: number }[] = [];
+    // A white flash on 2 frames of every 6 from 4 s to 6 s: 5 flashes a second.
+    ed.host.media!.decodeLuma = async (_path, o) => {
+      asked.push(o);
+      const frames = Array.from({ length: 300 }, (_, f) => new Uint8Array(o.width * o.height).fill(f >= 120 && f < 180 && f % 6 < 2 ? 250 : 30));
+      return { fps: o.fps, width: o.width, height: o.height, startSeconds: 0, frames };
+    };
+    const receipt = (await runTool({ doc: ed.doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
+    expect(asked[0]).toMatchObject({ width: 48, height: 27, fps: 30 });
+    const problems = (receipt.data as Row).problems as { kind: string; at: number; severity: string }[];
+    const flashing = problems.filter((p) => p.kind === "flashing");
+    expect(flashing).toHaveLength(1);
+    expect(flashing[0]).toMatchObject({ severity: "problem" });
+    expect(flashing[0]!.at).toBeGreaterThanOrEqual(4);
+    expect(receipt.summary).toMatch(/- PROBLEM: \d+ flashes within one second at 4\.\d\ds-.*WCAG 2\.3\.1 allows 3/);
+
+    // Three a second passes.
+    ed.host.media!.decodeLuma = async (_path, o) => ({
+      fps: o.fps, width: o.width, height: o.height, startSeconds: 0,
+      frames: Array.from({ length: 300 }, (_, f) => new Uint8Array(o.width * o.height).fill(f % 10 < 2 ? 250 : 30)),
+    });
+    const ok = (await runTool({ doc: ed.doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
+    expect(((ok.data as Row).problems as { kind: string }[]).filter((p) => p.kind === "flashing")).toEqual([]);
+    expect((ok.data as Row).flashing).toEqual([]);
+  });
 });

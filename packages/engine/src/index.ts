@@ -63,6 +63,8 @@ export * from "./review/render.js";
 export * from "./review/watch.js";
 export * from "./review/compare.js";
 export * from "./review/finish.js";
+export * from "./review/flashing.js";
+export * from "./review/timeline-flashes.js";
 export * from "./brief/brief.js";
 export * from "./brief/check.js";
 export * from "./brief/method.js";
