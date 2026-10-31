@@ -162,6 +162,7 @@ export const OFFSCREEN: Readonly<Record<string, string>> = {
   align_lyrics_tool: "word timings on the file's transcript, read by the caption and word tools",
   detect_music_structure_tool: "the song's sections as snap points and timeline markers",
   make_transition_mask_tool: "adds a mask image to Project Files, not the timeline",
+  save_brief_tool: "the creative brief, saved with the project for the director to read",
 };
 
 export interface BacklogEntry {

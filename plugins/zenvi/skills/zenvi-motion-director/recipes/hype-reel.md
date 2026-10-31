@@ -1,3 +1,15 @@
+---
+id: hype-reel
+kind: style
+summary: Sport, cars, launches, events, trailers, "edit to this song" - a cut every 0.2-0.3 s, ramps, flash and glitch drop
+categories: [sports-hype-edit, movie-game-trailer, automotive-ad, gaming-montage, fitness-lifestyle]
+tools: [build_reel_tool, speed_ramp_tool, apply_motion_transitions_tool, auto_sound_design_tool, unify_grade_tool]
+pace: frantic
+mood: [intense, loud, triumphant]
+aspect: ["9:16", "16:9"]
+pairs_with: []
+avoid_with: []
+---
 # Hype / sport reel
 
 Very fast (a cut every 0.2-0.3 s on a 120-160 bpm track, 4-frame bursts after

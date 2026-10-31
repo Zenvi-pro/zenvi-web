@@ -1,7 +1,9 @@
 /**
  * The remote MCP server: one `Server` per HTTP request (stateless Streamable
- * HTTP), with the cloud tools, the engine catalog and the preview view as a
- * `ui://` resource. The tool list is built once at startup.
+ * HTTP), with the cloud tools, the engine catalog, the preview view as a
+ * `ui://` resource and the zenvi-styles library (the brief compiler, the
+ * styles index and every style and technique) as zenvi://styles resources.
+ * The tool list is built once at startup.
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -14,6 +16,7 @@ import {
   McpError,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { STYLE_RESOURCES, styleResource } from "@zenvi/engine/styles";
 import type { Services } from "../container.js";
 import { cloudTools } from "./cloud-tools.js";
 import { engineTools, unavailableToolReason } from "./engine.js";
@@ -91,12 +94,14 @@ export function createMcpServer(tools: readonly McpTool[], ctx: McpCallContext):
   });
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-    resources: resources.map(({ text: _text, ...listed }) => listed),
+    resources: [...resources.map(({ text: _text, ...listed }) => listed), ...STYLE_RESOURCES.map(({ text: _text, ...listed }) => listed)],
   }));
 
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({ resourceTemplates: [] }));
 
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const style = styleResource(request.params.uri);
+    if (style) return { contents: [{ uri: style.uri, mimeType: style.mimeType, text: style.text }] };
     const resource = resources.find((r) => r.uri === request.params.uri);
     if (!resource) throw new McpError(RESOURCE_NOT_FOUND, `Resource not found: ${request.params.uri}`);
     return { contents: [{ uri: resource.uri, mimeType: resource.mimeType, text: resource.text, _meta: resource._meta }] };

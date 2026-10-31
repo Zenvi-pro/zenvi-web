@@ -1,3 +1,15 @@
+---
+id: match-cut-montage
+kind: style
+summary: Shots that share a shape or pose (circles, arms out) cut so the subject never jumps - ~0.3 s shots
+categories: [flash-cut-match-cut-edit, travel-cinematic-montage]
+tools: [gather_stock_footage_tool, detect_subject_tool, match_cut_montage_tool, auto_sound_design_tool]
+pace: fast
+mood: [hypnotic, clever]
+aspect: ["9:16", "16:9", "1:1"]
+pairs_with: []
+avoid_with: []
+---
 # Match-cut montage
 
 Shots that share a shape or pose (circles: cup, lamp, sun, moon, eye, vinyl,
