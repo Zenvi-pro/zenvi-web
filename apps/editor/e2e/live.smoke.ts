@@ -1,8 +1,6 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { rmSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { videoFixture, watch } from "./support/live";
 
 /**
  * After each deploy: the public editor loads, every library panel opens,
@@ -14,50 +12,6 @@ import { expect, test, type Page } from "@playwright/test";
 
 /** The editor's backend; another editor (ZENVI_LIVE_URL) skips the health check unless this is set too. */
 const API = process.env.ZENVI_LIVE_API || (process.env.ZENVI_LIVE_URL ? "" : "https://api.zenvi.pro");
-/** Requests that may fail without the editor being broken (analytics, aborted media previews). */
-const NOISE = /sentry|google-analytics|googletagmanager|favicon|videos\.pexels\.com|cdn\.freesound\.org/;
-const HANG_MS = 20_000;
-
-interface Watch {
-  problems: string[];
-  hanging(): string[];
-}
-
-function watch(page: Page): Watch {
-  const problems: string[] = [];
-  const started = new Map<object, { at: number; url: string }>();
-  page.on("pageerror", (e) => problems.push(`page error: ${String(e).slice(0, 300)}`));
-  page.on("console", (m) => {
-    if (m.type() === "error" && !NOISE.test(m.location().url ?? "")) problems.push(`console error: ${m.text().slice(0, 300)}`);
-  });
-  page.on("request", (r) => started.set(r, { at: Date.now(), url: r.url() }));
-  page.on("requestfinished", (r) => started.delete(r));
-  page.on("requestfailed", (r) => {
-    started.delete(r);
-    // ERR_ABORTED: the editor cancelled it (a search replaced by a newer one).
-    const error = r.failure()?.errorText ?? "";
-    if (!NOISE.test(r.url()) && !error.includes("ERR_ABORTED")) problems.push(`request failed: ${r.method()} ${r.url().slice(0, 160)} (${error})`);
-  });
-  page.on("response", (r) => {
-    if (r.status() >= 400 && !NOISE.test(r.url())) problems.push(`HTTP ${r.status()}: ${r.request().method()} ${r.url().slice(0, 160)}`);
-  });
-  return {
-    problems,
-    hanging: () => [...started.values()].filter((s) => Date.now() - s.at > HANG_MS && !NOISE.test(s.url)).map((s) => `hanging ${Math.round((Date.now() - s.at) / 1000)} s: ${s.url.slice(0, 160)}`),
-  };
-}
-
-function fixture(): { dir: string; video: string } | null {
-  const dir = mkdtempSync(join(tmpdir(), "zenvi-live-smoke-"));
-  const video = join(dir, "smoke.webm");
-  try {
-    execFileSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=s=540x960:r=30:d=4", "-f", "lavfi", "-i", "sine=f=440:d=4", "-c:v", "libvpx-vp9", "-b:v", "400k", "-deadline", "realtime", "-cpu-used", "8", "-c:a", "libopus", "-shortest", video]);
-    return { dir, video };
-  } catch {
-    rmSync(dir, { recursive: true, force: true });
-    return null;
-  }
-}
 
 const library = (page: Page) => page.getByRole("navigation", { name: "Library sections" });
 
@@ -117,7 +71,7 @@ test("the live editor works for a signed-out visitor", async ({ page, request })
   });
 
   // Without ffmpeg only this step is skipped (test.skip would skip the checks after it too).
-  const media = fixture();
+  const media = videoFixture("zenvi-live-smoke-");
   if (!media) test.info().annotations.push({ type: "skipped step", description: "local media import: ffmpeg is not installed" });
   else await test.step("local media imports and Make it snappy runs", async () => {
     await library(page).getByRole("button", { name: /Project files/ }).click();

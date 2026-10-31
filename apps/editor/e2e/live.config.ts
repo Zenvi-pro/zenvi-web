@@ -2,14 +2,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
 
-// Post-deploy smoke test of the public web editor (read-only: nothing is
-// saved anywhere but the test browser's own storage). No local server.
+// Post-deploy tests of the public web editor (nothing is saved anywhere but
+// the test browser's own storage). No local server. The signed-in spec runs
+// only with ZENVI_LIVE_SESSION set (live-signed-in.spec.ts).
 //   npx playwright test -c apps/editor/e2e/live.config.ts
 //   ZENVI_LIVE_URL=https://staging.example/editor/ npx playwright test -c apps/editor/e2e/live.config.ts
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "live.smoke.ts",
+  testMatch: ["live.smoke.ts", "live-signed-in.spec.ts"],
   workers: 1,
   retries: 1,
   timeout: 180_000,
