@@ -68,10 +68,10 @@ async function ask(page: Page, question: string, timeout = 240_000): Promise<str
   return panel.slice(panel.lastIndexOf(question) + question.length);
 }
 
-/** The result line under each run of the tool titled `title` in a reply. */
-function toolResults(reply: string, title: string): string[] {
+/** The result line under each run of a tool whose activity title matches `title` in a reply. */
+function toolResults(reply: string, title: RegExp): string[] {
   const lines = reply.split("\n").map((l) => l.trim()).filter(Boolean);
-  return lines.flatMap((line, i) => (line === title && lines[i + 1] ? [lines[i + 1]!] : []));
+  return lines.flatMap((line, i) => (title.test(line) && lines[i + 1] ? [lines[i + 1]!] : []));
 }
 
 test("the live editor works for a signed-in user", async ({ page }) => {
@@ -126,7 +126,7 @@ test("the live editor works for a signed-in user", async ({ page }) => {
 
     await test.step("Assistant: add captions", async () => {
       const reply = await ask(page, "Add captions to the narration clip");
-      const results = toolResults(reply, "Add captions");
+      const results = toolResults(reply, /^Add captions$/);
       expect(results.length, reply).toBeGreaterThan(0);
       expect(results.at(-1), reply).toMatch(/^Added \d+ caption/);
       expect(reply).not.toContain("Invalid arguments for add_captions_tool");
@@ -134,14 +134,14 @@ test("the live editor works for a signed-in user", async ({ page }) => {
 
     await test.step("Assistant: inspect the timeline", async () => {
       const reply = await ask(page, "Inspect the timeline visually and tell me what you see in the frames");
-      const results = toolResults(reply, "Inspect timeline");
+      const results = toolResults(reply, /^Inspect timeline$/);
       expect(results[0], reply).toMatch(/^Rendered \d+ inspect image/);
       expect(reply).not.toContain("Invalid arguments for inspect_timeline_tool");
     });
 
     await test.step("Assistant: generate an image", async () => {
       const reply = await ask(page, "Generate an image of a lighthouse at dusk and put it on the timeline after the video");
-      const results = toolResults(reply, "Generate image");
+      const results = toolResults(reply, /^Generate image( and add to timeline)?$/);
       expect(results.length, reply).toBeGreaterThan(0);
       expect(results.at(-1), reply).not.toMatch(/^Error/);
     });
@@ -160,7 +160,7 @@ test("the live editor works for a signed-in user", async ({ page }) => {
     } else if (video === "assistant") {
       await test.step("Assistant: generate a video", async () => {
         const reply = await ask(page, "Generate a 5 second video of waves at dawn", 420_000);
-        const results = toolResults(reply, "Generate video");
+        const results = toolResults(reply, /^Generate video( and add to timeline)?$/);
         expect(results.length, reply).toBeGreaterThan(0);
         expect(results.at(-1), reply).not.toMatch(/^Error/);
       });
