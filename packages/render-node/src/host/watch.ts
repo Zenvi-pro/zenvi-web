@@ -9,6 +9,11 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
+  COMPARE_PROMPT_VERSION,
+  COMPARE_RESPONSE_SCHEMA,
+  COMPARE_SYSTEM_PROMPT,
+  compareUserText,
+  normalizeComparison,
   normalizeCritique,
   WATCH_MAX_BYTES,
   WATCH_MAX_SECONDS,
@@ -19,6 +24,8 @@ import {
   WatchError,
   watchHttpError,
   watchUserText,
+  type CompareRequest,
+  type CompareVerdict,
   type WatchCritique,
   type WatchHost,
   type WatchRequest,
@@ -27,6 +34,7 @@ import { resolveBinary } from "../ffmpeg/binaries.js";
 import { runBinary } from "../ffmpeg/process.js";
 import { ffprobe } from "../probe/ffprobe.js";
 import type { BackendHostOptions } from "./backend.js";
+import { appendPreference } from "./preferences.js";
 
 /** Gemini's inline request limit is 20 MB; base64 adds a third. */
 const GEMINI_INLINE_MAX_BYTES = 14 * 1024 * 1024;
@@ -58,6 +66,8 @@ export async function makeWatchProxy(file: string, signal?: AbortSignal, maxByte
   const video = probe.streams.find((s) => s.codec_type === "video");
   if (!video) throw new WatchError("rejected", `${path.basename(file)} has no picture`);
   const duration = Number(probe.format.duration) || 0;
+  // An unknown length would tell the model the video is 0 s long and clamp every issue to 0.
+  if (!(duration > 0)) throw new WatchError("rejected", `${path.basename(file)} has no readable duration`);
   if (duration > WATCH_MAX_SECONDS + 0.5) {
     throw new WatchError("too_long", `${path.basename(file)} is ${duration.toFixed(1)} s; watching takes at most ${WATCH_MAX_SECONDS} s`);
   }
@@ -160,73 +170,114 @@ export function backendCritic(options: BackendHostOptions): Critic {
   };
 }
 
-/** Gemini `generateContent` with the video inline: the developer path, same prompt and schema as the backend. */
-export function geminiCritic(options: { apiKey: string; model?: string; fetchImpl?: typeof fetch }): Critic {
+interface GeminiOptions {
+  apiKey: string;
+  model?: string;
+  fetchImpl?: typeof fetch;
+}
+
+/** One `generateContent` call with schema-constrained JSON out: the parsed answer and the tokens it took. */
+async function geminiJson(
+  options: GeminiOptions,
+  parts: unknown[],
+  system: string,
+  schema: unknown,
+  what: string,
+  signal: AbortSignal | undefined,
+): Promise<{ raw: unknown; usage: { inputTokens: number; outputTokens: number } }> {
   const model = options.model || DEFAULT_WATCH_MODEL;
   const doFetch = options.fetchImpl ?? fetch;
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      temperature: 0,
+      responseMimeType: "application/json",
+      responseSchema: schema,
+      mediaResolution: "MEDIA_RESOLUTION_LOW",
+      thinkingConfig: { thinkingLevel: "low" },
+    },
+  };
+  const timeout = AbortSignal.timeout(180_000);
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  let response: Response;
+  try {
+    response = await doFetch(`${GEMINI_URL}/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": options.apiKey },
+      body: JSON.stringify(body),
+      signal: combined,
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new WatchError("failed", `cannot reach Gemini: ${(error as Error).message}`);
+  }
+  const answer = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!response.ok) {
+    const message = isRecord(answer?.error) && typeof answer.error.message === "string" ? answer.error.message : response.statusText;
+    throw new WatchError(response.status === 401 || response.status === 403 ? "unavailable" : "failed", `Gemini ${response.status}: ${message}`);
+  }
+  const candidate = Array.isArray(answer?.candidates) ? (answer.candidates[0] as Record<string, unknown> | undefined) : undefined;
+  const content = isRecord(candidate?.content) && Array.isArray(candidate.content.parts) ? candidate.content.parts : [];
+  const text = content.map((p) => (isRecord(p) && typeof p.text === "string" && p.thought !== true ? p.text : "")).join("");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new WatchError("failed", `Gemini returned no ${what}`);
+  }
+  const meta = isRecord(answer?.usageMetadata) ? answer.usageMetadata : {};
+  return {
+    raw,
+    usage: {
+      inputTokens: Number(meta.promptTokenCount) || 0,
+      // Thinking bills as output.
+      outputTokens: (Number(meta.candidatesTokenCount) || 0) + (Number(meta.thoughtsTokenCount) || 0),
+    },
+  };
+}
+
+const videoPart = (proxy: WatchProxy) => ({ inlineData: { mimeType: "video/mp4", data: Buffer.from(proxy.bytes).toString("base64") }, videoMetadata: { fps: WATCH_FPS } });
+
+/** Gemini `generateContent` with the video inline: the developer path, same prompt and schema as the backend. */
+export function geminiCritic(options: GeminiOptions): Critic {
+  const model = options.model || DEFAULT_WATCH_MODEL;
   return async (file, request) => {
     // Over the inline limit the proxy is made again at the smaller quality before giving up.
     const proxy = await makeWatchProxy(file, request.signal, GEMINI_INLINE_MAX_BYTES);
-    const body = {
-      systemInstruction: { parts: [{ text: WATCH_SYSTEM_PROMPT }] },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: "video/mp4", data: Buffer.from(proxy.bytes).toString("base64") }, videoMetadata: { fps: WATCH_FPS } },
-            { text: watchUserText(proxy.duration, request) },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0,
-        responseMimeType: "application/json",
-        responseSchema: WATCH_RESPONSE_SCHEMA,
-        mediaResolution: "MEDIA_RESOLUTION_LOW",
-        thinkingConfig: { thinkingLevel: "low" },
-      },
-    };
-    const timeout = AbortSignal.timeout(180_000);
-    const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
-    let response: Response;
-    try {
-      response = await doFetch(`${GEMINI_URL}/${encodeURIComponent(model)}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": options.apiKey },
-        body: JSON.stringify(body),
-        signal,
-      });
-    } catch (error) {
-      if (request.signal?.aborted) throw error;
-      throw new WatchError("failed", `cannot reach Gemini: ${(error as Error).message}`);
+    const { raw, usage } = await geminiJson(options, [videoPart(proxy), { text: watchUserText(proxy.duration, request) }], WATCH_SYSTEM_PROMPT, WATCH_RESPONSE_SCHEMA, "critique", request.signal);
+    return { model, duration: proxy.duration, hasAudio: proxy.hasAudio, ...normalizeCritique(raw, proxy.duration), usage, via: "gemini" };
+  };
+}
+
+/** Two local renders in one watch, `first` as A. */
+export type Comparer = (first: string, second: string, request: CompareRequest) => Promise<CompareVerdict>;
+
+/** Both videos inline in one request (each proxy within half the inline limit), labelled A and B, compared with the engine's prompt. */
+export function geminiComparer(options: GeminiOptions & { log?: string; source?: string }): Comparer {
+  const model = options.model || DEFAULT_WATCH_MODEL;
+  return async (first, second, request) => {
+    const half = Math.floor(GEMINI_INLINE_MAX_BYTES / 2);
+    const a = await makeWatchProxy(first, request.signal, half);
+    const b = await makeWatchProxy(second, request.signal, half);
+    const durations = { A: a.duration, B: b.duration };
+    const parts = [{ text: "=== Video A ===" }, videoPart(a), { text: "=== Video B ===" }, videoPart(b), { text: compareUserText(durations, request) }];
+    const { raw, usage } = await geminiJson(options, parts, COMPARE_SYSTEM_PROMPT, COMPARE_RESPONSE_SCHEMA, "comparison", request.signal);
+    const verdict: CompareVerdict = { model, durations, ...normalizeComparison(raw, durations), usage, via: "gemini" };
+    if (options.log) {
+      // Taste data must not cost the judgment: a log that cannot be written is skipped.
+      await appendPreference(options.log, {
+        source: options.source ?? "zenvi-cli",
+        judge: model,
+        prompt: COMPARE_PROMPT_VERSION,
+        brief: request.brief,
+        a: { path: first, seconds: a.duration },
+        b: { path: second, seconds: b.duration },
+        winner: verdict.winner === "A" ? "a" : verdict.winner === "B" ? "b" : "tie",
+        scores: { a: verdict.scores.A, b: verdict.scores.B },
+      }).catch(() => undefined);
     }
-    const answer = (await response.json().catch(() => null)) as Record<string, unknown> | null;
-    if (!response.ok) {
-      const message = isRecord(answer?.error) && typeof answer.error.message === "string" ? answer.error.message : response.statusText;
-      throw new WatchError(response.status === 401 || response.status === 403 ? "unavailable" : "failed", `Gemini ${response.status}: ${message}`);
-    }
-    const candidate = Array.isArray(answer?.candidates) ? (answer.candidates[0] as Record<string, unknown> | undefined) : undefined;
-    const parts = isRecord(candidate?.content) && Array.isArray(candidate.content.parts) ? candidate.content.parts : [];
-    const text = parts.map((p) => (isRecord(p) && typeof p.text === "string" && p.thought !== true ? p.text : "")).join("");
-    let raw: unknown;
-    try {
-      raw = JSON.parse(text);
-    } catch {
-      throw new WatchError("failed", "Gemini returned no critique");
-    }
-    const meta = isRecord(answer?.usageMetadata) ? answer.usageMetadata : {};
-    return {
-      model,
-      duration: proxy.duration,
-      hasAudio: proxy.hasAudio,
-      ...normalizeCritique(raw, proxy.duration),
-      usage: {
-        inputTokens: Number(meta.promptTokenCount) || 0,
-        // Thinking bills as output.
-        outputTokens: (Number(meta.candidatesTokenCount) || 0) + (Number(meta.thoughtsTokenCount) || 0),
-      },
-      via: "gemini",
-    };
+    return verdict;
   };
 }
 
@@ -245,14 +296,17 @@ export interface NodeWatchOptions {
 export function createNodeWatchHost(options: NodeWatchOptions): WatchHost | undefined {
   const env = options.env ?? process.env;
   const key = env.ZENVI_GEMINI_API_KEY?.trim();
-  const critic = key
-    ? geminiCritic({ apiKey: key, model: env.ZENVI_GEMINI_WATCH_MODEL?.trim() })
-    : options.backend
-      ? backendCritic(options.backend)
-      : undefined;
+  const model = env.ZENVI_GEMINI_WATCH_MODEL?.trim();
+  const critic = key ? geminiCritic({ apiKey: key, model }) : options.backend ? backendCritic(options.backend) : undefined;
   if (!critic) return undefined;
-  return {
+  const host: WatchHost = {
     watch: (p, request = {}) => critic(options.resolvePath(p), { ...request, signal: request.signal ?? options.signal }),
     length: async (p, signal) => Number((await ffprobe(options.resolvePath(p), signal ?? options.signal)).format.duration) || 0,
   };
+  // Side by side needs both videos in one request: the developer path only (the backend watches one file per call).
+  if (key) {
+    const comparer = geminiComparer({ apiKey: key, model, log: env.ZENVI_PREFERENCES_LOG?.trim() || undefined, source: env.ZENVI_PREFERENCES_SOURCE?.trim() || undefined });
+    host.compare = (first, second, request = {}) => comparer(options.resolvePath(first), options.resolvePath(second), { ...request, signal: request.signal ?? options.signal });
+  }
+  return host;
 }

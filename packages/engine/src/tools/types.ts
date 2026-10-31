@@ -26,6 +26,7 @@ import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { Scene3dQuality, Scene3dRender } from "../scenes3d/link.js";
 import type { PictureEvent } from "../sfx/events.js";
 import type { WatchCritique, WatchRequest } from "../review/watch.js";
+import type { CompareRequest, CompareVerdict } from "../review/compare.js";
 import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
 export type ToolSurface = "assistant" | "mcp" | "cli" | "editor";
@@ -654,6 +655,16 @@ export interface StorageHost {
    */
   writeBytes?(path: string, bytes: Uint8Array, contentType: string, options?: { overwrite?: boolean }): Promise<string>;
   /**
+   * Keep a copy of a project as another project (a variant to try a
+   * different cut on), without making it the open one: the CLI writes
+   * `path` (relative to the project's folder) with the same media, Zenvi
+   * Cloud creates a new cloud project named `path`. Refuses to replace an
+   * existing file unless `overwrite`. Returns what opens the copy.
+   */
+  saveCopy?(project: Project, path: string, options?: { overwrite?: boolean }): Promise<string>;
+  /** Read another project (a variant `saveCopy` kept) without opening it: the open project and its file stay as they are. */
+  readCopy?(path: string): Promise<Project>;
+  /**
    * Give the person a copy of a project file's media (Project Files > Export
    * Selected Clips) named `name`: the CLI copies it into `folder` (relative
    * to the project's folder; "" = the project's folder) and skips a file
@@ -983,6 +994,12 @@ export interface WatchHost {
    * Cloud: what render_project returned). Absent = renders are watched by path.
    */
   watchRender?(renderId: string, request?: WatchRequest): Promise<WatchCritique>;
+  /**
+   * Watch two renders in one go, `first` shown as A (review/compare.ts).
+   * One order per call; the tools run both. Absent = compared from two
+   * separate `watch` calls.
+   */
+  compare?(first: string, second: string, request?: CompareRequest): Promise<CompareVerdict>;
 }
 
 export interface ToolHost {
