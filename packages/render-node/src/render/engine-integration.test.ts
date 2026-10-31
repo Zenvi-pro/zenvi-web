@@ -19,6 +19,7 @@ import {
   setClipProperty,
   type Project,
 } from "@zenvi/engine";
+import { runTool } from "@zenvi/engine/tools";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { liveChildCount } from "../ffmpeg/process.js";
@@ -260,6 +261,46 @@ describe("pixels match the desktop's libopenshot Timeline", () => {
     }
     const ours = await renderFrameImage(down, 9 / 30, { resolveMedia, width: 320 });
     expect(maxChannelDifference(ours.data, referenceDown.get(10)!.data), "downscaled frame 10").toBe(0);
+  }, 120_000);
+});
+
+describe("the renders the skills workers doubted match libopenshot (sk2-product-brand)", () => {
+  it("origin_x 0 pivots on the left edge, ChromaKey keys a green screen, a shadow wheel tints: identical RGBA", async (t) => {
+    const base = await makeVideo(dir, "doubt-base.mp4", { width: 320, height: 180, duration: 1 });
+    const screen = await makeVideo(dir, "doubt-screen.mp4", { width: 320, height: 180, duration: 1, source: "color=c=0x00ff00:size=320x180:rate=30:duration=1,drawbox=x=110:y=50:w=100:h=80:color=0xc8604e:t=fill" });
+    const card = await makeVideo(dir, "doubt-card.mp4", { width: 320, height: 180, duration: 1, source: "color=c=white:size=320x180:rate=30:duration=1" });
+    const { project, clipIds } = await sizedProject(320, 180, [
+      { file: base, position: 0 },
+      { file: screen, position: 0 },
+      { file: card, position: 0 },
+    ]);
+    const doc = new ProjectDocument(project);
+    const tops = [...doc.project.layers].sort((a, b) => a.number - b.number).map((l) => l.number);
+    doc.transaction("stack", (tx) => {
+      for (const [i, id] of clipIds.entries()) tx.update(["clips", { id }], { layer: tops[0]! + i * 1_000_000 });
+    });
+    const call = (name: string, args: Record<string, unknown>) => runTool({ doc, host: {} }, name, args);
+    const [, keyed, wedge] = clipIds;
+    for (const r of [
+      await call("color_grade_clip_tool", { timeline_clip_id: clipIds[0], wheels: { shadows: { color: "#2a6cff", amount: 0.6 } } }),
+      await call("add_effect_tool", { timeline_clip_id: keyed, effect: "ChromaKey", properties: { color: "#00ff00", fuzz: 40 } }),
+      await call("set_clip_properties_tool", { timeline_clip_ids: [wedge], properties: { scale_x: 0.5, scale_y: 0.5, location_x: 0.25, origin_x: 0, origin_y: 0.5, rotation: 30 } }),
+    ]) {
+      expect(r.ok, r.text).toBe(true);
+    }
+    const reference = await libopenshotTimelineFrames(doc.project, [10], { highQuality: true });
+    if (!reference) {
+      t.skip(); // libopenshot's Python bindings are not installed here
+      return;
+    }
+    const resolveMedia = createMediaResolver({ projectFile: path.join(dir, "doubt.zvn"), engineAssetsDir: engineAssetsDir() });
+    const ours = await renderFrameImage(doc.project, 9 / 30, { resolveMedia, width: 320 });
+    expect(maxChannelDifference(ours.data, reference.get(10)!.data)).toBe(0);
+    // And each is visible: the key shows the base through the screen, the pivot is not the centre.
+    const centre = await renderFrameImage({ ...doc.project, clips: doc.project.clips.map((c) => (c.id === wedge ? { ...c, origin_x: { Points: [{ co: { X: 1, Y: 0.5 }, interpolation: 0 }] } } : c)) } as Project, 9 / 30, { resolveMedia, width: 320 });
+    expect(maxChannelDifference(ours.data, centre.data)).toBeGreaterThan(100);
+    const px = (x: number, y: number) => [...ours.data.subarray((y * 320 + x) * 4, (y * 320 + x) * 4 + 3)];
+    expect(px(20, 20)[1]).toBeLessThan(200); // the green screen is keyed: testsrc2 shows there, not pure green
   }, 120_000);
 });
 

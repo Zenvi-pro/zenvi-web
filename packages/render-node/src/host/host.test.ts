@@ -9,6 +9,7 @@ import { analyzeAudio, decodePcm, NoAudioError } from "../audio/analyze.js";
 import { probe } from "../probe/probe.js";
 import { makeAudio, makeImage, makeTempDir, makeVideo, removeDir } from "../test-support/fixtures.js";
 import { createBackendHost } from "./backend.js";
+import { createNodeHost } from "./node-host.js";
 import { createNodeMediaHost, globToRegExp, listPaths, missingOnDisk } from "./media.js";
 import { createMediaResolver, isPortableAssetPath, mapPathValues } from "./paths.js";
 import { parseProjectFileText, readProjectFile, serializeProjectFile, withProjectLock, writeProjectFile } from "./storage.js";
@@ -117,6 +118,24 @@ describe("project storage", () => {
     expect(back.files[0]!.path).toBe(path.join(dir, "rt", "media", "a.png"));
     expect((await readdir(path.dirname(file))).filter((n) => n.endsWith(".tmp"))).toEqual([]);
     expect(serializeProjectFile(back, file)).toBe(text);
+  });
+
+  it("saves a variant copy in a subfolder whose media still resolve, and refuses to replace one", async () => {
+    const file = path.join(dir, "variant", "trip.zvn");
+    // Imported media copied into the project's own assets folder, which a copy under another name must still find.
+    const assets = path.join(dir, "variant", "trip_assets", "media");
+    await mkdir(assets, { recursive: true });
+    const media = path.join(assets, "a.png");
+    const info = await probe(await makeImage(assets, "a.png"));
+    const project = createProject();
+    project.files = [{ ...info, id: "F1", path: media, media_type: "image" }];
+    await writeProjectFile(file, project);
+    const storage = createNodeHost({ projectFile: file }).storage!;
+    const copy = await storage.saveCopy!(await storage.open("trip.zvn"), "variants/trip-fast.zvn");
+    expect(copy).toBe(path.join(dir, "variant", "variants", "trip-fast.zvn"));
+    expect((await readProjectFile(copy)).files[0]!.path).toBe(media);
+    await expect(storage.saveCopy!(project, "variants/trip-fast.zvn")).rejects.toMatchObject({ code: "EEXIST" });
+    await storage.saveCopy!(project, "variants/trip-fast.zvn", { overwrite: true });
   });
 
   it("rejects files that are not projects with a clear error", () => {
