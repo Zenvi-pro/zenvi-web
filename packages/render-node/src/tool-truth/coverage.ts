@@ -157,6 +157,8 @@ export const OFFSCREEN: Readonly<Record<string, string>> = {
   setup_motion_runtime_tool: "installs the motion runtime",
   fetch_motion_graphics_video_tool: "downloads a render the backend made",
   remove_files_from_project_tool: "Project Files (its clips go too; delete_from_timeline_tool covers removing clips)",
+  fork_project_tool: "writes a copy of the project file and stays on the open one",
+  pick_best_variant_tool: "opens the winning variant's project (like open_project_tool)",
 };
 
 export interface BacklogEntry {

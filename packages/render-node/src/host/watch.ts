@@ -66,6 +66,8 @@ export async function makeWatchProxy(file: string, signal?: AbortSignal, maxByte
   const video = probe.streams.find((s) => s.codec_type === "video");
   if (!video) throw new WatchError("rejected", `${path.basename(file)} has no picture`);
   const duration = Number(probe.format.duration) || 0;
+  // An unknown length would tell the model the video is 0 s long and clamp every issue to 0.
+  if (!(duration > 0)) throw new WatchError("rejected", `${path.basename(file)} has no readable duration`);
   if (duration > WATCH_MAX_SECONDS + 0.5) {
     throw new WatchError("too_long", `${path.basename(file)} is ${duration.toFixed(1)} s; watching takes at most ${WATCH_MAX_SECONDS} s`);
   }
