@@ -39,6 +39,10 @@ set_keyframes_tool {"timeline_clip_id": "<black title>", "property": "location_y
 master_audio_tool {"target_lufs": -15, "true_peak_dbtp": -1.0, "balance": "keep"}
 ```
 
+The two `location_x` / `location_y` points are the first of the track: write one
+point per head position you read off the frames (every 0.125 s or so) for the
+whole 6 s, or the oval stops at 0.125 s while the head moves on.
+
 Keyframe values are `head_x - 0.5` and `head_y - 0.5` (frame fractions),
 one point every 0.125 s or denser. The verified build measured them with
 a 20-line OpenCV script (brightest figure on black, top of the torso
