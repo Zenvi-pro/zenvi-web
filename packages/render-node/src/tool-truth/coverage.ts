@@ -254,6 +254,10 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   datamosh_cut_tool: { reason: "not proven yet: datamosh_carry needs two clips with motion at the cut", params: "*" },
   sequence_shots_tool: { reason: "not proven yet: reorders shots (sequence tests cover the order)", params: "*" },
   generate_broll_set_tool: { reason: "generates footage through the Zenvi backend (account, credits)", params: "*" },
+  build_explainer_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  build_product_launch_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  build_talking_head_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  build_trailer_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {

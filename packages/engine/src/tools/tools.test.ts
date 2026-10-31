@@ -1155,6 +1155,39 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { file_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown file id\(s\): NOPE000000\.$/ },
   },
 
+  build_explainer_tool: {
+    happy: {
+      args: { voice_file_id: IDS.interview, broll_file_ids: [IDS.broll], replace: "true", hook: "Why it works", captions: "none" },
+      summary: /^Built an explainer: [\d.]+ s on the voice-over, \d+ B-roll shots/,
+      check: ({ doc }) => expect(doc.project.clips.some((c) => c.id === IDS.clipA)).toBe(false),
+    },
+    failure: { args: { voice_file_id: "NOPE000000" }, status: "refused", summary: /^Error: (the timeline already has|unknown voice_file_id)/ },
+  },
+
+  build_product_launch_tool: {
+    happy: {
+      args: { product: "Oarlight", features: ["Fast cuts: in one click"], replace: "true", three_d: "none" },
+      summary: /^Built a product launch for Oarlight: \d+ sections on \d+ BPM bars/,
+    },
+    failure: { args: { product: "Oarlight", features: ["Fast"], file_ids: ["NOPE000000"], replace: "true" }, status: "refused", summary: /^Error: unknown file_ids: NOPE000000\.$/ },
+  },
+
+  build_talking_head_tool: {
+    happy: {
+      args: { speaker_file_ids: [IDS.interview], broll_file_ids: [IDS.broll], replace: "true", caption_style: "none" },
+      summary: /^Built a talking head: [\d.]+ s from 1 take\(s\)/,
+    },
+    failure: { args: { speaker_file_ids: ["NOPE000000"], replace: "true" }, status: "refused", summary: /^Error: unknown speaker_file_ids: NOPE000000\.$/ },
+  },
+
+  build_trailer_tool: {
+    happy: {
+      args: { title: "The Long Way", act_cards: ["THIS WINTER"], replace: "true", duration_seconds: "20", braams: "false" },
+      summary: /^Built a trailer: [\d.]+ s, \d+ shots in three acts/,
+    },
+    failure: { args: { title: "The Long Way" }, status: "refused", summary: /^Error: the timeline already has \d+ clip\(s\)/ },
+  },
+
   align_match_cut_tool: {
     happy: {
       args: {

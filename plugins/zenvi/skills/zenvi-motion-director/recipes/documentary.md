@@ -28,6 +28,16 @@ a small logo bug, low impacts on topic changes and a quiet music bed.
 
 ## Tools
 
+0. One call first: `build_explainer_tool` with the narration in the bin
+   (`voice_file_id`, or `script` when there is no voice yet), the B-roll
+   (`broll_file_ids` in story order, named for what they show), `hook`,
+   `chapters` (2-4 words each, at most three), `data` (counters and charts
+   for the numbers; spoken percentages become counters by themselves) and
+   `pace: "documentary"` (0.6-1.6 s shots). It places the voice, the B-roll
+   cut on the keywords that name a picture and in the pauses, the hook,
+   chapter cards with a low impact, the captions, a quiet bed and the grade,
+   in one undo step; `data.decisions` says what each step did and every
+   fallback. Then fix single shots with the steps below and run the Finish.
 1. Script → `generate_tts_and_add_to_timeline_tool` (`voice: "onyx"`,
    `speed: 1.05`, `position_seconds: 0`); 2.5 words per second of video.
 2. B-roll: 8-12 clips over 6 searches, cut on phrase boundaries (word times

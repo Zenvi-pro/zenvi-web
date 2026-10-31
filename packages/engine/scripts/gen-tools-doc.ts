@@ -308,7 +308,10 @@ function typeOf(schema: JsonSchema): string {
   const branches = [...(schema.oneOf ?? []), ...(schema.anyOf ?? [])];
   if (branches.length > 0) return [...new Set(branches.map(typeOf))].join(" \\| ");
   if (Array.isArray(schema.type)) return schema.type.join(" \\| ");
-  if (schema.type === "array" && schema.items) return `${typeOf(schema.items)}[]`;
+  if (schema.type === "array" && schema.items) {
+    const item = typeOf(schema.items);
+    return item.includes("\\|") ? `(${item})[]` : `${item}[]`;
+  }
   return String(schema.type ?? "any");
 }
 

@@ -29,6 +29,10 @@ moment: the landing.
 
 ## Tools
 
+0. A launch with features and a call to action: `build_product_launch_tool`
+   with `three_d: "device_mockup"` (the reveal's footage on a phone) or
+   `"title_3d"` lays the whole film on the bars in one call; the steps below
+   are for the single-product spin.
 1. Product image: `generate_image_and_add_to_timeline_tool` `prompt:
    "minimal portable music player, white studio, soft shadow, product render,
    3/4 view"`, `position_seconds: 4.5`, `duration_seconds: 6.5`. If

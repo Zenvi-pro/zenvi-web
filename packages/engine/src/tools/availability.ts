@@ -239,6 +239,30 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     partialNote:
       "without audio decoding the cuts follow the style's tempo, not the music; without generated media there are no titles or flashes, and the motion styles (ui_promo, editorial_motion, product_callout, tutorial) are refused",
   },
+  build_explainer_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.transcribe", "motion", "assets"],
+    partialNote:
+      "without speech recognition the voice's words come from the media index or the script (timed by length), else the cuts follow the voice's pauses with no captions; without Zenvi Motion block rendering the counters and charts are kinetic titles; without the bundled fonts there are no titles or captions (the receipt lists each fallback)",
+    webNote: SERVER_ASR,
+  },
+  build_product_launch_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm", "motion", "scenes3d", "media.importPath", "assets"],
+    partialNote: "without Zenvi 3D the reveal is a kinetic headline block, without Zenvi Motion block rendering it, the features, the proof and the end card are native kinetic titles and the end card template; without audio decoding the sections follow 120 BPM; without the bundled fonts there is no native type (the receipt lists each fallback)",
+  },
+  build_talking_head_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.transcribe", "mattes", "assets"],
+    partialNote:
+      "without speech recognition the takes' words come from the media index (a take with none is jump-cut on its loudness, with no captions, keyword B-roll or punch-ins); without subject matting the hook is set over the speaker instead of behind them; without the bundled fonts there are no captions and no hook over the speaker (the receipt lists each fallback)",
+    webNote: SERVER_ASR,
+  },
+  build_trailer_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["audio.decodePcm", "assets"],
+    partialNote: "without audio decoding the cuts follow the frame grid, not the score's beats; without the bundled fonts there are no act, title or end cards (the receipt lists each skip)",
+  },
   add_sfx_tool: {
     methods: ["media.writeGenerated"],
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.kitSample"],
