@@ -37,6 +37,7 @@ const DIRECT_TOOLS = [
   "unify_grade_tool",
   "review_edit_tool",
   "review_render_tool",
+  "watch_render_tool",
   "swap_shot_tool",
   "add_motion_template_tool",
   "kinetic_captions_tool",
@@ -222,8 +223,8 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx"],
-      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "watch"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion", "watch"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);

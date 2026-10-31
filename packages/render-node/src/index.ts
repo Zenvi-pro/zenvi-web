@@ -27,6 +27,7 @@ export * from "./host/paths.js";
 export * from "./host/storage.js";
 export * from "./host/media.js";
 export * from "./host/backend.js";
+export * from "./host/watch.js";
 export * from "./host/web-video.js";
 export * from "./net/public-address.js";
 export * from "./host/node-host.js";
