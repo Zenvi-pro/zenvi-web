@@ -14,6 +14,7 @@ import { registerEditCommands } from "./commands/edit.js";
 import { registerHostCommands } from "./commands/hosts.js";
 import { registerIntegrationCommands } from "./commands/integrations.js";
 import { registerMotionCommands } from "./commands/motion.js";
+import { registerShotsCommands } from "./commands/shots.js";
 import { registerProjectCommands } from "./commands/project.js";
 import { registerRenderCommands } from "./commands/render.js";
 import { registerSpeechCommands } from "./commands/speech.js";
@@ -71,6 +72,7 @@ Examples:
   registerBridgeCommands(program, ctx);
   registerMotionCommands(program, ctx);
   registerSpeechCommands(program, ctx);
+  registerShotsCommands(program, ctx);
   for (const cmd of program.commands) {
     cmd.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });
     for (const sub of cmd.commands) sub.exitOverride().configureOutput({ writeOut: (s) => stdout.write(s), writeErr: (s) => stderr.write(s) });

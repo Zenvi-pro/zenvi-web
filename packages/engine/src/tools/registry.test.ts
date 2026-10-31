@@ -97,6 +97,9 @@ const DIRECT_TOOLS = [
   "replace_background_tool",
   "subject_glow_tool",
   "pop_out_tool",
+  "embed_media_tool",
+  "find_shots_tool",
+  "shot_similarity_tool",
   "add_vignette_tool",
   "add_shape_mask_tool",
 ];
@@ -246,7 +249,7 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "watch"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "shots", "motion", "scenes3d", "fx", "watch"],
       cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion", "watch"],
     };
     for (const tool of allTools) {

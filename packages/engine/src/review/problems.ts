@@ -7,6 +7,7 @@
  */
 
 import { REUSE_GAP_SECONDS } from "../reels/plan.js";
+import { cosine, NEAR_DUPLICATE, type Vector } from "../shots/vectors.js";
 import type { BeatAlignment, MixReview, PaceLimits, PaceProfile, ReviewProblem, Severity, TextBox, TimelineReview } from "./types.js";
 
 export const PACE_LIMITS: Readonly<Record<PaceProfile, PaceLimits>> = {
@@ -52,6 +53,8 @@ export interface ProblemInput {
   frames?: readonly SampledFrame[];
   textBoxes?: readonly TextBox[];
   frame: { width: number; height: number };
+  /** What each shot looks like (`ReviewShot.index` → shot embedding), when the host has the shot model. */
+  looks?: ReadonlyMap<number, Vector>;
 }
 
 /** Cuts against the nearest beat or onset. */
@@ -217,6 +220,35 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
         message: `${soon.length} shots bring a clip back within ${REUSE_GAP_SECONDS} s of its last shot (${names.slice(0, 4).join(", ")}${names.length > 4 ? ", …" : ""}).`,
         fix: "Swap the repeats for unused footage (swap_shot_tool with each of `swaps`), or import more clips (about one per shot in any 3 s) and rebuild.",
         shots: soon.map((s) => s.index),
+      });
+    }
+  }
+
+  // Back-to-back shots that look the same: the cut reads as a jump, not a new shot. Cuts inside one
+  // file are left alone (a jump cut in a talking head is a choice; clip-back-soon covers returns).
+  if (input.looks) {
+    const byIndex = new Map(review.shots.map((s) => [s.index, s]));
+    const pairs = review.cuts.flatMap((cut) => {
+      const a = byIndex.get(cut.from);
+      const b = byIndex.get(cut.to);
+      const va = input.looks!.get(cut.from);
+      const vb = input.looks!.get(cut.to);
+      if (!a || !b || !va || !vb || a.fileId === b.fileId) return [];
+      const similarity = cosine(va, vb);
+      return similarity >= NEAR_DUPLICATE ? [{ time: cut.time, a, b, similarity }] : [];
+    });
+    if (pairs.length > 0) {
+      add({
+        code: "near-duplicate-shots",
+        severity: "medium",
+        at: pairs[0]!.time,
+        times: pairs.map((p) => p.time).slice(0, 8),
+        message:
+          `${pairs.length} cut${pairs.length === 1 ? " joins" : "s join"} shots that look almost the same (` +
+          pairs.slice(0, 3).map((p) => `${p.a.name} → ${p.b.name} at ${t(p.time)}, similarity ${p.similarity.toFixed(2)}`).join("; ") +
+          `${pairs.length > 3 ? "; …" : ""}): the cut reads as a jump, not a new shot.`,
+        fix: "Swap the second shot of each pair for one that looks different (swap_shot_tool with each of `swaps`, or find_shots_tool for a described shot), or move another shot between them.",
+        shots: pairs.map((p) => p.b.index),
       });
     }
   }

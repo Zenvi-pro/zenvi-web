@@ -43,6 +43,7 @@ import { placeMusicBed } from "./music-bed.js";
 import { aspectOf, displayName, musicFromBeats, usableRange, visualKind, writeCard } from "./reels.js";
 import { FINISH_HINT } from "../director-card.js";
 import { inBinOrder, sequenceFiles } from "./sequence.js";
+import { lookOrder } from "../shots.js";
 
 const ALIGN = "align_match_cut_tool";
 const DETECT = "detect_subject_tool";
@@ -149,6 +150,10 @@ const montageInput = z.strictObject({
     .describe(`Refuse (nothing changes) when the files are too few for the pace and a file comes back within ${REUSE_GAP_SECONDS} s; the error says how many more to import. Default false: a warning.`),
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (in the same undo step)."),
   keep_order: z.boolean().optional().describe("Keep file_ids as given when they are the bin's own order (by default such a list is first chained by shape continuity, like sequence_shots_tool)."),
+  order: z
+    .enum(["given", "look"])
+    .optional()
+    .describe("given (default): file_ids is the chain. look: keep the first and last file and order the others so each shot looks most like the one before (shape and pose continuity, from the shot model; embed_media_tool)."),
 });
 
 type AlignArgs = z.infer<typeof alignInput>;
@@ -420,9 +425,14 @@ const montageTool = directTool({
       warnings.push("beats and offset_seconds are for music in the project: there is none, so the cuts follow bpm (default 120).");
     }
 
-    // A list in the bin's own order is no chain: shapes are chained first (re-edit bench, 2026-10-28).
+    // order=look chains the files by the shot model. Otherwise a list in the bin's own order is no chain:
+    // shapes are chained first (re-edit bench, 2026-10-28).
     const notes: string[] = [];
-    if (!args.keep_order && inBinOrder(project, ids)) {
+    if (args.order === "look" && ids.length > 3) {
+      const order = await lookOrder(call, ids.map((id) => files.get(id)!), ids.map((id) => given.get(id)?.time));
+      if (typeof order === "string") warnings.push(`order=look kept the given order: ${order}.`);
+      else ids = order.map((i) => ids[i]!);
+    } else if (!args.keep_order && inBinOrder(project, ids)) {
       const ordered = await sequenceFiles(call, ids, { arc: "flat", continuity: 2 }, "keep_order");
       if (ordered && "ids" in ordered) {
         ids = ordered.ids;
@@ -617,6 +627,7 @@ const montageTool = directTool({
           bpm: round(plan.bpm, 2),
           music_file_id: music ? String(music.id) : null,
           music_start: plan.musicStart,
+          ...(args.order === "look" ? { file_order: ids } : {}),
           target: fromTarget(built.alignment.target),
           shots,
           flashes,

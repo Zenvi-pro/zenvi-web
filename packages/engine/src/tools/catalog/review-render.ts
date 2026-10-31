@@ -33,6 +33,7 @@ import {
 import { finishGaps, finishLines } from "../../review/finish.js";
 import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
+import type { Vector } from "../../shots/vectors.js";
 import { FrameRenderError, mediaFileProject, renderPixels, secondsToFrame } from "../color-frames.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
@@ -72,6 +73,19 @@ const fmt = (value: number): string => `${(Math.round(value * 100) / 100).toFixe
 
 function escapeXml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Shot embeddings of each shot's middle frame, when the host has the shot model installed (never a download). */
+async function renderLooks(call: ToolCall, path: string, shots: readonly Shot[]): Promise<(Vector | null)[] | undefined> {
+  const host = call.host.shots;
+  if (!host || shots.length < 2 || shots.length > MAX_HASHED_SHOTS) return undefined;
+  try {
+    if (!(await host.status()).ready) return undefined;
+    return await host.embedFrames(path, shots.map((s) => s.mid), call.signal);
+  } catch (error) {
+    call.host.log?.(`shot embeddings of ${path} failed: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
 }
 
 /** The labels and red frames of the sheet, drawn over the grid of tiles. */
@@ -207,7 +221,7 @@ export const reviewRenderTools: CatalogTool[] = [
     title: "Review the rendered file",
     description:
       "Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), " +
-      "how it ends (a hold or end card, never black or cut off), and shots repeated too soon (perceptual hash of each shot's middle frame), " +
+      "how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), " +
       "with one contact sheet of the shots and the last frame (problems framed red). Call it on the file render/export wrote, after mastering; " +
       "fix every PROBLEM line and render again, then watch_render_tool once for the critique by eye and ear. Changes nothing.",
     input,
@@ -250,7 +264,8 @@ export const reviewRenderTools: CatalogTool[] = [
       }
       const repeats = repeatedShots(shots, hashes);
       const end = endVerdict(inspection, shots);
-      const problems = renderProblems(inspection, shots, repeats, end, targets);
+      const looks = await renderLooks(call, inspection.path, shots);
+      const problems = renderProblems(inspection, shots, repeats, end, targets, looks);
       const swaps = repeats.length > 0 ? repeatSwaps(project, inspection.duration, shots, repeats, targets.repeatWindowSeconds) : [];
 
       const finish = finishGaps(project);
