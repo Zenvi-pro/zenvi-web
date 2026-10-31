@@ -1,71 +1,4 @@
 (() => {
-  // packages/motion/src/blocks/ui.ts
-  function onColor(bg) {
-    const m = /^#?([0-9a-f]{6})/i.exec(bg.trim());
-    if (!m) return "#FFFFFF";
-    const lin = (i) => {
-      const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    };
-    const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
-    return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
-  }
-
-  // packages/motion/src/blocks/lower_third/block.ts
-  function build(ctx) {
-    const { tl, params: p, height: H, safe, palette } = ctx;
-    const S = ctx.seconds;
-    const bar = p.style === "bar";
-    const right = p.align === "right";
-    ctx.ownExit = p.exit !== false;
-    const box = ctx.el("div", `lt${bar ? " is-bar" : ""}${right ? " is-right" : ""}`);
-    const nameMask = ctx.el("div", "lt-mask", box);
-    const name = ctx.el("span", "lt-name", nameMask, String(p.name));
-    const rule = bar ? null : ctx.el("div", "lt-rule", box);
-    const roleMask = p.role ? ctx.el("div", "lt-mask", box) : null;
-    const role = roleMask ? ctx.el("span", "lt-role", roleMask, String(p.role)) : null;
-    const nameSize = ctx.portrait ? 104 : 96;
-    name.style.fontSize = `${ctx.display === "serif" ? nameSize : nameSize * 0.8}px`;
-    if (ctx.display !== "serif") name.style.fontWeight = "650";
-    if (role) role.style.fontSize = `${ctx.portrait ? 38 : 36}px`;
-    const rect = box.getBoundingClientRect();
-    const width = Math.max(name.getBoundingClientRect().width, role?.getBoundingClientRect().width ?? 0);
-    if (rule) rule.style.width = `${width + 36}px`;
-    const nameH = nameMask.getBoundingClientRect().height;
-    const top = Math.min(H - safe.bottom - rect.height, H * (ctx.portrait ? 0.7 : 0.8) - nameH);
-    Object.assign(box.style, { top: `${top}px`, ...right ? { right: `${safe.right}px` } : { left: `${safe.left}px` } });
-    const enter = 0.1;
-    const out = Math.max(1.6, S - 0.6);
-    const sign = right ? -1 : 1;
-    ctx.cue(enter, "whoosh", { weight: 0.35, at: nameMask });
-    if (ctx.ownExit) ctx.cue(out, "whoosh", { weight: 0.25, at: nameMask });
-    if (rule) {
-      tl.set(rule, { transformOrigin: right ? "100% 50%" : "0 50%" }, 0);
-      tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1 }, { at: enter, duration: 0.6, ease: "in-out" });
-      tl.fromTo(name, { yPercent: 105 }, { yPercent: 0 }, { at: enter + 0.3, duration: 0.7, ease: "out" });
-      if (role) tl.fromTo(role, { yPercent: -110 }, { yPercent: 0 }, { at: enter + 0.4, duration: 0.7, ease: "out" });
-      if (ctx.ownExit) {
-        tl.to(rule, { scaleX: 0 }, { at: out + 0.05, duration: 0.45, ease: "in" });
-        tl.set(rule, { transformOrigin: right ? "0 50%" : "100% 50%" }, out);
-        tl.to(name, { yPercent: -105 }, { at: out, duration: 0.4, ease: "in" });
-        if (role) tl.to(role, { yPercent: 110 }, { at: out, duration: 0.4, ease: "in" });
-      }
-    } else {
-      name.style.background = palette.accent;
-      name.style.color = onColor(palette.accent);
-      const wipe = (el, at, duration) => {
-        tl.fromTo(el, { clipPath: right ? "inset(0% 0% 0% 100%)" : "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)" }, { at, duration, ease: "in-out" });
-        if (ctx.ownExit) tl.to(el, { clipPath: right ? "inset(0% 100% 0% 0%)" : "inset(0% 0% 0% 100%)" }, { at: out + (el === name ? 0 : 0.06), duration: 0.42, ease: "in" });
-      };
-      wipe(name, enter, 0.6);
-      tl.fromTo(name, { x: -24 * sign }, { x: 0 }, { at: enter, duration: 0.8, ease: "out" });
-      if (role) {
-        wipe(role, enter + 0.18, 0.55);
-        tl.fromTo(role, { x: -24 * sign }, { x: 0 }, { at: enter + 0.18, duration: 0.8, ease: "out" });
-      }
-    }
-  }
-
   // packages/motion/src/runtime/easing.ts
   function cubicBezier(x1, y1, x2, y2) {
     const cx = 3 * x1;
@@ -285,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger) {
-    if (!stagger || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger === "number" ? { each: stagger } : stagger;
+  function staggerOffsets(count, stagger2) {
+    if (!stagger2 || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -601,6 +534,73 @@
 ${error.stack ?? ""}` : String(error);
       rejectReady(error);
     });
+  }
+
+  // packages/motion/src/blocks/ui.ts
+  function onColor(bg) {
+    const m = /^#?([0-9a-f]{6})/i.exec(bg.trim());
+    if (!m) return "#FFFFFF";
+    const lin = (i) => {
+      const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+    return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
+  }
+
+  // packages/motion/src/blocks/lower_third/block.ts
+  function build(ctx) {
+    const { tl, params: p, height: H, safe, palette } = ctx;
+    const S = ctx.seconds;
+    const bar = p.style === "bar";
+    const right = p.align === "right";
+    ctx.ownExit = p.exit !== false;
+    const box = ctx.el("div", `lt${bar ? " is-bar" : ""}${right ? " is-right" : ""}`);
+    const nameMask = ctx.el("div", "lt-mask", box);
+    const name = ctx.el("span", "lt-name", nameMask, String(p.name));
+    const rule = bar ? null : ctx.el("div", "lt-rule", box);
+    const roleMask = p.role ? ctx.el("div", "lt-mask", box) : null;
+    const role = roleMask ? ctx.el("span", "lt-role", roleMask, String(p.role)) : null;
+    const nameSize = ctx.portrait ? 104 : 96;
+    name.style.fontSize = `${ctx.display === "serif" ? nameSize : nameSize * 0.8}px`;
+    if (ctx.display !== "serif") name.style.fontWeight = "650";
+    if (role) role.style.fontSize = `${ctx.portrait ? 38 : 36}px`;
+    const rect = box.getBoundingClientRect();
+    const width = Math.max(name.getBoundingClientRect().width, role?.getBoundingClientRect().width ?? 0);
+    if (rule) rule.style.width = `${width + 36}px`;
+    const nameH = nameMask.getBoundingClientRect().height;
+    const top = Math.min(H - safe.bottom - rect.height, H * (ctx.portrait ? 0.7 : 0.8) - nameH);
+    Object.assign(box.style, { top: `${top}px`, ...right ? { right: `${safe.right}px` } : { left: `${safe.left}px` } });
+    const enter = 0.1;
+    const out = Math.max(1.6, S - 0.6);
+    const sign = right ? -1 : 1;
+    ctx.cue(enter, "whoosh", { weight: 0.35, at: nameMask });
+    if (ctx.ownExit) ctx.cue(out, "whoosh", { weight: 0.25, at: nameMask });
+    if (rule) {
+      tl.set(rule, { transformOrigin: right ? "100% 50%" : "0 50%" }, 0);
+      tl.fromTo(rule, { scaleX: 0 }, { scaleX: 1 }, { at: enter, duration: 0.6, ease: "in-out" });
+      tl.fromTo(name, { yPercent: 105 }, { yPercent: 0 }, { at: enter + 0.3, duration: 0.7, ease: "out" });
+      if (role) tl.fromTo(role, { yPercent: -110 }, { yPercent: 0 }, { at: enter + 0.4, duration: 0.7, ease: "out" });
+      if (ctx.ownExit) {
+        tl.to(rule, { scaleX: 0 }, { at: out + 0.05, duration: 0.45, ease: "in" });
+        tl.set(rule, { transformOrigin: right ? "0 50%" : "100% 50%" }, out);
+        tl.to(name, { yPercent: -105 }, { at: out, duration: 0.4, ease: "in" });
+        if (role) tl.to(role, { yPercent: 110 }, { at: out, duration: 0.4, ease: "in" });
+      }
+    } else {
+      name.style.background = palette.accent;
+      name.style.color = onColor(palette.accent);
+      const wipe = (el, at, duration) => {
+        tl.fromTo(el, { clipPath: right ? "inset(0% 0% 0% 100%)" : "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)" }, { at, duration, ease: "in-out" });
+        if (ctx.ownExit) tl.to(el, { clipPath: right ? "inset(0% 100% 0% 0%)" : "inset(0% 0% 0% 100%)" }, { at: out + (el === name ? 0 : 0.06), duration: 0.42, ease: "in" });
+      };
+      wipe(name, enter, 0.6);
+      tl.fromTo(name, { x: -24 * sign }, { x: 0 }, { at: enter, duration: 0.8, ease: "out" });
+      if (role) {
+        wipe(role, enter + 0.18, 0.55);
+        tl.fromTo(role, { x: -24 * sign }, { x: 0 }, { at: enter + 0.18, duration: 0.8, ease: "out" });
+      }
+    }
   }
 
   // packages/motion/src/blocks/lower_third/lower_third-entry.ts

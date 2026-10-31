@@ -1,0 +1,51 @@
+/* Shared block styles. Sizes are design px: the frame's shorter side is 1080. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; }
+body { -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; font-kerning: normal; }
+.block { font-family: var(--font-sans); color: var(--ink); }
+.block img { display: block; }
+/* A centred absolutely positioned element; animate it with xPercent/yPercent -50 kept in its tweens. */
+.abs { position: absolute; }
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 24px 60px rgba(10, 12, 20, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.is-dark .glass { border-color: rgba(255, 255, 255, 0.14); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.card { background: var(--surface); border-radius: var(--radius); box-shadow: 0 2px 6px rgba(10, 12, 20, 0.06), 0 24px 64px rgba(10, 12, 20, 0.14); }
+.is-dark .card { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 24px 64px rgba(0, 0, 0, 0.45); border: 1.5px solid var(--line); }
+.mono { font-family: var(--font-mono); }
+.label { font-family: var(--font-mono); font-size: 22px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The pointer used by UI blocks (ui.ts pointer); it presses around its tip. */
+.cursor { position: absolute; left: 0; top: 0; width: 64px; height: 64px; transform-origin: 21% 12.5%; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3)); z-index: 50; }
+/* Over video (alpha) type gets a soft halo of the palette's paper: TASTE.md §4, never bare text over busy footage. */
+.is-alpha .kh-text, .is-alpha .wr, .is-alpha .ct-number, .is-alpha .ts-line, .is-alpha .hud-label, .is-alpha .hud-title, .is-alpha .lt-rule ~ .lt-mask .lt-role, .is-alpha .lt:not(.is-bar) .lt-name {
+  text-shadow: 0 0 28px color-mix(in srgb, var(--paper) 55%, transparent), 0 1px 4px color-mix(in srgb, var(--paper) 45%, transparent);
+}
+
+.gm-svg { position: absolute; inset: 0; overflow: visible; }
+.gm-sphere { stroke: var(--line); stroke-width: 2; }
+.gm-graticule { fill: none; stroke: var(--line); stroke-width: 1.2; }
+.gm-land path { stroke-linejoin: round; }
+.gm-route { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.gm-scrim { position: absolute; left: 0; right: 0; height: 30%; pointer-events: none; }
+.gm-scrim.is-top { top: 0; }
+.gm-scrim.is-bottom { bottom: 0; }
+.gm-title { position: absolute; font-family: var(--font-display); font-size: 64px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.04; color: var(--ink); max-width: 13em; }
+.gm-marker { position: absolute; width: 0; height: 0; }
+.gm-pin { position: absolute; z-index: 1; left: -15px; top: -15px; width: 30px; height: 30px; }
+.gm-dot { position: absolute; inset: 0; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 5px var(--paper), 0 6px 18px rgba(0, 0, 0, 0.35); }
+.gm-pulse { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--accent); }
+.gm-label { position: absolute; z-index: 2; top: -26px; height: 52px; display: flex; align-items: center; padding: 0 20px; border-radius: var(--radius); background: var(--surface); color: var(--ink); font-size: 30px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+.gm-label.is-right { left: 26px; }
+.gm-label.is-left { right: 26px; }
+.gm-label.is-below, .gm-label.is-above { left: 0; translate: -50% 0; }
+.gm-label.is-below { top: 26px; }
+.gm-label.is-above { top: -78px; }
+.gm-legend { position: absolute; display: flex; flex-direction: column; gap: 12px; }
+.gm-legend-title { font-size: 28px; font-weight: 600; color: var(--ink); }
+.gm-ramp { height: 18px; border-radius: 9px; transform-origin: 0 50%; }
+.gm-ends { display: flex; justify-content: space-between; font-size: 24px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
