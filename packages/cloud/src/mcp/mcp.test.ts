@@ -272,6 +272,20 @@ describe("the preview view resource", () => {
   });
 });
 
+describe("the styles library resources", () => {
+  it("lists the brief compiler, the index and every style and technique, and reads them", async () => {
+    const h = await harness();
+    const client = await connect(h, await pat(h));
+    const uris = (await client.listResources()).resources.map((r) => r.uri);
+    expect(uris).toEqual(expect.arrayContaining(["zenvi://styles", "zenvi://styles/brief", "zenvi://styles/hype-reel"]));
+    const brief = (await client.readResource({ uri: "zenvi://styles/brief" })).contents[0] as { text: string; mimeType: string };
+    expect(brief).toMatchObject({ mimeType: "text/markdown" });
+    expect(brief.text).toMatch(/^# The brief compiler/);
+    await expect(client.readResource({ uri: "zenvi://styles/nope" })).rejects.toThrow();
+    await client.close();
+  });
+});
+
 describe("import_media_from_url", () => {
   async function mediaServer(body: Buffer, contentType = "video/mp4"): Promise<number> {
     const server = createServer((req, res) => {

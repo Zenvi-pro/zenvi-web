@@ -1,3 +1,15 @@
+---
+id: showreel-intro
+kind: style
+summary: A designer's or studio's intro or showreel - project grid zooming in, 3D letters, name assembling, burst
+categories: [kinetic-type-motion-design, brand-story-corporate, vfx-tutorial-breakdown]
+tools: [add_motion_block_tool, add_3d_scene_tool, auto_sound_design_tool]
+pace: fast
+mood: [confident, bold]
+aspect: ["16:9", "9:16"]
+pairs_with: []
+avoid_with: []
+---
 # Showreel / personal intro
 
 A designer's or studio's intro: a grid of project tiles that zooms into one,

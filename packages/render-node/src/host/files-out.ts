@@ -15,11 +15,11 @@ import { createHash, randomBytes } from "node:crypto";
 import { constants as fsConstants, createReadStream } from "node:fs";
 import { copyFile, mkdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
-import { projectAssetsDir, type CollectedMedia, type ExportedMedia, type MediaMove, type MediaRender, type ReclaimableMedia } from "@zenvi/engine";
+import { projectAssetsDir, type Project, type CollectedMedia, type ExportedMedia, type MediaMove, type MediaRender, type ReclaimableMedia } from "@zenvi/engine";
 import type { RenderEngine } from "../render/engine.js";
 import { renderProject } from "../render/render-project.js";
 import { isInside } from "./paths.js";
-import { writeFileAtomic } from "./storage.js";
+import { writeFileAtomic, writeProjectFile, type ProjectFileOptions } from "./storage.js";
 
 async function isFile(file: string): Promise<boolean> {
   return (await stat(file).catch(() => undefined))?.isFile() ?? false;
@@ -40,6 +40,13 @@ export async function writeBytesFile(file: string, bytes: Uint8Array, overwrite 
   await mkdir(path.dirname(file), { recursive: true });
   await writeFileAtomic(file, bytes);
   return file;
+}
+
+/** A copy of a project at `file` (a variant): its media paths stored relative to the copy's folder; refuses an existing file unless `overwrite`. */
+export async function writeProjectCopy(file: string, project: Project, options: ProjectFileOptions & { overwrite?: boolean } = {}): Promise<string> {
+  if (!options.overwrite && (await exists(file))) throw alreadyExists(file);
+  await mkdir(path.dirname(file), { recursive: true });
+  return writeProjectFile(file, project, options);
 }
 
 export interface ExportMediaOptions {

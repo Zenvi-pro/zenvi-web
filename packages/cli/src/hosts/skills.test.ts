@@ -14,7 +14,7 @@ import { checkParams, getBlock } from "@zenvi/motion";
 import { describe, expect, it } from "vitest";
 
 const SKILLS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../plugins/zenvi/skills");
-const CHECKED = ["zenvi-motion-director", "zenvi-reels", "zenvi-sound-designer"];
+const CHECKED = ["zenvi-motion-director", "zenvi-reels", "zenvi-sound-designer", "zenvi-styles"];
 /** Tools `zenvi mcp` adds next to the engine catalog (src/mcp/extra-tools.ts). */
 const MCP_TOOLS = new Set(["open_project_file", "render_video", "preview_frame", "launch_editor", "push_to_cloud", "list_hosts"]);
 
@@ -26,18 +26,27 @@ function markdownFiles(dir: string): string[] {
   });
 }
 
-/** `tool_name {json}` examples inside ```json fences (one call may span lines). */
+/**
+ * `tool_name {json}` examples inside ```json fences (one call may span lines;
+ * one with placeholders like <t> or ... is a template, not an example).
+ */
 function examples(markdown: string): { tool: string; args: string }[] {
   const found: { tool: string; args: string }[] = [];
   for (const fence of markdown.matchAll(/```json\n([\s\S]*?)```/g)) {
     const body = fence[1]!;
     for (const start of body.matchAll(/^([a-z0-9_]+) \{/gm)) {
       let depth = 0;
+      let inString = false;
       const from = start.index! + start[1]!.length + 1;
       for (let i = from; i < body.length; i++) {
-        if (body[i] === "{") depth++;
+        if (inString) {
+          if (body[i] === "\\") i++;
+          else if (body[i] === '"') inString = false;
+        } else if (body[i] === '"') inString = true;
+        else if (body[i] === "{") depth++;
         else if (body[i] === "}" && --depth === 0) {
-          found.push({ tool: start[1]!, args: body.slice(from, i + 1) });
+          const args = body.slice(from, i + 1);
+          if (!/<|\.\.\.|…/.test(args)) found.push({ tool: start[1]!, args });
           break;
         }
       }

@@ -33,6 +33,7 @@ import type {
   PcmDecoder,
   Renderer,
   SpeechTranscriber,
+  WatchProxyMaker,
 } from "./render/renderer.js";
 import { unavailableProber, unavailableRenderer } from "./render/renderer.js";
 import { RenderService } from "./render/service.js";
@@ -77,6 +78,8 @@ export interface Dependencies {
   mixPcm?: MixRenderer;
   /** Extracts speech audio and transcribes it through the backend (the speech tools); absent = index transcripts only. */
   transcribeMedia?: SpeechTranscriber;
+  /** Makes the proxy watch_render_tool sends to the backend; absent = no watching. */
+  watchProxy?: WatchProxyMaker;
   /** The fonts titles render with (add_title_tool / edit_title_tool check a font against them); absent = any font is taken as given. */
   fontFamilies?: FontLister;
   /** Hands renders to render workers (`render/dispatch.ts`); absent = renders run in this process. */
@@ -120,6 +123,7 @@ export interface Services {
   /** Built-in renderer assets on disk (what a mix of a project with bundled sounds reads). */
   resolveAsset: ((projectPath: string) => string | undefined) | null;
   transcribeMedia: SpeechTranscriber | null;
+  watchProxy: WatchProxyMaker | null;
   fontFamilies: FontLister | null;
   motion: MotionHostFactory | null;
   mattes: MatteHostFactory | null;
@@ -221,6 +225,7 @@ export function createServices(deps: Dependencies): Services {
     mixPcm: deps.mixPcm ?? null,
     resolveAsset: deps.resolveAsset ?? null,
     transcribeMedia: deps.transcribeMedia ?? null,
+    watchProxy: deps.watchProxy ?? null,
     fontFamilies: deps.fontFamilies ?? null,
     motion: deps.motion ?? null,
     mattes: deps.mattes ?? null,
