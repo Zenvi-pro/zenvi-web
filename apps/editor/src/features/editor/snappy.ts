@@ -35,7 +35,17 @@ const GRADE_TOOL = "unify_grade_tool";
 const GRADE_SAMPLES = 3;
 
 /** Sound design as dense as the transitions are loud: hype cuts get a sound on almost every cut, as in the reference reels. */
-const SOUND_FOR_STYLE: Record<MotionTransitionStyle, SfxIntensity> = { hype: "hype", cinematic: "normal" };
+const SOUND_FOR_STYLE: Record<MotionTransitionStyle, SfxIntensity> = {
+  hype: "hype",
+  sport: "hype",
+  flash: "hype",
+  punch: "hype",
+  cinematic: "normal",
+  brand: "normal",
+  editorial: "normal",
+  travel: "subtle",
+  gentle: "subtle",
+};
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
 
