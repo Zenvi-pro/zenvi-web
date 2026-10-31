@@ -6,7 +6,7 @@ import { readBrief } from "./brief.js";
 import { STYLE_FILES } from "../styles/library.gen.js";
 import { CINETIC_TECHNIQUES } from "./cinetic-library.js";
 import { DRAW_ORDER, drawSize, drawTechnique, drawTechniques, type DrawEntry } from "./draw.js";
-import { HOUSE_STYLES, houseDraw, tasteProfile } from "./house.js";
+import { drawForBrand, HOUSE_STYLES, houseDraw, tasteProfile } from "./house.js";
 
 const byId = new Map(CINETIC_TECHNIQUES.map((e) => [e.id, e]));
 
@@ -99,6 +99,16 @@ describe("house styles", () => {
     expect(tasteProfile({ style: "cinetic-logo-sting" })).toBe("cinetic");
     expect(tasteProfile({ style: "cinetic-logo-sting", brand: "Our serif wordmark, orange #FF6A00" })).toBeNull();
     expect(tasteProfile({ style: "saas-app-launch" })).toBeNull();
+  });
+
+  it("re-flag a kept draw's ban-safe variants when the brand changes", () => {
+    const banned = CINETIC_TECHNIQUES.find((e) => (e.bans ?? []).length > 0)!;
+    const free = CINETIC_TECHNIQUES.find((e) => (e.bans ?? []).length === 0)!;
+    const pick = (e: DrawEntry, flag: boolean) => ({ technique: drawTechnique(e), id: e.id, category: e.category, role: e.role, ban_safe_variant: flag });
+    const draw = { library: "cinetic", seed: 1, format: "launch" as const, energy: "calm" as const, picks: [pick(banned, true), pick(free, false)] };
+    const branded = drawForBrand(draw, "cinetic-launch-film", "Our serif wordmark");
+    expect(branded.picks.map((p) => p.ban_safe_variant)).toEqual([false, false]);
+    expect(drawForBrand(branded, "cinetic-launch-film").picks.map((p) => p.ban_safe_variant)).toEqual([true, false]);
   });
 
   it("the auto brief of a house style carries its draw, avoiding recent films", () => {

@@ -124,6 +124,42 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(doc.project.settings[BRIEF_KEY]).toBeUndefined();
   });
 
+  it("draws a house style's techniques once per film, remembers them, keeps them on a re-save and lifts the ban-safe variants under a brand", async () => {
+    const doc = bin();
+    const memory: string[][] = [];
+    const draws = { recent: async () => memory.flat(), remember: async (techniques: readonly string[]) => void memory.push([...techniques]) };
+    const ctx = { doc, host: { ...fakeHost(), draws } as ToolHost };
+    const cinetic = { ...BRIEF, style: "cinetic-launch-film", aspect: "16:9", length_seconds: 25, beats: [{ start: 0, end: 25, name: "all" }], techniques: [] };
+    const first = await runTool(ctx, "save_brief_tool", cinetic);
+    expect(first.ok, first.text).toBe(true);
+    const drawn = readBrief(doc.project)!.draw!;
+    expect(drawn.picks.length).toBeGreaterThanOrEqual(6);
+    expect(memory).toEqual([drawn.picks.map((p) => p.technique)]);
+    expect(first.text).toMatch(/Drawn \(cinetic, launch, calm, seed \d+\)/);
+
+    // The same film saved again keeps its draw and records nothing.
+    expect((await runTool(ctx, "save_brief_tool", cinetic)).data!.status).toBe("unchanged");
+    expect(memory).toHaveLength(1);
+
+    // The person's brand keeps the picks and lifts every ban-safe variant; a refused save draws nothing.
+    const branded = await runTool(ctx, "save_brief_tool", { ...cinetic, brand: "Kiln: serif wordmark, ember orange" });
+    expect(branded.ok, branded.text).toBe(true);
+    const kept = readBrief(doc.project)!.draw!;
+    expect(kept.picks.map((p) => p.technique)).toEqual(drawn.picks.map((p) => p.technique));
+    expect(kept.picks.every((p) => !p.ban_safe_variant)).toBe(true);
+    const refused = await runTool(ctx, "save_brief_tool", { ...cinetic, length_seconds: 20 });
+    expect(refused.ok).toBe(false);
+    expect(memory).toHaveLength(1);
+
+    // A new length is a new film: it draws again, away from the last draw.
+    const longer = await runTool(ctx, "save_brief_tool", { ...cinetic, length_seconds: 30, beats: [{ start: 0, end: 30, name: "all" }] });
+    expect(longer.ok, longer.text).toBe(true);
+    const again = readBrief(doc.project)!.draw!.picks.map((p) => p.technique);
+    expect(memory).toHaveLength(2);
+    expect(again.filter((t) => memory[0]!.includes(t))).toEqual([]);
+    expect(doc.undoLabels).toEqual(["fixture", "Save brief", "Save brief", "Save brief"]);
+  });
+
   it("hands over a measured music search when the bin has no music, built from the brief's music line", async () => {
     const doc = bin();
     doc.transaction("no song", (tx) => tx.replace(["files"], doc.project.files.filter((f) => f.id !== "SONGXXXXXX")));

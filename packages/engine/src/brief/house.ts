@@ -7,7 +7,7 @@
  * wins, and no other style is held to them.
  */
 
-import type { Brief, BriefAspect } from "./brief.js";
+import type { Brief, BriefAspect, BriefDraw } from "./brief.js";
 import { CINETIC_TECHNIQUES } from "./cinetic-library.js";
 import { drawSeed, drawTechniques, type Draw, type DrawEnergy, type DrawEntry, type DrawFormat } from "./draw.js";
 
@@ -62,4 +62,12 @@ export function houseDraw(input: HouseDrawInput): (Draw & { library: TasteProfil
   const avoid = [...(input.avoid ?? [])];
   const seed = drawSeed(`${input.style}\n${input.text}\n${avoid.join(",")}`);
   return { library: house.profile, ...drawTechniques(house.library, { format, energy, seconds: input.seconds, seed, avoid, houseBans: !input.brand }) };
+}
+
+/** `draw` under the brief's brand: a brand saved after the draw lifts its ban-safe variants, and dropping the brand brings them back. */
+export function drawForBrand(draw: BriefDraw, style: string, brand?: string): BriefDraw {
+  const house = houseStyle(style);
+  if (!house) return draw;
+  const bans = new Map(house.library.map((e) => [e.id, (e.bans ?? []).length > 0]));
+  return { ...draw, picks: draw.picks.map((p) => ({ ...p, ban_safe_variant: !brand && (bans.get(p.id) ?? p.ban_safe_variant) })) };
 }
