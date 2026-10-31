@@ -7,8 +7,8 @@ tools: [set_project_setting_tool, gather_stock_footage_tool, search_freesound_mu
 pace: fast
 mood: [bold, premium, precise, dark]
 aspect: ["16:9", "9:16"]
-pairs_with: [T048, T106, T110, T008, T002, T089, T027, T057, T062, T119]
-avoid_with: [T021, T084, T124, T118]
+pairs_with: [t048, t106, t110, t008, t002, t089, t027, t057, t062, t119]
+avoid_with: [t021, t084, t124, t118]
 needs: []
 ---
 
@@ -34,10 +34,10 @@ two in one film. For a pure CGI hero spot with feature metaphors use
 | --- | --- | --- | --- | --- |
 | Hook: product alone, macro edge on black or a lid snap | 0-1.5 | 0-2 | 0-3.5 | 0-5.5 |
 | Name card / 3D lockup (by 3 s) | 1.5-3 | 2-3.5 | 3.5-5.5 | 5.5-8 |
-| Proof block 1: spec slam → proof (T048) | 3-7 | 3.5-11 | 5.5-22 | 8-30 |
-| Proof block 2 (and 3), opened by a warp or zoom-through (T106/T110) | 7-11 | 11-21 | 22-45 | 30-68 |
+| Proof block 1: spec slam → proof (t048) | 3-7 | 3.5-11 | 5.5-22 | 8-30 |
+| Proof block 2 (and 3), opened by a warp or zoom-through (t106/t110) | 7-11 | 11-21 | 22-45 | 30-68 |
 | Recap / payoff: physical action or lockup at full energy (75-88 %) | 11-13 | 21-25.5 | 45-52 | 68-78 |
-| End card: logo + 2 % legal line, reverb tail (T089) | 13-15 | 25.5-30 | 52-60 | 78-90 |
+| End card: logo + 2 % legal line, reverb tail (t089) | 13-15 | 25.5-30 | 52-60 | 78-90 |
 
 ## Shot plan
 
@@ -70,7 +70,7 @@ two in one film. For a pure CGI hero spot with feature metaphors use
   hard cut out; no easing drift.
 - Name: medium title case 8-15 % (`kinetic_headline` `style: "pop"` or
   `add_3d_scene_tool` `title_3d`).
-- Stats pinned to the scene where possible (T008); a lower third only for
+- Stats pinned to the scene where possible (t008); a lower third only for
   a person credit (2.8-4 %).
 - 1-3 words per card; a full sentence on screen is the average film.
 - Legal line 1.5-2 % on the end card. No captions.
@@ -78,9 +78,9 @@ two in one film. For a pure CGI hero spot with feature metaphors use
 ## Motion & transitions
 
 - Hard cuts 57-68 %, on kick/snare transients inside spec runs.
-- At section changes only: zoom-through into a screen or port (T110),
-  1-1.5 s warp tunnel (`hyperspace` block, T106), a match cut on edge or
-  lid, an angled matte wipe (T027, rectangular approximation).
+- At section changes only: zoom-through into a screen or port (t110),
+  1-1.5 s warp tunnel (`hyperspace` block, t106), a match cut on edge or
+  lid, an angled matte wipe (t027, rectangular approximation).
 - No white flashes, no glitch, no slides between spec cards.
 
 ## Sound & music
@@ -88,7 +88,7 @@ two in one film. For a pure CGI hero spot with feature metaphors use
 - Music: electronic hip-hop / UK bass / trap with vocal chops, or ambient
   pulse for the calm design film; full energy from frame 0 in fast films.
   Cuts on onsets (~45 %), not the beat grid (~10 %).
-- Every hero event gets a cue (T086-like): sub drop or hit on each slam,
+- Every hero event gets a cue (t086-like): sub drop or hit on each slam,
   riser into a reveal, whooshes only on real movement (warp, zoom, matte),
   contact foley (lid snap, plug, key click) **above** the bed.
 - Levels: bed -15…-17 LUFS short-term; contact foley and subs 0-3 LU over
@@ -129,7 +129,7 @@ apply_motion_transition_tool {"track": "1", "time": 11.2, "preset": "zoom_throug
 ```
 
 (`scale_y` gets the same points as `scale_x`.) End on the closing action
-and the card (T089):
+and the card (t089):
 
 ```json
 add_motion_block_tool {"block": "logo_reveal_end", "position_seconds": 25.5, "duration_seconds": 4.5, "params": {"brand": "<Brand>", "cta": "", "url": "", "palette": "dark"}}
@@ -138,7 +138,7 @@ add_sfx_tool {"recipe": "impact_slam", "at_seconds": 3.6, "gain_db": -8}
 add_sfx_tool {"recipe": "sub_drop", "at_seconds": 6.1, "gain_db": -8}
 add_sfx_tool {"recipe": "whoosh_long", "at_seconds": 11.2, "gain_db": -12}
 add_sfx_tool {"recipe": "hit_transient", "at_seconds": 25.5, "gain_db": -6}
-master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}
+master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}
 review_edit_tool {}
 ```
 
@@ -162,11 +162,11 @@ Render, `review_render_tool` (`loudness_target_lufs: -16`), one fix pass.
 
 ## Mix-and-match
 
-Borrow: T048 verb card then proof, T106 warp tunnel, T110 zoom-through,
-T008 surface-locked stat, T002 exploded levitation, T027 angled matte, T089
-closing action to black, T119 keyword slam, T057 glass UI for a software
-section. Never: captions (T118/T124), T021 slow dark tease (too slow for
-the name-by-3 s rule), T084 music stops for a gag, grain, flashes.
+Borrow: t048 verb card then proof, t106 warp tunnel, t110 zoom-through,
+t008 surface-locked stat, t002 exploded levitation, t027 angled matte, t089
+closing action to black, t119 keyword slam, t057 glass UI for a software
+section. Never: captions (t118/t124), t021 slow dark tease (too slow for
+the name-by-3 s rule), t084 music stops for a gag, grain, flashes.
 
 ## Reference moments
 

@@ -7,8 +7,8 @@ tools: [set_project_setting_tool, add_3d_scene_tool, rerender_3d_scene_tool, gen
 pace: medium
 mood: [clean, premium, playful, precise]
 aspect: ["16:9", "9:16", "1:1"]
-pairs_with: [T062, T001, T002, T023, T004, T006, T008, T027, T083, T089, T110, T069]
-avoid_with: [T021, T045, T084, T118]
+pairs_with: [t062, t001, t002, t023, t004, t006, t008, t027, t083, t089, t110, t069]
+avoid_with: [t021, t045, t084, t118]
 needs: [exploded-view-3d, cgi-aperture-flythrough, refraction-rings-tracked, mesh-anchored-callouts-3d]
 ---
 
@@ -33,7 +33,7 @@ lifestyle ads with people as the subject.
 | beat | 15 s | 30 s | 60 s | 90 s |
 | --- | --- | --- | --- | --- |
 | Hook: title, product spin or ring graphic, full energy, no logo | 0-1.5 | 0-2.5 | 0-4 | 0-5 |
-| Feature run: one feature per 3-5 s unit (T062) | 1.5-11 (2-3) | 2.5-23 (4-5) | 4-48 (6-9) | 5-75 (10-14) |
+| Feature run: one feature per 3-5 s unit (t062) | 1.5-11 (2-3) | 2.5-23 (4-5) | 4-48 (6-9) | 5-75 (10-14) |
 | Last feature: stamina / battery / the "always" claim | inside the run, last | 19-23 | 42-48 | 68-75 |
 | Closing action: lid closes, buds dock, parts snap together | 11-12.5 | 23-25.5 | 48-52 | 75-80 |
 | End card: logo on white or black, 1.5 % legal, held | 12.5-15 | 25.5-30 | 52-60 | 80-90 |
@@ -58,7 +58,7 @@ A feature never runs over ~5.5 s.
 
 - One pole per film: high-key white (luma > 200, saturation < 15: one
   white, `#F7F7F5`, everywhere) or black void (luma < 30). Or a deliberate
-  hue per feature (blue, amber, violet, green) on silhouette stages (T023).
+  hue per feature (blue, amber, violet, green) on silhouette stages (t023).
 - No grain, no LUT on a white studio (`clean_&_denoise` at most). Bloom
   only on neon edges; chromatic aberration only on glass/refraction.
 
@@ -76,7 +76,7 @@ A feature never runs over ~5.5 s.
 ## Motion & transitions
 
 - Hard cut is the default (~68 %); match cuts on ring/shape (10 %),
-  zoom-through into a port or screen (T001/T110), speed-ramp cuts and one
+  zoom-through into a port or screen (t001/t110), speed-ramp cuts and one
   morph at section changes and the end only.
 - Camera: slow orbit (360° over 2-4.6 s) or push-in; zero shake.
 - A pop-in with overshoot for still products: scale 0.6 → 1.04 → 1 and
@@ -96,7 +96,7 @@ A feature never runs over ~5.5 s.
   with sub + harmonic layer; space a clean dark hall 1.2-2 s.
 - Master at -16 LUFS (`target_lufs: -16`, `genre: "product_3d"`), true
   peak ≤ -1.4 dBTP.
-- Optional "sound demonstration" (T083): the bed low-passes while a mode
+- Optional "sound demonstration" (t083): the bed low-passes while a mode
   is shown, then opens.
 
 ## Captions/VO
@@ -134,7 +134,7 @@ add_sfx_tool {"recipe": "impact_thud", "at_seconds": 2.53, "gain_db": -9}
 add_sfx_tool {"recipe": "sparkle", "at_seconds": 8.0, "gain_db": -18}
 add_sfx_tool {"recipe": "mouse_click", "at_seconds": 25.4, "pitch": -4, "gain_db": -8}
 add_sfx_tool {"recipe": "hit_transient", "at_seconds": 25.5, "gain_db": -8}
-master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}
+master_audio_tool {"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}
 review_edit_tool {}
 ```
 
@@ -157,12 +157,12 @@ claim pictures.
 
 ## Mix-and-match
 
-Borrow: T062 (the unit), T001 aperture fly-through, T002 exploded
-levitation, T023 one-hue silhouette stage, T006 refraction rings, T004
-mesh-pinned HUD (technical product), T008 surface-locked type, T027 angled
-matte, T083 low-pass then open, T089 closing action to black, T069 spring
-lockup. Never: T021 dark tease, T045 strobe bursts, T084 dead stop gag,
-captions (T118), grain, a transition on every cut.
+Borrow: t062 (the unit), t001 aperture fly-through, t002 exploded
+levitation, t023 one-hue silhouette stage, t006 refraction rings, t004
+mesh-pinned HUD (technical product), t008 surface-locked type, t027 angled
+matte, t083 low-pass then open, t089 closing action to black, t069 spring
+lockup. Never: t021 dark tease, t045 strobe bursts, t084 dead stop gag,
+captions (t118), grain, a transition on every cut.
 
 ## Reference moments
 

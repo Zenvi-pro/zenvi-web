@@ -7,8 +7,8 @@ tools: [set_project_setting_tool, transcribe_media_tool, get_transcript_tool, ge
 pace: medium
 mood: [informative, honest, crisp, friendly]
 aspect: ["16:9", "9:16"]
-pairs_with: [T047, T041, T112, T071, T068, T125, T082, T050, T119]
-avoid_with: [T021, T084, T023, T045]
+pairs_with: [t047, t041, t112, t071, t068, t125, t082, t050, t119]
+avoid_with: [t021, t084, t023, t045]
 needs: [tracked-point-callout-pin, paper-cut-wiggle-text]
 ---
 
@@ -34,11 +34,11 @@ TTS script.
 | beat | 15 s (short) | 30 s | 60 s | 90 s |
 | --- | --- | --- | --- | --- |
 | Verdict hook: product + stance ("solid upgrade") | 0-2 | 0-3 | 0-3 | 0-3 |
-| Feature rundown: inserts 1.9-2.9 s, one card each (T047) | 2-8 | 3-12 | 3-15 | 3-20 |
-| Caveats / positioning on camera, one punch-in (T041) | — | 12-17 | 15-27 | 20-37 |
+| Feature rundown: inserts 1.9-2.9 s, one card each (t047) | 2-8 | 3-12 | 3-15 | 3-20 |
+| Caveats / positioning on camera, one punch-in (t041) | — | 12-17 | 15-27 | 20-37 |
 | Chapter bumper 2.9 s (optional) | — | — | 27-30 | 37-40 |
 | Price and comparison: price pill, rival cutaway | 8-11 | 17-21 | 30-38 | 40-52 |
-| Buy-or-skip pivot (T112), 2.7 s, ~50 % in | 11-13 | 21-23.5 | 38-41 | 52-55 |
+| Buy-or-skip pivot (t112), 2.7 s, ~50 % in | 11-13 | 21-23.5 | 38-41 | 52-55 |
 | Breakdown: 1-5 s inserts intercut with presenter | — | 23.5-27 | 41-55 | 55-82 |
 | Close: price cards over product or hero close-up | 13-15 | 27-30 | 55-60 | 82-90 |
 
@@ -135,7 +135,7 @@ review_edit_tool {}
 
 With a real presenter: `transcribe_media_tool` first, `split_clip_tool` at
 the emphatic pause and `set_clip_properties_tool` `scale_x`/`scale_y` 1.3 on
-the second half (T041). Render,
+the second half (t041). Render,
 `review_render_tool`, one fix pass.
 
 ## Finish checklist
@@ -152,10 +152,10 @@ the second half (T041). Render,
 
 ## Mix-and-match
 
-Borrow: T047 transcript-keyed cutaway, T041 punch-in, T112 buy-or-skip,
-T071 leader-line callout, T068 slide-in pills, T125 staccato keyword list,
-T082 L-cut, T050 counter, T119 keyword slam. Never: T021 dark tease, T084
-dead music stop, T023 one-hue stylisation, T045 strobe bursts, glitch or
+Borrow: t047 transcript-keyed cutaway, t041 punch-in, t112 buy-or-skip,
+t071 leader-line callout, t068 slide-in pills, t125 staccato keyword list,
+t082 L-cut, t050 counter, t119 keyword slam. Never: t021 dark tease, t084
+dead music stop, t023 one-hue stylisation, t045 strobe bursts, glitch or
 whip chains, a whoosh on every cut.
 
 ## Reference moments
