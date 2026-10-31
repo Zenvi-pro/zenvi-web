@@ -270,6 +270,7 @@ describe("tracking argument errors", { timeout: TRACKING_TIMEOUT_MS }, () => {
       ["hold_point_reframe_tool", { clip_id: "CSUB", box: startBox(), time: 9 }],
       ["hold_point_reframe_tool", { clip_id: "CSUB", point: subjectAt(0), box: startBox() }],
       ["auto_reframe_tool", { subjects: [{ clip_id: "CSUB", box: startBox(), time: 9 }] }],
+      ["auto_reframe_tool", { subjects: [{ clip_id: "CSUB", box: startBox(), time: 9 }], follow: false }],
     ];
     for (const [tool, args] of calls) {
       const { doc, host } = setup();

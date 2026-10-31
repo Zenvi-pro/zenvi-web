@@ -148,6 +148,12 @@ function problemReceipt(tool: string, problem: TrackProblem, prefix = ""): ToolR
   return problem.status === "refused" ? refused(tool, message) : failed(tool, message);
 }
 
+/** A `time` outside `foot`'s source window, as a refusal; null when it is inside. */
+function timeProblem(foot: Footage, time: number): TrackProblem | null {
+  if (time >= foot.start - 1e-3 && time <= foot.end + 1e-3) return null;
+  return { status: "refused", message: `Error: time ${time}s is outside clip ${String(foot.clip.id)}'s source window ${round(foot.start, 3)}-${round(foot.end, 3)}s.` };
+}
+
 /** The track of the region the call names on `foot`, smoothed; a still image gives a constant track. */
 async function trackOf(call: ToolCall, foot: Footage, args: RegionArgs, defaultSmoothing: number): Promise<Track | TrackProblem> {
   const region = regionQuad(args, aspectOfFile(foot.file));
@@ -155,9 +161,8 @@ async function trackOf(call: ToolCall, foot: Footage, args: RegionArgs, defaultS
   const time = args.time ?? foot.start;
   const aspect = aspectOfFile(foot.file);
   if (foot.kind === "image") return { model: region.model, aspect, samples: [{ time: 0, quad: region.quad, lost: false, score: 1 }] };
-  if (time < foot.start - 1e-3 || time > foot.end + 1e-3) {
-    return { status: "refused", message: `Error: time ${time}s is outside clip ${String(foot.clip.id)}'s source window ${round(foot.start, 3)}-${round(foot.end, 3)}s.` };
-  }
+  const late = timeProblem(foot, time);
+  if (late) return late;
   const track = await trackFile(call, foot.file, {
     quad: region.quad,
     time,
@@ -579,7 +584,9 @@ const reframeTool = directTool({
       if (follow && source !== "centre") track = await trackOf(call, foot, region, 0.6);
       else {
         const q = regionQuad(region, aspectOfFile(foot.file));
-        track = typeof q === "string" ? { status: "refused", message: q } : { model: q.model, aspect: aspectOfFile(foot.file), samples: [{ time: foot.start, quad: q.quad, lost: false, score: 1 }] };
+        // Not tracked, but the subject's time is still the caller's to get right.
+        const late = foot.kind === "video" && region.time !== undefined ? timeProblem(foot, region.time) : null;
+        track = typeof q === "string" ? { status: "refused", message: q } : late ?? { model: q.model, aspect: aspectOfFile(foot.file), samples: [{ time: foot.start, quad: q.quad, lost: false, score: 1 }] };
       }
       if (isProblem(track)) return problemReceipt(REFRAME, track, `${id}: `);
       plans.push({ clipId: id, track, source });
