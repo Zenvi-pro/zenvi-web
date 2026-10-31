@@ -52,9 +52,15 @@ LLM listener tells a good mix from a bad one, so read the numbers.
    gain (each try lands quieter); put it under GAPS.
 8. **Listen** (when you may render). `render_video`, then
    `review_render_tool` with the path: true peak, loudness, dropouts, how it
-   ends. One fix pass for each `PROBLEM`.
+   ends. One fix pass for each `PROBLEM`. Then once
+   `watch_render_tool {"path": ..., "focus": ["sound_design", "mix"]}`: an
+   editor listens with the picture and names the silent cuts, buried voice
+   or missing riser, with times and tools. Fix the `HIGH` issues, master
+   again if you touched audio, render, watch again at most once. Refused
+   (signed out, no credits): skip it and note it under GAPS.
 9. **Report** (short): the genre and palette, the cue count and coverage,
-   the final score and LUFS / dBTP / voice over bed, the 3 biggest fixes in
+   the final score and LUFS / dBTP / voice over bed, the watch score for
+   sound_design and mix (before and after the fix), the 3 biggest fixes in
    dB, then `GAPS:` one line each for what the tools could not do.
 
 `analyze_mix_tool` alone (read-only, `detail: "compact"`) is for a mix you
@@ -70,13 +76,12 @@ and master: `iterate` runs it.
 | app, AI tool, UI blocks, glass cards | `saas_ui` | `saas_ui` | `palettes/saas.md` |
 | person talking, captions | `talking_head` | `talking_head` | `palettes/talking-head.md` |
 | pose / shape / circle matches | `match_cut` | `match_cut` | `palettes/match-cut.md` |
-| one product, 3D, device spin | `product_3d` | `3d_product` | `palettes/3d-product.md` |
+| one product, 3D, device spin | `product_3d` | `product_3d` | `palettes/3d-product.md` |
 | voice-over essay, documentary, explainer | `video_essay` / `documentary` | `video_essay` | `palettes/essay.md` |
 | type is the picture, brutalist, glitch | `editorial` | `editorial` | `palettes/editorial.md` |
 | tiles, grids, split screens, kaleidoscope | `multiplicity` | `multiplicity` | `palettes/multiplicity.md` |
 
-The two enums differ: `product_3d` designs, `3d_product` scores;
-`documentary` designs, `video_essay` scores.
+`documentary` designs; score and master it as `video_essay` (`documentary` is read as that).
 
 ## The numbers (reference reels, CRAFT.md §11-12)
 

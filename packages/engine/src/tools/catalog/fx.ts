@@ -8,6 +8,9 @@
  * - update_fx_tool: change one effect of the stack (or replace the stack).
  * - remove_fx_tool: drop one effect (re-render) or all of them (the clip
  *   goes back to the original file at its original times; no render).
+ * - datamosh_cut_tool: carry the motion of the clip before a cut into the
+ *   first frames of the clip after it (the datamosh_carry effect, which
+ *   needs the footage before the cut and so cannot go through apply_fx_tool).
  *
  * Each call is one undo step. Rendering runs before the transaction: a
  * failed or cancelled render leaves history untouched.
@@ -31,6 +34,7 @@ const LIST = "list_fx_tool";
 const APPLY = "apply_fx_tool";
 const UPDATE = "update_fx_tool";
 const REMOVE = "remove_fx_tool";
+const DATAMOSH = "datamosh_cut_tool";
 
 /** Longest source range one render takes (minutes of ProRes per call would stall the agent). */
 const MAX_RANGE_SECONDS = 120;
@@ -64,6 +68,16 @@ const removeInput = z.strictObject({
   index: z.int().min(0).optional().describe("Remove only this effect, 0-based (default: all of them, restoring the original clip)."),
 });
 type RemoveInput = z.output<typeof removeInput>;
+
+const datamoshInput = z.strictObject({
+  clip_id: clipId.describe("The clip AFTER the cut: its first frames get moshed."),
+  previous_clip_id: z.string().min(1).optional().describe("The clip before the cut (default: the clip on the same track that ends where this one starts)."),
+  length: z.number().min(0.1).max(2).optional().describe("Seconds of the clip's start that are moshed (default 0.6)."),
+  amount: z.number().min(0).max(1).optional().describe("How hard the previous clip's motion pushes (default 0.6)."),
+  ghost: z.number().min(0).max(1).optional().describe("How much of the previous clip's last frame lingers and fades (default 0.5; 0 = none)."),
+  block: z.int().min(8).max(96).optional().describe("Macroblock size in pixels at 1080p (default 32): bigger tears in chunkier pieces."),
+});
+type DatamoshInput = z.output<typeof datamoshInput>;
 
 /** A clip with what its FX state is: the original file, the source range and the current stack. */
 interface FxTarget {
@@ -106,13 +120,43 @@ function target(project: Project, tool: string, id: string): FxTarget | ToolRece
 /** Clip-relative windows read against the source range's length. */
 function parse(tool: string, raw: readonly unknown[], t: FxTarget): FxEffect[] | ToolReceipt {
   const parsed = parseFxStack(raw, t.range.end - t.range.start);
-  return parsed.ok ? parsed.effects : refused(tool, `Error: ${parsed.error}`);
+  if (!parsed.ok) return refused(tool, `Error: ${parsed.error}`);
+  const mosh = parsed.effects.find((e): e is FxEffect<"datamosh_carry"> => e.effect === "datamosh_carry");
+  if (mosh && !mosh.params.carry) return refused(tool, `Error: datamosh_carry needs the footage before the cut; use ${DATAMOSH} (it finds the previous clip).`);
+  return parsed.effects;
+}
+
+/** The footage a datamosh_carry in the stack carries the motion of: its file's path and end second. */
+function carryOf(tool: string, project: Project, effects: readonly FxEffect[]): { path: string; at: number } | undefined | ToolReceipt {
+  const mosh = effects.find((e): e is FxEffect<"datamosh_carry"> => e.effect === "datamosh_carry");
+  const carry = mosh?.params.carry;
+  if (!carry) return undefined;
+  const file = project.files.find((f) => String(f.id) === carry.file_id);
+  if (!file) return refused(tool, `Error: the footage before the cut (file ${carry.file_id}) is no longer in the project; run ${DATAMOSH} again.`);
+  return { path: String(file.path), at: carry.at };
+}
+
+/** The clip a datamosh follows: the one given, else the clip on the same track that ends at (or just before) this one's start. */
+function previousClip(project: Project, clip: Clip, given: string | undefined): { clip: Clip } | ToolReceipt {
+  const endOf = (c: Clip) => Number(c.position) + (Number(c.end) - Number(c.start));
+  if (given !== undefined) {
+    const found = project.clips.find((c) => String(c.id) === given);
+    if (!found) return refused(DATAMOSH, `Error: unknown timeline clip ${given}.`);
+    if (found.id === clip.id) return refused(DATAMOSH, "Error: previous_clip_id is the clip itself.");
+    return { clip: found };
+  }
+  const near = project.clips
+    .filter((c) => c.layer === clip.layer && c.id !== clip.id && Number(c.position) < Number(clip.position) && Math.abs(endOf(c) - Number(clip.position)) <= 0.5)
+    .sort((a, b) => endOf(b) - endOf(a));
+  return near[0] ? { clip: near[0] } : refused(DATAMOSH, `Error: no clip ends at the start of ${clip.id} on its track; give previous_clip_id.`);
 }
 
 async function render(call: ToolCall, tool: string, t: FxTarget, effects: FxEffect[]): Promise<{ render: FxRender; imported: ImportedMedia } | ToolReceipt> {
   let result: FxRender;
+  const carry = carryOf(tool, call.doc.project, effects);
+  if (carry && "status" in carry) return carry;
   try {
-    result = await call.host.fx!.render({ path: String(t.original.path), start: t.range.start, end: t.range.end, effects, signal: call.signal });
+    result = await call.host.fx!.render({ path: String(t.original.path), start: t.range.start, end: t.range.end, effects, ...(carry ? { carry } : {}), signal: call.signal });
   } catch (error) {
     return failed(tool, `Error: the FX render failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -124,7 +168,7 @@ async function render(call: ToolCall, tool: string, t: FxTarget, effects: FxEffe
 }
 
 /** Render `effects` for the target and put its clip (or every clip of its render) on the result. */
-async function renderAndSwap(call: ToolCall, tool: string, t: FxTarget, effects: FxEffect[], label: string): Promise<ToolReceipt> {
+async function renderAndSwap(call: ToolCall, tool: string, t: FxTarget, effects: FxEffect[], label: string, extra: Record<string, unknown> = {}): Promise<ToolReceipt> {
   if (t.linked && sameJson(effects, t.effects)) return unchanged(tool, `Clip ${t.clip.id} already has these FX.`, { data: summaryData(t, t.effects) });
   const done = await render(call, tool, t, effects);
   if ("status" in done) return done;
@@ -149,6 +193,7 @@ async function renderAndSwap(call: ToolCall, tool: string, t: FxTarget, effects:
     data: {
       ...summaryData({ ...t, file: call.doc.project.files.find((f) => String(f.id) === result.fileId) ?? t.file }, effects),
       timeline_clip_ids: result.clipIds,
+      ...extra,
       render: { codec: r.codec, alpha: r.codec === "prores4444", width: r.width, height: r.height, frames: r.frames, duration: round(r.duration), fingerprint: r.fingerprint, cached: r.cached, render_seconds: round(r.seconds) },
     },
   });
@@ -271,6 +316,44 @@ export const fxTools: CatalogTool[] = [
       return applied(REMOVE, `Clip ${args.clip_id} plays the original ${String(t.original.name ?? t.original.id)} again (${clips.length} clip(s) restored).`, {
         data: { timeline_clip_ids: clips.map((c) => c.id), file_id: t.original.id, removed_file_id: t.file.id },
       });
+    },
+  }),
+  directTool({
+    name: DATAMOSH,
+    title: "Datamosh a cut",
+    description:
+      "Datamosh the cut into a clip: the previous clip's motion keeps going into the first frames of this one (blocky tearing and smear, the old last frame lingering and fading), then it lands clean. " +
+      "Measures the motion of the last frames before the cut, renders the clip's first `length` seconds pushed along it (ProRes via ffmpeg, one undo step), and stacks like any apply_fx_tool effect (update_fx_tool / remove_fx_tool work on it). " +
+      "Strongest where the previous clip is moving fast (a whip, a pan, a push-in); a still clip before the cut gives only the fading ghost. Land it on a beat and put a hit under the cut; check with preview_frame. " +
+      "It follows the previous clip as trimmed now: if you retrim or move that clip, run this again.",
+    input: datamoshInput,
+    annotations: EDIT,
+    requires: ["fx", "media"],
+    run: async (call, args: DatamoshInput) => {
+      const missing = needsImport(call, DATAMOSH);
+      if (missing) return missing;
+      const t = target(call.doc.project, DATAMOSH, args.clip_id);
+      if ("status" in t) return t;
+      // The mosh is the render's first frames; a clip split or trimmed after its FX shows the render from later on and would miss it.
+      if (t.linked && Number(t.clip.start) > 0.01) {
+        return refused(DATAMOSH, `Error: clip ${t.clip.id} shows its FX render from ${round(Number(t.clip.start))}s in (it was split or trimmed after its FX), so a mosh at the render's start would not be at this cut; remove_fx_tool, then apply its FX and ${DATAMOSH} again.`);
+      }
+      const prev = previousClip(call.doc.project, t.clip, args.previous_clip_id);
+      if ("status" in prev) return prev;
+      const before = prev.clip;
+      const beforeFile = call.doc.project.files.find((f) => String(f.id) === String(before.file_id));
+      if (!beforeFile?.has_video || isSingleImageMedia(beforeFile)) return refused(DATAMOSH, `Error: clip ${before.id} is not video footage; there is no motion to carry.`);
+      const carry = { file_id: String(before.file_id), at: Number(before.end) };
+      const params: Record<string, unknown> = { carry };
+      if (args.length !== undefined) params.length = args.length;
+      if (args.ghost !== undefined) params.ghost = args.ghost;
+      if (args.block !== undefined) params.block = args.block;
+      const mosh: FxEffectInput = { effect: "datamosh_carry", params, ...(args.amount !== undefined ? { amount: args.amount } : {}) };
+      // Last in the stack so the other looks are pushed around with the picture; a second run replaces the first.
+      const kept = t.effects.filter((e) => e.effect !== "datamosh_carry");
+      const effects = parse(DATAMOSH, [...kept, mosh], t);
+      if ("status" in effects) return effects;
+      return renderAndSwap(call, DATAMOSH, t, effects, "Datamosh cut", { previous_clip_id: String(before.id), carry });
     },
   }),
 ];

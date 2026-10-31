@@ -39,7 +39,7 @@ function even(n: number): number {
 }
 
 /** Read exactly `size`-byte frames from a stream. */
-async function* frames(stream: AsyncIterable<Buffer>, size: number): AsyncGenerator<Uint8Array> {
+export async function* frames(stream: AsyncIterable<Buffer>, size: number): AsyncGenerator<Uint8Array> {
   let buffer: Buffer = Buffer.alloc(0);
   for await (const chunk of stream) {
     buffer = buffer.length === 0 ? chunk : Buffer.concat([buffer, chunk]);

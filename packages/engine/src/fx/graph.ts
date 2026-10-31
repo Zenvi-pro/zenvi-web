@@ -18,7 +18,9 @@
 
 import { FX_INFO, slowmoSpeed, type FxEffect } from "./catalog.js";
 
-export const FX_RENDERER_VERSION = 1;
+/** The graph reads the carry's extra inputs as `[1:v]` and `[2:v]` (displace maps, one frame per moshed frame, one pixel per block) and `[3:v]` (the previous clip's last frame). */
+
+export const FX_RENDERER_VERSION = 2;
 
 export interface FxGraphInput {
   width: number;
@@ -77,6 +79,12 @@ class Graph {
     this.add(`color=c=black:s=${width}x${height}:r=${this.rate}:d=${num(end)},format=gbrp${trim}[${out}]`);
     return out;
   }
+  /** A solid of the frame's size in `hexColor` (#rrggbb) for the whole render. */
+  plain(hexColor: string): string {
+    const out = this.label("c");
+    this.add(`color=c=0x${hexColor.slice(1)}:s=${this.ctx.width}x${this.ctx.height}:r=${this.rate}:d=${num(this.ctx.duration)},format=${this.work}[${out}]`);
+    return out;
+  }
   /** Blend `top` into `base` (first input wins outside the blend; alpha passes through). */
   blend(base: string, top: string, mode: string, opacity: number): string {
     const out = this.label();
@@ -88,7 +96,8 @@ class Graph {
   mixed(input: string, amount: number, build: (src: string) => string): string {
     if (amount >= 0.999) return build(input);
     const [a, b] = this.split(input, 2);
-    return this.blend(a!, build(b!), "normal", amount);
+    // Normal mode weighs its first input by the opacity, so the effect goes first.
+    return this.blend(build(b!), a!, "normal", amount);
   }
 }
 
@@ -140,6 +149,9 @@ const BUILDERS: { [F in FxEffect["effect"]]: Builder<F> } = {
   },
   vignette: vignette,
   light_leak: lightLeak,
+  crt: crt,
+  print_ink: printInk,
+  datamosh_carry: datamosh,
 };
 
 /** The filtergraph of a parsed FX stack (see the module comment). */
@@ -195,8 +207,8 @@ function applyEffect(g: Graph, input: string, effect: FxEffect): string {
 }
 
 /** Scale `input` up by `zoom` about (cx, cy) and crop back to the frame. */
-function zoomed(g: Graph, input: string, zoom: number, cx: number, cy: number): string {
-  const { width: w, height: h } = g.ctx;
+function zoomed(g: Graph, input: string, zoom: number, cx: number, cy: number, size: { width: number; height: number } = g.ctx): string {
+  const { width: w, height: h } = size;
   const sw = even(w * zoom);
   const sh = even(h * zoom);
   const out = g.label();
@@ -374,11 +386,7 @@ function halftone(g: Graph, input: string, e: FxEffect<"halftone">): string {
       `255*clip(hypot(X-ld(2),Y-ld(3))-ld(4)+0.5,0,1)`;
     const mask = g.label();
     g.add(`[${src}]format=gray,gblur=sigma=${num(cell / 3)},geq=lum='${expr}',format=${g.work}[${mask}]`);
-    const [ink, paper] = [e.params.ink, e.params.paper].map((hexColor) => {
-      const out = g.label("c");
-      g.add(`color=c=0x${hexColor.slice(1)}:s=${g.ctx.width}x${g.ctx.height}:r=${g.rate}:d=${num(g.ctx.duration)},format=${g.work}[${out}]`);
-      return out;
-    });
+    const [ink, paper] = [g.plain(e.params.ink), g.plain(e.params.paper)];
     const out = g.label();
     g.add(`[${ink}][${paper}][${mask}]maskedmerge[${out}]`);
     return out;
@@ -534,6 +542,249 @@ function lightLeak(g: Graph, input: string, e: FxEffect<"light_leak">, span: Spa
   const expr = (c: "r" | "g" | "b") => `clip(${terms[c].join("+")},0,255)`;
   g.add(`[${solid}]geq=r='${expr("r")}':g='${expr("g")}':b='${expr("b")}',scale=${w}:${h}:flags=bicubic,format=${g.work}[${layer}]`);
   return g.blend(input, layer, "screen", 0.35 + 0.65 * e.amount);
+}
+
+/** A picture drawn once with geq and held for the whole render: masks and patterns that do not move. */
+function still(g: Graph, w: number, h: number, format: "gray" | "gbrp", geq: string): string {
+  const out = g.label("m");
+  const tail = format === "gray" ? `,format=${g.work}` : g.ctx.alpha ? `,format=${g.work}` : "";
+  g.add(`color=c=black:s=${w}x${h}:r=${g.rate}:d=${num(1 / rateOf(g))},format=${format},geq=${geq},loop=loop=-1:size=1,setpts=N/(${g.rate})/TB,trim=end=${num(g.ctx.duration)}${tail}[${out}]`);
+  return out;
+}
+
+/**
+ * Old TV in one pass: red/cyan split and phosphor glow on the picture, a 4:3
+ * window cropped from it for the `tv` bezel, scanlines and RGB stripes (drawn
+ * once, multiplied in, with the gain they cost put back), a hum bar rolling up
+ * the screen and flicker, then barrel distortion of all of it (the lines bend
+ * toward the edges like glass), and last the screen's rounded edge and glass
+ * falloff over black.
+ */
+function crt(g: Graph, input: string, e: FxEffect<"crt">, span: Span): string {
+  const { width: w, height: h } = g.ctx;
+  const a = e.amount;
+  const split = Math.max(1, Math.round((1 + 3 * a) * g.k));
+  const fringed = g.label();
+  g.add(`[${input}]rgbashift=rh=${-split}:bh=${split}[${fringed}]`);
+  let cur = bloom(g, fringed, { effect: "bloom", amount: 0.3 + 0.4 * a, params: { threshold: 0.55, radius: 0.3 } });
+
+  // The screen: the whole frame, or a 4:3 window of it inside a black bezel.
+  const tv = e.params.bezel === "tv";
+  let cw = w;
+  let ch = h;
+  if (tv) {
+    ch = even(h * 0.88);
+    cw = even((ch * 4) / 3);
+    if (cw > w * 0.92) {
+      cw = even(w * 0.92);
+      ch = even((cw * 3) / 4);
+    }
+    const win = g.label();
+    g.add(`[${cur}]scale=${cw}:${ch}:force_original_aspect_ratio=increase:flags=bicubic,crop=${cw}:${ch},setsar=1[${win}]`);
+    cur = win;
+  }
+
+  // Scanlines (dark between lines) and phosphor stripes in one multiply layer; their average loss is made up with gain.
+  const pitch = Math.max(2, Math.round(e.params.pitch * g.k));
+  const depth = 0.15 + 0.4 * a;
+  const stripe = Math.max(1, Math.round(g.k));
+  const maskDepth = e.params.mask ? 0.12 + 0.2 * a : 0;
+  const lines = `(1-${num(depth)}*(0.5-0.5*cos(2*PI*(Y+0.5)/${pitch})))`;
+  const chan = (c: number) => `(1-${num(maskDepth)}*(1-eq(mod(floor(X/${stripe}),3),${c})))`;
+  const pattern = still(g, cw, ch, "gbrp", ["r", "g", "b"].map((p, c) => `${p}='255*${lines}*${chan(c)}'`).join(":"));
+  const lit = g.blend(cur, pattern, "multiply", 1);
+  const gain = Math.min(2, 1 / (1 - depth / 2) / (1 - (maskDepth * 2) / 3));
+  const gained = g.label();
+  g.add(`[${lit}]colorchannelmixer=rr=${num(gain)}:gg=${num(gain)}:bb=${num(gain)}[${gained}]`);
+  cur = gained;
+
+  // Hum bar and flicker share one dim-only layer drawn per frame at 1/8 size (eq cannot do this on planar RGB).
+  const mw = Math.max(8, Math.round(cw / 8));
+  const mh = Math.max(8, Math.round(ch / 8));
+  const solid = g.solid(mw, mh, span.from, span.to);
+  const dim = g.label("m");
+  const flicker = `${num(0.035 * a)}*(0.5+0.16*(sin(37*T)+sin(91*T+1)+sin(11*T+2)))`;
+  // A soft dark band, wrapping, climbing the screen about once every 8 s.
+  const bar = e.params.roll ? `-${num(0.1 * a)}*exp(-pow(ld(0)/0.09,2))` : "";
+  const dist = `st(0,abs(Y/${mh}-(1-mod(0.125*T,1))));st(0,min(ld(0),1-ld(0)));`;
+  g.add(`[${solid}]format=gray,geq=lum='${dist}clip(255*(1-(${flicker})${bar}),0,255)',scale=${cw}:${ch}:flags=bicubic,format=${g.work}[${dim}]`);
+  cur = g.blend(cur, dim, "multiply", 1);
+
+  if (e.params.curvature > 0) {
+    // The glass bulges, so the picture is pushed out to meet its edges: crop in about as far as the lens pulls the middle of the sides.
+    cur = zoomed(g, cur, 1 + 0.3 * e.params.curvature, 0.5, 0.5, { width: cw, height: ch });
+    const bent = g.label();
+    g.add(`[${cur}]lenscorrection=k1=${num(0.4 * e.params.curvature)}:k2=${num(0.2 * e.params.curvature)}:i=bilinear:fc=black[${bent}]`);
+    cur = bent;
+  }
+
+  // Rounded screen edge (anti-aliased) times a glass falloff toward the corners.
+  const rad = e.params.bezel === "none" ? 0 : Math.round(Math.min(cw, ch) * (tv ? 0.07 : 0.05));
+  const inset = e.params.bezel === "none" ? 0 : Math.round(Math.min(cw, ch) * 0.004);
+  const bx = cw / 2 - inset - rad;
+  const by = ch / 2 - inset - rad;
+  const edge =
+    rad > 0
+      ? `st(0,abs(X+0.5-${num(cw / 2)})-${num(bx)});st(1,abs(Y+0.5-${num(ch / 2)})-${num(by)});` +
+        `st(2,hypot(max(ld(0),0),max(ld(1),0))+min(max(ld(0),ld(1)),0)-${rad});st(3,clip(0.5-ld(2)/${num(1.5 * g.k)},0,1));`
+      : "st(3,1);";
+  const glass = `st(4,hypot((X+0.5)/${cw}-0.5,(Y+0.5)/${ch}-0.5)/0.7071);`;
+  const screen = still(g, cw, ch, "gray", `lum='${edge}${glass}255*ld(3)*(1-${num(0.25 + 0.3 * a)}*pow(ld(4),3))'`);
+  cur = g.blend(cur, screen, "multiply", 1);
+  if (!tv) return cur;
+  const padded = g.label();
+  g.add(`[${cur}]pad=${w}:${h}:${(w - cw) / 2}:${(h - ch) / 2}:color=black[${padded}]`);
+  return padded;
+}
+
+/** `input` moved by (dx, dy) pixels; what slides in from outside the frame is `fill`. */
+function shifted(g: Graph, input: string, dx: number, dy: number, fill: "white" | "black"): string {
+  const { width: w, height: h } = g.ctx;
+  const m = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)));
+  if (m === 0) return input;
+  const out = g.label();
+  g.add(`[${input}]pad=${w + 2 * m}:${h + 2 * m}:${m}:${m}:color=${fill},crop=${w}:${h}:${m - Math.round(dx)}:${m - Math.round(dy)}[${out}]`);
+  return out;
+}
+
+/**
+ * Screenprint: the picture is flattened to a few tones and printed on paper;
+ * Sobel edges (blurred and re-thresholded so thin lines swell like wet ink)
+ * are printed twice, in two colours, each off register in opposite
+ * directions, and so is the tone plate; seeded paper grain and ink dropouts
+ * come from one noise still.
+ */
+function printInk(g: Graph, input: string, e: FxEffect<"print_ink">): string {
+  return g.mixed(input, e.amount, (src) => {
+    const { width: w, height: h, duration } = g.ctx;
+    const k = g.k;
+    const p = e.params;
+    const miss = p.misregister * 14 * k;
+    const [tones, edges] = g.split(src, 2);
+
+    // Tone plate: contrast first, then `levels` steps per channel, slid off register.
+    const steps = p.levels;
+    // The darkest step stays a lifted ink tone, not black: a print never prints pure black.
+    const q = `24+trunc(val*${steps}/256)*231/${steps - 1}`;
+    const flat = g.label();
+    g.add(`[${tones}]curves=all='0/0.1 0.25/0.22 0.8/0.9 1/1',lutrgb=r='${q}':g='${q}':b='${q}'[${flat}]`);
+    const plate = shifted(g, flat, miss, miss * 0.5, "white");
+
+    // Line plate: Sobel magnitude, swelled by blur and a second threshold.
+    const lines = g.label();
+    const sigma = (0.35 + 1.8 * p.bleed) * k;
+    g.add(`[${edges}]format=gray,gblur=sigma=${num(2 * k)},sobel,gblur=sigma=${num(sigma)},curves=all='0/0 0.15/0 0.5/1 1/1'[${lines}]`);
+
+    // One seeded noise still: paper grain, and holes in the ink.
+    const grainSrc = g.label("m");
+    g.add(
+      `color=c=gray:s=${w}x${h}:r=${g.rate}:d=${num(1 / rateOf(g))},format=gray,noise=alls=${num(40 + 60 * p.grit, 0)}:allf=u:all_seed=${p.seed},` +
+        `loop=loop=-1:size=1,setpts=N/(${g.rate})/TB,trim=end=${num(duration)}[${grainSrc}]`,
+    );
+    const [grain, holes] = g.split(grainSrc, 2);
+    const speckle = g.label("m");
+    const cut = clamp(0.97 - 0.2 * p.grit, 0.6, 0.97);
+    g.add(`[${holes}]gblur=sigma=${num(0.7 * k)},curves=all='0/1 ${num(cut)}/1 ${num(cut + 0.03)}/0 1/0'[${speckle}]`);
+
+    const [lineA, lineB] = g.split(lines, 2);
+    const inkMask = g.label();
+    const plateMask = g.label();
+    const dropout = g.split(speckle, 2);
+    const keep = (line: string, dx: number, dy: number, strength: number, holesIn: string, out: string) => {
+      const moved = shifted(g, line, dx, dy, "black");
+      const toWork = g.label();
+      g.add(`[${moved}]format=gray[${toWork}]`);
+      const cutLines = g.label();
+      g.add(`[${toWork}][${holesIn}]blend=all_mode=multiply:all_opacity=1:shortest=1,lutyuv=y='val*${num(strength)}',format=${g.work}[${cutLines}]`);
+      g.add(`[${cutLines}]null[${out}]`);
+    };
+    keep(lineA!, -miss, -miss * 0.5, 1, dropout[0]!, inkMask);
+    keep(lineB!, miss * 0.7, -miss * 0.8, 0.85, dropout[1]!, plateMask);
+
+    // Paper, tone plate, the two line plates.
+    const paper = g.plain(p.paper);
+    const printed = g.blend(paper, plate, "multiply", 1);
+    const [ink, red] = [g.plain(p.ink), g.plain(p.plate)];
+    const withPlate = g.label();
+    g.add(`[${printed}][${red}][${plateMask}]maskedmerge[${withPlate}]`);
+    const withInk = g.label();
+    g.add(`[${withPlate}][${ink}][${inkMask}]maskedmerge[${withInk}]`);
+
+    // Paper fibre: the noise, softly overlaid.
+    const fibre = g.label();
+    g.add(`[${grain}]gblur=sigma=${num(0.5 * k)},format=${g.work}[${fibre}]`);
+    return g.blend(withInk, fibre, "overlay", 0.15 + 0.5 * p.grit);
+  });
+}
+
+/** Frames the carry moshes: its `length`, but never the whole clip (at least one frame lands clean). */
+export function moshFrameCount(length: number, fps: { num: number; den: number }, duration: number): number {
+  const total = Math.round((duration * fps.num) / fps.den);
+  return Math.max(0, Math.min(Math.round((length * fps.num) / fps.den), total - 1));
+}
+
+/**
+ * The first frames of the clip go through displace with the carry's maps
+ * (blocky: the maps are one pixel per block, scaled up without smoothing),
+ * mixed with the previous clip's last frame pushed by the same maps and
+ * fading out; the rest of the clip follows untouched.
+ */
+function datamosh(g: Graph, input: string, e: FxEffect<"datamosh_carry">): string {
+  const { width: w, height: h } = g.ctx;
+  const n = moshFrameCount(e.params.length, g.ctx.fps, g.ctx.duration);
+  if (n < 1) return input;
+  const [head, tail] = g.split(input, 2);
+  const moshed = g.label();
+  g.add(`[${head}]trim=end_frame=${n},setpts=PTS-STARTPTS[${moshed}]`);
+  const rest = g.label();
+  g.add(`[${tail}]trim=start_frame=${n},setpts=PTS-STARTPTS[${rest}]`);
+  const ghost = e.params.ghost;
+  const [xa, xb] = g.split(mapStream(g, 1, n), 2);
+  const [ya, yb] = g.split(mapStream(g, 2, n), 2);
+  const pushed = g.label();
+  g.add(`[${moshed}][${xa}][${ya}]displace=edge=smear[${pushed}]`);
+  let head2 = pushed;
+  if (ghost > 0.001) {
+    const last = g.label();
+    g.add(`[3:v]scale=${w}:${h}:force_original_aspect_ratio=increase:flags=bicubic,crop=${w}:${h},setsar=1,format=${g.work},setpts=PTS-STARTPTS,trim=end_frame=${n}[${last}]`);
+    const lastPushed = g.label();
+    g.add(`[${last}][${xb}][${yb}]displace=edge=smear[${lastPushed}]`);
+    head2 = g.label();
+    // The last frame's share starts at `ghost` and falls away squared.
+    const share = `(${num(ghost)}*pow(1-N/${n},2))`;
+    // With alpha, the clip's own (pushed) alpha stays: the ghost shows only where the clip does.
+    const keepAlpha = g.ctx.alpha ? ":c3_expr=A" : "";
+    g.add(`[${pushed}][${lastPushed}]blend=all_expr='A*(1-${share})+B*${share}'${keepAlpha}:shortest=1[${head2}]`);
+  } else {
+    // Unused maps still need a consumer.
+    g.add(`[${xb}]nullsink`);
+    g.add(`[${yb}]nullsink`);
+  }
+  const out = g.label();
+  g.add(`[${head2}][${rest}]concat=n=2:v=1:a=0[${out}]`);
+  return out;
+}
+
+/**
+ * Extra input `index` (an image sequence of displace maps), blocky-scaled to
+ * the frame, `frames` long. displace moves every plane by the map's matching
+ * plane, so with alpha the map's alpha plane is the map too (gray to gbrap
+ * would make it 255, a 127 px shift that throws the clip's alpha away).
+ */
+function mapStream(g: Graph, index: number, frames: number): string {
+  const out = g.label("m");
+  const scaled = `[${index}:v]format=gray,scale=${g.ctx.width}:${g.ctx.height}:flags=neighbor,setpts=PTS-STARTPTS,trim=end_frame=${frames}`;
+  if (!g.ctx.alpha) {
+    g.add(`${scaled},format=gbrp[${out}]`);
+    return out;
+  }
+  const map = g.label("m");
+  g.add(`${scaled}[${map}]`);
+  const [colour, alpha] = g.split(map, 2);
+  const rgb = g.label("m");
+  g.add(`[${colour}]format=gbrp[${rgb}]`);
+  g.add(`[${rgb}][${alpha}]alphamerge[${out}]`);
+  return out;
 }
 
 /** atempo takes 0.5-2 per stage: chain stages down to the speed. */

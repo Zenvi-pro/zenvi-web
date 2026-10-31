@@ -8,7 +8,8 @@
  *
  * The first source is always a 1080p testsrc2 pattern it generates. Media
  * stay outside the repo: pass clips you are allowed to use (Pexels, your own).
- * FX_ONLY=bloom,glitch renders some effects only.
+ * FX_ONLY=bloom,glitch renders some effects only. datamosh_carry carries the
+ * motion of the previous source's range (the last one for the first source).
  */
 
 import { execFile } from "node:child_process";
@@ -68,23 +69,26 @@ async function main(): Promise<void> {
   const fx = createFxRenderer({ ffmpeg, ffprobe, outputDir: () => renders, resolveMedia: (p) => p, hwaccel: process.env.ZENVI_FX_HWACCEL !== "0" });
   const timings: Record<string, Record<string, number>> = {};
 
-  for (const src of sources) {
+  for (const [si, src] of sources.entries()) {
+    // datamosh_carry carries the motion of the footage before the cut: the previous source's showcase range.
+    const before = sources[(si + sources.length - 1) % sources.length]!;
+    const carry = { path: before.file, at: before.start + SECONDS };
     const info = await probeFxSource(ffprobe, src.file);
     const dir = path.join(out, src.name);
     await mkdir(dir, { recursive: true });
-    const before = path.join(dir, "_before.png");
-    await row(src.file, before, src.start, SECONDS);
+    const beforePng = path.join(dir, "_before.png");
+    await row(src.file, beforePng, src.start, SECONDS);
     const reel: string[] = [];
     for (const id of ids) {
-      const parsed = parseFxStack([{ effect: id }], SECONDS);
+      const parsed = parseFxStack([id === "datamosh_carry" ? { effect: id, params: { carry: { file_id: "before", at: carry.at } } } : { effect: id }], SECONDS);
       if (!parsed.ok) throw new Error(parsed.error);
-      const r = await fx.render({ path: src.file, start: src.start, end: src.start + SECONDS, effects: parsed.effects });
+      const r = await fx.render({ path: src.file, start: src.start, end: src.start + SECONDS, effects: parsed.effects, ...(id === "datamosh_carry" ? { carry } : {}) });
       (timings[id] ??= {})[src.name] = r.cached ? NaN : r.seconds / SECONDS;
       const after = path.join(dir, `_${id}.png`);
       await row(r.path, after, 0, r.duration);
       const title = path.join(dir, `_${id}-label.png`);
       await label(title, `${FX_INFO[id].title} (${id}, amount ${parsed.effects[0]!.amount}) — top: original, bottom: FX — ${src.name} ${info.width}x${info.height}`, THUMB * STRIP_FRAMES);
-      await run(["-i", title, "-i", before, "-i", after, "-filter_complex", "[0][1][2]vstack=inputs=3", path.join(dir, `${id}.png`)]);
+      await run(["-i", title, "-i", beforePng, "-i", after, "-filter_complex", "[0][1][2]vstack=inputs=3", path.join(dir, `${id}.png`)]);
       reel.push(r.path);
       process.stdout.write(`${src.name} ${id}: ${r.seconds.toFixed(1)}s\n`);
     }
@@ -96,7 +100,7 @@ async function main(): Promise<void> {
     // Every strip in one tall sheet, then drop the pieces.
     if (ids.length > 1) await run([...ids.flatMap((id) => ["-i", path.join(dir, `${id}.png`)]), "-filter_complex", `vstack=inputs=${ids.length},scale=1400:-2`, path.join(dir, "overview.png")]);
     for (const id of ids) await rm(path.join(dir, `_${id}.png`), { force: true }).then(() => rm(path.join(dir, `_${id}-label.png`), { force: true }));
-    await rm(before, { force: true });
+    await rm(beforePng, { force: true });
   }
   await rm(renders, { recursive: true, force: true });
 

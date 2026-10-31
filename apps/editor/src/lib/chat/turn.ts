@@ -53,6 +53,8 @@ export interface ChatTurnOptions {
   action?: ChatAction;
   planId?: string;
   images?: ChatImage[];
+  /** Tools the editor cannot run, sent so the backend does not offer them. */
+  unavailableTools?: readonly string[];
   executeTool: ToolExecutor;
   onEvent: (event: ChatEvent) => void;
   signal?: AbortSignal;
@@ -198,6 +200,7 @@ export function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnResult> {
       if (options.action) data.data.action = options.action;
       if (options.planId) data.data.plan_id = options.planId;
       if (options.images && options.images.length > 0) data.data.images = options.images;
+      if (options.unavailableTools && options.unavailableTools.length > 0) data.data.unavailable_tools = [...options.unavailableTools];
       send(data);
       if (pingIntervalMs > 0) ping = setInterval(() => send({ type: "ping", data: {} }), pingIntervalMs);
     };
