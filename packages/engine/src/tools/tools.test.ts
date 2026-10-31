@@ -1315,6 +1315,18 @@ const SPECS: Record<string, Spec> = {
     happy: { args: {}, status: "unchanged", summary: /^No brief saved/ },
     failure: null,
   },
+  find_style_tool: {
+    happy: { args: { request: "a hype reel to this song" }, summary: /^The bin: .*\n1\. hype-reel: /, check: ({ doc }) => expect(doc.undoLabels).toEqual([]) },
+    failure: null,
+  },
+  get_style_tool: {
+    happy: { args: { style: "hype-reel", length_seconds: "15" }, summary: /^# Hype \/ sport reel \(style hype-reel;/ },
+    failure: { args: { style: "nope" }, status: "refused", summary: /^Error: no style nope\. find_style_tool picks one/ },
+  },
+  get_technique_tool: {
+    happy: { args: { technique: "accelerating-cut-length-ramp" }, summary: /^# Accelerating cut-length ramp \(technique accelerating-cut-length-ramp\)/ },
+    failure: { args: { technique: "nope" }, status: "refused", summary: /^Error: no technique nope\./ },
+  },
   review_edit_tool: {
     happy: {
       args: { image: "false", audio: "false" },
