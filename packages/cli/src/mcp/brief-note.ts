@@ -38,7 +38,7 @@ const STYLES = STYLE_FILES.filter((f) => f.kind === "style");
  * style's signature tools and lost frame closeness on technique-heavy styles.
  */
 export function autoBriefNote(brief: Brief): string {
-  return `Saved a minimal brief for this project (auto: style ${brief.style} matched from the styles index, ${brief.aspect}, ${brief.length_seconds} s, one beat). Nothing waits for it. Next: read_director_recipe {styles: "${brief.style}"} for that style's order and signature tools; save_brief_tool with your own hook, beats and storyboard plans the edit and has review check it.`;
+  return `Saved a minimal brief for this project (auto: style ${brief.style} matched from the styles index, ${brief.aspect}, ${brief.length_seconds} s, one beat). Nothing waits for it. Next: get_style_tool {"style": "${brief.style}"} for that style's beats, look, sound and tool calls (find_style_tool if it is the wrong style); save_brief_tool with your own hook, beats and storyboard plans the edit and has review check it.`;
 }
 
 /**

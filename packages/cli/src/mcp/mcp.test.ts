@@ -7,6 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { engineRegistry } from "../engine/registry.js";
 import { createContext } from "../program.js";
 import { fakeDesktop, testEnv, writeDiscovery, zenvi, type FakeDesktop } from "../test-support/harness.js";
 import { testRegistry } from "../test-support/registry.js";
@@ -17,8 +18,8 @@ let work: string;
 let desktop: FakeDesktop;
 const open: Array<{ client: Client; server: ZenviMcpServer }> = [];
 
-async function connect(projectFile?: string, env: NodeJS.ProcessEnv = {}): Promise<Client> {
-  const ctx = createContext({ env: testEnv(home, env), cwd: work, registry: testRegistry() });
+async function connect(projectFile?: string, env: NodeJS.ProcessEnv = {}, registry = testRegistry()): Promise<Client> {
+  const ctx = createContext({ env: testEnv(home, env), cwd: work, registry });
   const server = await createZenviMcpServer(ctx, projectFile);
   const [a, b] = InMemoryTransport.createLinkedPair();
   await server.server.connect(b);
@@ -56,6 +57,25 @@ afterAll(async () => {
 });
 
 describe("zenvi mcp", () => {
+  it("lists the tools agents use whole and the specialist ones short; a refused short one lists its arguments in full", async () => {
+    const full = (await (await connect(undefined, { ZENVI_MCP_LISTING: "full" }, engineRegistry())).listTools()).tools;
+    const client = await connect(undefined, {}, engineRegistry());
+    const lean = (await client.listTools()).tools;
+    const byName = (tools: typeof lean, name: string) => tools.find((t) => t.name === name)!;
+    expect(lean.map((t) => t.name)).toEqual(full.map((t) => t.name));
+    // A tool the bench uses keeps its whole text; a specialist one keeps its first sentence and its argument names, types and enums.
+    expect(byName(lean, "add_clip_to_timeline_tool")).toEqual(byName(full, "add_clip_to_timeline_tool"));
+    const split = byName(lean, "split_clip_tool");
+    expect(split.description.length).toBeLessThan(byName(full, "split_clip_tool").description.length + 1);
+    expect(Object.keys(split.inputSchema.properties ?? {})).toEqual(Object.keys(byName(full, "split_clip_tool").inputSchema.properties ?? {}));
+    expect(JSON.stringify(lean).length).toBeLessThan(JSON.stringify(full).length * 0.85);
+    expect(SERVER_INSTRUCTIONS).toContain("a call refused for its arguments lists them in full");
+
+    const refused = await call(client, "split_clip_tool", { no_such_argument: 1 });
+    expect(refused.receipt.status).toBe("refused");
+    expect(refused.receipt.notes.join("\n")).toMatch(/^split_clip_tool arguments in full:\n/m);
+  });
+
   it("never refuses for a missing brief: the first import saves a minimal one and says so", async () => {
     const client = await connect(undefined, { ZENVI_MCP_BRIEF: "on" });
     await call(client, "open_project_file", { path: "auto.zvn" });
@@ -70,7 +90,7 @@ describe("zenvi mcp", () => {
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {
     const client = await connect();
     const opened = await call(client, "open_project_file", { path: "plan.zvn" });
-    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: A brief first helps: get_brief_tool; to plan one, read_director_recipe \{styles: "brief"\}, then save_brief_tool \(nothing waits for it.*Then read its style's recipe, read_director_recipe \{recipe\}\..*Finish, in order: unify_grade_tool/);
+    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: find_style_tool \{request\} picks the style.*get_style_tool \{style, length_seconds\}.*save_brief_tool, get_brief_tool \(nothing waits for it.*Finish, in order: unify_grade_tool/);
     const recipe = await call(client, "read_director_recipe", { recipe: "match-cut-montage" });
     expect(recipe.receipt.status).toBe("applied");
     expect(recipe.receipt.summary).toMatch(/match_cut_montage_tool/);
