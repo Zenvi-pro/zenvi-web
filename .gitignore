@@ -9,6 +9,7 @@ coverage/
 !.env.example
 .vercel/
 playwright-report/
+tool-truth-report/
 test-results/
 .cache/
 *.log

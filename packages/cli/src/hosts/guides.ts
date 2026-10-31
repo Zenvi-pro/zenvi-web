@@ -1,13 +1,16 @@
 /**
  * What `zenvi mcp` serves besides tools: resources (`zenvi://hosts`,
  * `zenvi://taste`, `zenvi://handoff`, `zenvi://director` and its genre
- * recipes, `zenvi://sound` and its genre palettes) and prompts
- * (`taste_motion_design`, `edit_review`, `motion_director`, `sound_designer`)
+ * recipes, `zenvi://sound` and its genre palettes, `zenvi://styles` with the
+ * brief compiler and every style and technique) and prompts
+ * (`zenvi_brief`, `taste_motion_design`, `edit_review`, `motion_director`,
+ * `sound_designer`)
  * that carry the taste guide (docs/TASTE.md), its review checklist, the
  * motion-director and the sound-designer skills, with the tool names of the
  * host the work happens in.
  */
 
+import { STYLE_RESOURCES, STYLES_BRIEF, STYLES_INDEX, styleResource } from "@zenvi/engine/styles";
 import { DIRECTOR_RECIPES, DIRECTOR_SKILL } from "./director.gen.js";
 import type { HostsReport } from "./registry.js";
 import { SOUND_PALETTES, SOUND_SKILL } from "./sound.gen.js";
@@ -75,6 +78,7 @@ export const RESOURCES: readonly ResourceInfo[] = [
     description: `Sound palette: the design call, cues, levels, signature moves and what to avoid for ${genre.replace(/-/g, " ")}.`,
     mimeType: "text/markdown",
   })),
+  ...STYLE_RESOURCES.map(({ text: _text, ...info }) => info),
 ];
 
 /** The text of a markdown resource (every resource but zenvi://hosts), or undefined. */
@@ -83,6 +87,8 @@ export function guideText(uri: string): string | undefined {
   if (uri === "zenvi://handoff") return HANDOFF_GUIDE;
   if (uri === "zenvi://director") return DIRECTOR_SKILL;
   if (uri === "zenvi://sound") return SOUND_SKILL;
+  const style = styleResource(uri);
+  if (style) return style.text;
   return (DIRECTOR_RECIPES.find((r) => uri === `zenvi://director/${r.genre}`) ?? SOUND_PALETTES.find((r) => uri === `zenvi://sound/${r.genre}`))?.markdown;
 }
 
@@ -201,6 +207,13 @@ const HOST_ARGUMENT: PromptArgumentInfo = {
 
 export const PROMPTS: readonly PromptInfo[] = [
   {
+    name: "zenvi_brief",
+    title: "Compile the creative brief",
+    description:
+      "Step 0 of any whole video: turn the person's first prompt and the media bin into a creative brief (goal, frame, one style, up to 4 techniques, hook, beats, shot plan, type, palette, music, sound, captions, end card, checklist), critique and fix it, and save it with save_brief_tool before editing.",
+    arguments: [{ name: "prompt", description: 'The person\'s request as they wrote it, e.g. "a reel of my Lisbon trip, upbeat".', required: true }],
+  },
+  {
     name: "taste_motion_design",
     title: "Motion design with Zenvi taste",
     description:
@@ -253,6 +266,7 @@ function connectStep(host: PromptHost, tools: HostTools): string {
 export function promptText(name: string, args: Record<string, string | undefined>, report?: HostsReport): { description: string; text: string } {
   const prompt = PROMPTS.find((p) => p.name === name);
   if (!prompt) throw new Error(`Unknown prompt: ${name}. Prompts: ${PROMPTS.map((p) => p.name).join(", ")}.`);
+  if (name === "zenvi_brief") return briefPrompt(args);
   if (name === "motion_director") return directorPrompt(args);
   if (name === "sound_designer") return soundPrompt(args);
   const host = promptHost(args.host, report);
@@ -294,6 +308,20 @@ export function promptText(name: string, args: Record<string, string | undefined
     guide(),
   ].join("\n");
   return { description: `Review of the edit in ${tools.label}${focus ? ` (${focus})` : ""}`, text };
+}
+
+function briefPrompt(args: Record<string, string | undefined>): { description: string; text: string } {
+  const prompt = args.prompt?.trim();
+  if (!prompt) throw new Error("zenvi_brief needs the prompt: what the person asked for.");
+  const text = [
+    `The person asked: ${prompt}`,
+    "",
+    "Before any edit, compile the creative brief with the brief compiler below: inspect_media_bin_tool, pick ONE style and up to four techniques from the styles index (read only those files: zenvi://styles/<id>), write the brief, critique it against the style's checklist, fix it, then save_brief_tool. Do not ask the person unless something essential is missing; never invent brand facts. Then build it with the motion director (zenvi://director) and finish with the sound designer (zenvi://sound).",
+    "",
+    `--- The brief compiler (zenvi://styles/brief) ---\n\n${STYLES_BRIEF}`,
+    `--- The styles index (zenvi://styles) ---\n\n${STYLES_INDEX}`,
+  ].join("\n");
+  return { description: "Compile the creative brief", text };
 }
 
 function directorPrompt(args: Record<string, string | undefined>): { description: string; text: string } {

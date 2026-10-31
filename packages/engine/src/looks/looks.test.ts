@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseCubeLut } from "../render/kernels/cube-lut.js";
 import { accentLut, bleachBypassLut, chromeLut, duotoneLut, hueOf, solarizeLut } from "./luts.js";
-import { SHAPE_FEATHER_RANGE, shapeMaskSettings, shapeMaskSvg, vignetteSvg } from "./masks.js";
+import { SHAPE_FEATHER_RANGE, polygonProblem, polygonRegions, shapeMaskSettings, shapeMaskSvg, vignetteSvg } from "./masks.js";
 
 /** The LUT's entry nearest an input colour (red fastest). */
 function at(cube: string, rgb: [number, number, number]): number[] {
@@ -57,6 +57,65 @@ describe("mask images", () => {
     expect(ellipse).toMatch(/radialGradient id="e"/);
     const rect = shapeMaskSvg(1920, 1080, { shape: "rectangle", x: 0.5, y: 0.5, width: 0.5, height: 0.25 });
     expect(rect.match(/<polygon/g)).toHaveLength(4);
+  });
+
+  it("draw a convex polygon as the nearest side's ramp, so the field is the smallest distance to any side", () => {
+    const W = 1920;
+    const H = 1080;
+    // A parallelogram window leaning right, listed anticlockwise on screen; the same field either winding.
+    const quad: [number, number][] = [
+      [600, 200],
+      [400, 880],
+      [1300, 880],
+      [1500, 200],
+    ];
+    const range = 540;
+    for (const pts of [quad, [...quad].reverse()]) {
+      const regions = polygonRegions(W, H, pts, range);
+      expect(regions).toHaveLength(4);
+      // Grey along a region's ramp: 0.5 on its side, 0 `range` outside it, 1 `range` inside.
+      const grey = (r: (typeof regions)[number], p: [number, number]) => {
+        const dx = r.to[0] - r.from[0];
+        const dy = r.to[1] - r.from[1];
+        const t = ((p[0] - r.from[0]) * dx + (p[1] - r.from[1]) * dy) / (dx * dx + dy * dy);
+        return Math.min(1, Math.max(0, t));
+      };
+      const inside = (poly: readonly (readonly [number, number])[], p: [number, number]) => {
+        let sign = 0;
+        for (let i = 0; i < poly.length; i += 1) {
+          const a = poly[i]!;
+          const b = poly[(i + 1) % poly.length]!;
+          const c = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+          if (Math.abs(c) < 1e-6) continue;
+          if (sign !== 0 && Math.sign(c) !== sign) return false;
+          sign = Math.sign(c);
+        }
+        return true;
+      };
+      for (const p of [[950, 540], [610, 210], [300, 540], [1000, 100], [1700, 900], [960, 1000]] as [number, number][]) {
+        const owners = regions.filter((r) => inside(r.region, p));
+        expect(owners.length).toBeGreaterThan(0);
+        const values = regions.map((r) => grey(r, p));
+        // The owner's ramp is the smallest (nearest side) wherever the point is.
+        for (const o of owners) expect(grey(o, p)).toBeCloseTo(Math.min(...values), 6);
+      }
+      // The middle is inside (above mid-grey), a point left of the slanted side outside.
+      const at = (p: [number, number]) => grey(regions.find((r) => inside(r.region, p))!, p);
+      expect(at([950, 540])).toBeGreaterThan(0.6);
+      expect(at([380, 540])).toBeLessThan(0.5);
+    }
+    const svg = shapeMaskSvg(W, H, { shape: "polygon", x: 0, y: 0, width: 0, height: 0, points: quad.map(([x, y]) => ({ x: x / W, y: y / H })) });
+    expect(svg.match(/<polygon/g)).toHaveLength(8);
+    expect(svg.match(/<linearGradient/g)).toHaveLength(4);
+  });
+
+  it("refuse polygons that are not convex or cross themselves", () => {
+    expect(polygonProblem([[0, 0], [10, 0]])).toMatch(/at least 3/);
+    expect(polygonProblem([[0, 0], [100, 0], [100, 100], [50, 20], [0, 100]])).toMatch(/not convex/);
+    const star: [number, number][] = [0, 2, 4, 1, 3].map((k) => [500 + 400 * Math.cos((2 * Math.PI * k) / 5), 500 + 400 * Math.sin((2 * Math.PI * k) / 5)]);
+    expect(polygonProblem(star)).toMatch(/crosses itself/);
+    expect(polygonProblem([[0, 0], [50, 0], [100, 0], [50, 80]])).toMatch(/on the line/);
+    expect(polygonProblem([[0, 0], [100, 0], [50, 80]])).toBeNull();
   });
 
   it("turn feather and grow into the Mask effect's contrast and brightness", () => {

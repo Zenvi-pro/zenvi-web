@@ -1,3 +1,15 @@
+---
+id: flash-montage
+kind: style
+summary: One idea told by a new image every 3-6 frames ("the evolution of") - shapes matched, flashes, glow, loud
+categories: [flash-cut-match-cut-edit, gaming-montage, music-lyric-video]
+tools: [gather_stock_footage_tool, match_cut_montage_tool, apply_look_tool, auto_sound_design_tool]
+pace: frantic
+mood: [intense, hypnotic]
+aspect: ["9:16", "16:9"]
+pairs_with: []
+avoid_with: []
+---
 # Flash montage
 
 A new image every 3-6 frames on one idea ("the evolution of time"), shapes
@@ -35,7 +47,9 @@ eyes), and inside a group keep the shape centred.
    framing, no zoom. Without boxes the tool hunts for circles in every image
    and zooms 4-17x into whatever it finds. Shape matches then come from
    choosing images whose spiral or circle is already centred at a similar
-   size, and putting them next to each other in `file_ids`. The tool ends on
+   size, and putting them next to each other in `file_ids` (`sequence_shots_tool`
+   with `dry_run: true`, `continuity: 2` finds those neighbours: pass its
+   `data.file_ids`). The tool ends on
    the last downbeat before `duration_seconds`: ask for 1-2 s more than the
    run needs; its first and last shots are held, so keep the first short
    (trim it to 0.6-0.8 s) and put the end title over the last.

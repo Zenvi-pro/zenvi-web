@@ -373,6 +373,7 @@ zenvi call premiere_export preset=h264-high output=/Users/me/out/cut.mp4
 | `ZENVI_MCP_ENGINE=portable` | — | The MCP server never forwards to the desktop app (handoff tools are refused). |
 | `ZENVI_MCP_ADOBE` | `auto` | Which Adobe tool families `zenvi mcp` lists: `auto` (where Zenvi Link can run), `on`, `off`. |
 | `ZENVI_MCP_HANDOFF` | `auto` | Whether `zenvi mcp` lists the desktop's handoff tools and `bring_from_*`: `auto` (the desktop app is installed or has run here), `on`, `off`. |
+| `ZENVI_MCP_BRIEF` | `on` | `off` stops `zenvi mcp` saving a minimal creative brief (auto: style matched from the styles index, the frame, the length) on the first call that starts a video in a project without one. No call ever waits for a brief. |
 | `ZENVI_ADOBE_EXTENSION` | the bundle's `adobe/pro.zenvi.link` | The Zenvi Link build `zenvi adobe install` installs. |
 | `ZENVI_MCP_COMMAND` | — | Command `mcp-config` writes instead of `node <bundle> mcp`. |
 | `ZENVI_DEBUG=1` | — | Stack traces and host logs on stderr. |

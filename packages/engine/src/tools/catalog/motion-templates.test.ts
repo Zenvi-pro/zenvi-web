@@ -193,6 +193,29 @@ describe("add_motion_template_tool", () => {
     expect(noFonts.text).toContain("cannot read the bundled fonts");
   });
 
+  it("places a layout template's windowed clips with a Mask effect reading their written mask, in one undo step", async () => {
+    const doc = verticalProject("none");
+    const host = motionHost();
+    const result = await runTool({ doc, host }, "add_motion_template_tool", { template: "compare", variant: "diagonal", file_ids: ["POURXXXXXX", "PAGESXXXXX"], labels: ["Raw", "Edit"], replay: "true", sound: "true", bpm: 120 });
+    expect(result.ok, result.text).toBe(true);
+    expect(doc.undoLabels).toEqual(["Add motion template compare"]);
+    const layers = (dataOf(result) as { layers: { name: string; timeline_clip_id: string }[] }).layers;
+    const clipOf = (name: string) => doc.project.clips.find((c) => c.id === layers.find((l) => l.name === name)!.timeline_clip_id)!;
+    const mask = (clipOf("panel-2").effects ?? []).find((e) => e.class_name === "Mask")!;
+    const path = String((mask.mask_reader as { path: string }).path);
+    expect(path).toMatch(/compare-panel-2-mask\.svg$/);
+    expect(new TextDecoder().decode(host.written.get(path) as Uint8Array)).toMatch(/<linearGradient/);
+    expect(mask.mask_invert).toBe(true);
+    // The first clip keeps its sound, the second is muted under the music.
+    const volume = (name: string) => (clipOf(name).volume as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y;
+    expect(volume("panel-1")).toBe(1);
+    expect(volume("panel-2")).toBe(0);
+    const refused = await runTool({ doc, host }, "add_motion_template_tool", { template: "compare", variant: "diagonal", file_ids: ["POURXXXXXX", "PAGESXXXXX", "NOTESXXXXX"] });
+    expect(refused.ok).toBe(false);
+    expect(refused.text).toMatch(/takes 2/);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
   it("is not available where generated drawings cannot be stored", async () => {
     const result = await runTool({ doc: verticalProject(), host: motionHost({ omit: ["media.writeGenerated"] }) }, "add_motion_template_tool", { template: "end_card", text: "Zenvi" });
     expect(result.ok).toBe(false);

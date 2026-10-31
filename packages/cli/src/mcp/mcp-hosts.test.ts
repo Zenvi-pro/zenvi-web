@@ -5,6 +5,7 @@
  * paths included), bring_from_* across both, resources and prompts.
  */
 
+import { STYLE_FILES } from "@zenvi/engine/styles";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -688,7 +689,7 @@ describe("bring_from_premiere", () => {
 });
 
 describe("resources and prompts", () => {
-  it("serves zenvi://hosts, zenvi://taste (docs/TASTE.md), zenvi://handoff, the director with its recipes and the sound designer with its palettes", async () => {
+  it("serves zenvi://hosts, zenvi://taste (docs/TASTE.md), zenvi://handoff, the director with its recipes, the sound designer with its palettes and the styles library", async () => {
     await ae();
     const { client } = await connect();
     expect((await client.listResources()).resources.map((r) => [r.uri, r.mimeType])).toEqual([
@@ -699,6 +700,9 @@ describe("resources and prompts", () => {
       ...DIRECTOR_RECIPES.map((r) => [`zenvi://director/${r.genre}`, "text/markdown"]),
       ["zenvi://sound", "text/markdown"],
       ...SOUND_PALETTES.map((r) => [`zenvi://sound/${r.genre}`, "text/markdown"]),
+      ["zenvi://styles", "text/markdown"],
+      ["zenvi://styles/brief", "text/markdown"],
+      ...STYLE_FILES.map((f) => [`zenvi://styles/${f.id}`, "text/markdown"]),
     ]);
     expect(SOUND_PALETTES.map((r) => r.genre)).toEqual(["3d-product", "editorial", "essay", "flash", "hype", "match-cut", "multiplicity", "saas", "talking-head"]);
     const sound = ((await client.readResource({ uri: "zenvi://sound" })).contents[0] as { text: string }).text;
@@ -709,6 +713,8 @@ describe("resources and prompts", () => {
     expect(director).toMatch(/^# Zenvi motion director\n/);
     const recipe = ((await client.readResource({ uri: "zenvi://director/grid-montage" })).contents[0] as { text: string }).text;
     expect(recipe).toMatch(/^# Grid montage\n/);
+    const brief = ((await client.readResource({ uri: "zenvi://styles/brief" })).contents[0] as { text: string }).text;
+    expect(brief).toMatch(/^# The brief compiler/);
     const hosts = JSON.parse(((await client.readResource({ uri: "zenvi://hosts" })).contents[0] as { text: string }).text) as { hosts: Array<{ id: string }>; active: string };
     expect(hosts.hosts.map((h) => h.id)).toEqual(["zenvi-desktop", "zenvi-portable", "after-effects", "premiere-pro"]);
     expect(hosts.active).toBe("after-effects");
@@ -724,6 +730,7 @@ describe("resources and prompts", () => {
     await ae();
     const { client } = await connect();
     expect((await client.listPrompts()).prompts.map((p) => [p.name, p.arguments?.map((a) => `${a.name}${a.required ? "!" : ""}`)])).toEqual([
+      ["zenvi_brief", ["prompt!"]],
       ["taste_motion_design", ["brief!", "host"]],
       ["edit_review", ["host", "focus"]],
       ["motion_director", ["brief!", "genre"]],
