@@ -14,6 +14,7 @@
  * dropped. A refused build discards the media its steps wrote.
  */
 
+import { readBrief } from "../../../brief/brief.js";
 import { ProjectDocument, type Transaction } from "../../../history/document.js";
 import type { Project, ProjectFile } from "../../../model/types.js";
 import { Interpolation, ScaleMode } from "../../../model/types.js";
@@ -24,6 +25,9 @@ import type { ToolCall } from "../../define.js";
 import { applied, refused, type ReceiptFields, type ToolReceipt } from "../../receipt.js";
 // A cycle (the registry lists the builders), safe because runTool is only called while a builder runs (master-loop.ts does the same).
 import { runTool } from "../../registry.js";
+import { STYLE_FILES } from "../../../styles/index.js";
+import { styleChecklist, styleFinishCalls } from "../../../styles/recipe.js";
+import { isLookId } from "../../luts.js";
 import { applyProjectState, orphanedPaths } from "../master-loop.js";
 import { aspectOf, visualKind } from "../reels.js";
 
@@ -50,11 +54,18 @@ export interface NextCall {
   why: string;
 }
 
+/** The style a build follows (get_style_tool's recipe): its id and its finish checklist. */
+export interface BuildStyle {
+  id: string;
+  checklist: string[];
+}
+
 export class Composer {
   readonly scratch: ProjectDocument;
   readonly decisions: BuildDecision[] = [];
   readonly warnings: string[] = [];
   readonly next: NextCall[] = [];
+  style: BuildStyle | null = null;
 
   constructor(
     readonly call: ToolCall,
@@ -115,6 +126,44 @@ export class Composer {
     this.next.push({ tool, args, why });
   }
 
+  /**
+   * The style this build follows, read like get_style_tool reads it: the
+   * saved brief's style, else `fallback` (the builder's category). Its own
+   * finish calls (its look, transitions, sound, loudness) fill in the
+   * next calls: the builder's arguments win where both set one, a call only
+   * the style makes goes before master_audio_tool (mastering stays last).
+   * Call it after the builder's own suggestions.
+   */
+  followStyle(fallback: string): void {
+    const files = STYLE_FILES;
+    const brief = readBrief(this.call.doc.project);
+    const briefStyle = brief && !brief.auto ? files.find((f) => f.id === brief.style && f.kind === "style") : undefined;
+    const file = briefStyle ?? files.find((f) => f.id === fallback && f.kind === "style");
+    if (!file) {
+      this.skip("style", `no style ${fallback} in the styles library`);
+      return;
+    }
+    const calls = styleFinishCalls(file, isLookId);
+    for (const { tool, args } of calls) {
+      const mine = this.next.find((n) => n.tool === tool);
+      if (mine) {
+        mine.args = { ...args, ...mine.args };
+        continue;
+      }
+      const why = `the ${file.id} style's ${tool === "unify_grade_tool" ? "look" : tool === "apply_motion_transitions_tool" ? "transitions" : tool === "auto_sound_design_tool" ? "sound" : "loudness"}`;
+      const master = this.next.findIndex((n) => n.tool === "master_audio_tool");
+      this.next.splice(master < 0 || tool === "master_audio_tool" ? this.next.length : master, 0, { tool, args, why });
+    }
+    this.style = { id: file.id, checklist: styleChecklist(file) };
+    this.decisions.push({
+      step: "style",
+      tool: "get_style_tool",
+      outcome: "applied",
+      why: `${briefStyle ? "the brief's style" : "this builder's style"}: its finish calls are in next_calls (${calls.map((c) => c.tool).join(", ") || "none written as calls"}), its checklist in data.style`,
+      args: { style: file.id },
+    });
+  }
+
   /** Nothing lands: the media the steps wrote (and no project keeps) is deleted. */
   async abandon(message: string): Promise<ToolReceipt> {
     const orphans = orphanedPaths(this.scratch.project, [this.call.doc.project]);
@@ -130,7 +179,7 @@ export class Composer {
     return applied(this.tool, summary, {
       ...fields,
       warnings: [...(fields.warnings ?? []), ...collapse(this.warnings)],
-      data: { ...data, decisions: this.decisions, fallbacks: this.decisions.filter((d) => d.outcome !== "applied").length, next_calls: this.next },
+      data: { ...data, ...(this.style ? { style: this.style } : {}), decisions: this.decisions, fallbacks: this.decisions.filter((d) => d.outcome !== "applied").length, next_calls: this.next },
     });
   }
 }
