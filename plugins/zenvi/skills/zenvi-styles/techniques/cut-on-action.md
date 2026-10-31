@@ -24,7 +24,7 @@ Movement carries across the join, so a montage of a process feels continuous.
    pepper"}` and `slice_clip_at_best_match_tool`, or watch the window
    (`watch_clip_window_tool`, `preview_frame`).
 2. Outgoing shot ends 2-4 frames into the gesture; incoming starts at the same
-   phase of the same gesture: `trim_clip_tool {"clip_id", "start_seconds", "end_seconds"}`.
+   phase of the same gesture: `trim_clip_tool {"clip_id": "<clip_id>", "start_seconds": "<start_seconds>", "end_seconds": "<end_seconds>"}`.
 3. Same take, two scales (one camera): duplicate the moment and push the second
    piece in, `set_clip_properties_tool {"properties": {"scale_x": 1.6, "scale_y": 1.6,
    "location_y": -0.05}}`; a scale change of 1.5x or more, else it reads as a jump.

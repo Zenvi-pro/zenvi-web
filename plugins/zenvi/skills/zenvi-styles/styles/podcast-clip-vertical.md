@@ -3,7 +3,7 @@ id: podcast-clip-vertical
 kind: style
 summary: "For a 30-90 s vertical cut of a podcast or interview: one story, picture follows the voice, karaoke captions, name card."
 categories: [podcast-clip-vertical]
-tools: [transcribe_media_tool, get_transcript_tool, diarize_media_tool, remove_silence_tool, split_clip_tool, set_clip_properties_tool, swap_shot_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, add_clip_to_timeline_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool, edit_captions_tool, set_project_setting_tool, unify_grade_tool, analyze_mix_tool]
+tools: [transcribe_media_tool, get_transcript_tool, diarize_media_tool, remove_silence_tool, split_clip_tool, set_clip_properties_tool, swap_shot_tool, kinetic_captions_tool, add_kinetic_title_tool, add_motion_block_tool, add_clip_to_timeline_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, review_render_tool, edit_captions_tool, set_project_setting_tool, unify_grade_tool, analyze_mix_tool]
 pace: medium
 mood: [conversational, candid, informative]
 aspect: ["9:16"]
@@ -74,16 +74,16 @@ pauses (`remove_silence_tool` 0.35 / 0.12) but keep laughs.
 1. `set_project_setting_tool` 1080 x 1920, 30 fps.
 2. `transcribe_media_tool`, `get_transcript_tool {"includeWords": true}`;
    pick the excerpt (claim → turn → answer); trim to it.
-3. `remove_silence_tool {"clipId", "minPauseSec": 0.35, "padSec": 0.12}`.
+3. `remove_silence_tool {"clipId": "<clipId>", "minPauseSec": 0.35, "padSec": 0.12}`.
 4. Ladder: `split_clip_tool` at phrase ends; `set_clip_properties_tool {"properties":
    {"scale_x": 1.5, "scale_y": 1.5, "location_y": 0.1}}` on every other piece
    (or `swap_shot_tool` to the other camera).
 5. One insert: `add_clip_to_timeline_tool {"track": 3, ...}` 1.5-2.5 s at the noun.
-6. `kinetic_captions_tool {"style": "karaoke", "emphasis": [4-6 words], "text_size": 0.08,
+6. `kinetic_captions_tool {"style": "karaoke", "emphasis": ["<4-6 words>"], "text_size": 0.08,
    "y": 0.66, "placement": "style"}` over all picture clips.
 7. `add_kinetic_title_tool {"text": <headline>, "style": "documentary", "animation": "rise",
    "text_size": 0.062, "y": 0.12, "position_seconds": 0.3, "duration_seconds": 4}`.
-8. `add_motion_block_tool {"block": "lower_third", "params": {"name", "role", "accent"}}`
+8. `add_motion_block_tool {"block": "lower_third", "params": {"name": "<name>", "role": "<role>", "accent": "<accent>"}}`
    at the first turn, then `set_clip_properties_tool` location_y -0.42 on its clip.
 9. End card: `add_kinetic_title_tool {"text": <show>, "style": "stack", "animation": "pop",
    "background": "#0d0d0d", "duration_seconds": 1.4}` + `add_sfx_tool impact_thud -16`.

@@ -3,7 +3,7 @@ id: food-recipe
 kind: style
 summary: "For recipes and food stories: dish first, steps cut on the knife and the pour, warm soft grade, foley above the bed."
 categories: [food-recipe]
-tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, add_motion_block_tool, add_kinetic_title_tool, add_timer_tool, set_clip_speed_tool, unify_grade_tool, color_grade_clip_tool, apply_fx_tool, apply_look_tool, add_vignette_tool, add_sfx_tool, search_sound_library_tool, automate_volume_tool, master_audio_tool, render_video, review_render_tool, set_project_setting_tool, analyze_mix_tool]
+tools: [add_clip_to_timeline_tool, trim_clip_tool, gather_stock_footage_tool, add_motion_block_tool, add_kinetic_title_tool, add_timer_tool, set_clip_speed_tool, unify_grade_tool, color_grade_clip_tool, apply_fx_tool, apply_look_tool, add_vignette_tool, add_sfx_tool, search_sound_library_tool, automate_volume_tool, master_audio_tool, review_render_tool, set_project_setting_tool, analyze_mix_tool]
 pace: medium
 mood: [warm, cosy, satisfying, helpful]
 aspect: ["9:16", "1:1", "4:5", "16:9"]

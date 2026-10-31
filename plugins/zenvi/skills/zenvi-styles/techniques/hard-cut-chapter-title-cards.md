@@ -21,9 +21,9 @@ chapter's footage. Structure you can see.
 
 ## Build it in Zenvi
 ```json
-add_kinetic_title_tool {"text": "PREP", "position_seconds": t, "duration_seconds": 1.0,
+add_kinetic_title_tool {"text": "PREP", "position_seconds": "<t>", "duration_seconds": 1.0,
   "style": "stack", "animation": "slam", "background": "#d4141c", "text_size": 0.2}
-add_sfx_tool {"recipe": "impact_slam", "at_seconds": t, "gain_db": -10, "seed": 1}
+add_sfx_tool {"recipe": "impact_slam", "at_seconds": "<t>", "gain_db": -10, "seed": 1}
 ```
 then the chapter's shots from `t + 1.0`. One colour per chapter from the piece's
 palette. Snap `t` to a downbeat (`detect_beats_tool` on the music).

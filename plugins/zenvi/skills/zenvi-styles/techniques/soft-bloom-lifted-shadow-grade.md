@@ -24,7 +24,7 @@ across every clip.
 Per piece, in this order:
 1. One world first: `unify_grade_tool {"timeline_clip_ids": [...], "reference_clip_id":
    "<best clip>", "look": "warm_correction", "look_intensity": 0.5}`.
-2. Lift and roll: `color_grade_clip_tool {"timeline_clip_id", "shadows": 0.12,
+2. Lift and roll: `color_grade_clip_tool {"timeline_clip_id": "<timeline_clip_id>", "shadows": 0.12,
    "highlights": -0.2, "contrast": -0.1}` per clip (`timeline_clip_ids` for all).
 3. Bloom, gently (CLI/local FX):
    ```json

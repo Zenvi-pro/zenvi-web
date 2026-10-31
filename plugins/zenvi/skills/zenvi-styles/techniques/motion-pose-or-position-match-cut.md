@@ -3,7 +3,7 @@ id: motion-pose-or-position-match-cut
 kind: technique
 summary: "When two shots share a pose, path or position: align the subject across the cut and cut on the motion peak."
 categories: [fitness-lifestyle, flash-cut-match-cut-edit, travel-cinematic-montage, video-essay-explainer]
-tools: [align_match_cut_tool, match_cut_montage_tool, detect_subject_tool, preview_frame, swap_shot_tool, unify_grade_tool, trim_clip_tool]
+tools: [align_match_cut_tool, match_cut_montage_tool, detect_subject_tool, swap_shot_tool, unify_grade_tool, trim_clip_tool]
 pace: medium
 mood: [crafted, satisfying, flowing]
 aspect: ["9:16", "16:9", "1:1", "4:5"]
@@ -23,7 +23,7 @@ of them is a match-cut montage.
 ## Build it in Zenvi
 1. Pick pairs that already share direction and pose (both running away from
    camera, both mid-stride on the same leg). Selection is most of it.
-2. Boxes: round subjects: `detect_subject_tool {"clip_id"}` (circles only).
+2. Boxes: round subjects: `detect_subject_tool {"clip_id": "<clip_id>"}` (circles only).
    People: read the box off `preview_frame {"grid": true}` at the cut frames
    (top-left x, y, w, h as 0-1 of the frame); `body-pose-anchor-detect` is missing.
 3. ```json

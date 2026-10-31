@@ -3,7 +3,7 @@ id: screen-capture-zoom-onto-the-number
 kind: technique
 summary: "When proof is a metric on a screen: push in onto the number in 0.3-0.4 s with a swoosh, hold it 1 s."
 categories: [ugc-ad-testimonial, vfx-tutorial-breakdown]
-tools: [set_keyframes_tool, add_clip_to_timeline_tool, add_motion_block_tool, add_sfx_tool, preview_frame]
+tools: [set_keyframes_tool, add_clip_to_timeline_tool, add_motion_block_tool, add_sfx_tool]
 pace: fast
 mood: [credible, punchy, informative]
 aspect: ["9:16", "4:5", "1:1", "16:9"]
@@ -20,7 +20,7 @@ holds for a beat, then the frame punches in onto the one number that matters
 and holds it; 1.3-1.5 s per proof shot, a swoosh per push.
 
 ## Build it in Zenvi
-1. Place the capture: `add_clip_to_timeline_tool {"file_id", "position_seconds",
+1. Place the capture: `add_clip_to_timeline_tool {"file_id": "<file_id>", "position_seconds": "<position_seconds>",
    "duration_seconds": 4}` (images need `duration_seconds`).
 2. Find the number's centre on a `preview_frame {"grid": true}`: (px, py), 0-1.
 3. Zoom by `s` about the frame centre and offset so the number lands centre:

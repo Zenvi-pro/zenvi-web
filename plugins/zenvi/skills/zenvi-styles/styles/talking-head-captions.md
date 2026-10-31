@@ -3,7 +3,7 @@ id: talking-head-captions
 kind: style
 summary: "For a creator speaking to camera (advice, story, hot take): tight speech, word-synced captions, noun B-roll, punch-ins."
 categories: [talking-head-captions]
-tools: [remove_silence_tool, remove_words_tool, transcribe_media_tool, get_transcript_tool, split_clip_tool, set_clip_properties_tool, gather_stock_footage_tool, add_clip_to_timeline_tool, unify_grade_tool, kinetic_captions_tool, add_kinetic_title_tool, generate_subject_matte_tool, text_behind_subject_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, render_video, review_render_tool, set_project_setting_tool, analyze_mix_tool]
+tools: [remove_silence_tool, remove_words_tool, transcribe_media_tool, get_transcript_tool, split_clip_tool, set_clip_properties_tool, gather_stock_footage_tool, add_clip_to_timeline_tool, unify_grade_tool, kinetic_captions_tool, add_kinetic_title_tool, generate_subject_matte_tool, text_behind_subject_tool, add_sfx_tool, duck_under_speech_tool, master_audio_tool, review_render_tool, set_project_setting_tool, analyze_mix_tool]
 pace: fast
 mood: [direct, energetic, confident]
 aspect: ["9:16", "4:5"]
@@ -77,7 +77,7 @@ No transcript (TTS or script only): cues per phrase in timeline seconds.
 ## Tool sequence
 1. `set_project_setting_tool` width 1080 height 1920 fps 30.
 2. A-roll on track 1; `remove_words_tool {"fillerPreset": "english_fillers"}`
-   (after `transcribe_media_tool`), `remove_silence_tool {"clipId", "minPauseSec":
+   (after `transcribe_media_tool`), `remove_silence_tool {"clipId": "<clipId>", "minPauseSec":
    0.35, "padSec": 0.12}`; first word at frame 0.
 3. `get_transcript_tool {"includeWords": true}`; list sentence ends and 4-9
    trigger nouns.
@@ -91,8 +91,8 @@ No transcript (TTS or script only): cues per phrase in timeline seconds.
 6. `unify_grade_tool {"timeline_clip_ids": [all picture], "reference_clip_id": <A-roll>,
    "look": "warm_pop", "look_intensity": 0.35}`.
 7. Optional: `generate_subject_matte_tool` on the A-roll (CLI/cloud).
-8. `kinetic_captions_tool {"timeline_clip_ids": [all picture], "style": "creator",
-   "animation": "pop", "emphasis": [3-6 words], "text_size": 0.06, "y": 0.64,
+8. `kinetic_captions_tool {"timeline_clip_ids": ["<all picture>"], "style": "creator",
+   "animation": "pop", "emphasis": ["<3-6 words>"], "text_size": 0.06, "y": 0.64,
    "placement": "style"}` (with a matte: leave `placement` and `y` out).
 9. `add_kinetic_title_tool {"text": <hook topic>, "style": "creator", "emphasis":
    [1 word], "text_size": 0.05, "y": 0.14, "position_seconds": 0, "duration_seconds": 3}`.

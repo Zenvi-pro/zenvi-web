@@ -24,7 +24,7 @@ unit repeats metronomically, about 7 s each.
 Per unit at time `t`:
 ```json
 add_clip_to_timeline_tool {"file_id": "<object>", "position_seconds": t, "start_seconds": 1, "end_seconds": 3.4}
-add_kinetic_title_tool {"text": "a — adornment", "position_seconds": t + 0.2, "duration_seconds": 2.0,
+add_kinetic_title_tool {"text": "a — adornment", "position_seconds": "<t + 0.2>", "duration_seconds": 2.0,
   "style": "documentary", "animation": "typewriter", "text_size": 0.075, "y": 0.1}
 ```
 then three looks of 1.5-2 s each (`add_clip_to_timeline_tool`), ordered close →
