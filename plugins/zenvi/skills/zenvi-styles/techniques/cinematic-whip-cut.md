@@ -26,7 +26,7 @@ Related shot card: `shot-shot-transitions` (whip-pan, brake style).
 
 1. One cut: `apply_motion_transition_tool` `{"preset": "whip", "clip1_id": "<outgoing>",
    "direction": "left"}` (8 frames at 30 fps by default; `duration` 0.2-0.35 s, `intensity` 1).
-2. Several cuts with one direction: `apply_motion_transitions_tool` (same preset; it keeps the
+2. Several cuts with one direction: `apply_motion_transitions_tool` with `track` set to the cut's track (same preset; it keeps the
    track's direction).
 3. Sound on the cut frame: `add_sfx_tool` `{"recipe": "whip", "at_seconds": <cut>}` (peaks on
    the cut; vary `seed`), or `whoosh_short` with `pan` following the direction (left whip:

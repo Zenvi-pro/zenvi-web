@@ -17,7 +17,7 @@ documentary, wedding, automotive, music video). Read this before borrowing more 
 Hard rules:
 - One grade per piece (a second only as a deliberate section: a duotone opener, a day-for-night
   scene). Two grades stacked on the same clip always lost in testing.
-- Warm texture (`light-leak`, `warm-nostalgia`) never with a cold grade (`cold-thriller`,
+- Warm treatment (`light-leak` texture, `warm-nostalgia` grade) never with a cold grade (`cold-thriller`,
   `day-for-night`, `bleach-bypass`).
 - Calm grammar (`j-l-cut`, `title-sequence`, `rack-focus`, `dolly-zoom`) is not cut into a
   `montage-rhythm` fast section or across a `whip-cut`; it lives in the slow acts.
