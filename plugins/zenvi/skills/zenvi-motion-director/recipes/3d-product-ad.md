@@ -89,7 +89,7 @@ set_keyframes_tool {"timeline_clip_id": "<product still>", "property": "scale_x"
 ## Finish (every run, in this order; never skip it)
 
 1. Sound on every cut: step 7 above (each scene change and the landing has its sound).
-2. `master_audio_tool` `{"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}` (fixes what analyze_mix_tool finds, then masters), after the last audio change (any later
+2. `master_audio_tool` `{"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}` (fixes what analyze_mix_tool finds, then masters), after the last audio change (any later
    audio edit means mastering again).
 3. `render_video`, then `review_render_tool` `{"path": "<the file>", "loudness_target_lufs": -16}`.
 4. One fix pass: every `PROBLEM` line with the tool it names (a repeated

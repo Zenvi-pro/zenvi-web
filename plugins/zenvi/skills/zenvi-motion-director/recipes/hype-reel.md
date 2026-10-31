@@ -43,7 +43,9 @@ fixing single shots after it.
    of the busiest 3 s (the receipt warns with the number it needs: import
    that many and rebuild with `replace: true`). Music: aggressive trap/house
    120-160 bpm with a clear drop.
-2. Cut: `build_reel_tool` `style: "hype"`, `file_ids` in story order (the
+2. Cut: `build_reel_tool` `style: "hype"`, `file_ids` in story order
+   (`sequence_shots_tool` `dry_run: true`, `arc: "build"` gives one: motion
+   carried across the cuts, energy rising, the strongest shot last; the
    last is the payoff; leave it out and the clips that fit the look open and
    close the reel), `music_file_id`, `duration_seconds`, `hook` (1-3
    words), `end_card` (1-2 words: one line gets the echo). It does the

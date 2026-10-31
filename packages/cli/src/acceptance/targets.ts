@@ -133,7 +133,7 @@ export async function startPortable(options: PortableOptions): Promise<McpTarget
       ZENVI_MCP_ENGINE: "portable",
       ZENVI_MCP_ADOBE: "off",
       ZENVI_MCP_HANDOFF: "off",
-      // A scripted scenario, not an agent: it has no brief to compile (mcp/brief-note.ts).
+      // A scripted scenario, not an agent: no auto brief in its receipts (mcp/brief-note.ts).
       ZENVI_MCP_BRIEF: "off",
       ZENVI_NO_BROWSER: "1",
       ...options.env,

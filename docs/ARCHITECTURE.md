@@ -93,6 +93,7 @@ src/titles/      title templates (SVG) + text substitution
 src/render/      frame planner (Project × frame → FramePlan), audio planner, effect kernels (RGBA),
                  CPU compositor (reference implementation, used by render-node)
 src/fx/          Zenvi FX: footage effect catalog, ffmpeg filtergraphs, zenvi-fx links (docs/FX.md)
+src/tracking/    point/box/surface tracker (pyramidal Lucas-Kanade, forward-backward checks), screen activity, guide graphics
 src/tools/       tool catalog (zod schemas + handlers + host capability interfaces)
 src/io/          parse/validate/migrate project JSON, path/media resolution, export presets
 ```
@@ -315,7 +316,9 @@ replies with `tool_result`.
 
 ## 8. Out of scope for the first release (tracked in `docs/ROADMAP.md`)
 
-- OpenCV effects (stabilizer, tracker, object detection/AI masking) in the browser.
+- OpenCV effects (stabilizer, object detection/AI masking) in the browser. Tracking
+  does not need them: the engine's own tracker (`src/tracking/`) reads frames through
+  `FrameHost` on every surface and its tools write ordinary transform keyframes.
 - Blender animated titles.
 - Real-time multi-user collaboration (the cloud keeps last-writer-wins with
   revision checks; conflicts ask the user).

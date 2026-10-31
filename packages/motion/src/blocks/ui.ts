@@ -1,7 +1,7 @@
 /** UI pieces several blocks share: a pointer that moves and clicks, and small icons. */
 
 import type { PictureEventKind } from "@zenvi/engine";
-import type { BlockContext } from "../runtime/index.js";
+import { textLines, type BlockContext } from "../runtime/index.js";
 
 export const ICONS = {
   arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
@@ -81,12 +81,11 @@ export interface RichRun {
 }
 
 /**
- * Lines of runs from the rich text blocks take: `/` or a newline breaks a
- * line, `*words*` are emphasised.
+ * Lines of runs from the rich text blocks take: a newline or a slash with a
+ * space beside it breaks a line (textLines), `*words*` are emphasised.
  */
 export function parseRich(text: string): RichRun[][] {
-  return text
-    .split(/\s*(?:\/|\n)\s*/)
+  return textLines(text)
     .filter((line) => line.trim().length > 0)
     .map((line) => {
       const runs: RichRun[] = [];
@@ -130,4 +129,17 @@ export function onColor(bg: string): string {
   const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
   // Contrast against white (1.05 / (l + 0.05)) vs black ((l + 0.05) / 0.05).
   return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
+}
+
+/** #rgb (and #rgba) as #rrggbb, the form mixHex reads; longer forms unchanged. */
+function sixDigits(c: string): string {
+  return /^#[0-9a-f]{3,4}$/i.test(c) ? `#${[...c.slice(1, 4)].map((d) => d + d).join("")}` : c;
+}
+
+/** Two colours (#rgb, #rrggbb or #rrggbbaa; alpha ignored) mixed, `k` of the way from a to b, as #rrggbb. */
+export function mixHex(a: string, b: string, k: number): string {
+  const pa = parseInt(sixDigits(a).slice(1, 7), 16);
+  const pb = parseInt(sixDigits(b).slice(1, 7), 16);
+  const ch = (s: number): number => Math.round(((pa >> s) & 255) * (1 - k) + ((pb >> s) & 255) * k);
+  return `#${[16, 8, 0].map((s) => ch(s).toString(16).padStart(2, "0")).join("")}`;
 }

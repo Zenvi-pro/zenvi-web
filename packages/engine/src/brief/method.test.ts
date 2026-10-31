@@ -3,7 +3,7 @@ import { METHOD } from "../tools/test-support/brief-fixture.js";
 import { briefSchema, type Brief } from "./brief.js";
 import { DIRECTION_AXES, drawDirection, methodProblems, repeatedAxes } from "./method.js";
 
-const base = { goal: "g", platform: "Reels", aspect: "9:16", length_seconds: 12, style: "hype-reel", hook: "h", beats: [{ start: 0, end: 12, name: "all" }] };
+const base = { goal: "g", platform: "Reels", aspect: "9:16", length_seconds: 24, style: "hype-reel", hook: "h", beats: [{ start: 0, end: 24, name: "all" }] };
 const brief = (extra: Record<string, unknown> = {}): Brief => briefSchema.parse({ ...base, ...METHOD, ...extra });
 
 describe("the motif method's rules", () => {
@@ -11,8 +11,10 @@ describe("the motif method's rules", () => {
     expect(methodProblems(brief())).toEqual([]);
   });
 
-  it("leaves a quick edit under 6 s alone", () => {
-    expect(methodProblems(briefSchema.parse({ ...base, length_seconds: 5 }))).toEqual([]);
+  it("advises only from 20 s, or when asked", () => {
+    const short = briefSchema.parse({ ...base, length_seconds: 19, beats: [{ start: 0, end: 19, name: "all" }] });
+    expect(methodProblems(short)).toEqual([]);
+    expect(methodProblems(short, { force: true }).join(" ")).toContain("motifs: 0 of the 8-12");
   });
 
   it("asks for motifs, a through-line, a storyboard, the reskin test and a draw", () => {

@@ -132,34 +132,43 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(readBrief(doc.project)?.beats[1]!.start).toBe(3);
   });
 
-  it("refuses a beat that ends before it starts or starts past the end, and more than four techniques, without an undo step", async () => {
+  it("refuses beats out of order, ending before they start or after the length, and more than four techniques, without an undo step", async () => {
     const doc = bin();
     const ctx = { doc, host: fakeHost() as ToolHost };
     const backwards = await runTool(ctx, "save_brief_tool", { ...BRIEF, beats: [{ start: 2, end: 1, name: "hook" }] });
     expect(backwards.data!.summary).toMatch(/Error: beat "hook" ends at 1 s/);
-    const late = await runTool(ctx, "save_brief_tool", { ...BRIEF, beats: [{ start: 7, end: 8, name: "hook" }] });
-    expect(late.data!.summary).toMatch(/past the brief's 6 s/);
+    const late = await runTool(ctx, "save_brief_tool", { ...BRIEF, beats: [{ start: 0, end: 4, name: "hook" }, { start: 4, end: 8, name: "drop" }] });
+    expect(late.data!.summary).toMatch(/beat "drop" ends at 8 s, past the brief's 6 s/);
+    const unordered = await runTool(ctx, "save_brief_tool", { ...BRIEF, beats: [{ start: 3, end: 6, name: "drop" }, { start: 0, end: 3, name: "hook" }] });
+    expect(unordered.data!.summary).toMatch(/beat "hook" starts at 0 s, before "drop" \(3 s\): list the beats in order/);
     const five = Array.from({ length: 5 }, (_, i) => ({ id: `t${i}`, why: "because" }));
     expect((await runTool(ctx, "save_brief_tool", { ...BRIEF, techniques: five })).ok).toBe(false);
     expect(doc.undoLabels).toEqual(["fixture"]);
   });
 
-  it("refuses a whole-video brief that breaks the motif method, with every fix listed, and records nothing", async () => {
+  it("saves a brief that skips the motif method: advice from 20 s or when asked, never a refusal", async () => {
     const doc = bin();
-    const out = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, motifs: ["sole"], reskin: { generic: 4 } });
-    expect(out.data!.status).toBe("refused");
-    expect(out.data!.summary).toMatch(/^Error: not a plan yet, nothing saved/);
-    expect(out.data!.summary).toContain("motifs: 1 of the 8-12");
-    expect(out.data!.summary).toContain("4 of 5 shots would work for any subject");
-    expect(doc.undoLabels).toEqual(["fixture"]);
+    const ctx = { doc, host: fakeHost() as ToolHost };
+    const minimal = { goal: "g", platform: "Reels", aspect: "9:16", length_seconds: 6, style: "hype-reel", hook: "h", beats: [{ start: 0, end: 6, name: "all" }] };
+    const quick = await runTool(ctx, "save_brief_tool", minimal);
+    expect(quick.data!.status).toBe("applied");
+    expect(quick.data!.warnings.join(" ")).not.toContain("motif method");
+    const asked = await runTool(ctx, "save_brief_tool", { ...minimal, hook: "h2", check_method: true });
+    expect(asked.data!.status).toBe("applied");
+    expect(asked.data!.warnings.join(" ")).toMatch(/^Advice, the motif method \(BRIEF.md 4-6; saved anyway\): motifs: 0 of the 8-12/);
+    expect(readBrief(doc.project)).not.toHaveProperty("check_method");
+    const long = await runTool(ctx, "save_brief_tool", { ...minimal, length_seconds: 30, beats: [{ start: 0, end: 30, name: "all" }] });
+    expect(long.data!.status).toBe("applied");
+    expect(long.data!.warnings.join(" ")).toContain("storyboard: 0 rows");
+    expect(doc.undoLabels).toEqual(["fixture", "Save brief", "Save brief", "Save brief"]);
   });
 
-  it("warns about a thin brief: no shots, no technique, no critique", async () => {
+  it("an agent's brief replaces the auto one and is never marked auto", async () => {
     const doc = bin();
-    const thin = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, shots: [], techniques: [] });
-    expect(thin.data!.warnings.join(" ")).toContain("A thin brief (no borrowed technique, no self-critique)");
-    const full = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, critique: "Moved the logo off the hook" });
-    expect(full.data!.warnings.join(" ")).not.toContain("thin brief");
+    doc.setUntracked(["settings"], { zenvi_brief: { ...BRIEF, auto: true } });
+    await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, auto: true, hook: "a new hook" });
+    expect(readBrief(doc.project)?.auto).toBeUndefined();
+    expect(readBrief(doc.project)?.hook).toBe("a new hook");
   });
 
   it("warns when the shot plan names a file the bin does not have", async () => {

@@ -8,9 +8,10 @@ import { readPictureEvents, type PictureEvent } from "@zenvi/engine";
 import { BLOCKS } from "../catalog.js";
 import { checkParams } from "../params.js";
 import { createContext, pictureEvents, type BlockBuild } from "../runtime/index.js";
+import { mixHex } from "./ui.js";
 
 /** Blocks that draw only into a canvas, which jsdom does not paint. */
-const CANVAS_ONLY = new Set(["gradient_field", "ripple_logo", "line_trails"]);
+const CANVAS_ONLY = new Set(["gradient_field", "ripple_logo", "line_trails", "kinetic_cut_scene"]);
 
 /** The root's HTML with each style attribute's declarations sorted (setting a property again may move it). */
 function normalized(root: HTMLElement): string {
@@ -83,6 +84,13 @@ describe.each(BLOCKS.map((b) => [b.id, b] as const))("%s", (id, manifest) => {
     expect(await eventsOf()).toEqual(events);
     // Backgrounds may stay silent; everything else has something to hear.
     if (id !== "gradient_field") expect(events.length).toBeGreaterThan(0);
+  });
+});
+
+describe("mixHex", () => {
+  it("reads #rgb as #rrggbb (#f00 was read as #000f00)", () => {
+    expect(mixHex("#f00", "#000000", 0)).toBe("#ff0000");
+    expect(mixHex("#ff000080", "#00f", 0.5)).toBe("#800080");
   });
 });
 

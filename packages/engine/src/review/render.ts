@@ -9,6 +9,7 @@
  * Repeated shots are found by a difference hash of each shot's middle frame.
  */
 
+import { cosine, NEAR_DUPLICATE, type Vector } from "../shots/vectors.js";
 import type { RenderInspection, RenderInspectOptions, TimeRange } from "../tools/types.js";
 
 /** Detector thresholds review_render_tool asks the host for. */
@@ -59,11 +60,18 @@ export type ProblemKind =
   | "black_frames"
   | "frozen_picture"
   | "repeated_shot"
+  | "near_duplicate_shots"
   | "true_peak"
   | "loudness"
   | "silent_audio"
   | "no_audio"
-  | "audio_dropout";
+  | "audio_dropout"
+  // The rhythm checks of a fast-cut edit (review/rhythm.ts).
+  | "uniform_shot_lengths"
+  | "static_shot"
+  | "flat_brightness"
+  | "flat_hue"
+  | "cut_without_sound";
 
 export interface Problem {
   kind: ProblemKind;
@@ -158,6 +166,42 @@ export function differenceHash(image: { width: number; height: number; data: Arr
   return hex;
 }
 
+/** A frame this much one flat or smoothly shaded ground (a type card, a graphic) is not compared as footage. */
+const GROUND_SHARE = 0.7;
+/** Neighbouring pixels closer than this (0-255 grey) are smooth ground; footage has grain and texture. */
+const SMOOTH_STEP = 3;
+// Measured: strobe cards on a vignetted ground 0.74-0.77, stock footage at most 0.57.
+const SMOOTH_SHARE = 0.7;
+
+/**
+ * Whether an image is a graphic on a ground, not footage: at least
+ * GROUND_SHARE of its pixels within a few levels of the commonest grey, or
+ * SMOOTH_SHARE of them no different from their right and lower neighbours
+ * (a vignette, a gradient). Two centred words on the same ground hash alike;
+ * they are not the same footage.
+ */
+export function flatGround(image: { width: number; height: number; data: ArrayLike<number> }): boolean {
+  const { width, height, data } = image;
+  const n = width * height;
+  if (n === 0) return false;
+  const grey = new Float64Array(n);
+  const bins = new Float64Array(64);
+  for (let k = 0; k < n; k += 1) {
+    grey[k] = 0.299 * data[k * 4]! + 0.587 * data[k * 4 + 1]! + 0.114 * data[k * 4 + 2]!;
+    bins[Math.min(63, Math.floor(grey[k]! / 4))]! += 1;
+  }
+  let best = 0;
+  for (let b = 0; b < 64; b += 1) best = Math.max(best, (bins[b - 1] ?? 0) + bins[b]! + (bins[b + 1] ?? 0));
+  if (best / n >= GROUND_SHARE) return true;
+  let smooth = 0;
+  for (let y = 0; y + 1 < height; y += 1)
+    for (let x = 0; x + 1 < width; x += 1) {
+      const k = y * width + x;
+      if (Math.abs(grey[k]! - grey[k + 1]!) < SMOOTH_STEP && Math.abs(grey[k]! - grey[k + width]!) < SMOOTH_STEP) smooth += 1;
+    }
+  return smooth / Math.max(1, (width - 1) * (height - 1)) >= SMOOTH_SHARE;
+}
+
 /** Bits that differ between two difference hashes. */
 export function hashDistance(a: string, b: string): number {
   let bits = 0;
@@ -181,9 +225,10 @@ export interface RepeatGroup {
 /**
  * Shots that show the same picture: middle frames within REPEAT_DISTANCE,
  * not counting neighbours (two halves of one shot split by a false cut).
- * A flat frame (black, a solid card) has no structure to compare and is left out.
+ * A flat frame (black, a solid card) has no structure to compare and is left
+ * out, and so is a frame that is mostly one flat ground (`graphic`: type on a card).
  */
-export function repeatedShots(shots: readonly Shot[], hashes: readonly (string | null)[]): RepeatGroup[] {
+export function repeatedShots(shots: readonly Shot[], hashes: readonly (string | null)[], graphic: readonly boolean[] = []): RepeatGroup[] {
   const parent = shots.map((_, i) => i);
   const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
   const usable = (h: string | null | undefined): h is string => Boolean(h) && h !== "0000000000000000" && h !== "ffffffffffffffff";
@@ -191,6 +236,7 @@ export function repeatedShots(shots: readonly Shot[], hashes: readonly (string |
     for (let j = i + 2; j < shots.length; j += 1) {
       const a = hashes[i];
       const b = hashes[j];
+      if (graphic[i] || graphic[j]) continue;
       if (usable(a) && usable(b) && hashDistance(a, b) <= REPEAT_DISTANCE) parent[find(j)] = find(i);
     }
   }
@@ -216,6 +262,7 @@ export function renderProblems(
   repeats: readonly RepeatGroup[],
   end: EndVerdict,
   targets: DeliveryTargets = SOCIAL_TARGETS,
+  looks?: readonly (Vector | null)[],
 ): Problem[] {
   const { duration } = inspection;
   const timed: Problem[] = [];
@@ -267,6 +314,22 @@ export function renderProblems(
     for (const silence of inspection.silences) {
       if (silence.start <= EDGE_SECONDS || tail(silence)) continue;
       timed.push({ kind: "audio_dropout", severity: "warning", at: r2(silence.start), message: `audio drops out ${fmt(silence.start)}–${fmt(silence.end)}` });
+    }
+  }
+  // Back-to-back shots that look the same (shot embeddings of each shot's middle frame): the cut reads as a jump.
+  if (looks) {
+    for (let i = 1; i < shots.length; i += 1) {
+      const a = looks[i - 1];
+      const b = looks[i];
+      if (!a || !b) continue;
+      const similarity = cosine(a, b);
+      if (similarity < NEAR_DUPLICATE) continue;
+      timed.push({
+        kind: "near_duplicate_shots",
+        severity: "warning",
+        at: r2(shots[i]!.start),
+        message: `shots ${shots[i - 1]!.index} and ${shots[i]!.index} look almost the same (similarity ${similarity.toFixed(2)}): the cut at ${fmt(shots[i]!.start)} reads as a jump, not a new shot`,
+      });
     }
   }
   if (!end.ok)

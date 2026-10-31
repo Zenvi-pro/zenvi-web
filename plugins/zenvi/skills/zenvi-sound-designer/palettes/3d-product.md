@@ -2,7 +2,7 @@
 
 Design: `auto_sound_design_tool` `{"genre": "product_3d"}` - scene events
 (spins, lands, bursts) are on the sheet.
-Score / master: `"genre": "3d_product"`.
+Score / master: `"genre": "product_3d"`.
 
 - Sound design is foregrounded over a minimal, premium bed: weighty air
   whooshes on spins, a soft low impact on the landing one frame late (sub +
