@@ -276,7 +276,7 @@ const SPECS: Record<string, Spec> = {
   separate_clip_audio_tool: {
     happy: {
       args: { timeline_clip_ids: IDS.clipB },
-      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) on track\(s\) 1; the originals are muted\.$/,
+      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) \([A-Z0-9]{10}\) on track\(s\) 1; the originals are muted\.$/,
       check: ({ receipt }) => expect(receipt.createdTracks).toHaveLength(1),
     },
     failure: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Error: 'logo\.png' has no audio to separate$/ },
@@ -1160,6 +1160,52 @@ const SPECS: Record<string, Spec> = {
       check: ({ host }) => expect(host.calls).toContain("inspectRender /out/reel.mp4"),
     },
     failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for review_render_tool/ },
+  },
+  watch_render_tool: {
+    happy: {
+      args: { path: "/out/reel.mp4", brief: "a reel" },
+      summary: /^Watched \/out\/reel\.mp4 \(8\.00s, with sound\) via the Zenvi backend: overall 5\/10, would not post yet\. Watched for "a reel"\./,
+      check: ({ host }) => expect(host.calls).toContain("watch /out/reel.mp4"),
+    },
+    failure: { args: { path: "" }, status: "refused", summary: /^Error: pass either path \(the rendered file\) or render_id/ },
+  },
+  fork_project_tool: {
+    happy: {
+      args: { name: "fast-cuts" },
+      summary: /^Kept the edit \(\d+ clips\) as variant "fast-cuts" at \/projects\/current-fast-cuts\.zvn\. The open project is unchanged\./,
+      check: ({ host, receipt }) => {
+        expect(host.calls).toContain("saveCopy /projects/current-fast-cuts.zvn");
+        expect(receipt.undoSteps).toBe(0);
+      },
+    },
+    failure: { args: { name: "Fast Cuts" }, status: "refused", summary: /^Error: Invalid arguments for fork_project_tool/ },
+  },
+  compare_renders_tool: {
+    happy: {
+      args: { a: "/out/a.mp4", b: "/out/b.mp4" },
+      // The fake judge prefers whichever render is shown first: both orders disagree, the scores tie, a is kept.
+      summary: /^\/out\/a\.mp4 is the better edit \(a tie in both orders and scores; margin \+0 for \/out\/a\.mp4\)\./,
+      check: ({ host }) => expect(host.calls.filter((c) => c.startsWith("compare "))).toEqual(["compare /out/a.mp4 /out/b.mp4", "compare /out/b.mp4 /out/a.mp4"]),
+    },
+    failure: { args: { a: "/out/a.mp4", b: "/out/a.mp4" }, status: "refused", summary: /same render/ },
+  },
+  pick_best_variant_tool: {
+    happy: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      setup: (doc, host) => {
+        host.storage!.readCopy = async (path) => ({ ...structuredClone(doc.project), clips: path.endsWith("a.zvn") ? [] : doc.project.clips });
+      },
+      summary: /^Best of 2: a\.zvn \(\/out\/a\.mp4\)\. a\.zvn is now the open project/,
+      check: ({ doc, receipt }) => {
+        expect(doc.project.clips).toEqual([]);
+        expect(receipt.undoSteps).toBe(1);
+      },
+    },
+    failure: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      status: "refused",
+      summary: /^Error: could not open variant a\.zvn/,
+    },
   },
   swap_shot_tool: {
     happy: {

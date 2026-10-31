@@ -28,12 +28,13 @@ import { installedFontFamilies } from "../svg/fonts.js";
 import { createNodeMatteHost } from "../matte/host.js";
 import { onnxRuntimeAvailable, rvmModel, type MatteModel } from "../matte/rvm.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
+import { createNodeWatchHost } from "./watch.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createSfxGenerator } from "./sfx-generate.js";
 import { cacheDir } from "../svg/fonts.js";
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
-import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
+import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile, writeProjectCopy } from "./files-out.js";
 import { createNodeScenes3d } from "./scenes3d.js";
 import { createNodeFx } from "./fx.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
@@ -237,6 +238,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         return file;
       },
       writeBytes: (p, bytes, _contentType, opts) => writeBytesFile(inProject(p), bytes, opts?.overwrite),
+      readCopy: (p) => readProjectFile(inProject(p)),
+      saveCopy: (project, p, opts) => writeProjectCopy(inProject(p), project, { engineAssetsDir: assets, overwrite: opts?.overwrite }),
       exportMedia: (file, name, folder, render) =>
         exportMediaFile({
           source: resolveMedia(String(file.path ?? "")),
@@ -312,5 +315,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     };
     if (local) host.audio!.transcribesOnDevice = true;
   }
+  // Watching a render with sound: the backend as the person `zenvi login` signed in, or a developer Gemini key.
+  const watch = createNodeWatchHost({ env: options.env, backend: options.backend, resolvePath: exportPath, signal: options.signal });
+  if (watch) host.watch = watch;
   return host;
 }

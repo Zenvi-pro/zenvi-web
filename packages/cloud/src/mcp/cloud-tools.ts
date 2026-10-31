@@ -20,6 +20,7 @@ import { snapKlingDuration, t2vDims } from "../generation/service.js";
 import { isAudioRenderFormat, PRESET_NAMES, PRESETS, type PresetName, RENDER_FORMATS } from "../render/options.js";
 import type { RenderJobView } from "../render/service.js";
 import { defineTool } from "./define.js";
+import { cloudCapabilities } from "./host.js";
 import { checkProjectId, editProject, resolveProjectId } from "./projects.js";
 import type { McpCallContext, McpTool } from "./types.js";
 import { EDITOR_META_KEY, editorWidgetToolMeta, type EditorSessionMeta } from "./editor-widget.js";
@@ -409,6 +410,12 @@ function renderData(job: RenderJobView): z.infer<typeof renderStatusShape> {
   };
 }
 
+/** The watch to suggest once a video render is done, where this server can watch (watch_render_tool by render_id). */
+function watchHint(ctx: McpCallContext, job: RenderJobView): string {
+  if (job.status !== "done" || isAudioRenderFormat(job.format) || job.format === "gif" || !cloudCapabilities(ctx.services).has("watch")) return "";
+  return ` Then watch_render_tool ${JSON.stringify({ render_id: job.renderId })} once, so an editor watches it with sound and names what to fix.`;
+}
+
 function renderText(job: RenderJobView): string {
   switch (job.status) {
     case "queued":
@@ -469,7 +476,7 @@ const renderProject = defineTool({
     // What the director's finish still owes the edit (grade, transitions, sound design, master), with the calls: agents act on receipts.
     const gaps = isAudioRenderFormat(format) ? [] : finishGaps(project);
     const finish = gaps.length > 0 ? ` Not finished: ${gaps.map((g) => g.kind).join(", ")} missing. ${finishLines(gaps).join(" ")}` : "";
-    return { text: `${renderText(view)}${notes}${finish}`, data: { ...renderData(view), notes: job.notes } };
+    return { text: `${renderText(view)}${watchHint(ctx, view)}${notes}${finish}`, data: { ...renderData(view), notes: job.notes } };
   },
 });
 
@@ -491,7 +498,7 @@ const getRenderStatus = defineTool({
   async run(ctx, input) {
     if (!/^r_[a-z0-9]{16}$/.test(input.render_id)) throw new ApiError(400, "invalid_request", "render_id looks like r_… (from render_project).");
     const job = await ctx.services.renders.waitFor(ctx.principal.userId, input.render_id, (input.wait_seconds ?? 20) * 1000, ctx.signal);
-    return { text: renderText(job), data: renderData(job) };
+    return { text: `${renderText(job)}${watchHint(ctx, job)}`, data: renderData(job) };
   },
 });
 

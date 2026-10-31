@@ -198,35 +198,7 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
     .action(async (timeArg: string, outputArg: string | undefined, flags: { width: string; jpeg?: boolean; grid?: boolean }) => {
       const seconds = parseTime(timeArg)!;
       const format = flags.jpeg || /\.jpe?g$/i.test(outputArg ?? "") ? "jpeg" : "png";
-      const output = path.resolve(ctx.cwd, outputArg ?? `frame-${seconds.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`);
-      await withExecutor(ctx, async (executor) => {
-        let data: string;
-        let mimeType: string;
-        if (executor instanceof PortableExecutor) {
-          const project = executor.session.doc.project;
-          const width = Math.min(Number(flags.width) || 1280, 8192);
-          const fps = project.fps.num / project.fps.den;
-          const image = await executor.session.host.frames!.renderFrame(project, seconds, {
-            width,
-            format,
-            overlay: flags.grid ? { grid: true, caption: frameCaption(Math.floor(seconds * fps + 1e-9), seconds) } : undefined,
-          });
-          data = image.data;
-          mimeType = image.mimeType;
-        } else {
-          const outcome = await executor.call("inspect_timeline_tool", { start: seconds, end: seconds, maxFrames: 1 });
-          if (!outcome.ok || outcome.images.length === 0) {
-            printOutcome(ctx, outcome);
-            ctx.exitCode = 1;
-            return;
-          }
-          data = outcome.images[0]!.data;
-          mimeType = outcome.images[0]!.mimeType;
-        }
-        await writeFile(output, Buffer.from(data, "base64"));
-        if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output}`, engine: executor.engine, project: executor.project ?? null, file: output, mimeType, seconds });
-        else ctx.out.line(`${ctx.out.style("✓", "green")} Wrote ${output}`);
-      });
+      await writeTimelineFrame(ctx, seconds, outputArg, { width: Number(flags.width) || 1280, format, grid: flags.grid === true });
     });
 
   program
@@ -266,4 +238,48 @@ export function registerRenderCommands(program: Command, ctx: CommandContext): v
         }
       });
     });
+}
+
+/** The frame image a frame command writes by default: frame-<seconds>.png. */
+export function defaultFramePath(seconds: number, format: "png" | "jpeg"): string {
+  return `frame-${seconds.toFixed(2).replace(/\.?0+$/, "")}.${format === "jpeg" ? "jpg" : "png"}`;
+}
+
+/** Render one timeline frame into `outputArg` (default frame-<time>.png): `zenvi frame` and `zenvi call preview_frame`. */
+export async function writeTimelineFrame(
+  ctx: CommandContext,
+  seconds: number,
+  outputArg: string | undefined,
+  options: { width: number; format: "png" | "jpeg"; grid: boolean },
+): Promise<void> {
+  const { format } = options;
+  const output = path.resolve(ctx.cwd, outputArg ?? defaultFramePath(seconds, format));
+  await withExecutor(ctx, async (executor) => {
+    let data: string;
+    let mimeType: string;
+    if (executor instanceof PortableExecutor) {
+      const project = executor.session.doc.project;
+      const width = Math.min(options.width, 8192);
+      const fps = project.fps.num / project.fps.den;
+      const image = await executor.session.host.frames!.renderFrame(project, seconds, {
+        width,
+        format,
+        overlay: options.grid ? { grid: true, caption: frameCaption(Math.floor(seconds * fps + 1e-9), seconds) } : undefined,
+      });
+      data = image.data;
+      mimeType = image.mimeType;
+    } else {
+      const outcome = await executor.call("inspect_timeline_tool", { start: seconds, end: seconds, maxFrames: 1 });
+      if (!outcome.ok || outcome.images.length === 0) {
+        printOutcome(ctx, outcome);
+        ctx.exitCode = 1;
+        return;
+      }
+      data = outcome.images[0]!.data;
+      mimeType = outcome.images[0]!.mimeType;
+    }
+    await writeFile(output, Buffer.from(data, "base64"));
+    if (ctx.out.json) ctx.out.data({ status: "applied", summary: `Wrote ${output}`, engine: executor.engine, project: executor.project ?? null, file: output, mimeType, seconds });
+    else ctx.out.line(`${ctx.out.style("✓", "green")} Wrote ${output}`);
+  });
 }

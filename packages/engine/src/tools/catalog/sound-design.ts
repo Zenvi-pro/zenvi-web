@@ -22,7 +22,7 @@ import { z } from "zod";
 import { isAudioOnlyMedia } from "../../model/media.js";
 import type { Clip, Project } from "../../model/types.js";
 import { deleteClips } from "../../ops/clips.js";
-import { designSound, type DesignedCue } from "../../sfx/design.js";
+import { designSound, soloRecipe, type DesignedCue } from "../../sfx/design.js";
 import { KINETIC_CAPTIONS_KEY, isAutoSfxClip, isSfxClip, type BeatGrid } from "../../sfx/moments.js";
 import { PALETTES, PALETTE_IDS, guessPalette, traitsOf, type PaletteId } from "../../sfx/palettes.js";
 import { CLIMAX_TAIL, SFX_DENSITIES, SFX_INTENSITIES, musicClimax, type SfxCue, type TimelineBeat } from "../../sfx/plan.js";
@@ -32,7 +32,7 @@ import { KIT_SLOTS, KIT_SLOT_SPECS, applyKit, guessSlot, kitFileIds, proceduralK
 import { SFX_PROVIDERS, allowsCommercialUse } from "../../sfx/library.js";
 import { SFX_RECIPES, SFX_RECIPE_IDS, sfxRecipe, type SfxFamily } from "../../sfx/recipes.js";
 import { kitVariation } from "../../sfx/kit-search.js";
-import { SFX_KITS, pickRecordedOne, recordedGroupOf, recordedMaxSeconds, recordedPlaceRecipe, recordedSample, type RecordedSample, type SfxKit } from "../../sfx/recorded.js";
+import { SFX_KITS, askedMaxSeconds, pickRecordedOne, recordedGroupOf, recordedMaxSeconds, recordedPlaceRecipe, recordedSample, type RecordedSample, type SfxKit } from "../../sfx/recorded.js";
 import type { SfxParams } from "../../sfx/render.js";
 import { getEffectiveAiMetadata } from "../ai-metadata.js";
 import { MUSIC_MIN_DURATION, classifyClipAudioRole, speechWindowsFromCues } from "../audio-mix.js";
@@ -333,7 +333,7 @@ async function recordedFor(call: ToolCall, recipe: string, args: AddInput, at: n
   if (!sample) return undefined;
   try {
     const variation = kitVariation(sample.id, used.filter((u) => u.id === sample.id).length, args.seed ?? 1);
-    return await prepareRecordedSfx(call, sample, recipe, recordedMaxSeconds(group, args.duration), variation);
+    return await prepareRecordedSfx(call, sample, recipe, askedMaxSeconds(sample, args.duration), variation);
   } catch (error) {
     warnings.push(`The recorded kit sound could not be fetched (${errorText(error)}), so it is synthesised.`);
     return undefined;
@@ -430,7 +430,9 @@ export const soundDesignTools: CatalogTool[] = [
       let role: KitSlot | undefined;
       let kitSound: RecordedSample | undefined;
       if (args.provider === "kit") {
-        kitSound = /^\d+$/.test(args.sound_id!) ? recordedSample(Number(args.sound_id)) : undefined;
+        // search_sound_library_tool prints ids as kit:NNNN.
+        const kitId = /^(?:kit:)?(\d+)$/i.exec(args.sound_id!.trim())?.[1];
+        kitSound = kitId !== undefined ? recordedSample(Number(kitId)) : undefined;
         if (!kitSound) return refused(ADD, `Error: Zenvi's kit has no sound ${args.sound_id} (search_sound_library_tool lists them).`);
         if (args.role) return refused(ADD, "Error: a kit sound's category sets its hit point and level; role goes with openverse and freesound sounds.");
         const libraryArgs = (["title", "allow_noncommercial"] as const).filter((k) => args[k] !== undefined);
@@ -468,6 +470,7 @@ export const soundDesignTools: CatalogTool[] = [
       const hitAt = align === "peak" ? at : at + sound.hit;
       if (late(hitAt)) return refused(ADD, pastPicture(hitAt, until!));
       const name = sound.title ? `'${sound.title}'` : recipe.title.toLowerCase();
+      const hitName = recipe.hit === "onset" ? "transient" : recipe.hit;
       const placed = call.commit((tx) => placeSfx(tx, sound, { at, align, gainDb, auto: false, until }), `Add ${sound.title ? `sound '${sound.title}'` : recipe.title.toLowerCase()}`);
       if (!placed) return refused(ADD, "Error: nothing of the sound is left on the timeline at that moment.");
       const { clip, trimmed, fadeOut } = placed;
@@ -481,7 +484,9 @@ export const soundDesignTools: CatalogTool[] = [
         : {};
       return applied(
         ADD,
-        `Added ${name} with its ${recipe.hit === "onset" ? "transient" : recipe.hit} on ${moment} (${gainDb} dB).` +
+        (align === "start"
+          ? `Added ${name} starting on ${moment}, its ${hitName} at ${hitAt.toFixed(2)} s (${gainDb} dB).`
+          : `Added ${name} with its ${hitName} on ${moment} (${gainDb} dB).`) +
           (sound.credit ? ` ${library ? "" : "A recording from Zenvi's kit, "}${sound.credit.license_name}${sound.credit.attribution_required ? ": credit it (list_credits_tool)" : ", no credit needed"}.` : "") +
           (trimmed > 0 ? ` Its last ${trimmed.toFixed(2)} s would run past the picture, so it ends with it at ${until!.toFixed(2)} s, faded over ${fadeOut.toFixed(2)} s.` : ""),
         {
@@ -707,7 +712,7 @@ interface CueSheet {
 export async function spottedHits(call: ToolCall): Promise<ScoreHit[]> {
   const duration = pictureEnd(call.doc.project) ?? 0;
   if (duration <= 0) return [];
-  return (await cueSheet(call, {}, duration)).points.map((p) => ({ t: p.t, kind: p.kind, needsCue: p.needsCue }));
+  return (await cueSheet(call, {}, duration)).points.map((p) => ({ t: p.t, kind: p.kind, needsCue: p.needsCue, recipe: soloRecipe(p) }));
 }
 
 /** The cue sheet both tools read: music analysed, speech found, block events filled in, the genre picked. */

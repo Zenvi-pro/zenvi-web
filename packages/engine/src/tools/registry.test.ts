@@ -37,6 +37,10 @@ const DIRECT_TOOLS = [
   "unify_grade_tool",
   "review_edit_tool",
   "review_render_tool",
+  "watch_render_tool",
+  "fork_project_tool",
+  "compare_renders_tool",
+  "pick_best_variant_tool",
   "swap_shot_tool",
   "add_motion_template_tool",
   "kinetic_captions_tool",
@@ -143,6 +147,7 @@ describe("tool catalog", () => {
         else if (key === "effects") args[key] = [{ effect: "bloom", amount: 0.5 }];
         else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
         else if (key === "clips") args[key] = [{ clip_id: "x", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }];
+        else if (key === "variants") args[key] = [{ project: "a.zvn", render: "a.mp4" }, { project: "b.zvn", render: "b.mp4" }];
         else if (type === "array") args[key] = ["x"];
         // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
         else if (type === "object") args[key] = key === "properties" ? { sigma: 1 } : { x: 1 };
@@ -225,8 +230,8 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx"],
-      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "watch"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion", "watch"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);

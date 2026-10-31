@@ -48,6 +48,8 @@ export type HostMethod =
   | "ui.preferences"
   | "ui.clearPlaybackCache"
   | "storage.writeBytes"
+  | "storage.saveCopy"
+  | "storage.readCopy"
   | "storage.exportMedia"
   | "storage.currentPath"
   | "storage.recentProjects"
@@ -104,6 +106,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   },
   save_project_tool: {},
   open_project_tool: { methods: ["storage.open"] },
+  fork_project_tool: { methods: ["storage.saveCopy"] },
+  pick_best_variant_tool: { methods: ["storage.readCopy"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
   import_video_url_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
   gather_stock_footage_tool: { methods: ["media.importUrl"] },
@@ -421,7 +425,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "library"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "library", "watch"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -435,6 +439,8 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "storage.readText",
       "storage.writeText",
       "storage.writeBytes",
+      "storage.saveCopy",
+      "storage.readCopy",
       "storage.exportMedia",
       "storage.currentPath",
       "storage.recentProjects",
@@ -460,12 +466,13 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       motion: "headless Chrome is installed: zenvi motion setup",
       scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
       fx: "ffmpeg is installed (ZENVI_FX=0 turns it off)",
+      watch: "signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)",
     },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion", "watch"],
     methods: [
       "media.importUrl",
       "media.writeGenerated",
@@ -493,6 +500,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       stock: "the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY",
       mattes: "onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)",
       motion: "the image has chrome-headless-shell (one block renders at a time)",
+      watch: "the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin",
     },
     hidden: [
       "new_project_tool",
@@ -560,6 +568,8 @@ function needName(need: HostCapability | HostMethod): string {
     "ui.preferences": "an editor's settings",
     "ui.clearPlaybackCache": "a playback cache",
     "storage.writeBytes": "saving files (images)",
+    "storage.saveCopy": "saving a copy of the project as another project",
+    "storage.readCopy": "reading another project without opening it",
     "storage.exportMedia": "copying media out (to a folder, a download or a link)",
     "storage.currentPath": "knowing where the project is saved",
     "storage.recentProjects": "a list of recent projects",
