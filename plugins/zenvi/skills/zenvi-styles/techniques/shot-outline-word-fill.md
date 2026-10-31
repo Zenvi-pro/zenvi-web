@@ -34,7 +34,7 @@ add_motion_block_tool {"block": "particle_burst", "position_seconds": 1.77, "dur
 add_sfx_tool {"recipe": "impact_punch", "at_seconds": 1.77, "gain_db": -8}
 ```
 The lit copy's switch is a constant (stepped) keyframe so there is no in-between frame. Variant relay: reuse for three words, giving the first a
-`line_trails` orbit (`pattern: orbit`), the second `particle_burst` rings, the third a chrome sweep, `add_3d_scene_tool {"scene": "title_3d"}` (Blender, CLI only).
+`line_trails` orbit (`pattern: orbit`), the second `particle_burst` rings, the third a chrome sweep, `add_3d_scene_tool {"scene": "title_3d", "params": {"text": "WORD"}}` (Blender, CLI only).
 
 ## Timing & taste rules
 - Contraction 3.2x to 1 in 11 frames (0.37 s) with a snappy ease: under 2x is a plain zoom, over 20 frames a slow zoom with no impact.

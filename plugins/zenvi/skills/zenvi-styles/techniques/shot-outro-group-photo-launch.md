@@ -26,7 +26,7 @@ set_keyframes_tool {"timeline_clip_id": "<element_1>", "property": "rotation", "
 set_keyframes_tool {"timeline_clip_id": "<element_1>", "property": "alpha", "points": [{"seconds": 0.13, "value": 0}, {"seconds": 0.25, "value": 1}]}
 add_motion_block_tool {"block": "gradient_field", "params": {"style": "bokeh", "colors": ["#2a1f10", "#e8c27a"], "speed": 0.5, "grain": true}, "position_seconds": 0, "duration_seconds": 4.8, "placement": "full_frame"}
 add_motion_block_tool {"block": "logo_reveal_end", "params": {"brand": "Northfold", "cta": "", "url": "northfold.example", "glow": true}, "position_seconds": 1.2, "duration_seconds": 3.6, "placement": "over_video"}
-add_motion_block_tool {"block": "particle_burst", "params": {"shape": "dots", "count": 20, "origin": [{"x": 0.5, "y": 0.85}], "gravity": -60, "colors": ["#e8c27a"], "rings": false}, "position_seconds": 0.7, "duration_seconds": 4.0}
+add_motion_block_tool {"block": "particle_burst", "params": {"shape": "dots", "count": 20, "origin": [{"x": 0.5, "y": 0.85}], "gravity": 0, "colors": ["#e8c27a"], "rings": false}, "position_seconds": 0.7, "duration_seconds": 4.0}
 add_sfx_tool {"recipe": "riser_tonal", "at_seconds": 1.35, "gain_db": -12}
 add_sfx_tool {"recipe": "impact_boom", "at_seconds": 1.6, "gain_db": -5}
 add_sfx_tool {"recipe": "sparkle", "at_seconds": 2.1, "gain_db": -15}

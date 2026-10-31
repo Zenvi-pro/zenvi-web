@@ -20,7 +20,7 @@ the letters, and when the exposure comes back the same word at the same size sit
 does the downgrade from sensual to official. Use a made-up or the client's own word; never imitate a known logo.
 
 ## Build it in Zenvi
-1. The show: `add_3d_scene_tool {"scene": "title_3d", "params": {"text": "BRAND", "material": "chrome"}, "position_seconds": 0,
+1. The show: `add_3d_scene_tool {"scene": "title_3d", "params": {"text": "BRAND", "style": "chrome"}, "position_seconds": 0,
    "duration_seconds": 1.6}` or the client's mark with `{"scene": "logo_extrude", "params": {"file_id": "<svg>"}}` (run
    `list_3d_scenes_tool` for the exact params). An iridescent flowing text fill is `needs: liquid-metal-text`; chrome is the stand-in.
 2. The flash is the cut between the two: `apply_motion_transition_tool {"preset": "flash_white", "clip1_id": "<chrome>",

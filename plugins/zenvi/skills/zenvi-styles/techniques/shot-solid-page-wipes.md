@@ -32,7 +32,7 @@ Barn door (works today, without lit edges):
 4. Trailer: a hairline glow down the centre (a thin bright title strip `add_title_tool {"background_color": "#ffffffcc", ...}` scaled
    to 2 px wide) for the 30-40 f before the split.
 5. `add_sfx_tool {"recipe": "impact_thud", "at_seconds": 1.3, "gain_db": -14}` at the split, `{"recipe": "whoosh_medium", "at_seconds": 1.4, "gain_db": -16}`.
-Blinds: a true 3D blade wave is `needs: blinds-3d-wipe` (nearest today: `add_3d_scene_tool {"scene": "cube_cut"}` over the cut,
+Blinds: a true 3D blade wave is `needs: blinds-3d-wipe` (nearest today: `add_3d_scene_tool {"scene": "cube_cut", "params": {"from_clip_id": "<outgoing clip>", "to_clip_id": "<incoming clip>"}}` over the cut,
 or `apply_motion_transition_tool {"preset": "slide", "direction": "left"}`).
 
 ## Timing & taste rules
