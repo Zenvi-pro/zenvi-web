@@ -29,6 +29,7 @@
     },
     "bpm": { "type": "number", "min": 60, "max": 200, "default": 120, "description": "Tempo of the beat grid the shots are cut on (use the music's: detect_beats_tool)." },
     "look": { "type": "enum", "options": ["clean", "punchy", "wild"], "default": "punchy", "description": "How hard hits hit: clean (no resting aberration, soft flash), punchy, wild (big punch, heavy aberration and flash)." },
+    "allow_strobe": { "type": "boolean", "default": false, "description": "true keeps every hit's flash even past 3 flashes a second with the ground changes. Default false: those hits only punch (WCAG 2.3.1, photosensitive viewers); only when the user asks for a strobe." },
     "shutter_samples": { "type": "integer", "min": 1, "max": 16, "default": 6, "description": "Sub-frames averaged per frame for motion blur inside a shot (1 = off; 10+ for very fast moves; renders that many times slower)." }
   }
 }

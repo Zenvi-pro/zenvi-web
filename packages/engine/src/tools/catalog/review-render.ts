@@ -36,6 +36,7 @@ import {
   type Shot,
 } from "../../review/render.js";
 import { finishGaps, finishLines } from "../../review/finish.js";
+import { MAX_FLASHES, flashingOf, type FlashWindow } from "../../review/flashing.js";
 import { onsetRatios, rhythmReview } from "../../review/rhythm.js";
 import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
@@ -59,6 +60,11 @@ const FONT = "Lato, Helvetica, Arial, sans-serif";
 const SAME_EDIT_SECONDS = 0.5;
 /** Swaps listed at most. */
 const MAX_SWAPS = 12;
+/** The flash check decodes the picture this wide (3 x 3 cells and more), at the file's rate up to FLASH_MAX_FPS. */
+const FLASH_WIDTH = 48;
+const FLASH_MAX_FPS = 60;
+/** ...and stops after this many seconds. */
+const FLASH_MAX_SECONDS = 600;
 
 const input = z.strictObject({
   path: z.string().min(1).describe("The rendered video to review, as render/export wrote it (a path relative to the project's folder, or absolute)."),
@@ -92,6 +98,34 @@ async function renderLooks(call: ToolCall, path: string, shots: readonly Shot[])
     call.host.log?.(`shot embeddings of ${path} failed: ${error instanceof Error ? error.message : String(error)}`);
     return undefined;
   }
+}
+
+/**
+ * More than 3 flashes in a second (WCAG 2.3.1), from the decoded picture;
+ * undefined when the host cannot decode it (the reason goes to `warnings`).
+ */
+async function flashing(call: ToolCall, inspection: RenderInspection, warnings: string[]): Promise<FlashWindow[] | undefined> {
+  const decode = call.host.media?.decodeLuma;
+  if (!decode) return undefined;
+  const width = FLASH_WIDTH;
+  const height = Math.max(9, Math.min(360, Math.round((width * inspection.height) / Math.max(1, inspection.width))));
+  try {
+    const frames = await decode(inspection.path, { width, height, fps: Math.min(FLASH_MAX_FPS, inspection.fps > 0 ? inspection.fps : 30), maxSeconds: Math.min(inspection.duration, FLASH_MAX_SECONDS), signal: call.signal });
+    return flashingOf(frames);
+  } catch (error) {
+    warnings.push(`the flash check could not decode the picture: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
+/** One problem per stretch that flashes more than 3 times a second. */
+function flashProblems(windows: readonly FlashWindow[]): Problem[] {
+  return windows.map((w) => ({
+    kind: "flashing" as const,
+    severity: "problem" as const,
+    at: w.start,
+    message: `${w.flashes} flashes within one second at ${fmt(w.start)}-${fmt(Math.max(w.end, w.start + 1))} (WCAG 2.3.1 allows ${MAX_FLASHES}): flashing this fast can trigger seizures. Thin the flash transitions, flash frames or strobe there, unless the user asked for a strobe (then warn viewers)`,
+  }));
 }
 
 /** The labels and red frames of the sheet, drawn over the grid of tiles. */
@@ -229,6 +263,7 @@ export const reviewRenderTools: CatalogTool[] = [
       "Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), " +
       "how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), " +
       "and for a fast cut its rhythm (shot lengths that never vary, shots that go still, brightness and colour that never move, cuts with no sound), " +
+      "flashing past 3 flashes in a second (WCAG 2.3.1, a seizure risk), " +
       "with one contact sheet of the shots and the last frame (problems framed red). Call it on the file render/export wrote, after mastering; " +
       "fix every PROBLEM line and render again, then watch_render_tool once for the critique by eye and ear. Changes nothing.",
     input,
@@ -287,12 +322,14 @@ export const reviewRenderTools: CatalogTool[] = [
       }
       const rhythm = rhythmReview(shots, inspection.duration, inspection.picture, onsets, inspection.frozen);
       problems.push(...rhythm.problems);
+      const warnings: string[] = [];
+      const flashes = await flashing(call, inspection, warnings);
+      problems.push(...flashProblems(flashes ?? []));
       const swaps = repeats.length > 0 ? repeatSwaps(project, inspection.duration, shots, repeats, targets.repeatWindowSeconds) : [];
 
       const finish = finishGaps(project);
       const tiles = tilesFor(shots, repeats, end, inspection, args.max_tiles ?? 12);
       const images: ToolImage[] = [];
-      const warnings: string[] = [];
       try {
         const sheet = await sheetProject(call, project, file, inspection, tiles);
         images.push(await call.host.frames!.renderFrame(sheet.project, 0, { width: sheet.width, format: "jpeg" }));
@@ -343,6 +380,7 @@ export const reviewRenderTools: CatalogTool[] = [
         frozen: inspection.frozen,
         silences: inspection.silences,
         rhythm: { fast_cut: rhythm.fastCut, shots: rhythm.pictures, weak_cuts: rhythm.weakCuts },
+        flashing: flashes ?? null,
         sheet: images.length > 0 ? { tiles: tiles.map((t, i) => ({ tile: i + 1, time: t.time, label: t.label, flag: t.flag ?? null })) } : null,
       };
       return { receipt: applied(TOOL, summary, { data, warnings }, 0), images };

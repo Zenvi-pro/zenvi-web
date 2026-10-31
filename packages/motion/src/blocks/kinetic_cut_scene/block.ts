@@ -2,7 +2,7 @@ import { FONT_STACKS } from "../../tokens.js";
 import { applyFinish, finishBuffers, HIT_LOOKS, hitCamera, hitFinish, shapeMask, shapeParticles, subframeTimes, type HitLookName } from "../../runtime/kinetic.js";
 import type { BlockContext } from "../../runtime/index.js";
 import { baselines, drawShot, fitSize, groundBloom, layoutBox, type Scene } from "./draw.js";
-import { parseShot, scheduleShots, shotCues, shotHits, type Ground, type ShotSpec } from "./shots.js";
+import { limitHitFlashes, parseShot, scheduleShots, shotCues, shotHits, type Ground, type ShotSpec } from "./shots.js";
 
 /** engine.js `SHUTTER`: sub-frames spread over 0.6 of a frame. */
 const SHUTTER = 0.6;
@@ -38,6 +38,7 @@ export function build(ctx: BlockContext): void {
   const shots = scheduleShots(specs, bpm, ctx.seconds);
   const s = Math.min(W, H) / 1080;
   const hits = shotHits(shots, bpm, s);
+  if (p.allow_strobe !== true) limitHitFlashes(shots, hits, bpm);
   for (const c of shotCues(shots, bpm)) ctx.cue(c.t, c.kind, { weight: c.weight, ...(c.until !== undefined ? { until: c.until } : {}), ...(c.rate !== undefined ? { rate: c.rate } : {}) });
   // The last shot is the hold the piece lands on: no fade.
   ctx.ownExit = true;

@@ -104,6 +104,10 @@ const input = z.strictObject({
   seed: z.number().int().min(0).max(2 ** 31).optional().describe("paper: seed of the boil (default 1): the same seed boils the same."),
   marks: z.boolean().optional().describe("paper: the hand-drawn marks orbiting the word (default true)."),
   layouts: z.array(z.enum(STROBE_LAYOUTS)).min(1).max(12).optional().describe(`strobe: layouts cycled cut by cut (default all: ${STROBE_LAYOUTS.join(", ")}).`),
+  allow_strobe: z
+    .boolean()
+    .optional()
+    .describe("strobe: true flips the ground on every cut even past 3 flashes a second. Default false: past that the ground holds while the words keep cutting (WCAG 2.3.1, photosensitive viewers); only when the user asks for a strobe."),
 });
 
 type Input = z.infer<typeof input>;
@@ -114,7 +118,7 @@ const OWN: Readonly<Record<Block, readonly (keyof Input)[]>> = {
   write_on: ["ink", "text_size", "x", "y", "paths", "view_box", "width", "stroke_width", "fill", "draw_seconds"],
   stencil: ["text_size", "y", "ground", "open", "shadow"],
   echo_stack: ["ink", "text_size", "copies", "echo", "gap_frames"],
-  strobe: ["ink", "ground", "accent", "words", "lockup", "hold_frames", "beats", "layouts"],
+  strobe: ["ink", "ground", "accent", "words", "lockup", "hold_frames", "beats", "layouts", "allow_strobe"],
   wheel: ["ink", "text_size", "x", "y", "words", "hold_frames", "beats"],
   paper: ["ink", "text_size", "x", "y", "accent", "hold_frames", "seed", "marks"],
 };
@@ -267,7 +271,7 @@ export const typeBlockTools: CatalogTool[] = [
             });
             break;
           case "strobe":
-            out = buildStrobe({ ...base, words, starts, lockup, ground, ink, accent, layouts: args.layouts ?? STROBE_LAYOUTS });
+            out = buildStrobe({ ...base, words, starts, lockup, ground, ink, accent, layouts: args.layouts ?? STROBE_LAYOUTS, allowStrobe: args.allow_strobe ?? false });
             break;
         }
       } catch (error) {
