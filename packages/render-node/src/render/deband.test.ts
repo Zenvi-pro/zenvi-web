@@ -18,7 +18,8 @@ const H = 360;
 async function roundTrip(vf: string): Promise<Buffer> {
   const ffmpeg = resolveBinary("ffmpeg");
   const out = `${dir}/g-${Math.random().toString(36).slice(2)}.mp4`;
-  const src = `gradients=s=${W}x${H}:c0=0x0e1116:c1=0x2a3640:x0=0:y0=0:x1=${W}:y1=0:d=1:speed=0`;
+  // A ramp drawn by geq, not lavfi's gradients source: that one seeds itself at random, so its ramp moves between runs.
+  const src = `nullsrc=s=${W}x${H}:d=1,geq=r='14+X*28/W':g='17+X*31/W':b='22+X*30/W',format=gbrp`;
   await runBinary(ffmpeg, ["-v", "error", "-f", "lavfi", "-i", src, "-frames:v", "1", "-vf", vf, "-c:v", "libx264", "-crf", "14", "-y", out]);
   const raw = await runBinary(ffmpeg, ["-v", "error", "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgba", "-"]);
   last = out;
