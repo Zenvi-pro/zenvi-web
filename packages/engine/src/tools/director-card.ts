@@ -30,7 +30,7 @@ const FINISH =
  * Re-edit bench (2026-10-28): agents given a bin of finished shots cut them in
  * bin order (Kendall tau -0.14 against the editor's) and never opened a skill.
  */
-const ORDER = "Given shots to re-edit: order them with sequence_shots_tool first.";
+const ORDER = "Given shots to re-edit: sequence_shots_tool first.";
 
 export const DIRECTOR_CARD: string = [
   `Whole videos (reel, ad, promo, montage, a reference to recreate): before the first edit read the genre's recipe with read_director_recipe {recipe} (or the zenvi-motion-director skill's recipes/). ${RECIPES}`,
