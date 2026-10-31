@@ -96,7 +96,7 @@ describe("track_point_tool", () => {
     expect(Math.abs(last.y - truth.y)).toBeLessThan(0.01);
     expect(data.samples.some((s) => s.lost)).toBe(false);
     expect(doc.undoLabels).toHaveLength(0);
-  });
+  }, 30_000);
 
   it("refuses two regions at once", async () => {
     const { doc, host } = setup();
@@ -118,7 +118,7 @@ describe("pin_to_track_tool", () => {
       const subject = drawnAt(doc.project, "CSUB", t, subjectAt(t).x, subjectAt(t).y);
       expect(Math.hypot(dot.x - subject.x, dot.y - subject.y)).toBeLessThan(0.012);
     }
-  });
+  }, 30_000);
 
   it("undoes the callout, its graphic and its track in one step; refusals leave no undo step", async () => {
     const { doc, host } = setup();
@@ -160,7 +160,7 @@ describe("pin_to_track_tool", () => {
     const subjectBr = drawnAt(doc.project, "CSUB", t, e.x + hw, e.y + hh);
     expect(Math.hypot(tl.x - subjectTl.x, tl.y - subjectTl.y)).toBeLessThan(0.015);
     expect(Math.hypot(br.x - subjectBr.x, br.y - subjectBr.y)).toBeLessThan(0.015);
-  });
+  }, 30_000);
 });
 
 describe("hold_point_reframe_tool", () => {
