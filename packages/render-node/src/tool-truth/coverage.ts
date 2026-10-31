@@ -241,6 +241,11 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   snap_cuts_to_onsets_tool: { reason: "not proven yet: needs a fixture with audible onsets off the cuts", params: "*" },
   shot_length_ramp_tool: { reason: "not proven yet: builds a montage of ramping shot lengths", params: "*" },
   spot_action_foley_tool: { reason: "not proven yet: needs footage with visible impacts and taps", params: "*" },
+  add_guide_overlay_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
+  auto_reframe_tool: { reason: "not proven yet: needs footage with a detectable subject", params: "*" },
+  hold_point_reframe_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
+  pin_to_track_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
+  screen_zoom_follow_tool: { reason: "not proven yet: needs a screen recording with activity", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {
