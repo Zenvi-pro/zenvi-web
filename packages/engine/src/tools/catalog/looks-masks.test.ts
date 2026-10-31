@@ -70,6 +70,25 @@ describe("add_shape_mask_tool", () => {
     expect(looksOf(ed, a, "shape_mask")).toHaveLength(0);
   });
 
+  it("masks to a convex polygon (an angled wedge) whose edge keyframes like the other shapes, and refuses bad points before writing", async () => {
+    const ed = new EditHarness();
+    const a = ed.addClip(ed.addFile("video"), { position: 0, end: 4 });
+    const wedge = [{ x: 0.1, y: 0.15 }, { x: 0.95, y: 0.3 }, { x: 0.8, y: 0.85 }, { x: 0.2, y: 0.7 }];
+    ed.mark();
+    const r = await ed.call("add_shape_mask_tool", { clip_ids: [a], points: wedge, feather: 0.01, keyframes: [{ seconds: 0, grow: -0.5 }, { seconds: 0.5, grow: 0 }] });
+    expect(r.status).toBe("applied");
+    expect(r.summary).toContain("4-sided polygon");
+    expect(ed.stepsSinceMark()).toBe(1);
+    const [m] = looksOf(ed, a, "shape_mask");
+    expect(String((m!.mask_reader as { path: string }).path)).toMatch(/mask-polygon-[0-9a-f]{8}\.svg$/);
+    expect(points(m!, "brightness").map((p) => p[0])).toEqual([1, 16]);
+    ed.mark();
+    await ed.refused("add_shape_mask_tool", { clip_ids: [a], shape: "polygon" }, "needs points");
+    await ed.refused("add_shape_mask_tool", { clip_ids: [a], shape: "ellipse", points: wedge }, "only apply to shape=polygon");
+    await ed.refused("add_shape_mask_tool", { clip_ids: [a], points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: 0.2 }, { x: 0.5, y: 1 }] }, "not convex");
+    expect(ed.stepsSinceMark()).toBe(0);
+  });
+
   it("reads keyframe times counted from an overlay's own start as such, and refuses times outside the clip", async () => {
     // Bench round 5 (masking): a slit on an overlay placed at 2 s keyed 0-1.8 s; all four keys clamped to its first frame and it never opened.
     const ed = new EditHarness();

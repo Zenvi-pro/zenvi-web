@@ -59,6 +59,14 @@ export function stockRelevance(video: PexelsVideo, query: string): number {
   return words.reduce((score, w, i) => (slug.some((s) => sameStem(w, s)) ? score + words.length - i : score), 0);
 }
 
+/** The share (0-1) of `query`'s content words that `text` has, by stem: 0 when the query has none. */
+export function wordMatch(query: string, text: string): number {
+  const words = stems(query);
+  if (words.length === 0) return 0;
+  const have = stems(text);
+  return words.filter((w) => have.some((s) => sameStem(w, s))).length / words.length;
+}
+
 /** A Pexels page's slug words ("woman-running-on-a-trail-7348382" → woma, runn, trail), as stems. */
 function slugStems(video: PexelsVideo): string[] {
   return stems(/\/video\/([^/]*)/.exec(video.url ?? "")?.[1] ?? "");

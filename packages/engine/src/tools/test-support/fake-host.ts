@@ -30,6 +30,7 @@ import type {
 } from "../types.js";
 import { readBundledFont } from "../../typography/test-fonts.js";
 import { backendStock } from "../backend.js";
+import { WATCH_DIMENSION_NAMES, type WatchCritique } from "../../review/watch.js";
 import { fakeMotionHost } from "./fake-motion.js";
 import { SPOKEN_WORDS, TRANSCRIPT_CUES, infoForPath, videoInfo } from "./fixture.js";
 
@@ -59,6 +60,8 @@ export type OptionalMethod =
   | "ui.preferences"
   | "ui.clearPlaybackCache"
   | "storage.writeBytes"
+  | "storage.saveCopy"
+  | "storage.readCopy"
   | "storage.exportMedia"
   | "storage.currentPath"
   | "storage.recentProjects"
@@ -285,6 +288,7 @@ function defaultRoutes(): Record<string, (body: unknown, path: string) => unknow
     "/api/v1/generation/video": () => ({ video_url: "https://cdn.example.com/generated.mp4" }),
     "/api/v1/generation/tts": () => ({ success: true, audio_base64: "SUQzAwAAAAAAAA==" }),
     "/api/v1/generation/image": () => ({ image_base64: PNG_1PX, mime_type: "image/png" }),
+    "/api/v1/generation/morph": () => ({ video_url: "https://cdn.example.com/morph.mp4" }),
     "/api/v1/pexels/search": () => ({
       videos: [{ id: 101, url: "https://www.pexels.com/video/101/", video_files: [{ quality: "hd", link: "https://videos.pexels.com/101-hd.mp4" }] }],
     }),
@@ -621,6 +625,42 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
     };
   }
   if (!without.has("stock") && host.backend) host.stock = backendStock(host.backend);
+  if (!without.has("watch")) {
+    host.watch = {
+      watch: async (path, request) => {
+        calls.push(`watch ${path}`);
+        const scores = Object.fromEntries(WATCH_DIMENSION_NAMES.map((d) => [d, 5])) as WatchCritique["scores"];
+        return {
+          model: "fake-watch",
+          duration: 8,
+          hasAudio: true,
+          verdict: `Watched${request?.brief ? ` for "${request.brief}"` : ""}.`,
+          overall: 5,
+          wouldPost: false,
+          scores,
+          issues: [{ start: 1, end: 1.5, dimension: "sound_design", severity: "high", problem: "The cut is silent.", fix: "Add a whoosh on the cut." }],
+          strengths: [],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          via: "backend",
+        };
+      },
+      compare: async (first, second) => {
+        calls.push(`compare ${first} ${second}`);
+        const scores = (n: number) => Object.fromEntries(WATCH_DIMENSION_NAMES.map((d) => [d, n])) as WatchCritique["scores"];
+        // The first render shown wins every time: the slot bias both orders cancel.
+        return {
+          model: "fake-watch",
+          durations: { A: 8, B: 8 },
+          winner: "A",
+          why: "A lands its cuts.",
+          scores: { A: scores(6), B: scores(5) },
+          fixes: [{ video: "A", start: 1, dimension: "sound_design", problem: "The cut is silent.", fix: "Add a whoosh on the cut." }],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          via: "gemini",
+        };
+      },
+    };
+  }
   if (!without.has("storage")) {
     host.storage = {
       save: async (_project, path) => {
@@ -658,6 +698,24 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
         written.set(target, bytes);
         disk?.add(target);
         return target;
+      };
+    }
+    if (!omit.has("storage.saveCopy")) {
+      host.storage.saveCopy = async (project, path, opts) => {
+        const target = resolved(path);
+        calls.push(`saveCopy ${target}`);
+        if (!opts?.overwrite && (written.has(target) || disk?.has(target))) throw Object.assign(new Error(`EEXIST: ${target}`), { code: "EEXIST", path: target });
+        written.set(target, JSON.stringify(project));
+        disk?.add(target);
+        return target;
+      };
+    }
+    if (!omit.has("storage.readCopy")) {
+      host.storage.readCopy = async (path) => {
+        calls.push(`readCopy ${path}`);
+        const saved = written.get(resolved(path));
+        if (typeof saved !== "string") throw new Error(`cannot read ${path} in tests`);
+        return JSON.parse(saved) as Project;
       };
     }
     if (!omit.has("storage.exportMedia")) {
@@ -743,11 +801,11 @@ export function fakeHost(options: FakeHostOptions = {}): FakeHost {
     // Renders nothing: names the movie after the request so equal stacks share a path, like the render cache.
     host.fx = {
       render: async (r) => {
-        const key = JSON.stringify([r.path, r.start, r.end, r.effects]);
+        const key = JSON.stringify([r.path, r.start, r.end, r.effects, r.carry]);
         let hash = 0;
         for (const ch of key) hash = (Math.imul(hash, 31) + ch.charCodeAt(0)) >>> 0;
         const fingerprint = hash.toString(16).padStart(8, "0").repeat(8);
-        calls.push(`fx ${r.path} ${r.start}-${r.end} ${r.effects.map((e) => e.effect).join("+")}`);
+        calls.push(`fx ${r.path} ${r.start}-${r.end} ${r.effects.map((e) => e.effect).join("+")}${r.carry ? ` carry ${r.carry.path}@${r.carry.at}` : ""}`);
         if (r.path.includes("unrenderable")) throw new Error("ffmpeg failed (exit 1): Invalid data found when processing input");
         const duration = (r.end - r.start) * fxStretch(r.effects);
         return { path: `/cache/fx/${fingerprint.slice(0, 16)}.mov`, codec: "prores422", width: 1920, height: 1080, fps: { num: 30, den: 1 }, frames: Math.ceil(duration * 30), duration, fingerprint, cached: false, seconds: 1.5, renderedAt: "2026-10-26T00:00:00Z", ffmpeg: "9.0.2" };

@@ -22,6 +22,11 @@ export const MOTION_TEMPLATE_IDS = [
   "grid_background",
   "end_card",
   "grid",
+  "card_cascade",
+  "compare",
+  "window_cascade",
+  "pass_wipe",
+  "reflow",
 ] as const;
 export type MotionTemplateId = (typeof MOTION_TEMPLATE_IDS)[number];
 
@@ -112,6 +117,12 @@ export interface MotionContent {
   backdrop?: boolean;
   /** The montage grid's layout and timing options. */
   grid?: GridOptions;
+  /** Keep the clips' own sound (card_cascade: each card's while it is the newest; compare: the first clip's). */
+  sound?: boolean;
+  /** compare: end on the last clip alone, the split growing back into one full frame. */
+  replay?: boolean;
+  /** reflow: the layouts after the first, a box per cell in each. */
+  states?: readonly (readonly NormBox[])[];
 }
 
 export interface TemplateInput {

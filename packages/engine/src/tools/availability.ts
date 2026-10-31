@@ -31,6 +31,7 @@ export type HostMethod =
   | "media.fetchWebVideo"
   | "media.kitSample"
   | "media.inspectRender"
+  | "media.decodeLuma"
   | "storage.open"
   | "storage.readText"
   | "storage.writeText"
@@ -48,6 +49,8 @@ export type HostMethod =
   | "ui.preferences"
   | "ui.clearPlaybackCache"
   | "storage.writeBytes"
+  | "storage.saveCopy"
+  | "storage.readCopy"
   | "storage.exportMedia"
   | "storage.currentPath"
   | "storage.recentProjects"
@@ -57,6 +60,7 @@ export type HostMethod =
   | "exporter.supports"
   | "frames.fontFamilies"
   | "frames.renderSheet"
+  | "frames.sampleFrames"
   | "audio.measureMix";
 
 export interface ToolNeeds {
@@ -74,9 +78,9 @@ export interface ToolNeeds {
 }
 
 const WATCH = ["frames", "backend"] as (HostCapability | HostMethod)[];
-/** How the web surfaces transcribe (zenvi-backend POST /api/v1/transcription). */
+/** How the web surfaces transcribe (zenvi-backend POST /api/v1/transcription; the CLI on device after `zenvi speech setup`). */
 const SERVER_ASR =
-  "speech recognition runs on the Zenvi server instead of on device: it needs a Zenvi sign-in and spends credits (2 per started minute); media Zenvi indexed is read from its transcript for free";
+  "speech recognition runs on the Zenvi server (a Zenvi sign-in, 2 credits per started minute) except in the CLI after `zenvi speech setup`, which hears it on device for free; media Zenvi indexed is read from its transcript for free";
 const WATCH_NOTE = "without frame rendering and the Zenvi backend, windows are not vision-checked";
 /** Where a host cannot list its fonts (the browser), a title's font is taken as given, as the desktop does without Qt's list. */
 const FONTS_UNCHECKED =
@@ -104,6 +108,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   },
   save_project_tool: {},
   open_project_tool: { methods: ["storage.open"] },
+  fork_project_tool: { methods: ["storage.saveCopy"] },
+  pick_best_variant_tool: { methods: ["storage.readCopy"] },
   import_files_tool: { methods: ["media.importPath"], optional: ["media.listPaths"], partialNote: "folders and globs need path listing" },
   import_video_url_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
   gather_stock_footage_tool: { methods: ["media.importUrl"] },
@@ -113,6 +119,11 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   fetch_remotion_video_from_supabase_tool: { methods: ["media.importUrl"] },
   generate_video_and_add_to_timeline_tool: { methods: ["media.importUrl"] },
   generate_image_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
+  generate_broll_set_tool: {
+    methods: ["media.writeGenerated"],
+    optional: ["media.importUrl", "frames"],
+    partialNote: "animate=true needs URL downloads; the reference's look and image need frame rendering",
+  },
   // Hosted surfaces do not download third-party pages (terms of service, blocked server addresses): only the person's own computer does.
   ingest_web_video_tool: { methods: ["media.fetchWebVideo"] },
   generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
@@ -120,6 +131,15 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     methods: ["media.writeGenerated"],
     optional: ["frames.fontFamilies"],
     partialNote: FONTS_UNCHECKED,
+  },
+  align_lyrics_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
+  place_on_word_tool: {
+    optional: ["audio.transcribe"],
+    partialNote: "without speech recognition only words of kept transcripts (TTS voices, aligned lyrics) and indexed media are found",
+  },
+  insert_broll_on_words_tool: {
+    optional: ["audio.transcribe", "media.importUrl"],
+    partialNote: "without speech recognition only kept or indexed transcripts are searched; stock=true needs URL downloads",
   },
   add_captions_tool: {
     optional: ["media.writeGenerated", "storage.readText", "audio.transcribe"],
@@ -196,6 +216,15 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   transcribe_media_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   remove_words_tool: { methods: ["audio.transcribe"], webNote: `${SERVER_ASR}; cuts use exact word timings only` },
   detect_beats_tool: { methods: ["audio.decodePcm"] },
+  detect_onsets_tool: { methods: ["audio.decodePcm"] },
+  snap_cuts_to_onsets_tool: { methods: ["audio.decodePcm"] },
+  detect_music_structure_tool: { methods: ["audio.decodePcm"] },
+  spot_action_foley_tool: {
+    methods: ["media.decodeLuma"],
+    optional: ["audio.decodePcm", "media.writeGenerated"],
+    partialNote: "without audio decoding cues are not checked against the clip's own sound; without generated media place=true is refused",
+  },
+  shot_length_ramp_tool: { optional: ["audio.decodePcm"], partialNote: "without audio decoding snap=beats and snap=onsets are refused; the curve, the motif and the settle shot always work" },
   master_audio_tool: { methods: ["audio.mixPcm"] },
   analyze_mix_tool: { methods: ["audio.mixPcm"] },
   pan_tool: { methods: ["audio.decodePcm", "media.writeGenerated"] },
@@ -259,12 +288,18 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
     optional: ["library", "media.importUrl", "audio.decodePcm", "media.writeGenerated"],
     partialNote: "without Openverse (or stock search), downloads and audio decoding only procedural kits are made",
   },
+  sequence_shots_tool: {
+    optional: ["frames.sampleFrames"],
+    partialNote: "without frame sampling each shot is compared on a few rendered frames (its ends and five through it), so its energy is coarser",
+  },
   match_cut_montage_tool: {
     optional: ["audio.decodePcm", "media.writeGenerated", "frames"],
     partialNote:
       "without audio decoding the cuts follow 120 BPM, not the music; without generated media there are no flash frames; without frame rendering files need subjects boxes (no circle search)",
   },
   review_render_tool: { methods: ["media.inspectRender"] },
+  pin_to_track_tool: { optional: ["media.writeGenerated"], partialNote: "without generated media no callout (label) is drawn; existing clips can still be pinned (clip_id)" },
+  add_guide_overlay_tool: { methods: ["media.writeGenerated"] },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],
@@ -273,6 +308,7 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   // Zenvi FX renders with ffmpeg next to the media (the CLI and local MCP server offer fx).
   apply_fx_tool: { methods: ["media.importPath"] },
   update_fx_tool: { methods: ["media.importPath"] },
+  datamosh_cut_tool: { methods: ["media.importPath"] },
   remove_fx_tool: {
     optional: ["fx", "media.importPath"],
     partialNote: "removing every effect (back to the original clip) works anywhere; removing one of several re-renders the rest, which needs Zenvi FX",
@@ -436,7 +472,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
   cli: {
     title: "CLI and local MCP server (zenvi, zenvi mcp)",
     host: "packages/render-node/src/host/node-host.ts",
-    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "library"],
+    capabilities: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "shots", "motion", "scenes3d", "fx", "library", "watch"],
     methods: [
       "media.importPath",
       "media.listPaths",
@@ -446,10 +482,13 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.fetchWebVideo",
       "media.kitSample",
       "media.inspectRender",
+      "media.decodeLuma",
       "storage.open",
       "storage.readText",
       "storage.writeText",
       "storage.writeBytes",
+      "storage.saveCopy",
+      "storage.readCopy",
       "storage.exportMedia",
       "storage.currentPath",
       "storage.recentProjects",
@@ -463,6 +502,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "exporter.supports",
       "frames.fontFamilies",
       "frames.renderSheet",
+      "frames.sampleFrames",
       "audio.measureMix",
     ],
     conditional: {
@@ -471,15 +511,18 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       "media.fetchWebVideo": "yt-dlp is installed; zenvi doctor checks",
       "audio.generateSfx": "ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan",
       mattes: "onnxruntime-node is installed; the matting model downloads on first use",
+      "audio.transcribe": "zenvi speech setup ran (on device, free), else signed in with zenvi login",
+      shots: "onnxruntime-node is installed; the SigLIP model (about 213 MB) downloads once when the person agrees (zenvi shots setup, or embed_media_tool download=true)",
       motion: "headless Chrome is installed: zenvi motion setup",
       scenes3d: "Blender 4.2+ is installed (or ZENVI_BLENDER points to it)",
       fx: "ffmpeg is installed (ZENVI_FX=0 turns it off)",
+      watch: "signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)",
     },
   },
   cloud: {
     title: "Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)",
     host: "packages/cloud/src/mcp/engine.ts",
-    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
+    capabilities: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion", "watch"],
     methods: [
       "media.importUrl",
       "media.writeGenerated",
@@ -507,6 +550,7 @@ export const SURFACE_PROFILES: Readonly<Record<Exclude<AvailabilitySurface, "des
       stock: "the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY",
       mattes: "onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)",
       motion: "the image has chrome-headless-shell (one block renders at a time)",
+      watch: "the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin",
     },
     hidden: [
       "new_project_tool",
@@ -574,6 +618,8 @@ function needName(need: HostCapability | HostMethod): string {
     "ui.preferences": "an editor's settings",
     "ui.clearPlaybackCache": "a playback cache",
     "storage.writeBytes": "saving files (images)",
+    "storage.saveCopy": "saving a copy of the project as another project",
+    "storage.readCopy": "reading another project without opening it",
     "storage.exportMedia": "copying media out (to a folder, a download or a link)",
     "storage.currentPath": "knowing where the project is saved",
     "storage.recentProjects": "a list of recent projects",
@@ -583,6 +629,8 @@ function needName(need: HostCapability | HostMethod): string {
     "exporter.supports": "checking which codecs it can encode",
     "frames.fontFamilies": "listing the fonts titles render with",
     "frames.renderSheet": "composing contact sheets",
+    "media.decodeLuma": "decoding video frames for motion analysis",
+    "frames.sampleFrames": "decoding a stretch of frames in one pass",
     "audio.measureMix": "mixing and measuring the audio",
   };
   return names[need as HostMethod];

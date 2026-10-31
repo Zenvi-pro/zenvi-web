@@ -26,6 +26,7 @@ import type {
   PcmDecoder,
   Renderer,
   SpeechTranscriber,
+  WatchProxyMaker,
 } from "./renderer.js";
 import { RendererUnavailableError, unavailableRenderer } from "./renderer.js";
 
@@ -155,6 +156,8 @@ export const nodeAnalyzeAudio: AudioAnalyzer = (filePath, options) => renderNode
 export const nodeDecodePcm: PcmDecoder = (filePath, options) => renderNode.decodePcm(filePath, options);
 export const nodeMixPcm: MixRenderer = (project, options) => renderNode.renderMixPcm(project, options);
 export const nodeTranscribeMedia: SpeechTranscriber = (filePath, options) => renderNode.transcribeMediaFile(filePath, options);
+
+export const nodeWatchProxy: WatchProxyMaker = (filePath, signal) => renderNode.makeWatchProxy(filePath, signal);
 export const nodeFontFamilies: FontLister = () => renderNode.installedFontFamilies();
 
 /** Capture tabs per motion block render: the service container has 2 vCPUs, and requests still need answering. */

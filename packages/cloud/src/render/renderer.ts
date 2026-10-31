@@ -8,7 +8,7 @@
  */
 
 import type { AudioEnvelope, ExportOptions, MatteHost, MixPcm, MotionHost, Project, ReaderInfo, Transcription } from "@zenvi/engine";
-import type { TranscribeFileOptions } from "@zenvi/render-node";
+import type { TranscribeFileOptions, WatchProxy } from "@zenvi/render-node";
 
 /**
  * Maps a path as stored in the project (a clip's `reader.path`, a file's
@@ -100,6 +100,9 @@ export type FontLister = () => Promise<string[]>;
  * up in pieces).
  */
 export type SpeechTranscriber = (filePath: string, options: TranscribeFileOptions) => Promise<Transcription>;
+
+/** The small proxy of a render that watch_render_tool sends to the backend. */
+export type WatchProxyMaker = (filePath: string, signal?: AbortSignal) => Promise<WatchProxy>;
 
 /**
  * A host that renders next to local files, made for one tool call: it writes

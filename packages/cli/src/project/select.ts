@@ -33,10 +33,12 @@ export async function findProject(options: SelectOptions = {}): Promise<string |
   const candidates = names.filter((n) => path.extname(n).toLowerCase() === ".zvn" && !n.startsWith(".")).sort();
   if (candidates.length === 1) return path.join(cwd, candidates[0]!);
   if (candidates.length > 1) {
+    // The way out goes in the message itself: scripts and agents often keep only the error line.
     throw new CliError(
-      `This folder has ${candidates.length} projects (${candidates.slice(0, 4).join(", ")}${candidates.length > 4 ? ", …" : ""}).`,
+      `This folder has ${candidates.length} projects (${candidates.slice(0, 4).join(", ")}${candidates.length > 4 ? ", …" : ""}): ` +
+        `name one with -p, e.g. \`zenvi -p ${candidates[0]} <command>\`, or \`export ZENVI_PROJECT=${candidates[0]}\`.`,
       2,
-      "Pick one with -p <file.zvn> or ZENVI_PROJECT.",
+      "-p works before or after the command; a backup copy elsewhere (or not ending in .zvn) stops the question.",
     );
   }
   return undefined;

@@ -1,3 +1,15 @@
+---
+id: kinetic-captions
+kind: style
+summary: A person talking to camera where the captions are the show - word by word, emphasis words huge, behind the head
+categories: [talking-head-captions, podcast-clip-vertical, ugc-ad-testimonial]
+tools: [kinetic_captions_tool, generate_subject_matte_tool, text_behind_subject_tool, add_kinetic_title_tool]
+pace: fast
+mood: [direct, energetic]
+aspect: ["9:16"]
+pairs_with: []
+avoid_with: []
+---
 # Kinetic-caption talking head
 
 A person talks; the captions are the show: one word at a time in sync with
@@ -29,11 +41,20 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    step and fallback. The steps below refine it.
 1. Voice: `generate_tts_and_add_to_timeline_tool` `text` (write it to be
    said: short sentences, the emphasis words on stressed beats), `voice:
-   "onyx"` or `"nova"`, `position_seconds: 0`. Then `transcribe_media_tool`
-   (`file_id` of the narration) and `get_transcript_tool` with
-   `includeWords: true` for word times.
+   "onyx"` or `"nova"`, `position_seconds: 0`. Its receipt says how the
+   script's words are timed (where they are heard in the voice when speech
+   recognition runs on device, else over its pauses); `get_transcript_tool`
+   with `includeWords: true` gives the word times.
 2. Picture: talking-head clip on track 1 for the whole length; inserts on the
-   same track at the noun times, 0.8-1.5 s each. Then the head's matte, once:
+   same track at the noun times, 0.8-1.5 s each: `insert_broll_on_words_tool`
+   `{"timeline_clip_ids": ["<head clip>"], "file_ids": [...]}` (or
+   `"stock": true`) lands them on the content words, muted, every 5-8 s, no
+   source twice, in one call. A pop-in or a hit on one spoken word:
+   `place_on_word_tool` `{"word": "free", "what": "title", "args": {"style":
+   "creator"}}` or `"what": "sfx"`. Given pieces of a talking
+   head instead of one take (a re-edit, jump cuts): `sequence_shots_tool`
+   with `voice_file_id` and each piece's line in `says` (its burnt-in
+   caption or transcript) so every piece starts on its own words. Then the head's matte, once:
    `generate_subject_matte_tool` `{"clip_id": "<head clip>"}` (CLI; about 15
    frames a second). With it the captions find the head in every shot and
    put the emphasis words behind it; a refusal (no matting here) only costs

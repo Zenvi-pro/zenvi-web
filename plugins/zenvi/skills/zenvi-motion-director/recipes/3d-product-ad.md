@@ -1,3 +1,15 @@
+---
+id: 3d-product-ad
+kind: style
+summary: One product that spins in and lands - a device, a bottle, an app icon; clean studio, few cuts, one landing
+categories: [3d-product-cgi-ad, product-launch-film, tech-review]
+tools: [add_3d_scene_tool, add_motion_block_tool, auto_sound_design_tool, master_audio_tool]
+pace: medium
+mood: [clean, premium, calm]
+aspect: ["16:9", "9:16", "1:1"]
+pairs_with: []
+avoid_with: []
+---
 # 3D product ad
 
 A prompt types the wish, icons burst, a "Generating…" state, then the
@@ -81,7 +93,7 @@ set_keyframes_tool {"timeline_clip_id": "<product still>", "property": "scale_x"
 ## Finish (every run, in this order; never skip it)
 
 1. Sound on every cut: step 7 above (each scene change and the landing has its sound).
-2. `master_audio_tool` `{"preset": "social", "target_lufs": -16, "genre": "3d_product", "iterate": true}` (fixes what analyze_mix_tool finds, then masters), after the last audio change (any later
+2. `master_audio_tool` `{"preset": "social", "target_lufs": -16, "genre": "product_3d", "iterate": true}` (fixes what analyze_mix_tool finds, then masters), after the last audio change (any later
    audio edit means mastering again).
 3. `render_video`, then `review_render_tool` `{"path": "<the file>", "loudness_target_lufs": -16}`.
 4. One fix pass: every `PROBLEM` line with the tool it names (a repeated

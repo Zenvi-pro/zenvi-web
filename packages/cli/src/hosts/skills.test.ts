@@ -14,7 +14,7 @@ import { checkParams, getBlock } from "@zenvi/motion";
 import { describe, expect, it } from "vitest";
 
 const SKILLS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../plugins/zenvi/skills");
-const CHECKED = ["zenvi-motion-director", "zenvi-reels", "zenvi-sound-designer"];
+const CHECKED = ["zenvi-motion-director", "zenvi-reels", "zenvi-sound-designer", "zenvi-styles"];
 /** Tools `zenvi mcp` adds next to the engine catalog (src/mcp/extra-tools.ts). */
 const MCP_TOOLS = new Set(["open_project_file", "render_video", "preview_frame", "launch_editor", "push_to_cloud", "list_hosts"]);
 
@@ -26,18 +26,29 @@ function markdownFiles(dir: string): string[] {
   });
 }
 
-/** `tool_name {json}` examples inside ```json fences (one call may span lines). */
-function examples(markdown: string): { tool: string; args: string }[] {
-  const found: { tool: string; args: string }[] = [];
+/**
+ * `tool_name {json}` examples inside ```json fences (one call may span lines;
+ * one with placeholders like <t> or ... is a template, not an example).
+ * A `fragment` names a few arguments of a call in prose (`tool_name {"style": "pop"}`):
+ * the arguments it names must be valid, the ones it leaves out are not required.
+ */
+function examples(markdown: string): { tool: string; args: string; fragment?: true }[] {
+  const found: { tool: string; args: string; fragment?: true }[] = [];
   for (const fence of markdown.matchAll(/```json\n([\s\S]*?)```/g)) {
     const body = fence[1]!;
     for (const start of body.matchAll(/^([a-z0-9_]+) \{/gm)) {
       let depth = 0;
+      let inString = false;
       const from = start.index! + start[1]!.length + 1;
       for (let i = from; i < body.length; i++) {
-        if (body[i] === "{") depth++;
+        if (inString) {
+          if (body[i] === "\\") i++;
+          else if (body[i] === '"') inString = false;
+        } else if (body[i] === '"') inString = true;
+        else if (body[i] === "{") depth++;
         else if (body[i] === "}" && --depth === 0) {
-          found.push({ tool: start[1]!, args: body.slice(from, i + 1) });
+          const args = body.slice(from, i + 1);
+          if (!/<|\.\.\.|…/.test(args)) found.push({ tool: start[1]!, args });
           break;
         }
       }
@@ -47,7 +58,21 @@ function examples(markdown: string): { tool: string; args: string }[] {
   for (const m of markdown.matchAll(/`([a-z0-9_]+_tool)`\s+`(\{[^`]*\})`/g)) {
     if (!/<|\.\.\.|…/.test(m[2]!)) found.push({ tool: m[1]!, args: m[2]!.replace(/\s*\n\s*/g, " ") });
   }
+  for (const m of markdown.matchAll(/`([a-z0-9_]+_tool) (\{[^`]*\})`/g)) {
+    if (!/<|\.\.\.|…/.test(m[2]!)) found.push({ tool: m[1]!, args: m[2]!.replace(/\s*\n\s*/g, " "), fragment: true });
+  }
   return found;
+}
+
+/** "ok", or the first argument the tool refuses (a fragment's missing arguments are not refused). */
+function argumentCheck(example: { tool: string; args: string; fragment?: true }): string {
+  const tool = getTool(example.tool)!;
+  const args = JSON.parse(example.args) as Record<string, unknown>;
+  const parsed = tool.input.safeParse(normalizeArgs(tool.inputSchema, args));
+  const issues = parsed.success
+    ? []
+    : parsed.error.issues.filter((i) => !example.fragment || i.code === "unrecognized_keys" || String(i.path[0]) in args);
+  return issues.length === 0 ? "ok" : `${example.tool}: ${JSON.stringify(issues[0])}`;
 }
 
 const files = CHECKED.flatMap((skill) => markdownFiles(path.join(SKILLS, skill)));
@@ -64,8 +89,7 @@ describe("plugin skills", () => {
       const tool = getTool(example.tool);
       expect(tool, example.tool).toBeDefined();
       const args = JSON.parse(example.args) as Record<string, unknown>;
-      const parsed = tool!.input.safeParse(normalizeArgs(tool!.inputSchema, args));
-      expect(parsed.success ? "ok" : `${example.tool}: ${JSON.stringify(parsed.error.issues[0])}`).toBe("ok");
+      expect(argumentCheck(example)).toBe("ok");
       if (example.tool === "add_motion_block_tool") {
         const block = getBlock(String(args.block));
         expect(block, String(args.block)).toBeDefined();
@@ -90,6 +114,10 @@ describe("plugin skills", () => {
     const [bad] = examples('```json\nspeed_ramp_tool {"clip_id": "C1", "preset": "velocity", "hit": 2}\n```');
     const tool = getTool(bad!.tool)!;
     expect(tool.input.safeParse(normalizeArgs(tool.inputSchema, JSON.parse(bad!.args))).success).toBe(false);
+    const [fragment, badFragment, unknownArg] = examples(
+      '`add_kinetic_title_tool {"animation": "scramble"}` `add_kinetic_title_tool {"animation": "wobble"}` `add_kinetic_title_tool {"wobble": 1}`',
+    );
+    expect([fragment, badFragment, unknownArg].map((e) => argumentCheck(e!) === "ok")).toEqual([true, false, false]);
     expect(checkParams(getBlock("counter")!, { value: "3" }).ok).toBe(false);
     expect(parseScene3dParams("device_mockup", { device: "phone", move: "orbit_wildly" }).ok).toBe(false);
   });
