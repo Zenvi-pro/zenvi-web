@@ -36,7 +36,7 @@ import { boxQuad, quadAngle, quadCenter, quadSize, smoothTrack, trackAt, type Qu
 import { frameWindow, localFrame, timelineFrameOf } from "../../timeline/windows.js";
 import { fpsOf } from "../../ops/internal.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
-import { applied, failed, refused, unchanged, type CreatedTrack } from "../receipt.js";
+import { applied, failed, refused, unchanged, type CreatedTrack, type ToolReceipt } from "../receipt.js";
 import { colourFrame, fileFps, grayFrames, trackFile } from "../track-frames.js";
 import { visualKind, writeCard } from "./reels.js";
 
@@ -133,14 +133,36 @@ function regionQuad(args: RegionArgs, aspect: number): { quad: Quad; model: Trac
   return { quad: q, model: "affine" };
 }
 
+/** Why a call got no track: its own arguments (refused) or reading the footage (failed). */
+interface TrackProblem {
+  status: "refused" | "error";
+  message: string;
+}
+
+function isProblem(track: Track | TrackProblem): track is TrackProblem {
+  return "status" in track;
+}
+
+function problemReceipt(tool: string, problem: TrackProblem, prefix = ""): ToolReceipt {
+  const message = `${prefix}${problem.message}`;
+  return problem.status === "refused" ? refused(tool, message) : failed(tool, message);
+}
+
+/** A `time` outside `foot`'s source window, as a refusal; null when it is inside. */
+function timeProblem(foot: Footage, time: number): TrackProblem | null {
+  if (time >= foot.start - 1e-3 && time <= foot.end + 1e-3) return null;
+  return { status: "refused", message: `Error: time ${time}s is outside clip ${String(foot.clip.id)}'s source window ${round(foot.start, 3)}-${round(foot.end, 3)}s.` };
+}
+
 /** The track of the region the call names on `foot`, smoothed; a still image gives a constant track. */
-async function trackOf(call: ToolCall, foot: Footage, args: RegionArgs, defaultSmoothing: number): Promise<Track | string> {
+async function trackOf(call: ToolCall, foot: Footage, args: RegionArgs, defaultSmoothing: number): Promise<Track | TrackProblem> {
   const region = regionQuad(args, aspectOfFile(foot.file));
-  if (typeof region === "string") return region;
+  if (typeof region === "string") return { status: "refused", message: region };
   const time = args.time ?? foot.start;
   const aspect = aspectOfFile(foot.file);
   if (foot.kind === "image") return { model: region.model, aspect, samples: [{ time: 0, quad: region.quad, lost: false, score: 1 }] };
-  if (time < foot.start - 1e-3 || time > foot.end + 1e-3) return `Error: time ${time}s is outside clip ${String(foot.clip.id)}'s source window ${round(foot.start, 3)}-${round(foot.end, 3)}s.`;
+  const late = timeProblem(foot, time);
+  if (late) return late;
   const track = await trackFile(call, foot.file, {
     quad: region.quad,
     time,
@@ -149,7 +171,7 @@ async function trackOf(call: ToolCall, foot: Footage, args: RegionArgs, defaultS
     rate: Math.min(MAX_RATE, fileFps(foot.file) ?? MAX_RATE),
     model: region.model,
   });
-  if (typeof track === "string") return track;
+  if (typeof track === "string") return { status: "error", message: track };
   return smoothTrack(track, args.smoothing ?? defaultSmoothing);
 }
 
@@ -214,7 +236,7 @@ const trackTool = directTool({
     const region = regionQuad(args, aspectOfFile(foot.file));
     if (typeof region === "string") return refused(TRACK, region);
     const track = await trackOf(call, foot, args, 0);
-    if (typeof track === "string") return failed(TRACK, track);
+    if (isProblem(track)) return problemReceipt(TRACK, track);
     const rows = Math.min(args.max_samples ?? 40, track.samples.length);
     const pick = Array.from({ length: rows }, (_, i) => track.samples[Math.round((i * (track.samples.length - 1)) / Math.max(1, rows - 1))]!);
     const samples = pick.map((s) => {
@@ -289,7 +311,7 @@ const pinTool = directTool({
     const follow: PinFollow = args.follow ?? (args.quad ? "surface" : "position");
     if (follow === "surface" && !args.quad) return refused(PIN, "Error: follow=surface needs a quad (the surface's four corners).");
     const track = await trackOf(call, foot, args, 0.08);
-    if (typeof track === "string") return failed(PIN, track);
+    if (isProblem(track)) return problemReceipt(PIN, track);
 
     const W = Number(project.width) || 1920;
     const H = Number(project.height) || 1080;
@@ -384,7 +406,7 @@ const guideTool = directTool({
       track = { model: region.model, aspect: aspectOfFile(foot.file), samples: [{ time: args.time ?? foot.start, quad: region.quad, lost: false, score: 1 }] };
     } else {
       const t = await trackOf(call, foot, args, 0.1);
-      if (typeof t === "string") return failed(GUIDE, t);
+      if (isProblem(t)) return problemReceipt(GUIDE, t);
       track = t;
     }
     // The subject on the canvas where the guide first shows: at time for a static guide, else at the guide's first frame.
@@ -459,7 +481,7 @@ const holdTool = directTool({
     const foot = footageOf(call.doc.project, args.clip_id);
     if (typeof foot === "string") return refused(HOLD, foot);
     const track = await trackOf(call, foot, args, 0.25);
-    if (typeof track === "string") return failed(HOLD, track);
+    if (isProblem(track)) return problemReceipt(HOLD, track);
     const zoom = args.zoom ?? 1;
     const zoomEnd = args.zoom_end ?? zoom;
     const result = call.commit(
@@ -558,13 +580,15 @@ const reframeTool = directTool({
         region = { box: head?.box ?? { x: 0.4, y: 0.25, w: 0.2, h: 0.3 }, time: foot.start };
       }
       region.smoothing = args.smoothing ?? 0.6;
-      let track: Track | string;
+      let track: Track | TrackProblem;
       if (follow && source !== "centre") track = await trackOf(call, foot, region, 0.6);
       else {
         const q = regionQuad(region, aspectOfFile(foot.file));
-        track = typeof q === "string" ? q : { model: q.model, aspect: aspectOfFile(foot.file), samples: [{ time: foot.start, quad: q.quad, lost: false, score: 1 }] };
+        // Not tracked, but the subject's time is still the caller's to get right.
+        const late = foot.kind === "video" && region.time !== undefined ? timeProblem(foot, region.time) : null;
+        track = typeof q === "string" ? { status: "refused", message: q } : late ?? { model: q.model, aspect: aspectOfFile(foot.file), samples: [{ time: foot.start, quad: q.quad, lost: false, score: 1 }] };
       }
-      if (typeof track === "string") return failed(REFRAME, `${id}: ${track}`);
+      if (isProblem(track)) return problemReceipt(REFRAME, track, `${id}: `);
       plans.push({ clipId: id, track, source });
     }
     const close = args.close_zoom ?? 1.3;
