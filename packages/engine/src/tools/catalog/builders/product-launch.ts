@@ -208,7 +208,7 @@ export const productLaunchTools: CatalogTool[] = [
 
       c.suggest("auto_sound_design_tool", { genre: "saas_ui" }, "clicks and pops on the cards' entrances, whooshes on the section changes");
       c.suggest("master_audio_tool", { preset: "social", iterate: true }, "the loudness set last");
-      c.followStyle("product-launch-film");
+      await c.followStyle("product-launch-film");
       return c.finish(
         "Build product launch",
         `Built a product launch for ${args.product}: ${plan.sections.length} sections on ${Math.round(grid.bpm)} BPM bars, ${round3(plan.duration)} s.`,

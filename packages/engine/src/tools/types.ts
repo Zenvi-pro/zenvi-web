@@ -390,6 +390,12 @@ export interface ExportOptions {
    * mix exactly as the timeline plays (clipping included).
    */
   truePeakLimit?: boolean;
+  /**
+   * Smooth 8-bit gradient banding and dither it to the output's depth
+   * (hosts that encode with ffmpeg): for flat graphic grounds and gradients.
+   * review_render_tool reports banding; a cinetic house style exports this way.
+   */
+  deband?: boolean;
   /** Output location (CLI path). Hosts choose one when omitted. */
   output?: string;
 }
@@ -1112,6 +1118,14 @@ export interface WatchHost {
   compare?(first: string, second: string, request?: CompareRequest): Promise<CompareVerdict>;
 }
 
+/** What recent films drew, so a house style's next technique draw differs (brief/house.ts). */
+export interface DrawMemoryHost {
+  /** Technique ids the last few films drew. */
+  recent(): Promise<string[]>;
+  /** Remember the techniques a film drew. */
+  remember(techniques: readonly string[], project?: string): Promise<void>;
+}
+
 export interface ToolHost {
   media?: MediaHost;
   player?: PlayerHost;
@@ -1130,6 +1144,7 @@ export interface ToolHost {
   fx?: FxHost;
   library?: LibraryHost;
   watch?: WatchHost;
+  draws?: DrawMemoryHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }
