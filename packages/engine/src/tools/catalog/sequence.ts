@@ -168,7 +168,8 @@ export function inBinOrder(project: Project, ids: readonly string[]): boolean {
  */
 export async function sequenceFiles(call: ToolCall, ids: readonly string[], goal: SequenceGoal, keepFlag: string): Promise<{ ids: string[]; note: string } | { warning: string } | null> {
   const project = call.doc.project;
-  if (!call.host.frames) return null;
+  // Only where frames come in one sampling pass: frame by frame, a 20-file bin is ~180 renders (Cloud has 55 s a call).
+  if (!call.host.frames?.sampleFrames) return null;
   const unordered = (why: string) => ({ warning: `The files are in bin order and could not be ordered (${why}): order them with sequence_shots_tool, or pass ${keepFlag}: true.` });
   const fps = fpsFloat(project.fps);
   const shots: SequenceShotInput[] = [];
