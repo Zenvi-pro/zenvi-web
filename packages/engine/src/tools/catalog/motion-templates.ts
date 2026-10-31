@@ -27,6 +27,8 @@ import { addFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
 import { applyFittedMotionTransition, type MotionTransitionResult } from "../../ops/motion-transitions.js";
 import { placeOverlayClip } from "../../ops/overlays.js";
+import { fitsFlashLimit } from "../../review/flashing.js";
+import { FLASH_PRESETS, timelineFlashChanges, transitionFlashChanges } from "../../review/timeline-flashes.js";
 import { buildMotionTemplate } from "../../motion/build.js";
 import { gridFromBeats, tempoGrid } from "../../motion/grid.js";
 import { PALETTES, withAccent } from "../../motion/palettes.js";
@@ -306,7 +308,7 @@ const TILE = /^tile-(\d+)-\d+$/;
  * A grid's re-cuts, in time order: on each, every kept tile's clip cut back
  * to back with its next stage's on the same track (motion/templates/montage-grid.ts).
  */
-function tileRecuts(placed: readonly { layer: MotionLayer; clip: Clip }[]): { outClipId: string; inClipId: string; outFrames: number; inFrames: number }[][] {
+function tileRecuts(placed: readonly { layer: MotionLayer; clip: Clip }[]): { at: number; cuts: { outClipId: string; inClipId: string; outFrames: number; inFrames: number }[] }[] {
   const tiles = placed.filter((p) => TILE.test(p.layer.name) && p.layer.source.kind === "media");
   const starting = new Map(tiles.map((p) => [`${p.layer.track}@${p.layer.start}`, p]));
   const cuts = new Map<number, { outClipId: string; inClipId: string; outFrames: number; inFrames: number }[]>();
@@ -318,7 +320,7 @@ function tileRecuts(placed: readonly { layer: MotionLayer; clip: Clip }[]): { ou
     list.push({ outClipId: String(p.clip.id), inClipId: String(next.clip.id), outFrames: p.layer.frames, inFrames: next.layer.frames });
     cuts.set(at, list);
   }
-  return [...cuts.entries()].sort(([a], [b]) => a - b).map(([, list]) => list);
+  return [...cuts.entries()].sort(([a], [b]) => a - b).map(([at, list]) => ({ at, cuts: list }));
 }
 
 /** Tiles that show a clip another tile of the same stage shows, at the busiest stage, and how many tiles that stage has. */
@@ -464,6 +466,8 @@ export const motionTemplateTools: CatalogTool[] = [
       const stack = planOverlayStack(project, start, end, plan.tracks);
       const written = await writeDrawings(call, plan, args.template);
       if (typeof written === "string") return failed(TOOL, written);
+      const flashes = timelineFlashChanges(project);
+      let glitched = 0;
 
       const { placed, recuts } = await commitDrawn(
         call,
@@ -473,10 +477,26 @@ export const motionTemplateTools: CatalogTool[] = [
           if (recutChoice === "none") return { placed, recuts: [] };
           const groups = tileRecuts(placed);
           const presets = gridRecutPresets(recutChoice === "auto" ? "whip" : recutChoice, groups.length);
-          const recuts = groups.flatMap((group, k): MotionTransitionResult[][] => {
-            const done = group.flatMap((cut): MotionTransitionResult[] => {
-              const frames = fitMontageFrames(presets[k]!, cut.outFrames, cut.inFrames, fps);
-              const r = frames === null ? null : applyFittedMotionTransition(tx, { outClipId: cut.outClipId, inClipId: cut.inClipId, preset: presets[k]!, frames, direction: "auto" });
+          const recuts = groups.flatMap(({ at, cuts }, k): MotionTransitionResult[][] => {
+            let preset = presets[k]!;
+            // Every tile of a re-cut on the same frames: the length the shortest tile fits.
+            const fitted = (p: typeof preset) => {
+              const fits = cuts.map((c) => fitMontageFrames(p, c.outFrames, c.inFrames, fps)).filter((f) => f !== null);
+              return fits.length > 0 ? Math.min(...fits) : null;
+            };
+            if (FLASH_PRESETS.has(preset)) {
+              // The tiles flash together, one flash; past 3 flashes a second with the timeline's own it glitches instead (WCAG 2.3.1).
+              const frames = fitted(preset);
+              const changes = frames === null ? [] : transitionFlashChanges(start + at / fps, frames, fps);
+              if (fitsFlashLimit(flashes, changes)) flashes.push(...changes);
+              else {
+                preset = "glitch";
+                glitched += 1;
+              }
+            }
+            const frames = fitted(preset);
+            const done = cuts.flatMap((cut): MotionTransitionResult[] => {
+              const r = frames === null || fitMontageFrames(preset, cut.outFrames, cut.inFrames, fps) === null ? null : applyFittedMotionTransition(tx, { outClipId: cut.outClipId, inClipId: cut.inClipId, preset, frames, direction: "auto" });
               return r ? [r] : [];
             });
             return done.length > 0 ? [done] : [];
@@ -485,6 +505,7 @@ export const motionTemplateTools: CatalogTool[] = [
         },
         `Add motion template ${args.template}`,
       );
+      if (glitched > 0) warnings.push(`${glitched} flash re-cut(s) glitch instead: with the flashes already on the timeline they make more than 3 flashes in a second, which can trigger seizures (WCAG 2.3.1).`);
       const doc = call.doc.project;
       const g = grid;
       const beatsIn = g.beats.filter((t) => t >= start - 1e-6 && t <= end + 1e-6);

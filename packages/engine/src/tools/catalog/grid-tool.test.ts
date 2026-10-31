@@ -6,6 +6,7 @@ import type { Project } from "../../model/types.js";
 import { addFile } from "../../ops/files.js";
 import { listProjectMotionTransitions } from "../../ops/motion-transitions.js";
 import { planFrame } from "../../render/plan/frame-plan.js";
+import { timelineFlashChanges } from "../../review/timeline-flashes.js";
 import type { Affine } from "../../render/types.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
@@ -115,6 +116,28 @@ describe("add_motion_template_tool grid", () => {
     const plain = await runTool({ doc: plainDoc, host: host() }, "add_motion_template_tool", { ...args, transitions: "none" });
     expect((plain.data as { data: { transitions: unknown[] } }).data.transitions).toEqual([]);
     expect(listProjectMotionTransitions(plainDoc.project)).toEqual([]);
+  });
+
+  it("glitches a flash re-cut that would make more than 3 flashes a second with the timeline's own flashes (WCAG 2.3.1)", async () => {
+    const args = { template: "grid", file_ids: FILES, steps: [3, 4, 6], bpm: 120, transitions: "flash" };
+    type Transitions = { data: { transitions: { preset: string; cut: number }[] }; warnings: string[] };
+    const aloneDoc = verticalProject();
+    const alone = await runTool({ doc: aloneDoc, host: host() }, "add_motion_template_tool", args);
+    const cut = (alone.data as Transitions).data.transitions[0]!.cut;
+    // Its three tiles flash together on one cut, every tile on the same frames: one flash on the timeline, not three.
+    const tiles = listProjectMotionTransitions(aloneDoc.project).filter((r) => r.preset === "flash_invert");
+    expect(tiles).toHaveLength(3);
+    expect(new Set(tiles.map((r) => r.frames)).size).toBe(1);
+    expect(timelineFlashChanges(aloneDoc.project)).toHaveLength(2);
+    // Three flash cards in the second before the flash re-cut: three flashes there already.
+    const project = structuredClone(verticalProject().project);
+    project.files.push({ id: "FLASHCARD1", path: "/media/flash.svg", media_type: "image" } as (typeof project.files)[number]);
+    for (const [i, at] of [cut - 0.8, cut - 0.55, cut - 0.3].entries()) project.clips.push({ id: `FC${i}`, file_id: "FLASHCARD1", layer: project.layers[0]!.number, position: at, start: 0, end: 2 / 30 } as (typeof project.clips)[number]);
+    const result = await runTool({ doc: new ProjectDocument(project), host: host() }, "add_motion_template_tool", args);
+    expect(result.ok, result.text).toBe(true);
+    const receipt = result.data as Transitions;
+    expect(receipt.data.transitions.map((t) => t.preset)).toEqual(["glitch", "glitch"]);
+    expect(receipt.warnings.join(" ")).toMatch(/1 flash re-cut\(s\) glitch instead.*WCAG 2\.3\.1/);
   });
 
   it("warns when tiles outnumber the files, and refuses with strict_variety without touching the project", async () => {

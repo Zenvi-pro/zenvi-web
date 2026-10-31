@@ -188,6 +188,34 @@ describe("add_type_block_tool", () => {
     expect(strobe.warnings.join(" ")).not.toMatch(/ground holds/);
   });
 
+  it("counts the timeline's own flashes before it flips the strobe's ground", async () => {
+    const words = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX"];
+    const run = async (cards: number[]) => {
+      const project = createProject({ id: "TYPEBLOCK2", profile: findProfile("HD 1080p 30 fps")! });
+      project.files.push({ id: "FLASH1", path: "/tmp/flash.svg", media_type: "image" } as (typeof project.files)[number]);
+      for (const [i, at] of cards.entries()) project.clips.push({ id: `FC${i}`, file_id: "FLASH1", layer: project.layers[0]!.number, position: at, start: 0, end: 2 / 30 } as Clip);
+      const d = new ProjectDocument(project);
+      const h = fakeHost();
+      // 10 frames a word: 3 cuts a second, safe on their own.
+      const r = await runTool({ doc: d, host: h }, "add_type_block_tool", { block: "strobe", words, lockup: "", hold_frames: 10 });
+      expect(r.ok, r.text).toBe(true);
+      const paths = new Map(d.project.files.map((f) => [f.id, String(f.path)]));
+      const strobe = tagged(d).sort((a, b) => Number(a.position) - Number(b.position));
+      const grounds = strobe.map((c) => /<rect[^>]*fill="([^"]+)"/.exec(text(h.written.get(paths.get(c.file_id)!)!))![1]!);
+      const flips = strobe.flatMap((c, i) => (i > 0 && isFlashChange(relativeLuminance(grounds[i - 1]!), relativeLuminance(grounds[i]!)) ? [Number(c.position)] : []));
+      return { flips, warnings: (r.data as { warnings: string[] }).warnings };
+    };
+    const alone = await run([]);
+    expect(alone.flips.length).toBe(5);
+    expect(alone.warnings.join(" ")).not.toMatch(/ground holds/);
+    // Two flash cards in the first second already make 4 changes there.
+    const cards = [0.1, 0.5];
+    const beside = await run(cards);
+    const changes = [...cards.flatMap((t) => [t, t + 2 / 30]), ...beside.flips].sort((a, b) => a - b);
+    expect(flashViolations(changes)).toEqual([]);
+    expect(beside.warnings.join(" ")).toMatch(/the ground holds on \d+ of 6 cuts/);
+  });
+
   it("boils paper-cut type on twos, the same boil for the same seed", async () => {
     const run = async (seed: number) => {
       const d = doc();
