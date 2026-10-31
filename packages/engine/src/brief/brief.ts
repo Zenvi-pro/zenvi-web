@@ -80,7 +80,7 @@ export const briefDrawSchema = z.strictObject({
   picks: z
     .array(
       z.strictObject({
-        technique: line(80).describe("The technique file: get_style_tool / zenvi://styles/<technique>."),
+        technique: line(80).describe("The technique file: get_technique_tool / zenvi://styles/<technique>."),
         id: line(80).describe("The library id it was drawn as."),
         category: z.enum(DRAW_CATEGORIES),
         role: z.enum(["workhorse", "accent", "signature"]),

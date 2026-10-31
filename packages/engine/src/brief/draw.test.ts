@@ -3,9 +3,10 @@ import { ProjectDocument } from "../history/document.js";
 import { createProject } from "../model/defaults.js";
 import { ensureBrief } from "./auto.js";
 import { readBrief } from "./brief.js";
+import { STYLE_FILES } from "../styles/library.gen.js";
 import { CINETIC_TECHNIQUES } from "./cinetic-library.js";
-import { DRAW_ORDER, drawSize, drawTechniques, type DrawEntry } from "./draw.js";
-import { houseDraw, tasteProfile } from "./house.js";
+import { DRAW_ORDER, drawSize, drawTechnique, drawTechniques, type DrawEntry } from "./draw.js";
+import { HOUSE_STYLES, houseDraw, tasteProfile } from "./house.js";
 
 const byId = new Map(CINETIC_TECHNIQUES.map((e) => [e.id, e]));
 
@@ -53,6 +54,12 @@ describe("the technique draw (cinetic pick.py)", () => {
     expect(d.picks.map((p) => p.id).sort()).toEqual(["a", "b", "c", "d"]);
     expect(d.picks.find((p) => p.id === "d")!.ban_safe_variant).toBe(true);
     expect(drawTechniques(tiny, { format: "sting", energy: "calm", seconds: 6, seed: 3, houseBans: false }).picks.find((p) => p.id === "d")!.ban_safe_variant).toBe(false);
+  });
+
+  it("hands out technique files the styles library serves, and every house style is a style there", () => {
+    const files = new Map(STYLE_FILES.map((f) => [f.id, f.kind]));
+    for (const e of CINETIC_TECHNIQUES) expect(files.get(drawTechnique(e)), drawTechnique(e)).toBe("technique");
+    for (const id of Object.keys(HOUSE_STYLES)) expect(files.get(id)).toBe("style");
   });
 
   it("covers every category the formats ask for", () => {

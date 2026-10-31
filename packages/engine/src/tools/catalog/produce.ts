@@ -483,7 +483,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     made,
     `Style: ${rule.id} because ${plan.why}${plan.fallback ? `; ${plan.fallback.wanted} could not run (${plan.fallback.why})` : ""}.`,
     brief ? briefSummary(brief).split("\n")[0]! : "No brief.",
-    ...(brief?.draw ? [`Drawn techniques (${brief.draw.format}, ${brief.draw.energy}): ${brief.draw.picks.map((p) => p.technique).join(", ")}. get_style_tool each; build the ones the concept carries in the film's own objects, drop the rest with a reason.`] : []),
+    ...(brief?.draw ? [`Drawn techniques (${brief.draw.format}, ${brief.draw.energy}): ${brief.draw.picks.map((p) => p.technique).join(", ")}. get_technique_tool each; build the ones the concept carries in the film's own objects, drop the rest with a reason.`] : []),
     `Stages (${undoSteps} undo step${undoSteps === 1 ? "" : "s"}, one per stage): ${director.stages.map((s) => `${s.stage} ${s.outcome === "applied" ? "ok" : s.outcome}${s.tool !== "-" && s.outcome !== "applied" ? ` (${s.tool}: ${s.summary})` : ""}`).join(" · ")}`,
     ...(rendered ? [`Render: ${rendered.path}${rendered.seconds ? ` (${rendered.seconds.toFixed(1)} s)` : ""}.`] : []),
     ...(findings.length > 0
