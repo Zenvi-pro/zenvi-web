@@ -22,6 +22,7 @@ import type { ToolCall, ToolOutcome } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
 import { motionMedia, placeMotionPlan } from "./motion-templates.js";
+import type { MusicSegment } from "../../reels/loop.js";
 import { placeMusicBed } from "./music-bed.js";
 
 const TOOL = "build_reel_tool";
@@ -32,6 +33,8 @@ export interface MotionReelInput {
   ids: readonly string[];
   music: ProjectFile | null;
   beats: MusicBeats | null;
+  /** The music's stretches when it loops to reach the asked length (reels/loop.ts). */
+  loop?: readonly MusicSegment[];
   /** Tempo of the grid when there is no music (default: the style's). */
   fallbackBpm?: number;
   /** Receipt fields about where the beat grid came from. */
@@ -152,7 +155,7 @@ export async function buildMotionReel(call: ToolCall, input: MotionReelInput): P
     const layers = lowestTracks(tx, (music ? 1 : 0) + motionTracks);
     const musicLayer = music ? layers[0]! : null;
     const motion = music ? layers.slice(1) : layers;
-    if (music && musicLayer !== null) placeMusicBed(tx, String(music.id), grid.musicStart, duration, musicLayer, input.names.get(String(music.id)));
+    if (music && musicLayer !== null) placeMusicBed(tx, String(music.id), grid.musicStart, duration, musicLayer, input.names.get(String(music.id)), input.loop);
     for (const { scene, start, parts } of placed) {
       for (const { plan, base, written } of parts) placeMotionPlan(tx, plan, written, start, fps, motion.slice(base, base + plan.tracks), `${style.name}: ${scene.name}`);
     }

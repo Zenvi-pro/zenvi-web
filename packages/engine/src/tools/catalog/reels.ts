@@ -40,6 +40,7 @@ import { bundledFamily } from "../../typography/families.js";
 import { outlineSvgText } from "../../typography/outline.js";
 import { MOTION_STYLE_IDS, MOTION_STYLES, isMotionStyleId } from "../../motion/styles.js";
 import { buildMotionReel } from "./motion-reels.js";
+import { loopMusic, loopNote } from "../../reels/loop.js";
 import { placeMusicBed } from "./music-bed.js";
 import { cardSvg, flashSvg, type CardRole } from "../../reels/typography.js";
 import { beatOverrideProblem, beatOverrideShape, explicitBeats } from "../beat-override.js";
@@ -90,7 +91,7 @@ const input = z.strictObject({
     .optional()
     .describe("Media-bin videos and images to use, in story order; the last one closes the reel. Bin order is not a story order: get one from sequence_shots_tool (dry_run: true, its data.file_ids). Default: every video and image in the bin (not SVG titles), in bin order."),
   music_file_id: z.string().optional().describe("Music in the media bin to cut to. Default: the longest audio file in the bin. Without music the cuts follow the style's own tempo."),
-  duration_seconds: z.number().min(4).max(120).optional().describe("Target length, seconds (default per style, 12-20). The reel ends on a bar line: the first at or after it (at most a bar longer), else the nearest; the summary says the final length and why."),
+  duration_seconds: z.number().min(4).max(120).optional().describe("Target length, seconds (default per style, 12-20). The reel ends on a bar line: the first at or after it (at most a bar longer), else the nearest; music shorter than this loops whole phrases on a bar line so the reel still runs the full length. The summary says the final length and why."),
   hook: z.string().max(80).optional().describe("Opening title over the first shots: 2-6 punchy words."),
   end_card: z.string().max(80).optional().describe("Closing title over the last shot (a call to action, a name, a date)."),
   end_card_subtitle: z.string().max(80).optional().describe("A smaller line under the end card."),
@@ -382,11 +383,17 @@ export const reelTools: CatalogTool[] = [
       // No grid from the music (none, or tracking failed): the caller's bpm still sets the cut tempo.
       const fallbackBpm = beats ? undefined : args.bpm;
       if (fallbackBpm) beatSource = `${fallbackBpm} BPM`;
+      // An asked length the music cannot fill: whole phrases loop on a bar line (round 7: 26.2 s of a 30 s ask).
+      const loop = beats && args.duration_seconds !== undefined ? loopMusic(beats, args.duration_seconds) : null;
+      if (loop && beats) {
+        warnings.push(loopNote(beats, loop, args.duration_seconds!));
+        beats = loop.music;
+      }
 
       if (isMotionStyleId(styleId)) {
         if (args.labels && args.labels.length > ids.length) warnings.push("More labels than files: the extra labels are not used.");
         if (args.grade) warnings.push("grade is for the cut styles (hype, highlight, ...); this style keeps the shots' own colour.");
-        return buildMotionReel(call, { style: styleId, ids, music: music ?? null, beats, ...(fallbackBpm ? { fallbackBpm } : {}), beatInfo: { beat_source: beatSource, ...(tempo ? { music_tempo: tempo } : {}) }, names, warnings, args });
+        return buildMotionReel(call, { style: styleId, ids, music: music ?? null, beats, ...(loop ? { loop: loop.segments } : {}), ...(fallbackBpm ? { fallbackBpm } : {}), beatInfo: { beat_source: beatSource, ...(tempo ? { music_tempo: tempo } : {}) }, names, warnings, args });
       }
       if (args.words) warnings.push("words are for the motion styles (ui_promo, editorial_motion, product_callout, tutorial); this style does not use them.");
       const style = REEL_STYLES[styleId];
@@ -491,7 +498,7 @@ export const reelTools: CatalogTool[] = [
         }
         const track = reelTracks(tx);
 
-        if (music) placeMusicBed(tx, String(music.id), plan.musicStart, plan.duration, track.music, names.get(String(music.id)));
+        if (music) placeMusicBed(tx, String(music.id), plan.musicStart, plan.duration, track.music, names.get(String(music.id)), loop?.segments);
 
         // The end card comes in just after the last cut.
         const last = plan.shots[plan.shots.length - 1]!;

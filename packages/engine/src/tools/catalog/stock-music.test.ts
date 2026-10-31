@@ -37,12 +37,23 @@ const sound = (id: number, license = "http://creativecommons.org/publicdomain/ze
   previews: { hq_mp3: `https://cdn.freesound.test/${id}-hq.mp3` },
 });
 
-/** Previews by id: 31 = 90 BPM, 32 = 128 BPM, 33 = 160 BPM, 34 = a quiet 128 pad. */
+/** 8 s of a quiet 128 groove, then the full one: a drop at 8 s. */
+function dropping(): Float32Array {
+  const quiet = groove(128, 8, 0.02);
+  const loud = groove(128, 16);
+  const out = new Float32Array(quiet.length + loud.length);
+  out.set(quiet);
+  out.set(loud, quiet.length);
+  return out;
+}
+
+/** Previews by id: 31 = 90 BPM, 32 = 128 BPM, 33 = 160 BPM, 34 = a quiet 128 pad, 35 = 128 with a drop at 8 s. */
 const PREVIEWS: Record<string, Float32Array> = {
   "31": groove(90),
   "32": groove(128),
   "33": groove(160),
   "34": groove(128, 16, 0.02),
+  "35": dropping(),
 };
 
 /** How many previews the host was asked to decode. */
@@ -190,5 +201,17 @@ describe("search_freesound_music_tool licences", () => {
     expect(cc0.data.results.map((r) => r.sound_id)).toEqual([31]);
     const any = await search({ query: "loop", licence: "any" }, musicHost({ sounds: sounds() }));
     expect(any.data.results.map((r) => r.sound_id)).toEqual([31, 33, 32]);
+  });
+
+  it("measures a music-bed search without filters, and keeps the track whose energy curve drops, saying where", async () => {
+    const bed = await search({ query: "loop", count: 4, min_seconds: 30 });
+    expect(bed.data.measured).toBeGreaterThan(0);
+    expect(bed.data.results[0]).toHaveProperty("energy_curve", "steady");
+    const sounds = [sound(32), sound(35)];
+    const { result, data } = await search({ query: "loop", energy_curve: "drop" }, musicHost({ sounds }));
+    expect(data.results.map((r) => r.sound_id)).toEqual([35]);
+    expect((data.results[0] as { drop_seconds?: number }).drop_seconds).toBeGreaterThanOrEqual(7);
+    expect((data.results[0] as { drop_seconds?: number }).drop_seconds).toBeLessThanOrEqual(9);
+    expect(result.text).toMatch(/id=35 .*curve=drop \(drop at [789]s\)/);
   });
 });

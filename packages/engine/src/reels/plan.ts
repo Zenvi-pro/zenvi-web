@@ -263,7 +263,10 @@ export function planReelGrid(input: ReelGridInput): ReelGrid {
   const bars = grid.downbeats.filter(inMusic);
   const up = bars.find((t) => t >= target - EPS);
   const nearest = [...bars].filter((t) => t >= target * 0.6).sort((a, b) => Math.abs(a - target) - Math.abs(b - target) || b - a)[0];
-  const downEnd = up !== undefined && up - target <= bar + EPS ? up : nearest;
+  // Music that covers the target but not the bar line after it ends on the last beat before the target
+  // (under a beat short) rather than a whole bar early (round 7: 26.2 s of a 30 s ask).
+  const coversTarget = musicLeft >= target - EPS;
+  const downEnd = up !== undefined && up - target <= bar + EPS ? up : coversTarget && up === undefined ? undefined : nearest;
   const beatEnd = [...grid.beats].reverse().find((t) => t <= Math.min(target, musicLeft) + EPS && t > EPS);
   const duration = round3(downEnd ?? beatEnd ?? Math.min(target, musicLeft));
   const totalBeats = grid.beats.findIndex((t) => Math.abs(t - duration) < 1e-3);
@@ -271,7 +274,7 @@ export function planReelGrid(input: ReelGridInput): ReelGrid {
   const asked = `${round3(target)}s asked for`;
   const onBar = `ends on a bar line at ${Math.round(grid.bpm)} BPM`;
   let why: string;
-  if (downEnd === undefined) why = beatEnd === undefined ? `the music runs out before the ${asked}` : `ends on the last beat before the ${asked} (no bar line fits)`;
+  if (downEnd === undefined) why = beatEnd === undefined ? `the music runs out before the ${asked}` : `ends on the last beat at or before the ${asked} (no bar line fits)`;
   else if (Math.abs(duration - target) < 0.02) why = `${onBar}, as asked`;
   else if (downEnd === up) why = `${onBar}: the first one at or after the ${asked}`;
   else if (up === undefined && musicLeft < target) why = `${onBar}: the music runs out before the ${asked}`;

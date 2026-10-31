@@ -240,6 +240,8 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   place_on_word_tool: { reason: "needs word timings (speech recognition)", params: "*" },
   insert_broll_on_words_tool: { reason: "needs word timings (speech recognition)", params: "*" },
   snap_cuts_to_onsets_tool: { reason: "not proven yet: needs a fixture with audible onsets off the cuts", params: "*" },
+  fill_to_length_tool: { reason: "not proven yet: appends shots and music to an edit that runs short (fill-length tests cover the plan)", params: "*" },
+  snap_cuts_to_beats_tool: { reason: "not proven yet: needs a fixture with music whose beat falls off the cuts", params: "*" },
   shot_length_ramp_tool: { reason: "not proven yet: builds a montage of ramping shot lengths", params: "*" },
   spot_action_foley_tool: { reason: "not proven yet: needs footage with visible impacts and taps", params: "*" },
   add_guide_overlay_tool: { reason: "not proven yet: tracking needs moving footage with a known point", params: "*" },
