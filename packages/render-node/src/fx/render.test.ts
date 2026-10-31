@@ -140,6 +140,16 @@ describe("Zenvi FX renderer", () => {
   }, 60_000);
 
   describe("datamosh carry", () => {
+    /**
+     * How far an untouched frame (1.5 s, long after the mosh) sits from the
+     * source after the ProRes round trip. It depends on the ffmpeg build's
+     * 4:2:0 chroma resampling: about 1 with ffmpeg 9, 3.4 with Ubuntu's 6.1.
+     */
+    const roundTripFloor = async (file: string): Promise<number> => {
+      const floor = await frameDiff(file, clip, 1.5);
+      expect(floor).toBeLessThan(4);
+      return floor;
+    };
     const mosh = (params: Record<string, unknown>, at = 1.5) => stack([{ effect: "datamosh_carry", params: { length: 0.5, ...params, carry: { file_id: "A", at } } }], 2);
 
     it("pushes the clip's first frames along the motion before the cut, then lands clean", async () => {
@@ -150,17 +160,18 @@ describe("Zenvi FX renderer", () => {
       expect(audio).toMatchObject({ codec_type: "audio", codec_name: "pcm_s16le" });
       expect(await frameDiff(r.path, clip, 0.1)).toBeGreaterThan(6);
       // 0.5 s is 15 frames: from the 16th on the clip is untouched.
-      expect(await frameDiff(r.path, clip, 0.7)).toBeLessThan(2.5);
-      expect(await frameDiff(r.path, clip, 1.5)).toBeLessThan(2.5);
+      const floor = await roundTripFloor(r.path);
+      expect(await frameDiff(r.path, clip, 0.7)).toBeLessThan(floor + 0.5);
     }, 60_000);
 
     it("has nothing to carry from footage that stands still, unless the last frame lingers", async () => {
       const fx = renderer("mosh-still");
       const bare = await fx.render({ path: clip, start: 0, end: 2, effects: mosh({ ghost: 0 }), carry: { path: still, at: 1.5 } });
-      expect(await frameDiff(bare.path, clip, 0.1)).toBeLessThan(2.5);
+      const floor = await roundTripFloor(bare.path);
+      expect(await frameDiff(bare.path, clip, 0.1)).toBeLessThan(floor + 0.5);
       const ghost = await fx.render({ path: clip, start: 0, end: 2, effects: mosh({ ghost: 1 }), carry: { path: still, at: 1.5 } });
       expect(await frameDiff(ghost.path, clip, 0.03)).toBeGreaterThan(20);
-      expect(await frameDiff(ghost.path, clip, 0.7)).toBeLessThan(2.5);
+      expect(await frameDiff(ghost.path, clip, 0.7)).toBeLessThan(floor + 0.5);
     }, 60_000);
 
     it("moves alpha with the picture, and the ghost does not fill in transparent pixels", async () => {
