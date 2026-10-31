@@ -33,8 +33,16 @@ export interface RequestFacts {
   subject: string;
 }
 
-/** A quoted phrase; an apostrophe inside a word (it's, don't, the city's) opens or closes nothing. */
-const QUOTED = /(?<![\p{L}\p{N}])['"‘“]([^'"’”\n]{2,90})['"’”](?![\p{L}\p{N}])/gu;
+/**
+ * A quoted phrase, each opening quote closed by its own kind; an apostrophe
+ * inside a word (it's, don't, the city's) opens or closes nothing, and may
+ * sit inside the phrase ("Joe's Diner").
+ */
+const IN_WORD = String.raw`(?<=[\p{L}\p{N}])['’](?=[\p{L}\p{N}])`;
+const QUOTED = new RegExp(
+  [String.raw`"([^"\n]{2,90})"`, String.raw`“([^”"\n]{2,90})[”"]`, String.raw`(?<![\p{L}\p{N}])‘((?:${IN_WORD}|[^’'\n]){2,90})’`, String.raw`(?<![\p{L}\p{N}])'((?:${IN_WORD}|[^'\n]){2,90})'(?![\p{L}\p{N}])`].join("|"),
+  "gu",
+);
 const STOP = new Set(
   "a an the of for to and or with in on at by from about into over under is are be it its this that these those make made create video edit reel promo clip film second seconds sec s long short vertical landscape square deliver mp4 please some one two three four five my our your their me us like style fps called named titled".split(" "),
 );
@@ -65,7 +73,7 @@ function secondsOf(request: string): number | null {
 
 /** Facts stated in `request`. */
 export function readRequest(request: string): RequestFacts {
-  const quoted = [...request.matchAll(QUOTED)].map((m) => ({ text: m[1]!.trim(), at: m.index ?? 0 }));
+  const quoted = [...request.matchAll(QUOTED)].map((m) => ({ text: m.slice(1).find((g) => g !== undefined)!.trim(), at: m.index ?? 0 }));
   const before = (at: number) => request.slice(Math.max(0, at - 40), at).toLowerCase();
   const named = quoted.find((q) => /\b(called|named|titled|brand|for)\s*$/.test(before(q.at)));
   const headline = quoted.find((q) => /\b(headline|hook|title|tagline|line|says?|reads?)\b[^'"‘“]*$/.test(before(q.at)) && q !== named);
