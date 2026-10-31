@@ -308,8 +308,11 @@ function missingIngredient(builder: BuilderPlan, input: RouteInput): string | nu
       return (input.features ?? 0) > 0 ? null : "no features (pass features: one per bar)";
     case "match_cut_montage_tool":
       return input.bin.pictures >= 3 ? null : `${input.bin.pictures} picture file(s): a match-cut chain needs at least 3`;
+    case "build_trailer_tool":
+      if (!input.product) return "no film or game title (pass title, or name it in quotes in the request)";
+      return input.bin.pictures > 0 ? null : "no footage for the trailer";
     default:
-      return input.bin.pictures > 0 || builder.tool !== "build_trailer_tool" ? null : "no footage for the trailer";
+      return null;
   }
 }
 
