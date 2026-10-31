@@ -31,9 +31,13 @@ const STARTS_A_VIDEO = new Set([
 
 const STYLES = STYLE_FILES.filter((f) => f.kind === "style");
 
-/** The receipt line for an auto brief. */
+/**
+ * The receipt line for an auto brief. It names the matched style's recipe:
+ * with the gate gone, merge-10 bench agents skipped the recipe and the
+ * style's signature tools and lost frame closeness on technique-heavy styles.
+ */
 export function autoBriefNote(brief: Brief): string {
-  return `Saved a minimal brief for this project (auto: style ${brief.style} matched from the styles index, ${brief.aspect}, ${brief.length_seconds} s, one beat). Nothing waits for it; save_brief_tool with your own hook, beats and storyboard plans the edit and has review check it.`;
+  return `Saved a minimal brief for this project (auto: style ${brief.style} matched from the styles index, ${brief.aspect}, ${brief.length_seconds} s, one beat). Nothing waits for it. Next: read_director_recipe {styles: "${brief.style}"} for that style's order and signature tools; save_brief_tool with your own hook, beats and storyboard plans the edit and has review check it.`;
 }
 
 /**

@@ -16,6 +16,7 @@ describe("the auto brief", () => {
     expect(readBrief(d.project)).toBeNull();
     const note = autoBriefFor("gather_stock_footage_tool", d, JSON.stringify({ queries: ["sprinter on a track", "sports car drift"] }));
     expect(note).toMatch(/^Saved a minimal brief for this project \(auto: style hype-reel matched from the styles index, 9:16, 15 s, one beat\)/);
+    expect(note).toContain('read_director_recipe {styles: "hype-reel"}');
     expect(readBrief(d.project)).toMatchObject({ auto: true, style: "hype-reel", aspect: "9:16", length_seconds: 15 });
     expect(d.undoLabels).toEqual([]);
     expect(autoBriefFor("add_clip_to_timeline_tool", d, "{}")).toBeUndefined();
