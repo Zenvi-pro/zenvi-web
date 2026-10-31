@@ -84,6 +84,15 @@ describe("readRequest", () => {
     expect(readRequest("A trailer for “Dune” with the line ‘it's time’").headline).toBe("it's time");
   });
 
+  it("reads the first length stated, not a decade or the footage's length", () => {
+    expect(readRequest("make an 80s retro synthwave reel").seconds).toBeNull();
+    expect(readRequest("a 90s hip hop vibe edit, 20 s").seconds).toBe(20);
+    expect(readRequest("a 60s ad for the bakery").seconds).toBe(60);
+    expect(readRequest("a 30 second reel from my 5 minutes of drone footage").seconds).toBe(30);
+    expect(readRequest("my 5 minutes of drone footage as a 30s reel").seconds).toBe(30);
+    expect(readRequest("a 20 minute film").seconds).toBe(1200);
+  });
+
   it("reads minutes, vertical frames and sizes", () => {
     expect(readRequest("a 1 minute vertical recap for TikTok")).toMatchObject({ seconds: 60, aspect: "9:16", platform: "TikTok" });
     expect(readRequest("4:3 (1440x1080), about 20 seconds").size).toEqual({ width: 1440, height: 1080 });

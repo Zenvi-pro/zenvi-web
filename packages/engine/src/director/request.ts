@@ -63,12 +63,23 @@ function aspectOf(request: string): BriefAspect | null {
   return null;
 }
 
+/** A length in minutes or seconds; "of" after it is the footage it comes from ("5 minutes of drone footage"). */
+const LENGTH = /\b(\d+(?:\.\d+)?)[- ]?(minutes?|mins?|seconds?|secs?|s)\b(?!\s+of\b)/gi;
+
+/** What follows "60s" when it is a length ("a 60s ad"), not a decade ("a 90s hip hop edit"). */
+const LENGTH_NOUN = /^\s*(?:[,.;)]|$|(?:long|reel|video|ad|edit|clip|cut|spot|promo|trailer|teaser|film|story|short|version|loop|intro|montage|recap)\b)/i;
+
+/** The first length the request states; a decade ("an 80s synthwave reel") is none. */
 function secondsOf(request: string): number | null {
-  const minutes = request.match(/\b(\d+(?:\.\d+)?)[- ]?(?:minutes?|mins?)\b/i);
-  if (minutes) return Math.round(Number(minutes[1]) * 60);
-  const seconds = request.match(/\b(\d+(?:\.\d+)?)[- ]?(?:seconds?|secs?|s)\b/i);
-  const n = seconds ? Number(seconds[1]) : NaN;
-  return Number.isFinite(n) && n >= 2 && n <= 600 ? n : null;
+  for (const m of request.matchAll(LENGTH)) {
+    const unit = m[2]!.toLowerCase();
+    if (unit === "s" && /^[5-9]0$/.test(m[1]!) && !LENGTH_NOUN.test(request.slice(m.index + m[0].length))) continue;
+    // Minutes are kept past the bounds so the tool can refuse a 20 minute film by name.
+    if (unit.startsWith("m")) return Math.round(Number(m[1]) * 60);
+    const n = Number(m[1]);
+    if (n >= 2 && n <= 600) return n;
+  }
+  return null;
 }
 
 /** Facts stated in `request`. */
