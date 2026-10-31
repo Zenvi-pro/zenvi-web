@@ -131,7 +131,13 @@ const IMAGE_SEQUENCE = ["-f", "image2", "-start_number", "1"];
 const PAD_EVEN = "pad=ceil(iw/2)*2:ceil(ih/2)*2";
 /** RGB → BT.709 limited range, tagged below, so players reproduce the colors; `deband` dithers smooth gradients on the way. */
 export const TO_YUV = (pixFmt: string, deband = false): string =>
-  deband ? `${DEBAND},scale=out_color_matrix=bt709:out_range=tv:sws_dither=a_dither,format=${pixFmt},${DITHER}` : `scale=out_color_matrix=bt709:out_range=tv,format=${pixFmt}`;
+  (deband ? `${DEBAND},scale=out_color_matrix=bt709:out_range=tv:sws_dither=a_dither,format=${pixFmt},${DITHER}` : `scale=out_color_matrix=bt709:out_range=tv,format=${pixFmt}`) + `,${TAG_FRAMES}`;
+/**
+ * The frames' own colour tags: ffmpeg 7+ writes the encoder's primaries and
+ * transfer from the frames, so the -color_primaries / -color_trc flags alone
+ * leave both "unknown" in the file (players then guess, and the picture shifts).
+ */
+const TAG_FRAMES = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv";
 /**
  * `deband`: smooth gradients that arrive as flat 8-bit plateaus (CSS and SVG
  * grounds) at 16 bits, dither them down to the output's depth, and add a

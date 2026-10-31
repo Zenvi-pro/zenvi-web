@@ -2,7 +2,7 @@ import { bandingOf } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { runBinary } from "../ffmpeg/process.js";
-import { makeTempDir, removeDir } from "../test-support/fixtures.js";
+import { ffprobeJson, makeTempDir, removeDir } from "../test-support/fixtures.js";
 import { encoderCommand, TO_YUV } from "./encoder.js";
 
 let dir: string;
@@ -21,8 +21,10 @@ async function roundTrip(vf: string): Promise<Buffer> {
   const src = `gradients=s=${W}x${H}:c0=0x0e1116:c1=0x2a3640:x0=0:y0=0:x1=${W}:y1=0:d=1:speed=0`;
   await runBinary(ffmpeg, ["-v", "error", "-f", "lavfi", "-i", src, "-frames:v", "1", "-vf", vf, "-c:v", "libx264", "-crf", "14", "-y", out]);
   const raw = await runBinary(ffmpeg, ["-v", "error", "-i", out, "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgba", "-"]);
+  last = out;
   return raw.stdout;
 }
+let last = "";
 
 describe("the deband pass (cinetic's dithered gradients)", () => {
   it("turns a banded 8-bit gradient into one the banding check passes", async () => {
@@ -30,6 +32,10 @@ describe("the deband pass (cinetic's dithered gradients)", () => {
     const dithered = bandingOf({ width: W, height: H, data: await roundTrip(TO_YUV("yuv420p", true)) });
     expect(plain.area).toBeGreaterThan(0.03);
     expect(dithered.area).toBeLessThan(plain.area / 4);
+    // BT.709 in the file itself, primaries and transfer too (cinetic's probe.py gate).
+    const probe = await ffprobeJson(last);
+    const v = probe.streams.find((s) => s.codec_type === "video") as Record<string, unknown>;
+    expect([v.color_space, v.color_primaries, v.color_transfer]).toEqual(["bt709", "bt709", "bt709"]);
   });
 
   it("is in the H.264 chain when asked, tagged BT.709, and never on alpha ProRes", () => {
