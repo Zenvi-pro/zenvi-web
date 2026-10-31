@@ -55,6 +55,11 @@ This entry is the sound: sparse bed, sub 8-12 f before the cut, kick on the cut 
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-oh-quiet-intro-drop.mp4` (1280x720p60, bg card 0-2 s with a 2-word fade title, 3 s test-pattern stand-in cut in at 2.0 s over a 120 BPM tone bed): music dipped -14 dB for 0-1.98 s, sub_drop at 1.82 and impact_thud at 2.00 landed on the cut (kick transient at frame 119-120), tight 0.1-1.9 s title; the sheet shows the quiet type card then a hard cut to picture; watch judge 1.6/10 (stand-in test-pattern media, not the move).
+
+Found when rendering it (apply before building):
+
+- Step 2: eq_tool preset muffle applies to the whole clip it is given, so split the music at the cut first (split_clips_tool at 1.98) and EQ only the intro piece; do not EQ the full music clip.
+- Step 1: add_clip_to_timeline_tool wants start_seconds + duration_seconds to trim; end_seconds with position_seconds>0 and no start_seconds produced a 5 s clip for end_seconds 3 at position 2 (use duration_seconds).
 
 Translated from cinetic's technique library (`oh-quiet-intro-drop`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

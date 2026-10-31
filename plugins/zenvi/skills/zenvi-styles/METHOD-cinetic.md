@@ -142,6 +142,19 @@ with no brand. Other Zenvi styles use serif-italic accents and glass cards on pu
   button zones get background, not an empty band. Text never lands on text.
 - After each act: `review_edit_tool {"start": a, "end": b}` and look at its sheet.
 
+- Zenvi facts that rendering 30 of the techniques taught (2026-10-31):
+  - `set_keyframes_tool` `seconds` count from the clip's start; on a clip that starts later use
+    `timeline_seconds`, or the move lands that much late.
+  - Titles and kinetic titles are one clip per word with absolute `location_x`/`location_y`: read the
+    word's own value first and animate from it; scale words about a shared pivot (`loc = C + f * (loc - C)`).
+  - `origin_x`, `origin_y` and `corner_radius` cannot be keyframed; `apply_fx_tool` refuses titles and
+    stills (use `add_effect_tool` Blur with keyframes there).
+  - The UI blocks (`prompt_bar`, `chart_build`, `data_table`, `cursor_path`) keep their own internal
+    timing: measure where their beat lands in a draft and put the cut and the sound there.
+  - `add_shape_mask_tool` ellipses default to 0.6 of the frame: an iris that must cover the frame needs
+    width and height above 1.42.
+  - Use `duration_seconds` on `add_clip_to_timeline_tool` when the clip does not start at 0.
+
 ## Step 5. Sound
 
 - Effects come from visible events: `spot_sound_tool` lists the events still without a cue;

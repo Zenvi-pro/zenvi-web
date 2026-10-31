@@ -53,6 +53,11 @@ Soft `whoosh_short` at the start; a `ui_tap` at the swap frame.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-cam-isolating-push.mp4` (1280x720p60, two copies of a test-pattern UI on tracks 1 and 2: the top copy masked to one row rectangle, both scaled 1 to 4 over 0.8-2.13 s ease_in_out_sine with location compensation, the full copy underneath alpha 1 to 0 over 0.33 s): frames 0.8-2.18 s show the siblings going dark within 0.33 s while the masked item grows to about 4x and travels towards the centre; the item is roughly (not exactly) centred at the end, so location_x/y values need a hand check; watch judge 1.6/10 (stand-in media, no sound).
+
+Found when rendering it (apply before building):
+
+- Step 1: set_keyframes_tool refuses origin_x and origin_y (only alpha, location_x, location_y, rotation, scale_x, scale_y, volume are accepted by the CLI). Scale about the frame centre and add location_x/location_y keyframes on the same times and ease to bring the item to the centre (for an item at (0.7, 0.4) and 4x, about location_x -0.8 and location_y +0.4; verify by eye, it landed near (0.6, 0.45)).
+- Step 2: the sibling fade works as a second full copy of the screen on the track below with alpha 1 to 0 over 0.33 s, while the top copy carries add_shape_mask_tool on the item (rectangle, outside false); both copies need the same scale/location keyframes.
 
 Translated from cinetic's technique library (`cam-isolating-push`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

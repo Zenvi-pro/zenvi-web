@@ -52,6 +52,12 @@ A mouse_click at -20 dB on the press frame; the travel is silent.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-mi-guide-cursor-hover-press.mp4` (1280x720p60, cursor_path motion block (full frame, background a test-pattern still, two stops Open and Send, cursor_size 0.6, target 170, 5 s) with a mouse_click at 1.9 s): the pointer starts bottom right, reaches the first stop with a hover outline and an Open label pill by about 1.55 s, and the second stop with a Send pill by about 3.4 s; click time is the block's own, so the sfx has to be read off frames (I placed 1.9 s by eye); judged on picture only; watch judge 1.8/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: params.points must be a list of {x, y} objects (x and y 0-1): [{"x": 0.25, "y": 0.3}, {"x": 0.7, "y": 0.65}]; the [[x, y]] arrays are refused (Error: points must be a list of {x, y} points).
+- Step 1: params.target is the hover outline width in px at 1080 (default 170), not 1; cursor_size is a multiple of 88 px at 1080 (0.6 reads small at 720p, use 1 or more). background takes a media-bin file id (a still worked); without placement it rendered full frame.
+- Steps 2-3: the block has no timing parameters: the pointer reached the first stop about 1.5 s into a 5 s block and the second near 3.4 s, so read the arrival and press frames off a render before placing the mouse_click, and do not expect the 6-12 f arrival lead or the 4 f hover fill to be controllable; the hover fill and press recoil are inside the block, not separate clips with an alpha curve.
 
 Translated from cinetic's technique library (`mi-guide-cursor-hover-press`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

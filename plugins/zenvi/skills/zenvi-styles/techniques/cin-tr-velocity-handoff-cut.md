@@ -54,6 +54,12 @@ A short whoosh peaking on the cut frame (the fastest frame); no hit unless the i
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-tr-velocity-handoff-cut.mp4` (1280x720p60, two test-pattern clips on one track cut at 2.0 s: A location_x 0 to -0.16 over its last 0.33 s ease_in_cubic, B location_x 0.21 to 0 over 1 s ease_out_expo, directional_blur 0.15 s each side of the cut, whoosh_short at 1.9 s): frames 1.67-2.78 s show A sliding left with a smear and a black wedge at the right edge, then B arriving from the right already blurred, a thin black strip at 2.28 s and settled by about 2.45 s; measured about 37 px/f out and 35 px/f in (inside the 25-40 px/f band); watch judge 1.7/10 (stand-in test patterns, not the move).
+
+Found when rendering it (apply before building):
+
+- Steps 2-3: set_keyframes_tool points with seconds count from the clip start; B starts at T, so write B's points with timeline_seconds (timeline_seconds: T and T+1.0). With seconds: T on a clip starting at T the entry is silently pushed T seconds late (B sat displaced for 2 s and the brake happened at 4-5 s).
+- Step 4: apply_fx_tool bakes each clip into a new .mov (ui-fx-xxxx.mov) and keeps the clip id; run it after set_keyframes_tool (keyframes survive). review_edit_tool still reports needs-motion-blur on the baked move (false positive), so ignore that flag after step 4.
+- Steps 2-3: with unscaled clips the move reveals a black wedge at the exposed edge (right edge of A, left edge of B); scale both clips slightly up (about 1.1) if the edge must not show.
 
 Translated from cinetic's technique library (`tr-velocity-handoff-cut`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

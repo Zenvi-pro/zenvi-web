@@ -53,6 +53,11 @@ One whoosh_short at -20 dB under the panel entry and a very soft impact_thud at 
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-ui-push-aside-reflow.mp4` (1280x720p60, three tracks, a flat card, a 0.5-scale test-pattern neighbour and a 0.62 x 0.9 bars panel with location_x 0.85 to 0.15 over 1.2 s ease_in_out_expo and the neighbour's location_x sampled every 3 f from the panel's left edge minus 0.02, whoosh_short at 0 s): the panel enters from beyond the right edge, the neighbour sits still until contact at about 0.7 s, then travels with the panel edge (location_x 0 to -0.43) and ends partly off the left edge; watch judge 2.1/10 (test patterns).
+
+Found when rendering it (apply before building):
+
+- Step 3: a two-point ease_in_out_sine on the neighbour (0 at 0.70 s to -0.2 at 1.2 s) does not bind it to the panel: the gap opens or the two overlap. Write the neighbour as location_x = min(0, panel_left_edge - gap - neighbour_right_edge) sampled every 3 f (25 points for 1.2 s, "interpolation": "linear") from the same ease as the panel; for a 0.62-wide panel (scale_x 0.62, location_x 0.85 to 0.15) and a 0.5-wide neighbour that gave 0 until about 0.55 s and -0.43 at the end, which leaves the card cropped by the left edge, so shrink it (scale 0.5 to 0.4) or start it further right if it must stay in frame.
+- Steps 1-2: a clip's size comes from scale_x/scale_y (panel scale_x 0.62, scale_y 0.9 on a full-frame source), and location_x is an offset of the centre in frame widths: 0.85 puts a 0.62-wide panel fully off the right edge, 0.19 puts its right edge on the frame edge (the 0.1 in the file leaves a 0.09 gap on the right).
 
 Translated from cinetic's technique library (`ui-push-aside-reflow`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

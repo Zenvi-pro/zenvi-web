@@ -53,6 +53,12 @@ One very soft `ui_tap` per step the lead passes (-22 dB); nothing for the travel
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-cam-lead-follow.mp4` (1280x720p60, test-pattern UI at scale 2.5 with 36 linear location_y keyframes computed as a first-order lag (0.08 per frame) of a dot that steps down in three moves, plus a 64 px flat orange dot clip with its own location_y track): the layout scrolls under the dot, which stays within about 0.05 of the frame height of its 40 % mark and never freezes; row reveals, ui_tap sounds and screen_zoom_follow_tool were not built; watch judge 1.9/10 (stand-in media).
+
+Found when rendering it (apply before building):
+
+- Step 2: the lag cannot be written as four ease_out_cubic points; sample the lead every 6 f and write the camera as a first-order lag of it (cam += (lead - cam) * 0.08 per frame, plus 0.002 per frame drift) with "interpolation": "linear" and mode replace (36 points for 3.5 s was accepted); the lead (flat dot) needs its own location_y keyframes = lead - camera, as a separate clip on a track above the layout (a 64 px dot.png needs scale ~0.05; an image fills the frame at scale 1).
+- Step 3: screen_zoom_follow_tool args are wrong: ease is a number (seconds each push/pan/pull takes, default 0.45, max 2), "ease_out_cubic" is refused; cursor is object[] of click positions (0-1 over source time), not true; rate is the analysis frames per second (1-15), not a lag rate; there are also min_hold and stops [{source seconds, 0-1 point}].
+- Step 2: layout must be scaled (here 2.5) so there is room to travel without showing black; a tall layout at scale 1 has none.
 
 Translated from cinetic's technique library (`cam-lead-follow`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

@@ -52,6 +52,12 @@ Reuse the opening's sound recipe at the same relative frame, plus one hit on the
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-le-bookend-replay.mp4` (1280x720p60, flat card with a Made for makers title (0.3-1.8 s) and a Solid_Color card rising location_y 0.1 to 0 with alpha 0 to 1, both duplicated to 3.0 s with duplicate_clips_tool and the copy retitled Made with Zenvi with edit_title_tool scope this_clip, whoosh_short at 3.0 s): the duplicated card replays the same rise at 3.0-3.5 s at the same size and position (alpha 0.5 and location_y 0.017 at 3.1 s, settled at 3.5 s); my card sat above the title so the text was hidden in the frames I checked; watch judge 1.7/10.
+
+Found when rendering it (apply before building):
+
+- Step 2: duplicate_clips_tool already copies the keyframes, effects and transitions with the clips, so the copy_clip_keyframes_tool call is redundant (it answers Nothing to change); and its timing argument is stretch | offset | exact (keep is refused), exact copies absolute times, offset keeps them relative to the clip start.
+- Step 3: edit_title_tool {"timeline_clip_id": "<copy_b>", "text": "Made with Zenvi", "scope": "this_clip"} gave the copy its own edited title (receipt: Gave clip ... its own edited title); pass scope this_clip explicitly so the opening title is not rewritten with it.
+- Step 2: duplicate_clips_tool puts the copies back on their own tracks at position_seconds (to_track empty = same tracks); a copy that would overlap is refused unless allow_overlap is set, so place it after the original ends.
 
 Translated from cinetic's technique library (`le-bookend-replay`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

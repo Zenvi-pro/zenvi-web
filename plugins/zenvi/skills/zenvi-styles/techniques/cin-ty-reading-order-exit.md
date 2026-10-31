@@ -51,6 +51,12 @@ None; the exit is a clearing gesture, any sound belongs to the next move.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-ty-reading-order-exit.mp4` (1280x720p60, editorial title Everything you need (stagger 0, 0.5-3.5 s, one clip per word) with the word clips you and need exiting at 2.0 and 2.067 s via location_y -0.012 (ease_in_cubic) and alpha 1 to 0 over 0.167 s, swish_airy at 2.0 s): at 2.00 s the full line shows, at 2.17 s you has gone and need is fading, at 2.25 s only Everything remains and does not move; watch judge 2.5/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: add_kinetic_title_tool already makes one clip per word (g0w0 Everything, g0w1 you, g0w2 need, on separate tracks), so no separate hero title is needed; with stagger_seconds 0 and emphasis none the words stand together and only the leaving word clips are keyed (the hero clip is left alone).
+- Step 2: word clips are placed by absolute location_y (here 0.6647 for you and 0.6627 for need), so the exit points must start from that base: [{timeline_seconds: 2.0, value: 0.6647}, {timeline_seconds: 2.167, value: 0.6527, ease: ease_in_cubic}] (-0.012 is the lift), not 0 to -0.012, and use mode merge on alpha so the baked fade-in stays.
+- Step 2: points need timeline_seconds (the title starts at 0.5 s).
 
 Translated from cinetic's technique library (`ty-reading-order-exit`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

@@ -53,6 +53,13 @@ Only the action that carries the accent gets a sound: a pressed button gets `add
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-cl-mono-one-accent.mp4` (1280x720p60, test-pattern UI and bars both graded black_and_white with one color_grade_clip_tool call, an orange (#ff5a1f) add_guide_overlay_tool ring on the UI at 1.0-2.2 s with alpha 1 to 0.7 to 0.3, and an editorial Ship the whole film title on a near-black card at 3.0 s with whole in orange): the shot reads grey except the ring and the one orange word; the first try with *whole* showed the asterisks and the stack style set the line as a vertical word stack; watch judge 1.9/10.
+
+Found when rendering it (apply before building):
+
+- Step 2: add_kinetic_title_tool prints the asterisks (the line rendered as *WHOLE* in orange); pass the plain text and the emphasis list only: text: Ship the whole film, emphasis: [whole]. The default stack style sets a left-aligned vertical stack of words, so add style: editorial for a one-line payoff (whole then renders in the italic accent).
+- Step 3: add_guide_overlay_tool box takes {x, y, w, h} (not width/height; 'w' is a required property); the ring lands on a new top track (here track 7) at the start time, and a 0.14 x 0.10 box was drawn as an ellipse, so use w 0.1, h 0.178 at 16:9 for a circle.
+- Step 4: the ring's alpha points need timeline_seconds (the ring clip starts at 1.0); the keyframes were accepted on the guide clip.
+- Step 1: color_grade_clip_tool {"timeline_clip_ids": [...], "look": "black_and_white"} works as written in one call.
 
 Translated from cinetic's technique library (`cl-mono-one-accent`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

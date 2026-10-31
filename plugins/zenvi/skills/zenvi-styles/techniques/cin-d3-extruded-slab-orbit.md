@@ -54,6 +54,12 @@ A soft swish_airy on each camera move at -18 dB; cursor clicks get mouse_click a
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-d3-extruded-slab-orbit.mp4` (1280x720p60, add_3d_scene_tool device_mockup (tablet, file_id of the UI clip, move orbit, body graphite, shadow, no dof, size 0.7, dark, 3 s draft, 32 s render) plus a documentary rise caption at 1.2 s and swish_airy at 0.3 s): the slab turns through about 30 degrees of yaw over the 3 s with its bezel edge visible and settles face-on-ish by 1.9 s; the caption was centred on top of the slab rather than in an open third; the push, cursor-led whip and final rerender were not built; watch judge 3.2/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: the device_mockup call works exactly as written (device tablet, file_id, move orbit, body graphite, shadow, dof, size, background dark, quality draft rendered in about 32 s for 3 s); the receipt places it on the lowest free track above the picture.
+- Step 4: with move orbit the slab is centred, so a caption at y 0.5 prints over it; push the caption into a corner thirds position (y 0.85) or use move push/hero which clears a third, as the Technique already says for the push beat.
+- Step 1: the recording is the media-bin file id of the screen recording (params.file_id), with media_start_seconds for the in-point; a 60 fps test pattern was accepted.
 
 Translated from cinetic's technique library (`d3-extruded-slab-orbit`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

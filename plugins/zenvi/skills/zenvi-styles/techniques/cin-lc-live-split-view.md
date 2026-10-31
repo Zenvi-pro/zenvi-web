@@ -52,6 +52,12 @@ The typing or marker steps get ui_tap or keyboard_key at -18 dB at most; the eff
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-lc-live-split-view.mp4` (1280x720p60, add_motion_template_tool compare (variant side_by_side, file_ids cause then effect, labels Prompt and Result, 0-5 s) with scale 1 to 1.04 linear over 0.5-4.5 s and a 0.06 exit pan on both panel clips): two playing panels fill the left and right halves with the labels at the bottom, the creep and exit pan applied to panel-1 (location_x -0.251) and panel-2 (+0.251); the panels run edge to edge with no 3 % gutter; the chat_thread block option was placed once and removed; watch judge 1.7/10.
+
+Found when rendering it (apply before building):
+
+- Step 3: add_motion_template_tool compare works as written; it returns five clips (compare-bg, panel-1, panel-2, label-1, label-2) on tracks 1-5, with panel-1 at location_x -0.251 and panel-2 at +0.251 (scale 1) and no gutter between them; panel ids come from the receipt, and the creep and exit-pan points must use timeline_seconds (the panels enter at 0 and 0.25 s).
+- Step 4: key the creep on the two panel clips only (not the labels), and write the exit pan around their base location_x (-0.251 to -0.311 and +0.251 to +0.191), not 0 to -0.06, or the panels jump to the centre.
+- Step 1: chat_thread over compare is a separate alternative; adding both stacks the chat block over the split.
 
 Translated from cinetic's technique library (`lc-live-split-view`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

@@ -52,6 +52,12 @@ One soft pop on the last removal; the removals themselves stay silent so the hol
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-lc-subtract-to-one.mp4` (1280x720p60, add_motion_template_tool grid with six file_ids and reveal cut (0-4 s, 7 clips: backdrop plus six tiles entering every 0.5 s on 120 BPM), then tiles 2-6 ended at 3.00, 3.08, 3.16, 3.24 and 3.32 s with the CLI trim --edge right --to, pop at 3.32 s): the frames at 2.92-3.42 s show the board losing a tile every ~5 f until one tile remains; the survivor re-centre (constant location keyframes), hold and drift were not built; watch judge 2.4/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: add_motion_template_tool grid works as written (template grid, file_ids, tiles 6, reveal cut) but the tiles enter on the beats about 0.5 s apart (first at 0, last at 2.5 s), so the board is only full from 2.5 s; start the removals after 2.5 s. It returns 7 clips (a grid-bg and tile-1-1 to tile-1-6 on tracks 1-7) whose ids are in the receipt's clips list.
+- Step 2: to end a tile early use `zenvi trim <clip> --edge right --to <timeline s>` (tested on the receipt's tile clips; trim_clips_tool was not tried); the tile clips run past the template's duration (ends at 3.7-5.9 s for a 4 s template), so trim each to the removal time rather than counting on the template length.
+- Step 2: the receipt's survivor (tile-1-1) sits at location_x -0.33, location_y -0.25 and scale 0.50; re-centring needs location_x/location_y keyframes with "interpolation": "constant" at the removal time using timeline_seconds in the points.
 
 Translated from cinetic's technique library (`lc-subtract-to-one`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

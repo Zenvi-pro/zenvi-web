@@ -52,6 +52,12 @@ One pop or ui_tap at -22 dB on the press frame; the morph itself is silent.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-ui-container-morph.mp4` (1280x720p60, a full-frame Solid_Color title (add_title_tool with a space and background_color) scaled to a 0.5 x 0.09 pill, then scale_x 0.5 to 0.3 and scale_y 0.09 to 0.42 over 1.0-1.55 s on ease_in_out_expo, a black Solid_Color backdrop alpha 0 to 0.5, a Deployed kinetic title fading in at 1.35 s, pop at 1.0 s over a 3 s test-pattern UI): the white pill widens into a rounded tile centred on the frame with the picture dimming and the word appearing after the peak; the morph is one object with no swap; the rounded corners go slightly elliptical while stretching; watch judge 1.8/10 (stand-in UI).
+
+Found when rendering it (apply before building):
+
+- Step 2: set_keyframes_tool refuses corner_radius (only alpha, location_x, location_y, rotation, scale_x, scale_y, volume are accepted); set a static radius with set_clip_properties_tool {"timeline_clip_id": ..., "properties": {"corner_radius": 0.3}}. The radius is applied before the scale, so a non-uniform stretch makes the corners elliptical (visible on the pill ends); pick one radius that suits both shapes instead of easing it from full to 22 %.
+- Step 1: add_title_tool with text " " and background_color makes a full-frame solid (template Solid_Color, scale 1, centred); the card is that clip scaled down (scale_x 0.5, scale_y 0.09 for a pill), not a block of the stated size. Use two Solid_Color titles, one #000000 for the dimmer (alpha 0 to 0.5) and one for the card.
+- Step 4: the content child worked as a separate kinetic title (stagger_seconds 0, ink #101018 for contrast on the light card) placed with position_seconds 0.35 s into the morph, rather than as an alpha keyframe on a clip.
 
 Translated from cinetic's technique library (`ui-container-morph`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

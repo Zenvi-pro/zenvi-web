@@ -53,6 +53,12 @@ A whoosh_short at -18 dB peaking on the cut frame, a soft impact_thud at -26 dB 
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-pd-device-rise-on-cut.mp4` (1280x720p60, bars test pattern graded to grey (saturation 0, contrast 0.1, exposure -0.5) under a coloured test-pattern device card (scale 0.45): location_y 0.14 to 0 over 0.73 s ease_out_expo, both clips scaling to 0.9 of their size over 0.8 s ease_out_cubic, whoosh_short at 0): frames 0.12-0.87 s show the colour card moving up already on the first frame while the grey backdrop is the only other element, both settling smaller; add_3d_scene_tool device_mockup also rendered (75 s) with file_id; watch judge 2.1/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: color_grade_clip_tool contrast is -1..1 (1.1 is refused); use contrast 0.1 for a 10 % lift. saturation 0 and exposure -0.5 are valid.
+- Step 2: add_3d_scene_tool device_mockup takes the recording as params.file_id (a media-bin file id) and optional media_start_seconds, not params.video (params: Unrecognized key video); a final render took about 75 s for 1 s of picture.
+- Steps 3-4: when the device is a smaller object (the card here is scale 0.45), the shot-wide 1 to 0.9 scale has to start from each clip's own base scale (base to base*0.9), and the rise is added to location_y; with a full-size clip the file's values work as written.
 
 Translated from cinetic's technique library (`pd-device-rise-on-cut`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

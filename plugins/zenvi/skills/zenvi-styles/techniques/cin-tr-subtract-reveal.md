@@ -54,6 +54,12 @@ One whoosh at the start of the scatter; optionally a tiny `pop` as the hero is l
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-tr-subtract-reveal.mp4` (1280x720p60, counter motion block (98.6 %, 3 s) as the hero with four scaled-down cards on tracks 3-6 around it, each moving outward along the vector from the centre with location_x/location_y over 1.0-1.5 s on ease_in_out_expo (travel 1.6 x 1.1 frame units times 1 + 0.1 i), whoosh_short at 1.0 s): frames 0.95-1.6 s show the four cards flying to their corners and off the frame by about 1.33 s while the counter stays put and keeps counting; the window and staccato variants were not built; watch judge 5.8/10.
+
+Found when rendering it (apply before building):
+
+- Step 2: location_x/location_y points need the item's own base position as start (here -0.3/-0.25 and so on) and timeline_seconds; start the points with the hold at 0 (value base) and then T, otherwise the clip moves from the first keyframe; with the card base at the item's position the end value is base + outward vector (1.6 x 1.1 units cleared the frame from scale 0.3).
+- Step 1: the counter block is placed over_video on track 2 by default and the clutter clips on tracks 3+; add_clip_to_timeline_tool with track 3..6 keeps them above the hero. Counters keep rolling after the scatter (it reads 98 % at 1.08 s), so start the scatter after the count ends if the hero must be still.
+- Step 4: origin_x/origin_y cannot be keyframed (set_keyframes_tool refuses them); for the window variant scale about the corner with location compensation location = (1 - f) * (P - 0.5) per axis.
 
 Translated from cinetic's technique library (`tr-subtract-reveal`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

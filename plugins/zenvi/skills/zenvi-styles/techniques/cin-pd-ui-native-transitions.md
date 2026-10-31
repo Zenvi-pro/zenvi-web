@@ -53,6 +53,13 @@ A ui_tap at -22 dB on each trigger press; nothing on the transition itself, the 
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-pd-ui-native-transitions.mp4` (1280x720p60, flat card, a test-pattern window, a bars sheet and a white popover on four tracks: window scale 1 to 0.7 with location compensation toward the bottom-left corner and alpha out over 0.5-0.87 s, sheet location_y 1.0 to 0 over 1.0-1.87 s ease_in_out_sine, popover scale 0.09 to 0.18 from its trigger over 2.5-2.7 s ease_out_cubic with a 0.07 s alpha in, ui_tap at 0.4 s): the window shrinks toward the corner and fades before the sheet rises from the bottom, and the popover opens at its trigger; the mask-clipped sheet and cursor_path/prompt_bar blocks were not built; watch judge 1.9/10.
+
+Found when rendering it (apply before building):
+
+- Step 2: origin_x/origin_y cannot be keyframed (set_keyframes_tool refuses them); scale about a corner P by f with location compensation: location = (1 - f) * (P - 0.5) per axis (for P = (0.1, 0.9) and f 0.7: location_x -0.12, location_y +0.12), keyframed with the scale on the same times and ease. Positive location_y moves down.
+- Steps 2-4: write timeline_seconds in the points for any clip that does not start at 0 (the sheet and the popover here); seconds count from the clip start.
+- Step 3: add_shape_mask_tool masks in the clip's own space, so the mask travels with a sliding clip and does not clip it to the window; to hold a sheet inside a window, put the window shape on a separate track as a matte (make_transition_mask_tool or a masked copy) or keep the sheet narrower than the window so no clipping is needed.
+- Step 4: a popover grown from its trigger point needs both scale and location keyframes (scale about the clip centre); pin the centre at the trigger with static location_x/location_y of (trigger - 0.5), as done here, so the popover grows around the trigger instead of the frame centre.
 
 Translated from cinetic's technique library (`pd-ui-native-transitions`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

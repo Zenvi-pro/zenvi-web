@@ -52,6 +52,12 @@ None.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-tx-global-grain.mp4` (1280x720p60, two test clips (flat dark card, test pattern) with apply_look_preset_tool film_grain_35mm_fine scope all, then an apply_fx dither on the flat card; flat-patch noise measured on the render with ffmpeg crop + pixel std): grain alone gave a std of about 1.0 code level on the flat card at 1280x720 (the target is 1.5-2, so 35mm_fine runs a little under it), and after the dither bake the same patch measured 0.35, so the grain nearly disappears when apply_fx dither colors 32 is baked on a clip that already has the look; watch judge 1/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: apply_look_preset_tool {"look": "film_grain_35mm_fine", "scope": "all"} works as written (applied on 2 clips, effect FilmGrain); other grains are film_grain_16mm_classic, 35mm_classic, 35mm_gritty, high_iso and super_8.
+- Step 2: apply_fx dither with colors 32 on a clip that already carries the grain look cut the measured noise on a flat patch from about 1.0 to 0.35 code levels (get_clip_effects_tool still lists FilmGrain); do the dither bake only where banding shows, and measure the patch again, or use a gritter grain look afterwards.
+- Step 3: analyze_frame_colors_tool does not measure noise (it reports luma percentiles, cast and saturation of the source frame); measure the render instead: ffmpeg -ss 1 -i out.mp4 -frames:v 1 -vf crop=200:200:100:100,format=gray -f rawvideo - and take the pixel standard deviation (about 1.0 for 35mm_fine here, below the 1.5-2 target; the stronger grains by name were not measured).
 
 Translated from cinetic's technique library (`tx-global-grain`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

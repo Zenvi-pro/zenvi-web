@@ -54,6 +54,13 @@ A very quiet pop on the flags; one ui_tap on the pick frame.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-dn-flag-then-select.mp4` (1280x720p60, data_table block (4 rows, highlight 2, glass plate, full frame) 0.5-5.5 s with a 1.0 to 1.02 scale push at 3.0-3.8 s, pop at 1.2 s and ui_tap at 1.67 s): the rows slide in one by one and the third row takes the accent fill with the other rows dimming from about 3.0 s, but the status cells are plain text (no chips), the pick arrives about 2.5 s after the block starts rather than 0.47 s after the first flag, and the last row stays clipped by the bottom edge of the card in every frame I looked at; watch judge 4.6/10. Does not look right yet with today's tools (see the fixes).
+
+Found when rendering it (apply before building):
+
+- Step 1: status chips only appear for cells in square brackets: rows: ["Invoice 204 | [In review]", "Invoice 206 | [Blocked]", ...]; without brackets the status is plain grey text and there is no flag to pick.
+- Steps 2-3: the data_table block has no timing parameters. Rows slide in about 0.5 s apart from the block start, and the highlighted row is picked out about 2.5 s after the block start (here 3.0 s for a block at 0.5 s), long after the last row. Put the pop on the first flag and the ui_tap at block start + 2.5 s, not at 1.2 s and 1.67 s, and size the block so the pick lands where the voice or beat needs it (duration 5 s here); the 0.47 s flag-to-pick gap is not available.
+- Step 4: with placement full_frame the block carries its own cream background, so a 2 % scale on it also scales the background; use over_video with plate glass, or push gently on an alpha-matched wrapper, if the background must stay put. The push needs timeline_seconds in the points when the block does not start at 0.
+- Step 1: with 4 rows the fourth row (Invoice 207) is clipped by the bottom edge of the glass card at 1280x720 in every frame checked (2.0-3.7 s); use 3 rows or check the card with inspect_timeline_tool after placing the block.
 
 Translated from cinetic's technique library (`dn-flag-then-select`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

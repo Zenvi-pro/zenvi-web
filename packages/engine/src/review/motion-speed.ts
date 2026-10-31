@@ -13,6 +13,7 @@
  * Speeds here are those numbers, whatever the project's size and rate.
  */
 
+import { readFxLink } from "../fx/link.js";
 import { evaluate } from "../keyframe/evaluate.js";
 import { isAudioOnlyMedia } from "../model/media.js";
 import type { Clip, Project } from "../model/types.js";
@@ -34,6 +35,8 @@ export interface ClipSpeed {
   /** Timeline seconds of the peak. */
   at: number;
   text: boolean;
+  /** Motion blur is baked into its picture (apply_fx_tool directional_blur / radial_blur). */
+  blurred: boolean;
 }
 
 const MOVING = ["location_x", "location_y", "scale_x", "scale_y"] as const;
@@ -59,6 +62,8 @@ export function clipSpeeds(project: Project, textClipIds: ReadonlySet<string> = 
   for (const clip of project.clips) {
     const file = files.get(String(clip.file_id));
     if ((file && isAudioOnlyMedia(file)) || !animated(clip)) continue;
+    // A clip whose picture is a Zenvi FX render with motion blur baked in has had its finish pass.
+    const blurred = ((readFxLink(file)?.effects ?? []) as { effect?: string }[]).some((e) => e.effect === "directional_blur" || e.effect === "radial_blur");
     const w = frameWindow(clip, project.fps);
     let peak = 0;
     let at = 0;
@@ -80,7 +85,7 @@ export function clipSpeeds(project: Project, textClipIds: ReadonlySet<string> = 
       }
       prev = cur;
     }
-    if (peak > 0) out.push({ clipId: String(clip.id), peak: Math.round(peak * 10) / 10, at: Math.round(at * 100) / 100, text: textClipIds.has(String(clip.id)) });
+    if (peak > 0) out.push({ clipId: String(clip.id), peak: Math.round(peak * 10) / 10, at: Math.round(at * 100) / 100, text: textClipIds.has(String(clip.id)), blurred });
   }
   return out.sort((a, b) => b.peak - a.peak);
 }

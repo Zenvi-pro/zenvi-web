@@ -53,6 +53,12 @@ A soft pop at -22 dB on each check, pitched up one semitone per step so the run 
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-mi-spinner-to-check.mp4` (1280x720p60, text_on_path ring (spin 450, radius 0.06, 0.3-1.5 s) swapped on the done frame for a write_on check (1.5 s, draw 0.13 s), kinetic-title labels Rendering and Done, pop at 1.57 s on a flat card): the ring is replaced by the tick on the same frame and the tick draws on, but at radius 0.06 the dot ring reads as a few faint specks and the label (centred) sits on top of it; mechanism works, the look needs a larger ring and the label offset; watch judge 3/10. Does not look right yet with today's tools (see the fixes).
+
+Found when rendering it (apply before building):
+
+- Step 1: add_type_block_tool radius and width have a minimum of 0.05 (0.012 and 0.014 are refused); the smallest ring (0.05-0.06 of the short side) draws its dots as faint specks at 720p, so use radius about 0.1 with a bold ink and text_size, and set x/y (0-1) to put it beside the label (x 0.42 here).
+- Step 1 and 3: add_title_tool with no template renders the Bar_1 title, a large opaque blue bar that covers the spinner; for the label and the Done tag use add_kinetic_title_tool {"text": "Done", "style": "documentary", "animation": "fade", "y": 0.5, "text_size": 0.05} (it has no x, so it centres and overlaps a spinner placed at the centre: place the spinner at x 0.42 and keep the label short, or accept the overlap).
+- Step 2: write_on with paths works as written once width is >= 0.05 (width 0.06 here, x/y to match the ring); the tick ink was a thin orange line at 2.5 stroke_width, use 4 or more at 720p.
 
 Translated from cinetic's technique library (`mi-spinner-to-check`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

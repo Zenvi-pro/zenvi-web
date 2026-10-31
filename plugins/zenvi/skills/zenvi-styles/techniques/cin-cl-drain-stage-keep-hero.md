@@ -52,6 +52,12 @@ Nothing on the drain; a very low `tail_bloom` (-20 dB) under the exhale at the e
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-cl-drain-stage-keep-hero.mp4` (1280x720p60, test-pattern world on track 1, a white rounded card (hero, scale 0.3, shadow_soft look, corner_radius 0.1) on track 4 and a #14151a Solid_Color cover on track 3 with alpha 0 to 1 over 1.0-1.17 s ease_in_cubic, plus a Blur 8 copy of the world crossfaded in over 0.4-0.7 s): the hero never moves while the world blurs by 0.67 s and is fully dark at 1.17 s; watch judge 2.3/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: corner_radius cannot be keyframed (set_keyframes_tool refuses it); set it static with set_clip_properties_tool {"timeline_clip_id": "<hero>", "properties": {"corner_radius": 0.1}}. apply_look_preset_tool look shadow_soft is accepted.
+- Step 2: the cover must sit on a track between the world and the hero (add_title_tool track 3 with the hero on track 4) and its alpha points need timeline_seconds (cover starts at 1.0, not 0).
+- Step 3: duplicate_clips_tool {"timeline_clip_ids": ["<column>"], "to_track": "2", "position_seconds": 0, "allow_overlap": true} is needed, because the copy lands on top of the original otherwise (refused without allow_overlap); then add_effect_tool {"timeline_clip_id": "<copy>", "effect": "Blur", "properties": {"horizontal_radius": 8, "vertical_radius": 8}}; the copy rendered with a visible soft blur at 8.
 
 Translated from cinetic's technique library (`cl-drain-stage-keep-hero`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

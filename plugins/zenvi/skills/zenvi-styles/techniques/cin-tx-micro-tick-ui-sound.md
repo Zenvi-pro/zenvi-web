@@ -52,6 +52,12 @@ This entry is the sound: ticks only on cause (a legible word, a UI appearance), 
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-tx-micro-tick-ui-sound.mp4` (1280x720p60, flat card with a typewriter editorial title (1.0-4.0 s), a 120 BPM tone bed, five keyboard_key ticks from 1.2 s every 0.32 s with seeds 1-5 and gains -27 to -24 dB, ui_tap at 2.4 s at -28 dB, ticks filed as the sfx stem with set_track_role_tool and checked with analyze_mix_tool): the ticks land one per word at the stated gains, the role is accepted, and analyze_mix_tool reports the sfx true peak at -16.9 dBFS in a -26.7 LUFS mix; it also flags that the two title events at 1.00 s and 1.37 s have no cue within a frame (hit coverage 0); the tick sounds themselves are audio only, judged on picture it is a plain title; watch judge 2.7/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: detect_music_structure_tool {"clip_id": "<music>", "add_markers": true} works; on a steady tone it reports one verse section and no drop, so the marker is only useful with real music.
+- Step 4: analyze_mix_tool detail is compact | full (sfx is refused); use {"detail": "full"}. set_track_role_tool {"track": "SFX", "role": "sfx"} works with the track label as it comes (the ticks sit on the SFX tracks add_sfx_tool creates, SFX and SFX 2; set the role on each).
+- Step 2: ticks placed 0.32 s apart ended up on two SFX tracks (SFX and SFX 2) because the receipts show overlapping sounds; set the sfx role on both tracks. add_sfx_tool keyboard_key accepts seed and gain_db (-24 to -27 accepted).
 
 Translated from cinetic's technique library (`tx-micro-tick-ui-sound`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

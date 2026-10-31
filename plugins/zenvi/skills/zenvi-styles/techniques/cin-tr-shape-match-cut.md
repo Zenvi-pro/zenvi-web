@@ -53,6 +53,13 @@ A single soft hit or tick on the cut frame (`hit_transient` at -16 dB); the obje
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-tr-shape-match-cut.mp4` (1280x720p60, two synthetic clips (a 130-px circle at left, an 80-px circle at lower right) joined at 2.0 s: detect_subject_tool circle on both, align_match_cut_tool with cover zoom_all, then a 3 % pre-cut shrink on A and a 0.57x to 1x ease_out_expo settle on B written as scale and location together): the circle stays on centre (0.5, 0.5) through the cut; A shrinks 3 % into the cut, B opens at 0.57 size on centre and settles within 0.3 s; as first written (absolute scale values, scale only) the settle overwrote the alignment and B's subject started off centre in the top-left; watch judge 1.5/10 (flat stand-in shapes).
+
+Found when rendering it (apply before building):
+
+- Steps 1-2 args: align_match_cut_tool takes clips as objects, not ids: clips: [{clip_id: <A>}, {clip_id: <B>}] (optionally box from detect_subject_tool data.subjects[0].box; without a box it measures the subject itself, kind circle), and target is an object {x: 0.5, y: 0.5, size: 0.36} where size is the subject height as a fraction of the frame height; target: [0.5,0.5] and fit: contain are refused (fit is position | position_scale | position_scale_rotation, default position_scale).
+- Step 2: add cover: zoom_all so every clip is zoomed to the same size; with the default cover the clip whose subject needs a covering zoom ends larger than the others (subjects 0.55 vs 0.36 of the frame height here, 1.5x apart, outside the 0.57-1.3x ratio).
+- Steps 3-4: align_match_cut_tool leaves a base scale and a base location per clip (here scale 1.556 / location 0.267, 0.1285 on A and scale 2.49 / location -0.468, -0.348 on B), so absolute scale values 1.0, 0.97 and 0.57 overwrite it and break the match. Read the base values at the cut (get_clip_properties_tool with at_seconds) and multiply scale AND location_x/location_y by the same factor: A base to base*0.97 over 4 f, B base*0.57 to base over 0.3 s on ease_out_expo; scaling only scale_x/scale_y pulls the subject off centre because the alignment offset does not shrink with it.
+- Steps 3-4: set_keyframes_tool points with seconds count from the clip start; B starts at T, so write B's points with timeline_seconds, and use mode replace_range (not merge) so the alignment's own keyframes (one every 6 f) between the new points are dropped.
 
 Translated from cinetic's technique library (`tr-shape-match-cut`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

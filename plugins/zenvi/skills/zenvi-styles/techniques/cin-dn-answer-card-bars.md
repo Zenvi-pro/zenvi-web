@@ -53,6 +53,14 @@ A quiet typing_burst for the insight line, -22 dB; the bars growing get none.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-dn-answer-card-bars.mp4` (1280x720p60, chart_build bar block (4 values, highlight 0, glass plate, over a flat card) 0.5-4.5 s with a 0.4 s rise and 0.17 s fade keyframed on the block, a documentary typewriter title at 1.4 s, typing_burst at 1.4 s): the card rises and fades in, bars grow and the first bar takes the accent at about 2.4 s, but the block carries its own default heading and big counter, the bars take about 1.4 s to land (not 0.5 s) and the typed insight at y 0.82 prints over the counter and the axis labels; watch judge 4.8/10. Does not look right yet with today's tools (see the fixes).
+
+Found when rendering it (apply before building):
+
+- Step 1: pass title (and a short caption), otherwise the block prints its default heading Hours saved per person, each month; the caption is a small badge at the highlighted bar (a 30-character sentence overflows it), keep it to a few words such as Search leads.
+- Step 3: the chart_build block has no timing parameters: its bars grow one after another over roughly 1.4 s from the block start and the accent colour arrives about 0.9 s after the last bar, not 5 f apart with the group inside 0.5 s. Say so, and time the title by the block (type the insight at about block start + 1.9 s).
+- Step 4: the block also shows a big counter bottom left; a typed title at y 0.82 collides with it and with the axis labels. Put the insight above the card (y about 0.08) or set the block plate to none and leave the bottom free; check with inspect_timeline_tool.
+- Step 2: location_y and alpha keyframes on the block need timeline_seconds in the points when the block does not start at 0 (here at 0.5 s); the card has to be positioned at base 0 (centre gravity), so 0.022 to 0 is the right base.
+- Step 6: typing_burst picked a recorded typing sound that ran past the end of the picture ('Its last 0.54 s would run past the picture', so the tool trimmed and faded it); give it a duration (add_sfx_tool duration) so it ends with the typing.
 
 Translated from cinetic's technique library (`dn-answer-card-bars`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

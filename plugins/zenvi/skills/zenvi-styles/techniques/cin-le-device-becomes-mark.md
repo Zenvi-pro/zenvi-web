@@ -52,6 +52,12 @@ One hit_transient on the swap frame; the object's own last sound ends before it.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-le-device-becomes-mark.mp4` (1280x720p60, white 400 px card with corner_radius 0.5 (a coin) at scale 0.3 rising location_y 0.2 to 0 over 1.0-1.37 s ease_out_expo with a 0.2 s alpha in, then an orange circle PNG (the mark) cut in at 1.37 s at scale 0.171 growing to 0.3 over 0.3 s ease_out_expo, hit_transient at 1.37 s): the coin lands on the centre and the mark appears there on the next frame smaller and grows, with no gap; the deleting-word pill and in-place variants were not built; watch judge 1.7/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: a rounded object needs a static corner_radius set with set_clip_properties_tool {"timeline_clip_id": ..., "properties": {"corner_radius": 0.5}} (0.5 on a square makes a circle); set_keyframes_tool refuses corner_radius.
+- Steps 1 and 3: keyframes on clips that do not start at 0 need timeline_seconds in the points; the object's scale (0.3 here) is the base: the mark's 0.57-to-1 is base*0.57 (0.171) to base (0.3), both clips sharing the same final size and centre.
+- Step 3: the mark clip is placed with add_clip_to_timeline_tool on its own track from position_seconds 1.37 (start_seconds 0 and duration_seconds 2); the object clip should end at 1.4 so only the mark remains afterwards.
 
 Translated from cinetic's technique library (`le-device-becomes-mark`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

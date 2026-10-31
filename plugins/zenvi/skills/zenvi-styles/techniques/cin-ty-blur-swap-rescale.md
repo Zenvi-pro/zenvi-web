@@ -52,6 +52,14 @@ One hit_transient at -14 dB on the frame the new line is readable, or none.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-ty-blur-swap-rescale.mp4` (1280x720p60, stack SHIP (slam, 1.0-2.3 s) swapped for the editorial line Ship the film today. (stagger 0, 2.23 s) over a flat card: old scale 1 to 0.85 plus alpha 1 to 0 and Blur 0 to 12 over 2.2-2.3 s, new four word-clips scale 1.25 to 1 about the line centre ease_out_expo over 0.23 s with alpha over 0.1 s and Blur 12 to 0): SHIP is gone by 2.30 s and the sentence appears at 2.30 s oversize and soft and is settled by 2.38-2.47 s, a swap rather than a dissolve; watch judge 3.0/10 (stand-in background).
+
+Found when rendering it (apply before building):
+
+- Step 5: apply_fx_tool refuses title clips (Error: clip ... is not video footage; FX render video clips). Blur a title with add_effect_tool {"timeline_clip_ids": [<every word clip>], "effect": "Blur", "properties": {"horizontal_radius": [{"time": 2.2, "value": 0, "interpolation": "linear"}, {"time": 2.3, "value": 12, "interpolation": "linear"}], "vertical_radius": <same>}} (times are timeline seconds; the new layer runs 12 to 0).
+- Step 2: add stagger_seconds 0 to the new line, otherwise its words (one clip each, g0w0-g0w3) enter 0.12 s apart and the swap is not one layer.
+- Steps 3-4: a title is one clip per word, each placed by absolute location_x/location_y (gravity Top Left) and scaled about its own top-left corner. Scaling the clips to 0.85 / 1.25 would scatter the words. For each word keyframe scale_x/scale_y to S*f and location_x/location_y to C + f*(loc - C), where C is the pivot (the word's own centre loc + S/2 for a one-word layer, the line centre such as (0.5, 0.70) for a phrase). Read base values with get_clip_properties_tool (SHIP: scale 0.6705 at 0.0143, 0.1533; words: scale 0.12-0.14 at y 0.6704).
+- Steps 3-4: points need timeline_seconds (seconds count from the clip start), and mode replace_range so the baked slam/fade keyframes outside the window survive.
+- Step 3: ease_in_cubic over 0.1 s moves almost nothing in the first 0.05 s (about 1 % of the 0.85 shrink at 2.22 s), so the old layer reads mostly as a fade plus blur; use ease_in_quad if the shrink must be seen.
 
 Translated from cinetic's technique library (`ty-blur-swap-rescale`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

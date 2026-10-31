@@ -53,6 +53,12 @@ One airy swish at the start of the swap, -18 dB; no sound per word.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-ty-staggered-word-roll.mp4` (1280x720p60, editorial titles over a flat card: Made for makers (0.5-2.2 s, last word clip trimmed) then the last word clip of Made for everyone from 2.067 s; old word location_y 0.4304 to 0.4104 with alpha 1 to 0 over 0.2 s, new word 0.4572 to 0.4322 on ease_out_expo with alpha 0 to 1 over 0.17 s, swish_airy at 2.0 s): the frames 2.00-2.42 s show Made for staying fixed, makers lifting and fading, everyone rising into the same slot; watch judge 2.7/10 (flat stand-in background, generic serif).
+
+Found when rendering it (apply before building):
+
+- Step 2: add_kinetic_title_tool has no x parameter, so a separate title for the changing word lands on top of Made for (every title centres on the frame, all words overlap). Add the whole phrase twice instead (Made for makers 0.5-4.0 s, then Made for everyone at the same position and size), delete the second title's Made and for word clips (a title makes one clip per word, g0w0, g0w1, g0w2, on separate tracks) and keep only the last word clip of each. Shorten the old word (trim_clips_tool, or zenvi trim <clip> --edge right --to 2.2) and split the new word at 2.067 keeping the right side (zenvi split <clip> --at 2.067 --keep right); the split drops the baked entrance, so the keyframes in steps 3-4 do the whole entrance.
+- Steps 3-4: set_keyframes_tool points with seconds count from the clip start, not the timeline; for a clip that does not start at 0 use timeline_seconds in each point (seconds 2.0 on a clip starting at 0.5 is refused as outside the clip).
+- Steps 3-4: title word clips are gravity Top Left and place themselves with absolute location_x/location_y (here 0.508 / 0.4304 for makers and 0.4953 / 0.4322 for everyone); location_y values of -0.02 / 0.025 / 0 throw the word to the top of the frame. Read the clip first (get_clip_properties_tool) and animate around those: old word 0.4304 to 0.4104, new word 0.4572 to 0.4322, and set the new word location_x to the old word's 0.508 so it starts where makers started. Use mode merge on alpha for the old word to keep its baked fade.
 
 Translated from cinetic's technique library (`ty-staggered-word-roll`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

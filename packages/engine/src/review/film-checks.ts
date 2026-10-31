@@ -77,7 +77,7 @@ export function filmChecks(input: FilmCheckInput): ReviewProblem[] {
   if (ceiling.length > 0) out.push({ code: "motion-too-fast", severity: "medium", at: ceiling[0]!.at, times: ceiling.map((s) => s.at), message: `Moves faster than ${CEILING_PX_PER_FRAME} px/f (1080p, 60 fps) smear into stepped copies: ${list(ceiling.map((s) => `${s.clipId} ${s.peak} px/f at ${s.at}s`))}.`, fix: "Redesign the move as a cut on the beat, a match cut, a mask wipe or a shorter distance (frame-filling edges excepted)." });
   const fastText = speeds.filter((s) => s.text && s.peak > TEXT_PX_PER_FRAME);
   if (fastText.length > 0) out.push({ code: "text-too-fast", severity: "medium", at: fastText[0]!.at, times: fastText.map((s) => s.at), message: `Text travelling faster than ${TEXT_PX_PER_FRAME} px/f reads as a double image: ${list(fastText.map((s) => `${s.clipId} ${s.peak} px/f`))}.`, fix: "Fly it with the text faded and let it resolve on landing, or shorten the travel." });
-  const blur = speeds.filter((s) => s.peak > BLUR_PX_PER_FRAME && !ceiling.includes(s) && !fastText.includes(s));
+  const blur = speeds.filter((s) => s.peak > BLUR_PX_PER_FRAME && !s.blurred && !ceiling.includes(s) && !fastText.includes(s));
   if (blur.length > 0) out.push({ code: "needs-motion-blur", severity: "low", at: blur[0]!.at, times: blur.map((s) => s.at), message: `${blur.length} move${blur.length === 1 ? "" : "s"} over ${BLUR_PX_PER_FRAME} px/f strobe without motion blur: ${list(blur.map((s) => `${s.clipId} ${s.peak} px/f`))}.`, fix: "Bake motion blur on those clips (apply_fx_tool directional_blur or radial_blur on the move's frames), or slow the move." });
 
   const rate = fpsFloat(project.fps);

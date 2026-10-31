@@ -53,6 +53,12 @@ A hit only on the cut frame when the card is a statement; the arrival and exit a
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-ps-breath-envelope.mp4` (1280x720p60, a white card PNG (scale 0.3) on a flat card: scale_x/scale_y 1.08x to 1.0 (ease_out_expo, 0.6 s), 1.02x at 1.5 s and 1.08x at 1.77 s (ease_in_cubic), location_y 0.047 to 0 to -0.052, whoosh_short at 0): sampling the clip with get_clip_properties_tool gave scale 0.324 at 0 s, 0.3005 at 0.3 s, 0.3 at 0.6 s, 0.3023 at 1.0 s, 0.306 at 1.5 s, 0.3213 at 1.75 s and location_y 0.047, 0.001, 0, 0, 0, -0.044, so the three-term curve (arrive, slow growth, accelerating exit) is as described; I did not look at frames; watch judge 1.6/10.
+
+Found when rendering it (apply before building):
+
+- Step 4: apply_fx_tool refuses stills and titles (Error: clip ... is not video footage; FX render video clips), so the directional blur only works on video clips; for a card, title or PNG use add_effect_tool {"timeline_clip_id": "<card>", "effect": "Blur", "properties": {"horizontal_radius": [{"time": 0, "value": 8}, {"time": 0.25, "value": 0}], "vertical_radius": [...]}} with keyframes in timeline seconds.
+- Steps 2-3: for a clip that does not start at 0 the points need timeline_seconds; scale values are multiples of the clip's own base scale (card base 0.3: 1.08x is 0.324), not 1.08 absolute; the sample curve landed as written.
+- Step 1: a kinetic title is one clip per word, each scaled about its own corner, so a three-term scale on the words would scatter them; apply this curve to a card clip, or use the per-word pivot compensation (scale S*f and location C + f*(loc - C)).
 
 Translated from cinetic's technique library (`ps-breath-envelope`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

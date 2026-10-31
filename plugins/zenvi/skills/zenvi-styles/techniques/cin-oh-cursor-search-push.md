@@ -55,6 +55,13 @@ Micro keyboard ticks only (very quiet, one per word); nothing on the pushes.
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-oh-cursor-search-push.mp4` (1280x720p60, prompt_bar motion block (palette night, full frame, 4.5 s) with scale_x/scale_y keyframes 1.0 to 2.16 (0.4-1.1 s) to 3.4 (1.83 s) and location_x 0 to -0.35, one keyboard_key tick at 1.55 s): the two-stage push renders, but the block types from about 0.3 s (caret mid-line at 1.1 s, line complete by 2.4 s), so the push does not meet the start of typing; at 3.4x the caret slides out of frame left/up and the final Generating state is soft; watch judge 4.6/10. Does not look right yet with today's tools (see the fixes).
+
+Found when rendering it (apply before building):
+
+- Step 1: palette must be one of light, dark, cream, forest, mono, sky, ember, night, tide, cherry, porcelain, lilac, cobalt, sage, graphite; "ink" is refused (use "night" or "dark"; "ink" is only a colour param).
+- Step 4: prompt_bar has no typing-start or speed param; it types from about 0.3 s and finishes a 40-character query by about 2.4 s. The 1.5 s start cannot be set, so say the push must be timed to the block (delay the whole block with position_seconds, or start push 1 at ~0 and let typing start under it) instead of a typing start at 60% of push 2.
+- Step 3: a fixed location_x -0.35 does not keep the caret in frame (it moves right as it types, and the line wraps up-left at 3.4x); needs location_x and location_y keyframes that follow the caret (several points across the typing), or stop the push at ~2x.
+- Fallback: a 3.4x push of the raster is visibly soft in the final Generating state; keep the end of push 2 under ~3x or make the project 4K.
 
 Translated from cinetic's technique library (`oh-cursor-search-push`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

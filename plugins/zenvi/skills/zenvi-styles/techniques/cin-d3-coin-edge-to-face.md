@@ -55,6 +55,12 @@ One thud on the edge-on frame as it snaps open; tail_bloom at -20 dB as it settl
 
 ## Verified
 
-Not rendered yet.
+2026-10-31, `~/zenvi-motion/fleet/artifacts/x2-cinetic/verify/cin-d3-coin-edge-to-face.mp4` (1280x720p60, add_3d_scene_tool logo_extrude (svg a local circle file, style matte, animation tumble, depth 0.9, bevel 0.6, dark background, 2.5 s draft, 26 s render) with impact_thud at 0.07 s): the extruded coin appears small and edge-on at 0.08 s with visible thickness, turns through three-quarter view at 0.25 s and faces the camera by 0.42 s, then holds; the render came out orange rather than the SVG's gold fills; the 2D snap fallback and logo_reveal_end hard cut were not built; watch judge 2.7/10.
+
+Found when rendering it (apply before building):
+
+- Step 1: logo_extrude works as written with params.svg set to a local file path (an absolute path to a 100x100 viewBox SVG was accepted); the coin rendered orange, not the SVG's gold, so the SVG's fills are not used (the scene's color/secondary/accent params exist but were not tried).
+- Step 1: the tumble reaches face-on in about 0.4 s, not edge-on for 4 f then a 10 f snap; the first rendered frame (0.08 s) is already tilted, small and off-centre. If an exact 4 f edge hold matters, use the 2D snap fallback ; draft quality takes about 26 s for 2.5 s.
+- Step 5: logo_reveal_end block and the hard-cut match were not tested here.
 
 Translated from cinetic's technique library (`d3-coin-edge-to-face`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.
