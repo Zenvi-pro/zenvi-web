@@ -1,3 +1,15 @@
+---
+id: editorial-type
+kind: style
+summary: Type is the picture - a brand or design study, crosshair grids, mono labels, letter swaps, flash frames
+categories: [kinetic-type-motion-design, fashion-beauty-ad, brand-story-corporate]
+tools: [add_kinetic_title_tool, add_motion_block_tool, add_motion_template_tool, auto_sound_design_tool]
+pace: fast
+mood: [designed, crisp, playful]
+aspect: ["9:16", "1:1", "4:5"]
+pairs_with: []
+avoid_with: []
+---
 # Editorial / brand type
 
 Type is the picture: one object (a flower, a shoe, a cookie), thin crosshair

@@ -288,7 +288,7 @@ describe("spot_sound_tool", () => {
     const host = withAudio(fakeHost());
     const sheet = data<{ points: { t: number; kind: string; needs_cue: boolean }[] }>(await runTool({ doc, host }, "spot_sound_tool", { include_dry: true }));
     const hits = await spottedHits({ doc, host } as unknown as Parameters<typeof spottedHits>[0]);
-    expect(hits).toEqual(sheet.points.map((p) => ({ t: p.t, kind: p.kind, needsCue: p.needs_cue })));
+    expect(hits).toEqual(sheet.points.map((p) => ({ t: p.t, kind: p.kind, needsCue: p.needs_cue, recipe: expect.any(String) })));
   });
 });
 
