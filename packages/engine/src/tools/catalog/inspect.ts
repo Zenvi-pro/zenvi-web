@@ -179,10 +179,13 @@ export const inspectTools: CatalogTool[] = [
         endFrame = toFrame(t1, fps);
         if (endFrame <= startFrame) endFrame = startFrame + 1;
       }
-      if (startFrame === undefined && !overview) {
-        return refused(tool, "Error: Provide startFrame, or clipId+start+end, or overview=true.");
-      }
       if (total <= 0 && (project.clips ?? []).length === 0) return refused(tool, "Error: Timeline is empty — nothing to render.");
+      // No range at all is the Assistant's "look at the timeline": frames spread over all of it (the desktop refuses it).
+      if (startFrame === undefined && !overview) {
+        startFrame = 0;
+        endFrame = Math.max(1, total);
+        warnings.push("No range given: frames spread over the whole timeline.");
+      }
       const [maxN, clampWarnings] = clampMaxFrames(input.maxFrames);
       warnings.push(...clampWarnings);
 

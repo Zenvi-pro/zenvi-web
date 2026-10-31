@@ -510,7 +510,7 @@ const SPECS: Record<string, Spec> = {
         expect(["image/png", "image/jpeg"]).toContain(result.images![0]!.mimeType);
       },
     },
-    failure: { summary: /^Error: Provide startFrame, or clipId\+start\+end, or overview=true\.$/ },
+    failure: { args: { startFrame: "100000" }, summary: /^Error: startFrame 100000 out of range \[0, \d+\)\.$/ },
   },
   inspect_media_tool: {
     happy: { args: { fileId: IDS.interview, maxFrames: "2" }, summary: /^Rendered 2 inspect image\(s\)\.$/, check: ({ result }) => expect(result.images).toHaveLength(2) },

@@ -52,6 +52,14 @@ describe("the Assistant's calls through runTool (live zenvi.pro, 2026-10-31)", (
     expect(ranged.images).toHaveLength(2);
   });
 
+  it("inspect_timeline_tool with no range spreads frames over the whole timeline (the Assistant's next first call)", async () => {
+    const doc = fixtureDoc();
+    const r = await runTool({ doc, host: fakeHost() }, "inspect_timeline_tool", { max_frames: 4 });
+    expect(r.ok, r.text).toBe(true);
+    expect(r.images).toHaveLength(4);
+    expect(r.text).toContain("No range given: frames spread over the whole timeline.");
+  });
+
   it("add_captions_tool takes the desktop's default look and whole_project", async () => {
     const doc = fixtureDoc();
     const r = await runTool({ doc, host: fakeHost() }, "add_captions_tool", { style: "pill-karaoke", whole_project: true });
