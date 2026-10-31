@@ -33,12 +33,14 @@ const STARTS_A_VIDEO = new Set([
 const STYLES = STYLE_FILES.filter((f) => f.kind === "style");
 
 /**
- * The receipt line for an auto brief. It names the matched style's recipe:
+ * The receipt line for an auto brief. It sends the agent to the style tools:
  * with the gate gone, merge-10 bench agents skipped the recipe and the
  * style's signature tools and lost frame closeness on technique-heavy styles.
+ * The auto style is a guess from the call's arguments (W70: "automotive-ad"
+ * for a SaaS promo's stock searches), so find_style_tool checks it first.
  */
 export function autoBriefNote(brief: Brief): string {
-  return `Saved a minimal brief for this project (auto: style ${brief.style} matched from the styles index, ${brief.aspect}, ${brief.length_seconds} s, one beat). Nothing waits for it. Next: read_director_recipe {styles: "${brief.style}"} for that style's order and signature tools; save_brief_tool with your own hook, beats and storyboard plans the edit and has review check it.`;
+  return `Saved a minimal brief for this project (auto: style ${brief.style} matched from the styles index, ${brief.aspect}, ${brief.length_seconds} s, one beat). Nothing waits for it. Next: find_style_tool {"request": "<the person's words>"} checks that guess against the whole request, then get_style_tool on its pick for the beats, look, sound and tool calls; save_brief_tool with your own hook, beats and storyboard plans the edit and has review check it.`;
 }
 
 /**

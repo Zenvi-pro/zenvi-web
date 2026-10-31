@@ -38,7 +38,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { HOST_IDS } from "@zenvi/adobe-link";
 import { readBrief, type ToolImage } from "@zenvi/engine";
-import { DIRECTOR_CARD, failed, parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
+import { argumentNotes, DIRECTOR_CARD, failed, FINISH_HINT, FULL_LISTING, leanListing, parseReceipt, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import type { CommandContext } from "../commands/context.js";
 import { adobeToolDefinitions, callAdobeTool, hostOfTool, hostRefusal, isOkHostStatus } from "../hosts/adobe-tools.js";
 import { guideText, PROMPTS, promptText, RESOURCES } from "../hosts/guides.js";
@@ -60,6 +60,7 @@ export const SERVER_INSTRUCTIONS = [
   DIRECTOR_CARD,
   "Taste: omitted arguments take the defaults in zenvi://taste (entrances 0.6 s, exits 0.4 s, smooth easing, nothing that moves is linear, text inside title-safe). Look before you say done: after any visual change capture frames (preview_frame, with grid=true for a 0-1 coordinate grid; ae_capture_frame; premiere_capture_frame) at the first frame, entrance ends, holds and the last frame, check them against the review checklist (prompt edit_review), fix, and look again. After cutting a multi-shot edit, call review_edit_tool: one contact sheet of the cut plus pacing, beat and loudness numbers and a ranked problem list; fix what it flags and call it again.",
   "Web videos: for a YouTube or other web page link call ingest_web_video_tool once (intent=timeline only when the person asked to put it on the timeline, reference for a colour or look reference; it needs yt-dlp on this machine). If it answers status=running, call it again with the job_id until completed or failed: each call waits up to about 45 s, and a client timeout is not a failure. On ok=false report the reason once and stop. A direct link to a media file can use import_video_url_and_add_to_timeline_tool.",
+  "Tools listed in one sentence with one-clause argument notes are the specialist ones: get_technique_tool shows how a technique uses them, and a call refused for its arguments lists them in full.",
   "Every tool returns a JSON receipt (contract 3): status applied|unchanged|refused|error (read-only Adobe tools: ok), summary, and what changed (clips, shifted, removedClipIds, createdTracks, undoSteps; Adobe tools: ids in data). Patch your view from receipts instead of re-listing everything. Failures start with \"Error:\"; refused means nothing changed, so read the summary and adjust. Each Zenvi call is one undo step (undo_tool); edits autosave to the project file with their undo history. Use these tools instead of running ffmpeg yourself: they keep the project editable in Zenvi. Times are seconds.",
 ].join("\n\n");
 
@@ -92,6 +93,15 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     { name: "zenvi", title: "Zenvi video editor", version: VERSION },
     { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS },
   );
+  /** Engine tools listed short (FULL_LISTING); ZENVI_MCP_LISTING=full lists every one whole. */
+  const fullListing = ctx.env.ZENVI_MCP_LISTING === "full";
+  const isLean = (name: string): boolean => !fullListing && !FULL_LISTING.has(name) && !extraByName.has(name);
+  /** A short-listed tool refused for its arguments: the full argument list, so the next call can be right (portable or desktop). */
+  const withArgumentNotes = (name: string, receipt: ToolReceipt): ToolReceipt => {
+    if (receipt.status !== "refused" || !isLean(name) || !/^Error: (Invalid arguments|unknown argument)/.test(receipt.summary)) return receipt;
+    const tool = ctx.registry.get(name);
+    return tool ? { ...receipt, notes: [...receipt.notes, argumentNotes(name, tool.inputSchema)] } : receipt;
+  };
   /** The Adobe families in the client's last tools/list (undefined until it lists). */
   let listedFamilies: string | undefined;
 
@@ -102,13 +112,17 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     listedFamilies = listingKey(families, handoff);
     return {
       tools: [
-        ...engineTools.map((t) => ({
-          name: t.name,
-          title: t.title,
-          description: t.description,
-          inputSchema: t.inputSchema as unknown as { type: "object"; [key: string]: unknown },
-          ...(t.annotations ? { annotations: { ...t.annotations, title: t.title } } : {}),
-        })),
+        ...engineTools.map((t) => {
+          const listed = isLean(t.name) ? leanListing(t) : t;
+          return {
+            name: t.name,
+            title: t.title,
+            // The instructions carry the finish (DIRECTOR_CARD): once is enough on this server, unless the listing is asked for whole.
+            description: fullListing ? listed.description : listed.description.replace(FINISH_HINT, "").trim(),
+            inputSchema: listed.inputSchema as unknown as { type: "object"; [key: string]: unknown },
+            ...(t.annotations ? { annotations: { ...t.annotations, title: t.title } } : {}),
+          };
+        }),
         ...extras
           .filter((t) => handoff.listed || !HANDOFF_TOOL_NAMES.has(t.name))
           .map((t) => ({
@@ -175,7 +189,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       if (desktop) {
         const outcome = await desktop.call(name, args);
         const receipt = outcome.receipt ?? parseReceipt(outcome.text) ?? (outcome.ok ? undefined : failed(name, outcome.text));
-        if (receipt) return toCallResult(receipt, outcome.images, { engine: "desktop" });
+        if (receipt) return toCallResult(withArgumentNotes(name, receipt), outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...(outcome.ok ? {} : { isError: true }) };
       }
       state.notePortableCall();
@@ -190,6 +204,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       }
       const brief = ctx.env.ZENVI_MCP_BRIEF !== "off" && isOkHostStatus(receipt.status) ? autoBriefFor(name, state.session.doc, JSON.stringify(args ?? {})) : undefined;
       if (brief) receipt.notes = [...receipt.notes, brief];
+      receipt.notes = withArgumentNotes(name, receipt).notes;
       if (!state.session.file && receipt.undoSteps > 0) {
         receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }

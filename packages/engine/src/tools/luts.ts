@@ -69,6 +69,16 @@ export function resolveLut(value: unknown): ResolvedLut {
   throw new LutError(`no LUT named ${pyReprString(text)}${hint} (list_luts_tool lists them)`);
 }
 
+/** A built-in LUT's id or name (what unify_grade_tool's look takes), exactly: no partial or close match. */
+export function isLookId(value: string): boolean {
+  try {
+    const lut = resolveLut(value);
+    return lut.kind === "builtin" && (norm(lut.lut.id) === norm(value) || norm(lut.lut.name) === norm(value) || norm(stem(lut.lut)) === norm(value));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * color_agent.resolve_lut_filesystem_path for a look's `lut_path`
  * (`category/name.cube`, `@colors/…` or absolute): the stored path, or
