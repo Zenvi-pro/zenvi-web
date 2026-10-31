@@ -8,8 +8,11 @@ import {
   WATCH_FIX_TOOLS,
   WatchError,
   watchHttpError,
+  watchTimelineNotes,
   watchUserText,
+  WATCH_NOTES_MAX_CHARS,
 } from "./watch.js";
+import type { ReviewShot, TimelineReview } from "./types.js";
 
 describe("watch critique", () => {
   it("normalizes like the backend: clamped scores and times, unknown names folded, worst first, six at most", () => {
@@ -71,5 +74,23 @@ describe("watch critique", () => {
       for (const tool of fixToolsFor({ dimension: "other", problem: "", fix: words })) named.add(tool);
     }
     expect([...named].filter((tool) => !getTool(tool))).toEqual([]);
+  });
+
+  it("keeps the notes in whole lines under the limit, every title kept, shots in time order with titles", () => {
+    const shots = Array.from({ length: 400 }, (_, i) => ({ index: i, start: i * 0.2, end: (i + 1) * 0.2, name: `a-rather-long-stock-footage-name-${i}.mp4` }) as ReviewShot);
+    const titleClips = [5, 40, 79].map((start, i) => ({ clipId: `T${i}`, start, end: start + 1, path: `@assets/title/headline-${i}.svg` }));
+    const notes = watchTimelineNotes({ shots, titleClips } as unknown as TimelineReview);
+    expect(notes.length).toBeLessThanOrEqual(WATCH_NOTES_MAX_CHARS);
+    const lines = notes.split("\n");
+    expect(lines.every((l) => /^(shot \d+ [\d.]+-[\d.]+ a-rather-long-stock-footage-name-\d+\.mp4|title [\d.]+-[\d.]+ headline-\d\.svg|\(\d+ later shots left out\))$/.test(l))).toBe(true);
+    expect(lines.filter((l) => l.startsWith("title"))).toEqual(["title 5.00-6.00 headline-0.svg", "title 40.00-41.00 headline-1.svg", "title 79.00-80.00 headline-2.svg"]);
+    const kept = lines.filter((l) => l.startsWith("shot")).length;
+    expect(lines.at(-1)).toBe(`(${400 - kept} later shots left out)`);
+    // Titles sit among the shots by time.
+    expect(lines[lines.indexOf("title 5.00-6.00 headline-0.svg") - 1]).toMatch(/^shot 25 /);
+
+    const short = watchTimelineNotes({ shots: shots.slice(0, 3), titleClips: [] } as unknown as TimelineReview);
+    expect(short.split("\n")).toHaveLength(3);
+    expect(short).not.toContain("left out");
   });
 });

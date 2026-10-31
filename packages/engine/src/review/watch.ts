@@ -306,15 +306,37 @@ export function fixToolsFor(issue: Pick<WatchIssue, "dimension" | "fix" | "probl
   return [...new Set([...named, ...WATCH_FIX_TOOLS[issue.dimension]])].slice(0, 3);
 }
 
-/** Shot lines sent with the watch at most (a 90 s montage at 4 cuts/s fits). */
-const MAX_NOTE_SHOTS = 400;
+/** The backend's `timeline_notes` limit, characters. */
+export const WATCH_NOTES_MAX_CHARS = 6000;
+/** Title lines sent at most (they are kept before shots when the notes run long). */
+const MAX_NOTE_TITLES = 60;
+/** Room kept for the "left out" line, should shots not all fit. */
+const LEFT_OUT_CHARS = 40;
 
-/** The timeline as the critic reads it: one line per shot (numbered from 1) and title, timeline seconds. */
-export function watchTimelineNotes(review: TimelineReview): string {
+/**
+ * The timeline as the critic reads it: one line per shot (numbered from 1)
+ * and title, in time order, timeline seconds. Within the backend's limit
+ * whole lines only: the titles are kept, then as many shots as fit, with a
+ * last line saying how many were left out.
+ */
+export function watchTimelineNotes(review: TimelineReview, maxChars: number = WATCH_NOTES_MAX_CHARS): string {
   const t = (s: number): string => s.toFixed(2);
-  const lines = review.shots.slice(0, MAX_NOTE_SHOTS).map((s) => `shot ${s.index + 1} ${t(s.start)}-${t(s.end)} ${s.name}`);
-  for (const title of review.titleClips.slice(0, 60)) lines.push(`title ${t(title.start)}-${t(title.end)} ${title.path.split(/[\\/]/).pop() ?? title.path}`);
-  return lines.join("\n").slice(0, 6000);
+  const titles = review.titleClips.slice(0, MAX_NOTE_TITLES).map((c) => ({ start: c.start, text: `title ${t(c.start)}-${t(c.end)} ${c.path.split(/[\\/]/).pop() ?? c.path}` }));
+  const shots = review.shots.map((s) => ({ start: s.start, text: `shot ${s.index + 1} ${t(s.start)}-${t(s.end)} ${s.name}` }));
+  const size = (lines: readonly { text: string }[]): number => lines.reduce((n, l) => n + l.text.length + 1, 0);
+  const kept = titles.filter((_, i) => size(titles.slice(0, i + 1)) <= maxChars - LEFT_OUT_CHARS);
+  let room = maxChars - size(kept);
+  const fitShots: typeof shots = [];
+  for (const [i, shot] of shots.entries()) {
+    const need = shot.text.length + 1 + (i < shots.length - 1 ? LEFT_OUT_CHARS : 0);
+    if (need > room) break;
+    fitShots.push(shot);
+    room -= shot.text.length + 1;
+  }
+  const lines = [...kept, ...fitShots].sort((a, b) => a.start - b.start).map((l) => l.text);
+  const left = shots.length - fitShots.length;
+  if (left > 0) lines.push(`(${left} later shots left out)`);
+  return lines.join("\n");
 }
 
 /** The shots an issue's window covers (or the one it starts in), at most three. */

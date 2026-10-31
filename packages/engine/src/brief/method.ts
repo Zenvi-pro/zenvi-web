@@ -14,15 +14,16 @@
  *   subject means the plan is a template;
  * - a creative-direction draw of at least three axes, each with a reason.
  *
- * Bench sk0 (zenvi-web #73): agents made to save a brief saved the least that
- * validated and the edit came out the same, so for a whole video these are
- * refusals, not advice. Very short pieces (a quick edit) skip them.
+ * These are advice, never a refusal: as refusals (bench rounds 6-7, fleet
+ * w61-bench7) they became most of the agents' tool errors and placeholder
+ * briefs written to get past them. save_brief_tool lists them as warnings
+ * for pieces of 20 s or more, or whenever the agent asks (check_method).
  */
 
 import type { Brief } from "./brief.js";
 
-/** Pieces at least this long are planned with the motif method. */
-export const METHOD_MIN_SECONDS = 6;
+/** Pieces at least this long get the motif method's advice unasked. */
+export const ADVICE_MIN_SECONDS = 20;
 export const MIN_MOTIFS = 8;
 export const MIN_ROWS = 3;
 export const MIN_AXES = 3;
@@ -40,9 +41,9 @@ function counts(values: readonly string[]): Map<string, number> {
   return out;
 }
 
-/** What keeps `brief` from being a plan; empty when it holds. Each line says what to change. */
-export function methodProblems(brief: Brief): string[] {
-  if (brief.length_seconds < METHOD_MIN_SECONDS) return [];
+/** Where `brief` falls short of the motif method; empty when it holds or it is too short to be asked. Each line says what to change. */
+export function methodProblems(brief: Brief, options: { force?: boolean } = {}): string[] {
+  if (!options.force && brief.length_seconds < ADVICE_MIN_SECONDS) return [];
   const out: string[] = [];
   const motifs = new Set(brief.motifs.map(norm));
   if (brief.motifs.length < MIN_MOTIFS) out.push(`motifs: ${brief.motifs.length} of the ${MIN_MOTIFS}-12 elements only this subject has (its tools, materials, signs, screens, places, the one gesture of the trade).`);

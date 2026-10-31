@@ -101,6 +101,7 @@ export const briefShape = {
   checklist: z.array(line(200)).max(16).default([]).describe("The style's finish checklist, the lines review checks before done."),
   critique: line(800).optional().describe("What the self-critique against the style's best-vs-average list changed."),
   missing: z.array(line(200)).max(8).default([]).describe("Facts the person must supply (brand name, URL, price): never invented."),
+  auto: z.boolean().optional().describe("Set by Zenvi when the first cut saved a minimal brief for an agent that had none; a brief you save yourself leaves it out."),
 };
 
 export const briefSchema = z.strictObject(briefShape);

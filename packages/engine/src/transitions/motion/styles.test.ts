@@ -29,6 +29,8 @@ describe("motion transition styles", () => {
   it("maps brief styles to mixes", () => {
     expect(styleForBrief("brand-story-corporate")).toBe("brand");
     expect(styleForBrief("flash-montage")).toBe("flash");
+    // A name inside another word does not count: "app" in apparel is no app promo.
+    expect(styleForBrief("apparel brand film")).toBe("brand");
     expect(styleForBrief("flash-cut-match-cut-edit")).toBe("flash");
     expect(styleForBrief("match-cut-montage")).toBe("punch");
     expect(styleForBrief("hype-reel")).toBe("hype");

@@ -1,4 +1,182 @@
 (() => {
+  // packages/motion/src/blocks/ui.ts
+  var ICONS = {
+    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
+    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
+    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
+    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
+    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
+    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
+    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
+    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
+    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
+    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
+    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
+    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
+    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
+    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
+    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
+    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
+  };
+  function icon(ctx, name, className, parent) {
+    const el = ctx.el("span", `icon ${className}`, parent);
+    el.innerHTML = ICONS[name];
+    return el;
+  }
+  function pointer(ctx, from, at, size = 64) {
+    const el = ctx.el("div", "cursor");
+    el.innerHTML = ICONS.pointer;
+    const ringSize = Math.round(size * 1.3);
+    if (size !== 64) Object.assign(el.style, { width: `${size}px`, height: `${size}px` });
+    const ring = ctx.el("div", "cursor-ring");
+    Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: `${ringSize}px`, height: `${ringSize}px`, marginLeft: `${-ringSize / 2}px`, marginTop: `${-ringSize / 2}px`, borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
+    const tip = (x, y) => ({ x: x - Math.round(size * 6 / 28), y: y - Math.round(size * 3.5 / 28) });
+    let last = from;
+    ctx.tl.fromTo(el, { ...tip(from.x, from.y), opacity: 0, scale: 0.8 }, { ...tip(from.x, from.y), opacity: 1, scale: 1 }, { at, duration: 0.3, ease: "out" });
+    return {
+      el,
+      moveTo(x, y, start, duration = 0.7) {
+        ctx.tl.to(el, tip(x, y), { at: start, duration, ease: "in-out" });
+        last = { x, y };
+      },
+      click(when, sound = "click") {
+        if (sound) ctx.cue(when, sound, { weight: 0.35, at: last });
+        ctx.tl.to(el, { scale: 0.86 }, { at: when, duration: 0.08, ease: "out" });
+        ctx.tl.to(el, { scale: 1 }, { at: when + 0.08, duration: 0.22, ease: "out" });
+        const p = last;
+        ctx.tl.set(ring, { x: p.x, y: p.y }, when);
+        ctx.tl.fromTo(ring, { scale: 0.3, opacity: 0.9 }, { scale: 1.4, opacity: 0 }, { at: when, duration: 0.5, ease: "out" });
+      }
+    };
+  }
+  function onColor(bg) {
+    const m = /^#?([0-9a-f]{6})/i.exec(bg.trim());
+    if (!m) return "#FFFFFF";
+    const lin = (i) => {
+      const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
+    return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
+  }
+
+  // packages/motion/src/blocks/toggle_panel/block.ts
+  var TRAVEL = 108 - 50 - 12;
+  function parseRow(text) {
+    const on = text.startsWith("+");
+    const body = on ? text.slice(1).trim() : text.trim();
+    const i = body.indexOf(":");
+    return i > 0 ? { label: body.slice(0, i).trim(), detail: body.slice(i + 1).trim(), on } : { label: body, detail: "", on };
+  }
+  function build(ctx) {
+    const { tl, params: p, width: W, height: H, safe, palette } = ctx;
+    const rows = p.rows.map(parseRow);
+    const n = rows.length;
+    const S = ctx.seconds;
+    const onAccent = onColor(palette.accent);
+    const panelW = W <= H * 1.3 ? W - safe.left - safe.right : Math.min(980, W * 0.52);
+    const panel = ctx.el("div", "tp-panel");
+    panel.style.width = `${panelW}px`;
+    const head = ctx.el("div", "tp-head", panel);
+    const tile = ctx.el("div", "tp-tile", head);
+    const shield = icon(ctx, "shield", "", tile);
+    const check = icon(ctx, "check", "", tile);
+    ctx.el("div", "tp-title", head, String(p.title));
+    const pill = ctx.el("div", "tp-pill", head);
+    const pillFill = ctx.el("span", "tp-pill-fill", pill);
+    const count = ctx.el("span", "tp-count", pill);
+    const switches = rows.map((row) => {
+      const el = ctx.el("div", "tp-row", panel);
+      const text = ctx.el("div", "tp-text", el);
+      const label = ctx.el("div", "tp-label", text, row.label);
+      if (row.detail) ctx.el("div", "tp-detail", text, row.detail);
+      const sw = ctx.el("div", "tp-switch", el);
+      const fill = ctx.el("span", "tp-fill", sw);
+      const knob = ctx.el("span", "tp-knob", sw);
+      return { row, el, label, sw, fill, knob };
+    });
+    const pillW = Math.max(...[`${n} of ${n} on`, String(p.done)].map((text) => {
+      count.textContent = text;
+      return pill.getBoundingClientRect().width;
+    }));
+    pill.style.width = `${Math.ceil(pillW)}px`;
+    pill.style.justifyContent = "center";
+    count.textContent = "";
+    const rect = panel.getBoundingClientRect();
+    const left = (W - rect.width) / 2;
+    const top = safe.top + Math.max(0, (H - safe.top - safe.bottom - rect.height) / 2);
+    Object.assign(panel.style, { left: `${left}px`, top: `${top}px` });
+    tl.fromTo(panel, { y: H * 0.04, scale: 0.97, opacity: 0, blur: 12 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.7, ease: "out" });
+    ctx.cue(0, "pop", { weight: 0.4, at: { x: left + rect.width / 2, y: top + rect.height / 2 } });
+    tl.fromTo(switches.map((s) => s.el), { y: 24, opacity: 0 }, { y: 0, opacity: 1 }, { at: 0.15, duration: 0.6, ease: "out", stagger: Math.min(0.08, 0.45 / Math.max(1, n - 1)) });
+    for (const s of switches) {
+      tl.set(s.knob, { x: s.row.on ? TRAVEL : 0 }, 0);
+      tl.set(s.fill, { opacity: s.row.on ? 1 : 0 }, 0);
+      if (!s.row.on) tl.set(s.label, { opacity: 0.62 }, 0);
+    }
+    const offs = switches.filter((s) => !s.row.on);
+    const start = 1;
+    const doneBeat = 0.45;
+    const room = S - start - doneBeat - 0.8 - (p.exit === false ? 0.6 : 1);
+    const fit = offs.length > 1 ? (S - (p.exit === false ? 0 : 0.4) - 0.5 - doneBeat - (start + 0.55)) / (offs.length - 1) : Infinity;
+    const interval = offs.length > 0 ? Math.max(0.2, Math.min(1, Math.max(0.45, room / offs.length), fit)) : 0;
+    const clicks = offs.map((_, i) => start + 0.55 + i * interval);
+    const already = n - offs.length;
+    const done = String(p.done);
+    const doneAt = (clicks[clicks.length - 1] ?? start) + doneBeat;
+    tl.track((t) => {
+      const on = already + clicks.filter((c) => t >= c).length;
+      const text = t >= doneAt + 0.1 ? done : `${on} of ${n} on`;
+      if (count.textContent !== text) count.textContent = text;
+    });
+    const at = (s) => {
+      const r = s.sw.getBoundingClientRect();
+      return { x: r.left + r.width * 0.68, y: r.top + r.height * 0.55 };
+    };
+    if (p.cursor !== false && offs.length > 0) {
+      const first = at(offs[0]);
+      const size = ctx.portrait ? 84 : 72;
+      const ptr = pointer(ctx, { x: first.x + 140, y: first.y + 220 }, start - 0.2, size);
+      offs.forEach((s, i) => {
+        const pt = at(s);
+        ptr.moveTo(pt.x, pt.y, clicks[i] - Math.min(0.55, interval * 0.8), Math.min(0.5, interval * 0.75));
+        ptr.click(clicks[i], null);
+      });
+      const last = at(offs[offs.length - 1]);
+      tl.to(ptr.el, { x: last.x + 40, y: last.y + 200, opacity: 0 }, { at: clicks[clicks.length - 1] + 0.4, duration: 0.45, ease: "in" });
+    }
+    offs.forEach((s, i) => {
+      const c = clicks[i] + 0.02;
+      ctx.cue(c, "toggle", { weight: 0.35, at: s.knob });
+      tl.to(s.knob, { x: TRAVEL }, { at: c, duration: 0.32, ease: "back-out" });
+      tl.to(s.fill, { opacity: 1 }, { at: c, duration: 0.22, ease: "smooth" });
+      tl.to(s.label, { opacity: 1 }, { at: c, duration: 0.3, ease: "smooth" });
+      tl.to(s.knob, { scaleX: 1.14 }, { at: c, duration: 0.12, ease: "out" });
+      tl.to(s.knob, { scaleX: 1 }, { at: c + 0.12, duration: 0.2, ease: "out" });
+    });
+    tl.set(check, { opacity: 0, scale: 0.4 }, 0);
+    tl.set(pillFill, { scaleX: 0 }, 0);
+    pillFill.style.transformOrigin = "0 50%";
+    tl.fromTo(tile, { backgroundColor: hexA(palette.ink, 0.1), color: palette.ink }, { backgroundColor: palette.accent, color: onAccent }, { at: doneAt, duration: 0.35, ease: "smooth" });
+    tl.to(shield, { opacity: 0, scale: 0.6 }, { at: doneAt, duration: 0.2, ease: "exit" });
+    tl.to(check, { opacity: 1, scale: 1 }, { at: doneAt + 0.08, duration: 0.4, ease: "back-out" });
+    tl.to(pillFill, { scaleX: 1 }, { at: doneAt, duration: 0.45, ease: "in-out" });
+    ctx.cue(doneAt, "pop", { weight: 0.45, at: pill });
+    tl.fromTo(pill, { color: palette.muted }, { color: onAccent }, { at: doneAt + 0.1, duration: 0.25, ease: "smooth" });
+    tl.to(tile, { scale: 1.08 }, { at: doneAt, duration: 0.18, ease: "out" });
+    tl.to(tile, { scale: 1 }, { at: doneAt + 0.18, duration: 0.35, ease: "out" });
+  }
+  function hexA(hex, a) {
+    const m = /^#([0-9a-f]{6})/i.exec(hex);
+    if (!m) return hex;
+    const v = (i) => parseInt(m[1].slice(i, i + 2), 16);
+    return `rgba(${v(0)}, ${v(2)}, ${v(4)}, ${a})`;
+  }
+
   // packages/motion/src/runtime/easing.ts
   function cubicBezier(x1, y1, x2, y2) {
     const cx = 3 * x1;
@@ -218,9 +396,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -534,184 +712,6 @@
 ${error.stack ?? ""}` : String(error);
       rejectReady(error);
     });
-  }
-
-  // packages/motion/src/blocks/ui.ts
-  var ICONS = {
-    arrowUp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>`,
-    plus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
-    sparkle: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>`,
-    check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
-    film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg>`,
-    note: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>`,
-    captions: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 11h4M13 11h4M7 15h7"/></svg>`,
-    layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>`,
-    wave: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 10v4M8 6v12M12 9v6M16 4v16M20 10v4"/></svg>`,
-    pen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.2-4.6L15.6 5a2.1 2.1 0 013 3L8.2 18.4z"/><path d="M13.5 7l3.5 3.5"/></svg>`,
-    chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg>`,
-    grid: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="3.5"/></svg>`,
-    bolt: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2L5 13.5h6L10 22l9-12h-6.2z"/></svg>`,
-    sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>`,
-    play: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 001.5.86l10.4-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
-    bell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>`,
-    bubble: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z"/></svg>`,
-    shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/></svg>`,
-    lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>`,
-    pointer: `<svg viewBox="0 0 28 28"><path d="M6 3.5v19.2l5.1-4.6 3.3 7.4 3.4-1.5-3.3-7.3 6.9-.4z" fill="#111" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>`
-  };
-  function icon(ctx, name, className, parent) {
-    const el = ctx.el("span", `icon ${className}`, parent);
-    el.innerHTML = ICONS[name];
-    return el;
-  }
-  function pointer(ctx, from, at, size = 64) {
-    const el = ctx.el("div", "cursor");
-    el.innerHTML = ICONS.pointer;
-    const ringSize = Math.round(size * 1.3);
-    if (size !== 64) Object.assign(el.style, { width: `${size}px`, height: `${size}px` });
-    const ring = ctx.el("div", "cursor-ring");
-    Object.assign(ring.style, { position: "absolute", left: "0", top: "0", width: `${ringSize}px`, height: `${ringSize}px`, marginLeft: `${-ringSize / 2}px`, marginTop: `${-ringSize / 2}px`, borderRadius: "50%", border: "3px solid var(--accent)", zIndex: "49", opacity: "0" });
-    const tip = (x, y) => ({ x: x - Math.round(size * 6 / 28), y: y - Math.round(size * 3.5 / 28) });
-    let last = from;
-    ctx.tl.fromTo(el, { ...tip(from.x, from.y), opacity: 0, scale: 0.8 }, { ...tip(from.x, from.y), opacity: 1, scale: 1 }, { at, duration: 0.3, ease: "out" });
-    return {
-      el,
-      moveTo(x, y, start, duration = 0.7) {
-        ctx.tl.to(el, tip(x, y), { at: start, duration, ease: "in-out" });
-        last = { x, y };
-      },
-      click(when, sound = "click") {
-        if (sound) ctx.cue(when, sound, { weight: 0.35, at: last });
-        ctx.tl.to(el, { scale: 0.86 }, { at: when, duration: 0.08, ease: "out" });
-        ctx.tl.to(el, { scale: 1 }, { at: when + 0.08, duration: 0.22, ease: "out" });
-        const p = last;
-        ctx.tl.set(ring, { x: p.x, y: p.y }, when);
-        ctx.tl.fromTo(ring, { scale: 0.3, opacity: 0.9 }, { scale: 1.4, opacity: 0 }, { at: when, duration: 0.5, ease: "out" });
-      }
-    };
-  }
-  function onColor(bg) {
-    const m = /^#?([0-9a-f]{6})/i.exec(bg.trim());
-    if (!m) return "#FFFFFF";
-    const lin = (i) => {
-      const c = parseInt(m[1].slice(i, i + 2), 16) / 255;
-      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    };
-    const l = 0.2126 * lin(0) + 0.7152 * lin(2) + 0.0722 * lin(4);
-    return 1.05 / (l + 0.05) >= (l + 0.05) / 0.05 ? "#FFFFFF" : "#0B0B0F";
-  }
-
-  // packages/motion/src/blocks/toggle_panel/block.ts
-  var TRAVEL = 108 - 50 - 12;
-  function parseRow(text) {
-    const on = text.startsWith("+");
-    const body = on ? text.slice(1).trim() : text.trim();
-    const i = body.indexOf(":");
-    return i > 0 ? { label: body.slice(0, i).trim(), detail: body.slice(i + 1).trim(), on } : { label: body, detail: "", on };
-  }
-  function build(ctx) {
-    const { tl, params: p, width: W, height: H, safe, palette } = ctx;
-    const rows = p.rows.map(parseRow);
-    const n = rows.length;
-    const S = ctx.seconds;
-    const onAccent = onColor(palette.accent);
-    const panelW = W <= H * 1.3 ? W - safe.left - safe.right : Math.min(980, W * 0.52);
-    const panel = ctx.el("div", "tp-panel");
-    panel.style.width = `${panelW}px`;
-    const head = ctx.el("div", "tp-head", panel);
-    const tile = ctx.el("div", "tp-tile", head);
-    const shield = icon(ctx, "shield", "", tile);
-    const check = icon(ctx, "check", "", tile);
-    ctx.el("div", "tp-title", head, String(p.title));
-    const pill = ctx.el("div", "tp-pill", head);
-    const pillFill = ctx.el("span", "tp-pill-fill", pill);
-    const count = ctx.el("span", "tp-count", pill);
-    const switches = rows.map((row) => {
-      const el = ctx.el("div", "tp-row", panel);
-      const text = ctx.el("div", "tp-text", el);
-      const label = ctx.el("div", "tp-label", text, row.label);
-      if (row.detail) ctx.el("div", "tp-detail", text, row.detail);
-      const sw = ctx.el("div", "tp-switch", el);
-      const fill = ctx.el("span", "tp-fill", sw);
-      const knob = ctx.el("span", "tp-knob", sw);
-      return { row, el, label, sw, fill, knob };
-    });
-    const pillW = Math.max(...[`${n} of ${n} on`, String(p.done)].map((text) => {
-      count.textContent = text;
-      return pill.getBoundingClientRect().width;
-    }));
-    pill.style.width = `${Math.ceil(pillW)}px`;
-    pill.style.justifyContent = "center";
-    count.textContent = "";
-    const rect = panel.getBoundingClientRect();
-    const left = (W - rect.width) / 2;
-    const top = safe.top + Math.max(0, (H - safe.top - safe.bottom - rect.height) / 2);
-    Object.assign(panel.style, { left: `${left}px`, top: `${top}px` });
-    tl.fromTo(panel, { y: H * 0.04, scale: 0.97, opacity: 0, blur: 12 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.7, ease: "out" });
-    ctx.cue(0, "pop", { weight: 0.4, at: { x: left + rect.width / 2, y: top + rect.height / 2 } });
-    tl.fromTo(switches.map((s) => s.el), { y: 24, opacity: 0 }, { y: 0, opacity: 1 }, { at: 0.15, duration: 0.6, ease: "out", stagger: Math.min(0.08, 0.45 / Math.max(1, n - 1)) });
-    for (const s of switches) {
-      tl.set(s.knob, { x: s.row.on ? TRAVEL : 0 }, 0);
-      tl.set(s.fill, { opacity: s.row.on ? 1 : 0 }, 0);
-      if (!s.row.on) tl.set(s.label, { opacity: 0.62 }, 0);
-    }
-    const offs = switches.filter((s) => !s.row.on);
-    const start = 1;
-    const doneBeat = 0.45;
-    const room = S - start - doneBeat - 0.8 - (p.exit === false ? 0.6 : 1);
-    const fit = offs.length > 1 ? (S - (p.exit === false ? 0 : 0.4) - 0.5 - doneBeat - (start + 0.55)) / (offs.length - 1) : Infinity;
-    const interval = offs.length > 0 ? Math.max(0.2, Math.min(1, Math.max(0.45, room / offs.length), fit)) : 0;
-    const clicks = offs.map((_, i) => start + 0.55 + i * interval);
-    const already = n - offs.length;
-    const done = String(p.done);
-    const doneAt = (clicks[clicks.length - 1] ?? start) + doneBeat;
-    tl.track((t) => {
-      const on = already + clicks.filter((c) => t >= c).length;
-      const text = t >= doneAt + 0.1 ? done : `${on} of ${n} on`;
-      if (count.textContent !== text) count.textContent = text;
-    });
-    const at = (s) => {
-      const r = s.sw.getBoundingClientRect();
-      return { x: r.left + r.width * 0.68, y: r.top + r.height * 0.55 };
-    };
-    if (p.cursor !== false && offs.length > 0) {
-      const first = at(offs[0]);
-      const size = ctx.portrait ? 84 : 72;
-      const ptr = pointer(ctx, { x: first.x + 140, y: first.y + 220 }, start - 0.2, size);
-      offs.forEach((s, i) => {
-        const pt = at(s);
-        ptr.moveTo(pt.x, pt.y, clicks[i] - Math.min(0.55, interval * 0.8), Math.min(0.5, interval * 0.75));
-        ptr.click(clicks[i], null);
-      });
-      const last = at(offs[offs.length - 1]);
-      tl.to(ptr.el, { x: last.x + 40, y: last.y + 200, opacity: 0 }, { at: clicks[clicks.length - 1] + 0.4, duration: 0.45, ease: "in" });
-    }
-    offs.forEach((s, i) => {
-      const c = clicks[i] + 0.02;
-      ctx.cue(c, "toggle", { weight: 0.35, at: s.knob });
-      tl.to(s.knob, { x: TRAVEL }, { at: c, duration: 0.32, ease: "back-out" });
-      tl.to(s.fill, { opacity: 1 }, { at: c, duration: 0.22, ease: "smooth" });
-      tl.to(s.label, { opacity: 1 }, { at: c, duration: 0.3, ease: "smooth" });
-      tl.to(s.knob, { scaleX: 1.14 }, { at: c, duration: 0.12, ease: "out" });
-      tl.to(s.knob, { scaleX: 1 }, { at: c + 0.12, duration: 0.2, ease: "out" });
-    });
-    tl.set(check, { opacity: 0, scale: 0.4 }, 0);
-    tl.set(pillFill, { scaleX: 0 }, 0);
-    pillFill.style.transformOrigin = "0 50%";
-    tl.fromTo(tile, { backgroundColor: hexA(palette.ink, 0.1), color: palette.ink }, { backgroundColor: palette.accent, color: onAccent }, { at: doneAt, duration: 0.35, ease: "smooth" });
-    tl.to(shield, { opacity: 0, scale: 0.6 }, { at: doneAt, duration: 0.2, ease: "exit" });
-    tl.to(check, { opacity: 1, scale: 1 }, { at: doneAt + 0.08, duration: 0.4, ease: "back-out" });
-    tl.to(pillFill, { scaleX: 1 }, { at: doneAt, duration: 0.45, ease: "in-out" });
-    ctx.cue(doneAt, "pop", { weight: 0.45, at: pill });
-    tl.fromTo(pill, { color: palette.muted }, { color: onAccent }, { at: doneAt + 0.1, duration: 0.25, ease: "smooth" });
-    tl.to(tile, { scale: 1.08 }, { at: doneAt, duration: 0.18, ease: "out" });
-    tl.to(tile, { scale: 1 }, { at: doneAt + 0.18, duration: 0.35, ease: "out" });
-  }
-  function hexA(hex, a) {
-    const m = /^#([0-9a-f]{6})/i.exec(hex);
-    if (!m) return hex;
-    const v = (i) => parseInt(m[1].slice(i, i + 2), 16);
-    return `rgba(${v(0)}, ${v(2)}, ${v(4)}, ${a})`;
   }
 
   // packages/motion/src/blocks/toggle_panel/toggle_panel-entry.ts

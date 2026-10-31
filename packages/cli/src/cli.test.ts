@@ -284,6 +284,7 @@ describe("zenvi call preview_frame", () => {
       const named = await run(["call", "preview_frame_tool", "seconds=0", "format=png", "--json"], dir);
       expect(named.json()).toMatchObject({ file: path.join(dir, "frame-0.png") });
       expect((await run(["call", "preview_frame"], dir)).stderr).toMatch(/preview_frame needs seconds/);
+      expect((await run(["call", "preview_frame", "seconds=0", "format=webp"], dir)).stderr).toMatch(/format is jpeg or png/);
     } finally {
       await removeDir(dir);
     }

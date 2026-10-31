@@ -66,6 +66,8 @@ export async function makeWatchProxy(file: string, signal?: AbortSignal, maxByte
   const video = probe.streams.find((s) => s.codec_type === "video");
   if (!video) throw new WatchError("rejected", `${path.basename(file)} has no picture`);
   const duration = Number(probe.format.duration) || 0;
+  // An unknown length would tell the model the video is 0 s long and clamp every issue to 0.
+  if (!(duration > 0)) throw new WatchError("rejected", `${path.basename(file)} has no readable duration`);
   if (duration > WATCH_MAX_SECONDS + 0.5) {
     throw new WatchError("too_long", `${path.basename(file)} is ${duration.toFixed(1)} s; watching takes at most ${WATCH_MAX_SECONDS} s`);
   }
@@ -74,8 +76,9 @@ export async function makeWatchProxy(file: string, signal?: AbortSignal, maxByte
   try {
     const out = path.join(dir, "proxy.mp4");
     const edge = WATCH_PROXY_EDGE;
-    // An fps filter only above 30 (not -fpsmax, which ffmpeg before 4.4 lacks).
-    const fps = (frameRate(video.avg_frame_rate) || frameRate(video.r_frame_rate)) > 30.01 ? ",fps=30" : "";
+    // An fps filter only above 30 (not -fpsmax, which ffmpeg before 4.4 lacks). The higher of the two
+    // rates: an MP4 muxer without VFR falls back to r_frame_rate, which can be above a variable avg_frame_rate.
+    const fps = Math.max(frameRate(video.avg_frame_rate), frameRate(video.r_frame_rate)) > 30.01 ? ",fps=30" : "";
     for (const crf of [30, 38]) {
       await runBinary(
         resolveBinary("ffmpeg"),

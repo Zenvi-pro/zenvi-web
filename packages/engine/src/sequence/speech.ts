@@ -25,6 +25,8 @@ export function spokenTokens(text: string): string[] {
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
+    // A caption's typographic apostrophe (don’t) is the transcript's don't.
+    .replace(/[\u2018\u2019]/g, "'")
     .split(/[^\p{L}\p{N}']+/u)
     .map((t) => t.replace(/^'+|'+$/g, ""))
     .filter(Boolean);

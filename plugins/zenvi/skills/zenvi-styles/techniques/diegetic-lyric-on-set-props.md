@@ -38,7 +38,7 @@ add_title_tool {"text": " ", "position_seconds": 0, "duration_seconds": 4, "back
 set_clip_properties_tool {"timeline_clip_ids": ["<stage a clip>"], "properties": {"location_y": -0.15, "origin_y": 0.65}}
 set_keyframes_tool {"timeline_clip_id": "<stage a clip>", "property": "rotation", "points": [{"timeline_seconds": 0, "value": -35}, {"timeline_seconds": 4, "value": 35}], "interpolation": "linear"}
 add_clip_to_timeline_tool {"file_id": "<record insert>", "position_seconds": 0, "start_seconds": 2, "end_seconds": 6, "track": "1"}
-set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop", "volume": 0}}
+set_clip_properties_tool {"scope": "all", "properties": {"scale": "Crop"}}
 import_files_tool {"paths": ["<stage b render>"]}
 add_clip_to_timeline_tool {"file_id": "<stage b>", "position_seconds": 0, "start_seconds": 0, "end_seconds": 4, "track": "2"}
 set_clip_properties_tool {"timeline_clip_ids": ["<label>"], "properties": {"composite": "multiply", "scale_x": 1.0, "scale_y": 0.39, "location_x": -0.3125, "location_y": 0.417, "volume": 0}}

@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -561,10 +561,10 @@ ${error.stack ?? ""}` : String(error);
   };
 
   // packages/motion/src/blocks/ripple_logo/block.ts
-  var clamp013 = (u) => Math.min(1, Math.max(0, u));
-  var out = (u) => 1 - (1 - clamp013(u)) ** 3;
+  var clamp012 = (u) => Math.min(1, Math.max(0, u));
+  var out = (u) => 1 - (1 - clamp012(u)) ** 3;
   var backOut2 = (u) => {
-    const x = clamp013(u) - 1;
+    const x = clamp012(u) - 1;
     return 1 + 2.3 * x * x * x + 1.3 * x * x;
   };
   function tint(hex, white) {

@@ -97,16 +97,17 @@ export function styleEvery(style: MotionTransitionStyle): number {
  */
 export function styleForBrief(briefStyle: string | undefined): MotionTransitionStyle {
   const s = (briefStyle ?? "").toLowerCase();
+  // Each name starts a word ("app" in saas-app-launch, not in "happy").
   const rules: [RegExp, MotionTransitionStyle][] = [
-    [/flash|cosmic|strobe/, "flash"],
-    [/match/, "punch"],
-    [/hype/, "hype"],
-    [/sport|gaming|fitness|automotive/, "sport"],
-    [/wedding|event|food|lifestyle/, "gentle"],
-    [/travel|real.?estate|tour/, "travel"],
-    [/saas|ui.?promo|app|explainer|tech|3d|product/, "cinematic"],
-    [/brand|corporate|launch|documentary|essay|science|kids|fashion|ugc|testimonial/, "brand"],
-    [/editorial|kinetic|type|lyric|news|podcast|talking|caption/, "editorial"],
+    [/\b(?:flash|cosmic|strobe)/, "flash"],
+    [/\b(?:match)/, "punch"],
+    [/\b(?:hype)/, "hype"],
+    [/\b(?:sport|gaming|fitness|automotive)/, "sport"],
+    [/\b(?:wedding|event|food|lifestyle)/, "gentle"],
+    [/\b(?:travel|real.?estate|tour)/, "travel"],
+    [/\b(?:saas|ui.?promo|app|explainer|tech|3d|product)/, "cinematic"],
+    [/\b(?:brand|corporate|launch|documentary|essay|science|kids|fashion|ugc|testimonial)/, "brand"],
+    [/\b(?:editorial|kinetic|type|lyric|news|podcast|talking|caption)/, "editorial"],
   ];
   return rules.find(([re]) => re.test(s))?.[1] ?? "cinematic";
 }

@@ -17,7 +17,7 @@ import { sfxRecipe } from "../../sfx/recipes.js";
 import type { SfxParams } from "../../sfx/render.js";
 import { onsetsOfFile } from "../beats.js";
 import { directTool, unavailable, type CatalogTool } from "../define.js";
-import { applied, failed, refused } from "../receipt.js";
+import { applied, failed, refused, unchanged } from "../receipt.js";
 import { pictureEnd, placeSfx, prepareSfx, type PreparedSfx } from "../sfx-media.js";
 import { isRetimed } from "../speech.js";
 import { fileById } from "./common.js";
@@ -173,6 +173,8 @@ export const actionFoleyTools: CatalogTool[] = [
         });
         return ids;
       }, "Spot foley on actions");
+      // Every cue refused by placeSfx (past the picture's end): no sound, no undo step.
+      if (placed.length === 0) return unchanged(TOOL, `${sheet} None of the sounds could be placed on the SFX track.`, { warnings, data });
       return applied(TOOL, `${sheet} Placed ${placed.length} sound(s) on the SFX track.`, { warnings, data: { ...data, createdClipIds: placed } });
     },
   }),

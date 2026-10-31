@@ -4,7 +4,8 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { FILLER_PROMPT, isTranscriptionError, parseTranscription, type AudioEnvelope, type MotionBlockInfo, type ReaderInfo } from "@zenvi/engine";
+import { FILLER_PROMPT, isTranscriptionError, isWatchError, parseTranscription, type AudioEnvelope, type MotionBlockInfo, type ReaderInfo } from "@zenvi/engine";
+import { renderPath } from "../services/paths.js";
 import { describe, expect, it } from "vitest";
 import { SCOPE_READ, SCOPE_WRITE } from "../auth/scopes.js";
 import type { AssetSource, MatteHostFactory, MediaProber, MixRenderer, MotionHostFactory, RenderInput, SpeechTranscriber, WatchProxyMaker } from "../render/renderer.js";
@@ -473,6 +474,33 @@ describe("watching a render in the cloud", () => {
     expect([sent[0]!.form.get("brief"), sent[0]!.form.get("focus")]).toEqual(["a reel", "mix"]);
     expect(critique).toMatchObject({ via: "backend", overall: 6, usage: { credits: 1 } });
     expect(critique.issues[0]!.fix).toBe("Duck the music 8 dB.");
+    await dispose();
+  });
+
+  it("watches what render_project made, by its render_id, and refuses one that is not done", async () => {
+    const sent: FormData[] = [];
+    const h = await harness({ prober, watchProxy, config: { backendAuth: { kind: "assertion", secret: SECRET } } });
+    h.services.backendSessions.fetchImpl = async (_url, init) => {
+      sent.push(init?.body as FormData);
+      return new Response(JSON.stringify(ANSWER), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const { id: projectId } = await h.services.projects.create(USER_A, { name: "Reel", project: sampleProject() as never });
+    const jobs: Record<string, { status: string; format: string }> = { r_done000000000000: { status: "done", format: "mp4" }, r_busy000000000000: { status: "running", format: "mp4" }, r_song000000000000: { status: "done", format: "mp3" } };
+    h.services.renders.get = (async (_user: string, _project: string, id: string) => {
+      const job = jobs[id];
+      if (!job) throw new Error("Render not found");
+      return { renderId: id, projectId, ...job };
+    }) as never;
+    await h.services.blobs.write(renderPath(USER_A, projectId, "r_done000000000000", "mp4"), Buffer.from("rendered bytes"));
+    const { host, dispose } = createCloudHost(context(h), projectId, () => sampleProject() as never);
+    const critique = await host.watch!.watchRender!("r_done000000000000", { brief: "a reel" });
+    expect(critique).toMatchObject({ via: "backend", overall: 6 });
+    expect(await (sent[0]!.get("video") as File).text()).toBe("rendered bytes");
+    for (const [id, words] of [["r_busy000000000000", "is running"], ["r_song000000000000", "not a video"], ["r_none000000000000", "no render r_none000000000000"], ["../../etc", "no render ../../etc"]]) {
+      const error = await host.watch!.watchRender!(id!).catch((e: unknown) => e);
+      expect(isWatchError(error) && error.code === "rejected" && error.message.includes(words!), id).toBe(true);
+    }
+    expect(sent).toHaveLength(1);
     await dispose();
   });
 

@@ -61,7 +61,7 @@ function text(v: unknown): string | undefined {
 
 /** What a recipe read before any brief starts with. */
 const BRIEF_FIRST =
-  "This project has no brief yet. Step 0, before the first edit: compile the brief with the brief compiler below (inspect_media_bin_tool, one style, up to four techniques, the critique) and save it with save_brief_tool; then build it with the recipe after it.";
+  'No brief saved yet. A short one plans the edit and lets review check it: read_director_recipe {styles: "brief"}, then save_brief_tool. Nothing waits for it: the first cut saves a minimal one if you skip it.';
 
 /** On an empty project, the plan: open_project_file is the one receipt every agent reads before its first edit. */
 function startNotes(state: McpState): { notes?: string[] } {
@@ -150,11 +150,10 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
         const uri = palette ? `zenvi://sound/${palette}` : recipe === "director" ? "zenvi://director" : `zenvi://director/${recipe}`;
         const markdown = guideText(uri);
         if (!markdown) return { receipt: refused(tool, `Error: no ${palette ? `sound palette ${palette}` : `recipe ${recipe}`}; recipes: director, ${DIRECTOR_RECIPES.map((r) => r.genre).join(", ")}.`), engine: null };
-        // Bench sk0, first pass: agents went from the card straight to the recipe and never compiled
-        // the brief. A genre recipe read before any brief is saved carries the brief compiler first.
+        // A genre recipe read before any brief opens with one line pointing at the brief compiler (it used to carry
+        // all of BRIEF.md: bench rounds 6-7 put the brief step's cost at a third of a run's).
         if (recipe !== undefined && recipe !== "director" && !readBrief(state.session.doc.project)) {
-          const draw = await drawText(ctx.config.configDir, String(state.session.doc.project.id));
-          return { receipt: applied(tool, `${BRIEF_FIRST}\n\n${guideText("zenvi://styles/brief")}\n\n${draw}\n\n--- Recipe (${uri}) ---\n\n${markdown}`, { data: { uri, brief: "zenvi://styles/brief" } }, 0), engine: null };
+          return { receipt: applied(tool, `${BRIEF_FIRST}\n\n${markdown}`, { data: { uri, brief: "zenvi://styles/brief" } }, 0), engine: null };
         }
         return { receipt: applied(tool, markdown, { data: { uri } }, 0), engine: null };
       },

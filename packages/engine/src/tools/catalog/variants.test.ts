@@ -112,11 +112,15 @@ describe("compare_renders_tool", () => {
 
   it("refuses a render over 60 s before watching, and falls back to separate watches", async () => {
     const ed = new EditHarness();
-    const calls = judging(ed, {}, { "long.mp4": 75 });
+    const calls = judging(ed, {}, { "long.mp4": 75, "nan.mp4": Number.NaN });
     const long = (await runTool({ doc: ed.doc, host: ed.host }, "compare_renders_tool", { a: "long.mp4", b: "b.mp4" })).data!;
     expect(long.status).toBe("refused");
     expect(long.summary).toContain("at most 60 s");
     expect(calls).toEqual([]);
+    // A length nobody could read is not a 0 s render that passes the guard.
+    const unknown = (await runTool({ doc: ed.doc, host: ed.host }, "compare_renders_tool", { a: "b.mp4", b: "nan.mp4" })).data!;
+    expect(unknown.status).toBe("refused");
+    expect(unknown.summary).toContain("could not read the length of nan.mp4");
 
     const critique = (overall: number): WatchCritique => ({
       model: "w",

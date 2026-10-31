@@ -182,6 +182,14 @@ describe("add_type_block_tool", () => {
     expect((await run(8)).svgs).not.toEqual(a.svgs);
   });
 
+  it("boils a long paper block slower instead of drawing a pose per frame", async () => {
+    // Regression (t4 review): 30 s on ones was 900 clips and about 5 MB of SVG.
+    const d = doc();
+    const r = await runTool({ doc: d, host: fakeHost() }, "add_type_block_tool", { block: "paper", text: "BUY IT", duration_seconds: 30, hold_frames: 1 });
+    expect(r.ok, r.text).toBe(true);
+    expect(tagged(d).length).toBeLessThanOrEqual(120);
+  });
+
   it("refuses arguments another block reads, without touching the project", async () => {
     const d = doc();
     const before = snapshotOf(d.project);

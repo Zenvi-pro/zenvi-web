@@ -13,6 +13,11 @@ prices, claims, URLs, dates, people. When the piece needs one you do not
 have, put it in `missing`, leave a neutral placeholder out of the video (no
 fake URL, no "Brand" logo), and say so.
 
+Nothing waits for the brief: if you cut without one, the first call saves a
+minimal brief by itself (style matched from your words, the frame, the
+length, one beat) and says so. That keeps review honest, but it plans
+nothing; a brief of your own is what makes the edit directed.
+
 ## 1. Read what you have
 
 - The prompt: who it is for, where it goes, what it must make someone do.
@@ -71,8 +76,8 @@ kinetic-cut-video, see NOTICE); in short:
   `motion`, `3d`, `title`), `composition`, `text_entrance`, `tone`
   (brightness and main colour), `transition` (a motif match cut first: the
   waveform becomes the next shot's trace). The last four columns exist to
-  see repetition before cutting. Hard rules (save refuses a brief that
-  breaks them, from 6 s on):
+  see repetition before cutting. The rules (advice, never a refusal: from
+  20 s, or with `check_method: true`, the save receipt lists what breaks them):
   - first and last shot grow from the through-line; every motif is a listed one;
   - lengths vary (1 / 2 / 4 / 8 beats in a curve: set-up, speed-up, breath,
     climax, hold), never all the same;
@@ -130,8 +135,7 @@ Pitfalls) and against these, and rewrite what fails:
 - **The reskin test.** For each storyboard row: if the copy named another
   subject (a coffee brand instead of a university), would this picture still
   work? Count those rows in **reskin.generic**. More than a third is a
-  template: regrow those shots from the motifs and count again. Save
-  refuses over a third.
+  template: regrow those shots from the motifs and count again. The save receipt flags over a third.
 - Does the hook work with the sound off, and does it hit in the first 0.5 s?
 - Is there one bold moment, and only one? Is there stillness before it?
 - Does every beat start with a picture change and end before it drags (the
@@ -144,7 +148,7 @@ Pitfalls) and against these, and rewrite what fails:
 Write what you changed in **critique** (one line per fix). Then:
 
 ```json
-save_brief_tool {"goal": "Make runners want the new trail shoe after one watch", "platform": "Instagram Reels", "aspect": "9:16", "length_seconds": 15, "style": "hype-reel", "techniques": [{"id": "speed-ramp", "why": "the wind-up into the drop at 7.5 s", "tools": ["speed_ramp_tool"]}], "hook": "Mud splashes off a sole in slow motion, impact on frame 1, sub hit", "beats": [{"start": 0, "end": 2, "name": "hook"}, {"start": 2, "end": 7.5, "name": "build"}, {"start": 7.5, "end": 13.5, "name": "drop"}, {"start": 13.5, "end": 15, "name": "end card"}], "motifs": ["lugged sole", "mud spray", "laces pulled tight", "trail map contour lines", "altitude readout", "GPS pace screen", "rock and root texture", "the stride"], "through_line": "lugged sole", "storyboard": [{"start": 0, "beats": 4, "picture": "lugged sole hits wet mud in slow motion", "motif": "lugged sole", "source": "stock", "composition": "full bleed", "text_entrance": "none", "tone": "dark wet earth"}, {"start": 2, "beats": 2, "picture": "contour lines draw on over the ridge", "motif": "trail map contour lines", "source": "motion", "composition": "object left / type right", "text_entrance": "typed", "tone": "bright paper map", "transition": "contour line becomes the trail"}, {"start": 3, "beats": 1, "picture": "laces yanked tight, macro", "motif": "laces pulled tight", "source": "stock", "composition": "diagonal", "text_entrance": "slam", "tone": "dark, orange accent"}, {"start": 3.5, "beats": 8, "picture": "altitude counts up as the runner crests", "motif": "altitude readout", "source": "motion", "composition": "type cropped by the frame", "text_entrance": "built from the motif", "tone": "orange accent fill", "climax": true}, {"start": 7.5, "beats": 4, "picture": "the sole again, now clean, held as a poster", "motif": "lugged sole", "source": "stock", "composition": "centred", "text_entrance": "mask wipe", "tone": "dark, orange accent"}], "reskin": {"generic": 1, "note": "the laces macro could sell any shoe"}, "direction": [{"axis": "art style", "pick": "blueprint line drawing", "why": "trail maps are line drawings; last edit was film documentary"}, {"axis": "rhythm", "pick": "slow start, fast finish", "why": "the climb, then the descent"}, {"axis": "opening", "pick": "straight into the hit", "why": "the sole strike is the hook"}], "music": "128 BPM, quiet build, drop at 7.5 s", "checklist": ["a hit on every cut", "one look on every shot", "ends on a held product shot"], "critique": "Moved the logo off the hook; the drop had no stillness before it, added 0.4 s hold; replaced a generic sunset with the altitude readout"}
+save_brief_tool {"goal": "Make runners want the new trail shoe after one watch", "platform": "Instagram Reels", "aspect": "9:16", "length_seconds": 15, "style": "hype-reel", "techniques": [{"id": "cinematic-speed-ramp", "why": "the wind-up into the drop at 7.5 s", "tools": ["speed_ramp_tool"]}], "hook": "Mud splashes off a sole in slow motion, impact on frame 1, sub hit", "beats": [{"start": 0, "end": 2, "name": "hook"}, {"start": 2, "end": 7.5, "name": "build"}, {"start": 7.5, "end": 13.5, "name": "drop"}, {"start": 13.5, "end": 15, "name": "end card"}], "motifs": ["lugged sole", "mud spray", "laces pulled tight", "trail map contour lines", "altitude readout", "GPS pace screen", "rock and root texture", "the stride"], "through_line": "lugged sole", "storyboard": [{"start": 0, "beats": 4, "picture": "lugged sole hits wet mud in slow motion", "motif": "lugged sole", "source": "stock", "composition": "full bleed", "text_entrance": "none", "tone": "dark wet earth"}, {"start": 2, "beats": 2, "picture": "contour lines draw on over the ridge", "motif": "trail map contour lines", "source": "motion", "composition": "object left / type right", "text_entrance": "typed", "tone": "bright paper map", "transition": "contour line becomes the trail"}, {"start": 3, "beats": 1, "picture": "laces yanked tight, macro", "motif": "laces pulled tight", "source": "stock", "composition": "diagonal", "text_entrance": "slam", "tone": "dark, orange accent"}, {"start": 3.5, "beats": 8, "picture": "altitude counts up as the runner crests", "motif": "altitude readout", "source": "motion", "composition": "type cropped by the frame", "text_entrance": "built from the motif", "tone": "orange accent fill", "climax": true}, {"start": 7.5, "beats": 4, "picture": "the sole again, now clean, held as a poster", "motif": "lugged sole", "source": "stock", "composition": "centred", "text_entrance": "mask wipe", "tone": "dark, orange accent"}], "reskin": {"generic": 1, "note": "the laces macro could sell any shoe"}, "direction": [{"axis": "art style", "pick": "blueprint line drawing", "why": "trail maps are line drawings; last edit was film documentary"}, {"axis": "rhythm", "pick": "slow start, fast finish", "why": "the climb, then the descent"}, {"axis": "opening", "pick": "straight into the hit", "why": "the sole strike is the hook"}], "music": "128 BPM, quiet build, drop at 7.5 s", "checklist": ["a hit on every cut", "one look on every shot", "ends on a held product shot"], "critique": "Moved the logo off the hook; the drop had no stillness before it, added 0.4 s hold; replaced a generic sunset with the altitude readout"}
 ```
 
 The receipt checks the brief against the project at once (frame, length).

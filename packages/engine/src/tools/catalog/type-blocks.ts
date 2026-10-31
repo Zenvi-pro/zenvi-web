@@ -99,7 +99,7 @@ const input = z.strictObject({
   gap_frames: z.number().int().min(1).max(12).optional().describe("echo_stack: frames between one pair of copies and the next (default 2)."),
   words: z.array(z.string().min(1).max(40)).min(1).max(40).optional().describe("strobe: the words, one per cut; wheel: the drum's lines in order, 2-12 (default: text split at spaces)."),
   lockup: z.string().max(80).optional().describe("strobe: the held end card (default: the text, none when `words` come without it; empty string: none, the last word holds 0.4 s)."),
-  hold_frames: z.number().int().min(1).max(90).optional().describe("strobe: frames each word holds (default 4, ~0.13 s at 30 fps: a strobe; 8-12 for a staccato list); wheel: frames each word rests before the drum turns (default 0.7 s); paper: frames per stop-motion pose (default 2)."),
+  hold_frames: z.number().int().min(1).max(90).optional().describe("strobe: frames each word holds (default 4, ~0.13 s at 30 fps: a strobe; 8-12 for a staccato list); wheel: frames each word rests before the drum turns (default 0.7 s); paper: frames per stop-motion pose (default 2; a long block holds longer, at most 120 poses)."),
   beats: z.array(z.number().min(0)).min(2).max(400).optional().describe("strobe: timeline seconds to cut on instead of hold_frames (detect_beats_tool's beats moved to the music's position); a word per beat from the first one at or after position_seconds, the lockup on the next. wheel: the drum turns on these beats (the first n-1 after position_seconds)."),
   seed: z.number().int().min(0).max(2 ** 31).optional().describe("paper: seed of the boil (default 1): the same seed boils the same."),
   marks: z.boolean().optional().describe("paper: the hand-drawn marks orbiting the word (default true)."),

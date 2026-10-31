@@ -5,7 +5,7 @@
  *
  * Frames are rendered small (TRACK_EDGE) through the same scratch project
  * inspect_media_tool uses, so a track is in source-frame coordinates (0-1)
- * whatever the clip's transform. Tracks are cached per file and request: a
+ * whatever the clip's transform. Tracks are cached per host, file and request: a
  * look with track_point_tool followed by a pin or a reframe tracks once.
  */
 
@@ -36,7 +36,14 @@ export interface TrackRequest {
   model: TrackModel;
 }
 
-const cache = new Map<string, Track>();
+/** Tracks per host: a cloud process serves many people, and a file id and path are only unique inside one project. */
+const caches = new WeakMap<object, Map<string, Track>>();
+
+function cacheOf(call: ToolCall): Map<string, Track> {
+  let cache = caches.get(call.host);
+  if (!cache) caches.set(call.host, (cache = new Map()));
+  return cache;
+}
 
 function cacheKey(file: ProjectFile, r: TrackRequest): string {
   const q = r.quad.map((p) => `${p.x.toFixed(4)},${p.y.toFixed(4)}`).join(";");
@@ -104,6 +111,7 @@ async function trackLeg(call: ToolCall, file: ProjectFile, r: TrackRequest, time
  */
 export async function trackFile(call: ToolCall, file: ProjectFile, r: TrackRequest): Promise<Track | string> {
   if (!call.host.frames) return "Error: this Zenvi surface cannot render frames to track.";
+  const cache = cacheOf(call);
   const key = cacheKey(file, r);
   const hit = cache.get(key);
   if (hit) {

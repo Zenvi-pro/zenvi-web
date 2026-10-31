@@ -47,7 +47,7 @@ today read it off `detect_beats_tool` downbeats + the loudness curve.
 - Suck-out 80-300 ms (`length_ms`, default 200), at most 1-2 per 30 s.
 - The hit lands on frame one of the hero shot and on the drop's downbeat; never one frame late.
 - Nothing in the gap: no whoosh tail, no reverb ring (cut the riser at `t`).
-- Bumper version at the very start (video-shotcraft, Apache-2.0, `shot-trailer-grammar-moves`): three equal shots of 9 frames (0.3 s), each a different composition, each pushing 1.0 -> 1.04; then 6 frames of pure black with nothing in it, then the title, held >= 1.3 s (40 f) fully still. The mid-film drop silence stays 0.4-0.6 s.
+- Bumper version at the very start (video-shotcraft, Apache-2.0, `shot-trailer-grammar-moves`): three equal shots of 9 frames (0.375 s at 24 fps), each a different composition, each pushing 1.0 -> 1.04; then 6 frames of pure black with nothing in it, then the title, held >= 1.3 s (40 f) fully still. The mid-film drop silence stays 0.4-0.6 s.
 
 ## Sound for it
 

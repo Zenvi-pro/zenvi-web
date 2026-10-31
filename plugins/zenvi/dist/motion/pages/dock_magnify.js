@@ -228,9 +228,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -733,12 +733,12 @@ ${error.stack ?? ""}` : String(error);
   var FILLS = ["#FF7A45", "#2FC0A8", "#FFB020", "#3D7BFF", "#FF5C8A", "#2E2A3D", "#45B649", "#FF4F3B", "#5A6FE0"];
   var MAGNIFY = 1.75;
   var SPREAD = 1.25;
-  var clamp013 = (u) => Math.min(1, Math.max(0, u));
+  var clamp012 = (u) => Math.min(1, Math.max(0, u));
   var smooth = (u) => {
-    const x = clamp013(u);
+    const x = clamp012(u);
     return x * x * (3 - 2 * x);
   };
-  var out = (u) => 1 - (1 - clamp013(u)) ** 3;
+  var out = (u) => 1 - (1 - clamp012(u)) ** 3;
   async function build(ctx) {
     const { tl, params: p, width: W, height: H, palette, safe } = ctx;
     const S = ctx.seconds;
@@ -842,7 +842,7 @@ ${error.stack ?? ""}` : String(error);
         el.style.top = `${bottom - pad - B + dy - (i === target ? hop(t) : 0)}px`;
         el.style.transform = `scale(${k.toFixed(4)})`;
         const gone = !open || t < launchAt ? 1 : i === target ? 0 : 1 - smooth((t - launchAt - 0.2) / 0.3);
-        el.style.opacity = String(clamp013((t - riseAt - i * 0.04) / 0.3) * gone);
+        el.style.opacity = String(clamp012((t - riseAt - i * 0.04) / 0.3) * gone);
       });
       const s = slots[target];
       Object.assign(dot.style, { left: `${s.left + s.size / 2 - 4 * scale}px`, top: `${bottom - pad * 0.45 + dy}px`, transform: `scale(${scale})` });

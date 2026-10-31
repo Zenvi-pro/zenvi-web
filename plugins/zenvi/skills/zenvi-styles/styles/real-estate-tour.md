@@ -35,7 +35,7 @@ techniques), a city or travel film (`travel-cinematic-montage`).
 | Arrival hook: vehicle / gate, then drone descent; no text | 0-3 | 0-6 | 0-7 | 0-7 |
 | Host or invitation: door handle turn, POV step inside | 3-4.5 | 6-9 | 7-15 | 7-15 |
 | Lifestyle proof (people using the house) | – | – | 15-30 | 15-46 |
-| Room chain, forward glides, 4 s → 2 s | 4.5-11 | 9-23.5 | 30-50 | 46-80 |
+| Room chain, forward glides, 4 s → 2 s | 4.5-11 | 9-23.5 | 30-50 | 46-72 |
 | Action inserts with foley inside the chain (1.5-3 s) | in chain | 16-18 | 2-3 inserts | 3-4 inserts |
 | Held reveal: orbit or ascending drone, 6-18 s, music swells | 11-15 | 23.5-30 | 50-60 | 72-90 |
 
