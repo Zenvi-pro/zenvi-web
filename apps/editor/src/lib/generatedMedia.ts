@@ -25,6 +25,8 @@ export function withBackendAuth(token: () => Promise<string | null> = getAccessT
     // downloadFile's headers are a plain record (its Range); jsdom's Headers would drop Range.
     const headers: Record<string, string> = { ...(init?.headers as Record<string, string> | undefined) };
     const value = await token();
+    // A cancel during the token lookup stops here, before the request.
+    init?.signal?.throwIfAborted();
     if (value) headers.Authorization = `Bearer ${value}`;
     return doFetch(input, { ...init, headers });
   };

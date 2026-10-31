@@ -35,4 +35,19 @@ describe("generated media downloads", () => {
     await withBackendAuth(async () => null, backend)("https://api.zenvi.pro/x", { headers: { Range: "bytes=0-9" } });
     expect([headers.get("Range"), headers.get("Authorization") ?? null]).toEqual(["bytes=0-9", null]);
   });
+
+  it("does not send the request when the download was cancelled during the token lookup", async () => {
+    let sent = 0;
+    const backend = (async () => {
+      sent += 1;
+      return new Response("");
+    }) as typeof fetch;
+    const controller = new AbortController();
+    const pending = withBackendAuth(async () => {
+      controller.abort();
+      return "jwt";
+    }, backend)("https://api.zenvi.pro/x", { signal: controller.signal });
+    await expect(pending).rejects.toThrow();
+    expect(sent).toBe(0);
+  });
 });
