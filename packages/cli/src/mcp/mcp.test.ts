@@ -66,7 +66,7 @@ describe("zenvi mcp", () => {
     // A tool the bench uses keeps its whole text; a specialist one keeps its first sentence and its argument names, types and enums.
     expect(byName(lean, "add_clip_to_timeline_tool")).toEqual(byName(full, "add_clip_to_timeline_tool"));
     const split = byName(lean, "split_clip_tool");
-    expect(split.description.length).toBeLessThan(byName(full, "split_clip_tool").description.length + 1);
+    expect((split.description ?? "").length).toBeLessThanOrEqual((byName(full, "split_clip_tool").description ?? "").length);
     expect(Object.keys(split.inputSchema.properties ?? {})).toEqual(Object.keys(byName(full, "split_clip_tool").inputSchema.properties ?? {}));
     expect(JSON.stringify(lean).length).toBeLessThan(JSON.stringify(full).length * 0.85);
     expect(SERVER_INSTRUCTIONS).toContain("a call refused for its arguments lists them in full");
