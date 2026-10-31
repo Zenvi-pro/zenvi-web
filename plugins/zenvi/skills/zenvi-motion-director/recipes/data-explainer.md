@@ -19,7 +19,7 @@ time. Every graphic lands on a hit; whooshes on camera moves and dissolves.
 
 1. Map: `add_motion_block_tool` `{"block": "geo_map", "params": {"focus":
    "Western Africa", "highlight": ["Nigeria", "Ghana"], "markers": ["Lagos",
-   "Accra"], "route": "path", "title": "Two capitals, one corridor"}}`.
+   "Accra"], "route": "path", "title": "Two cities, one corridor"}}`.
    Places are countries, continents, Natural Earth subregions ("Southern
    Asia"), cities ("Paris, France") or "lat, lon"; an unknown name is refused
    with a suggestion. `projection: "flat"` for a newsroom map, `"globe"` for
@@ -27,13 +27,14 @@ time. Every graphic lands on a hit; whooshes on camera moves and dissolves.
    `legend`, `suffix`.
 2. Time: `add_motion_block_tool` `{"block": "data_clock", "params":
    {"style": "band", "start": "2006-01-20", "end": "2006-02-05", "step":
-   "day", "legends": ["CO₂ ppm=377..395@thermal"]}}` on the track above a
-   map or a time-lapse; `style: "ghost"` for a huge year, `reverse: true`
+   "day"}}` on the track above a map or a time-lapse (`legends`, e.g.
+   `["CO₂ ppm=377..395@thermal"]`, only when the picture under it shows that
+   data); `style: "ghost"` for a huge year, `reverse: true`
    over a reversed clip.
 3. Unit chart: `{"block": "pictogram_morph", "params": {"groups":
-   ["Lost=60", "Returned=340"], "unit": 2, "icon": "person", "layouts":
-   ["grid", "bars", "hold"], "captions": ["Of 400 who sailed", "", "Three
-   wrote home"], "keep": 3}}` on the track above the footage the hold
+   ["Lost=60", "Returned=340"], "unit": 2, "icon": "person", "suffix": "", "layouts":
+   ["grid", "bars", "hold"], "captions": ["Of 400 who sailed", "", "Six
+   never came home"], "keep": 3}}` on the track above the footage the hold
    dissolves to (the block has alpha; the backdrop fades on `hold`).
 4. Race: `{"block": "bar_race", "params": {"series": ["Kite=1, 8, 27, 52",
    "Atlas=12, 17, 19, 22"], "periods": ["2018", "2020", "2022", "2024"],
