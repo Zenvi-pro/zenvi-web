@@ -13,7 +13,7 @@ import { readBrief } from "../../brief/brief.js";
 import { nearestAspect } from "../../brief/auto.js";
 import { inventoryEntry, inventoryFiles } from "../../brief/inventory.js";
 import type { Project } from "../../model/types.js";
-import { styleLibrary } from "../../styles/load.js";
+import { STYLE_FILES } from "../../styles/index.js";
 import { compactStyle, compactTechnique, nearestIds, rankStyles, styleChecklist, styleFinishCalls, type BinSignals, type StyleFile } from "../../styles/recipe.js";
 import { timelineEnd } from "../../timeline/queries.js";
 import { directTool, type CatalogTool } from "../define.js";
@@ -81,7 +81,7 @@ export const styleTools: CatalogTool[] = [
     input: findInput,
     annotations: READ_ONLY,
     run: async (call, args: z.output<typeof findInput>) => {
-      const files = await styleLibrary();
+      const files = STYLE_FILES;
       const project = call.doc.project;
       const brief = readBrief(project);
       const request = args.request ?? (brief && !brief.auto ? brief.goal : "");
@@ -105,7 +105,7 @@ export const styleTools: CatalogTool[] = [
     input: getInput,
     annotations: READ_ONLY,
     run: async (call, args: z.output<typeof getInput>) => {
-      const files = await styleLibrary();
+      const files = STYLE_FILES;
       const id = args.style ?? readBrief(call.doc.project)?.style;
       if (!id) return refused(GET, "Error: give style (find_style_tool lists the best three for the request).");
       const file = files.find((f) => f.id === id && f.kind === "style");
@@ -126,7 +126,7 @@ export const styleTools: CatalogTool[] = [
     input: techniqueInput,
     annotations: READ_ONLY,
     run: async (_call, args: z.output<typeof techniqueInput>) => {
-      const files = await styleLibrary();
+      const files = STYLE_FILES;
       const file = files.find((f) => f.id === args.technique);
       if (!file) return refused(TECHNIQUE, `Error: no technique ${args.technique}.${near(args.technique, files, ["technique", "family", "method"])} A style's Borrow line names its techniques.`);
       if (file.kind === "style") return refused(TECHNIQUE, `Error: ${file.id} is a style: get_style_tool {"style": "${file.id}"}.`);

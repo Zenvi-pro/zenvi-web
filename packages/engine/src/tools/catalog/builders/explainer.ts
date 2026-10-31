@@ -237,7 +237,7 @@ export const explainerTools: CatalogTool[] = [
 
       c.suggest("auto_sound_design_tool", { genre: "documentary" }, "soft whooshes on the cuts and hits under the cards and counters");
       c.suggest("master_audio_tool", { preset: "social", iterate: true }, "the voice on top, the bed under it, the loudness set last");
-      await c.followStyle("video-essay-explainer");
+      c.followStyle("video-essay-explainer");
       if (c.call.signal?.aborted) return c.abandon("cancelled; nothing changed");
       return c.finish(
         "Build explainer",

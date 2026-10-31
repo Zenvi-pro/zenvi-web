@@ -25,7 +25,7 @@ import type { ToolCall } from "../../define.js";
 import { applied, refused, type ReceiptFields, type ToolReceipt } from "../../receipt.js";
 // A cycle (the registry lists the builders), safe because runTool is only called while a builder runs (master-loop.ts does the same).
 import { runTool } from "../../registry.js";
-import { styleLibrary } from "../../../styles/load.js";
+import { STYLE_FILES } from "../../../styles/index.js";
 import { styleChecklist, styleFinishCalls } from "../../../styles/recipe.js";
 import { isLookId } from "../../luts.js";
 import { applyProjectState, orphanedPaths } from "../master-loop.js";
@@ -134,8 +134,8 @@ export class Composer {
    * the style makes goes before master_audio_tool (mastering stays last).
    * Call it after the builder's own suggestions.
    */
-  async followStyle(fallback: string): Promise<void> {
-    const files = await styleLibrary();
+  followStyle(fallback: string): void {
+    const files = STYLE_FILES;
     const brief = readBrief(this.call.doc.project);
     const briefStyle = brief && !brief.auto ? files.find((f) => f.id === brief.style && f.kind === "style") : undefined;
     const file = briefStyle ?? files.find((f) => f.id === fallback && f.kind === "style");
