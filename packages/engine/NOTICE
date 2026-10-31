@@ -22,27 +22,6 @@ MIT License
 
 Copyright (c) 2026 Leonxlnx
 
-Changes: the method and its formats rewritten as Zenvi tool calls (Zenvi
-uses neither Remotion nor HyperFrames/GSAP), each technique's recipe rebuilt
-with Zenvi tools with its 60 fps timings kept as frames and seconds, and
-techniques that are an existing Zenvi move merged into it (CINETIC.md). No
-cinetic code, starter, script, sound kit, film, image or brand is included.
-
-Zenvi's adaptations of its scripts: the technique draw of scripts/pick.py in
-packages/engine/src/brief/draw.ts, house.ts and cinetic-library.ts (the
-library's categories, roles, energies, formats, evidence and banned looks);
-the hard bans of SKILL.md and scripts/lint-film.mjs in
-packages/engine/src/review/taste.ts; the speed check of measure-speed.py,
-the AV-sync audit of av-audit.py, the text-flow gate of grid-check.ts and
-the banding check of forensics.py in packages/engine/src/review/
-motion-speed.ts, av-sync.ts, copy-pacing.ts, banding.ts and film-checks.ts;
-its dithered gradients (finishing.md) as the deband pass of
-packages/render-node/src/render/encoder.ts. The earshot sound kit cinetic
-uses is not ported.
-
-MIT License
-
-
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
