@@ -86,6 +86,15 @@ describe("house styles", () => {
     expect(matchStyle("a movie teaser")).toBe("movie-game-trailer");
   });
 
+  it("are never reached by a format's word alone: their bans hold only where the house was asked for", () => {
+    expect(matchStyle("a seamless loop of my travel clips")).toBe("travel-cinematic-montage");
+    expect(matchStyle("a tutorial walkthrough of the settings page")).toBe("tutorial");
+    expect(matchStyle("an onboarding video for our app")).toBe("saas-ui-promo");
+    const summaries = STYLE_FILES.filter((f) => f.kind === "style").map((f) => ({ id: f.id, summary: f.summary }));
+    expect(matchStyle("a logo sting for my channel", summaries)).not.toMatch(/^cinetic-/);
+    expect(matchStyle("a logo sting for my channel, cinetic", summaries)).toBe("cinetic-logo-sting");
+  });
+
   it("hold a brief to the cinetic bans only without a brand of the person's", () => {
     expect(tasteProfile({ style: "cinetic-logo-sting" })).toBe("cinetic");
     expect(tasteProfile({ style: "cinetic-logo-sting", brand: "Our serif wordmark, orange #FF6A00" })).toBeNull();

@@ -17,7 +17,7 @@ import type { ProjectDocument } from "../history/document.js";
 import type { Project } from "../model/types.js";
 import { timelineEnd } from "../timeline/queries.js";
 import { aspectRatio, BRIEF_ASPECTS, BRIEF_KEY, readBrief, type Brief, type BriefAspect } from "./brief.js";
-import { houseDraw } from "./house.js";
+import { houseDraw, houseStyle } from "./house.js";
 
 /** Length of an auto brief when the timeline is still empty: a social reel. */
 export const AUTO_LENGTH_SECONDS = 15;
@@ -30,7 +30,7 @@ export const AUTO_DEFAULT_STYLE = "hype-reel";
  * beyond their own summaries.
  */
 const STYLE_WORDS: Readonly<Record<string, readonly string[]>> = {
-  // "cinetic" names the house (first, so it wins its ties); the format's own word picks which of its styles.
+  // "cinetic" names the house (first, so it wins its ties); the format's own word picks which of its styles (only once the house is named).
   "cinetic-launch-film": ["cinetic"],
   "cinetic-logo-sting": ["cinetic", "sting", "logo-sting"],
   "cinetic-ui-walkthrough": ["cinetic", "walkthrough", "walk-through", "onboarding"],
@@ -73,14 +73,21 @@ export interface StyleMatch {
  */
 export function styleMatch(text: string, candidates: readonly { id: string; summary: string }[] = []): StyleMatch {
   const said = new Set(words(text));
+  // A house style (house.ts) is reached only by naming its house: "a seamless loop of my travel clips" is not a cinetic film.
+  const reachable = (id: string): boolean => {
+    const house = houseStyle(id);
+    return !house || said.has(house.profile);
+  };
   const hits = new Map<string, string[]>();
   const score = new Map<string, number>();
   for (const [id, list] of Object.entries(STYLE_WORDS)) {
+    if (!reachable(id)) continue;
     const found = list.filter((w) => said.has(w));
     hits.set(id, found);
     score.set(id, found.length * 3);
   }
   for (const c of candidates) {
+    if (!reachable(c.id)) continue;
     const found = [...new Set(words(`${c.id.replace(/-/g, " ")} ${c.summary}`).filter((w) => said.has(w)))];
     hits.set(c.id, [...new Set([...(hits.get(c.id) ?? []), ...found])]);
     score.set(c.id, (score.get(c.id) ?? 0) + found.length);
