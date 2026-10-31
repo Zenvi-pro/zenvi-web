@@ -46,6 +46,13 @@ describe("routeRequest", () => {
     expect(routeRequest({ request: "a grid of tiles, split panels", bin: FOOTAGE }).builder).toEqual({ tool: "build_reel_tool", style: "hype" });
   });
 
+  it("cuts a trailer with no title as the cinematic reel, saying why", () => {
+    const route = routeRequest({ request: "a movie trailer", bin: FOOTAGE });
+    expect(route.rule.id).toBe("movie-game-trailer");
+    expect(route.builder).toEqual({ tool: "build_reel_tool", style: "cinematic" });
+    expect(route.fallback?.why).toMatch(/no film or game title/);
+  });
+
   it("keeps a style the caller chose", () => {
     const route = routeRequest({ request: "a hype reel", style: "editorial-type", bin: FOOTAGE });
     expect(route.rule.id).toBe("editorial-type");
@@ -67,6 +74,11 @@ describe("readRequest", () => {
     const facts = readRequest("A 15 second match-cut montage.\n# Format\n1920x1080, 24.0 fps, about 16 seconds.\nUse this footage only (no stock search, no AI video).");
     expect(facts).toMatchObject({ size: { width: 1920, height: 1080 }, fps: 24, noStock: true, seconds: 15 });
     expect(readRequest("a reel of my trip").noStock).toBe(false);
+  });
+
+  it("does not read apostrophes inside words as quotes", () => {
+    expect(readRequest("A hype reel that says it's game day, don't miss it").headline).toBeNull();
+    expect(readRequest("A 20 s promo called 'Island Control' for the city's port").name).toBe("Island Control");
   });
 
   it("reads minutes, vertical frames and sizes", () => {
