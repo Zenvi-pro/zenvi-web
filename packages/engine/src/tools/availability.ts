@@ -264,6 +264,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
       "without audio decoding the cuts follow 120 BPM, not the music; without generated media there are no flash frames; without frame rendering files need subjects boxes (no circle search)",
   },
   review_render_tool: { methods: ["media.inspectRender"] },
+  pin_to_track_tool: { optional: ["media.writeGenerated"], partialNote: "without generated media no callout (label) is drawn; existing clips can still be pinned (clip_id)" },
+  add_guide_overlay_tool: { methods: ["media.writeGenerated"] },
   add_motion_template_tool: {
     methods: ["media.writeGenerated"],
     optional: ["audio.decodePcm"],
