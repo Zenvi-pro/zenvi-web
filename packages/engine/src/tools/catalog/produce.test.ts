@@ -75,6 +75,22 @@ describe("produce_video_tool", () => {
       if (s) expect(s, stage).toMatchObject({ undo_steps: 0, summary: "the edit was not cut" });
     }
     expect(doc.undoLabels).toEqual([]);
+    expect(result.data?.status).toBe("refused");
+    expect(result.data?.summary).toMatch(/^Error: Did not cut the edit/);
+    expect(result.data?.summary).not.toMatch(/master_audio_tool/);
+  });
+
+  it("writes the music the call asks for into the auto brief", async () => {
+    const doc = fixtureDoc(createProject({ id: "PRODUCEMUS" }));
+    await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "A 12 second hype reel", bpm: "128", music_query: "dark synthwave", skip: ["format", "footage", "music", "build", "render"] });
+    expect(readBrief(doc.project)?.music).toMatch(/^dark synthwave, about 128 BPM/);
+  });
+
+  it("states the length the builder cut, not only the one asked", async () => {
+    const doc = fixtureDoc();
+    const result = await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "An 8 second movie trailer", title: "Night Run", replace: true, skip: ["footage", "music", "watch", "render"] });
+    expect(result.data?.status, result.text).toBe("applied");
+    expect(result.data?.summary).toMatch(/^Produced a movie-game-trailer edit \([^)]*~15s, 8s asked: build_trailer_tool cuts no shorter\)/);
   });
 
   it("sets the frame rate the request names even when the frame already matches", async () => {

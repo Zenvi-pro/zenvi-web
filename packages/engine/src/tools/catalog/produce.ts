@@ -295,7 +295,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     if (saved) director.pass("brief", `kept the saved brief (${saved.style}, ${saved.length_seconds}s)`);
     else {
       const firstSentence = args.request.split(/(?<=[.!?])\s|\n/)[0] ?? args.request;
-      const bpm = facts.bpm ?? rule.music.bpm;
+      const bpm = args.bpm ?? facts.bpm ?? rule.music.bpm;
       brief = ensureBrief(call.doc, args.request, STYLES, {
         style: rule.id,
         aspect,
@@ -303,7 +303,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
         goal: clipText(firstSentence, GOAL_CHARS),
         ...(facts.platform ? { platform: clipText(facts.platform, 60) } : {}),
         ...(hook ? { hook: clipText(`"${hook}" over the first shot, on the first hit at 0.0 s`, GOAL_CHARS) } : {}),
-        music: clipText(`${facts.musicQuery ?? rule.music.query}, about ${bpm} BPM, ${rule.music.energy} energy`, GOAL_CHARS),
+        music: clipText(`${args.music_query ?? facts.musicQuery ?? rule.music.query}, about ${bpm} BPM, ${rule.music.energy} energy`, GOAL_CHARS),
         sound: clipText(`${rule.sound} palette, ${rule.intensity}: a sound on the cuts and moves, mastered to -14 LUFS`, GOAL_CHARS),
         ...(endCard ? { end_card: clipText(endCard, GOAL_CHARS) } : {}),
         missing: missing.slice(0, 8).map((m) => clipText(m, 200)),
@@ -369,16 +369,23 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   plan = { ...route(rule.id), why: plan.why, runnersUp: plan.runnersUp };
   missing = missingFor(plan);
   let built: ToolReceipt | null = null;
+  // What the report states: the length the builder cut for (a trailer and a launch film have a floor, a match-cut montage a ceiling).
+  let cutSeconds = seconds;
   if (director.wants("build")) {
     const bin = binFacts(entries());
     const pictureIds = entries().filter((e) => e.kind === "video" || e.kind === "image").map((e) => e.id);
     const replace = args.replace ?? false;
     const builderInput = { args, route: plan, seconds, name, hook, endCard, url: facts.url, music, bpm, pictures: pictureIds, voices: bin.voices, speakers: bin.speakers, replace };
-    built = await director.run("build", plan.builder.tool, builderArgs(plan.builder, builderInput));
+    const build = async (builder: BuilderPlan): Promise<ToolReceipt | null> => {
+      const input = builderArgs(builder, builderInput);
+      const receipt = await director.run("build", builder.tool, input);
+      if (receipt && typeof input.duration_seconds === "number") cutSeconds = input.duration_seconds;
+      return receipt;
+    };
+    built = await build(plan.builder);
     if (!built && plan.builder.tool !== "build_reel_tool") {
       // The style's builder refused (no speech heard, too few files): the reel builder still makes a first cut.
-      const stand = fallbackFor(rule);
-      built = await director.run("build", stand.tool, builderArgs(stand, builderInput));
+      built = await build(fallbackFor(rule));
     }
     for (const next of Array.isArray(record(built?.data).next_calls) ? (record(built?.data).next_calls as NextCall[]) : []) director.next.push(next);
   }
@@ -453,7 +460,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     director.next.push({ tool: "gather_stock_footage_tool", args: { queries, count: Math.min(MAX_GATHER, reviewed.repeats.length + MIN_GATHER) }, why: "shots repeat and nothing in the bin is unused: more footage first" });
     director.next.push({ tool: TOOL, args: { replace: true, skip: ["brief", "format", "footage", "music"] }, why: "then cut again with the new footage, finish, render and review" });
   }
-  for (const gap of finishGaps(project())) {
+  // What the finish still owes is the new edit's; with none cut, the old timeline's gaps are not this call's to report.
+  for (const gap of hasEdit ? finishGaps(project()) : []) {
     findings.push({ from: "finish", severity: "problem", message: gap.message });
     for (const next of gap.next) director.next.push({ ...next, why: gap.kind });
   }
@@ -464,8 +472,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const undoSteps = director.stages.reduce((n, s) => n + s.undo_steps, 0);
   const builder = director.stages.filter((s) => s.stage === "build" && s.outcome !== "failed").pop();
   const made = builder
-    ? `Produced a ${rule.id} edit (${aspect}, ~${seconds}s) with ${builder.tool}: ${builder.summary}`
-    : `Did not cut the edit (${rule.id}): ${director.stages.filter((s) => s.stage === "build").map((s) => s.summary).join("; ") || "build skipped"}.`;
+    ? `Produced a ${rule.id} edit (${aspect}, ~${cutSeconds}s${cutSeconds !== seconds ? `, ${seconds}s asked: ${builder.tool} cuts no ${cutSeconds > seconds ? "shorter" : "longer"}` : ""}) with ${builder.tool}: ${builder.summary}`
+    : `Did not cut the edit (${rule.id}): ${director.stages.filter((s) => s.stage === "build").map((s) => s.summary.replace(/\.$/, "")).join("; ") || "build skipped"}.`;
   const lines = [
     made,
     `Style: ${rule.id} because ${plan.why}${plan.fallback ? `; ${plan.fallback.wanted} could not run (${plan.fallback.why})` : ""}.`,
@@ -494,6 +502,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   };
   const warnings = failedStages.map((s) => `${s.stage} (${s.tool}) did not run: ${s.summary}`);
   const images = director.images.slice(-1);
+  // The build failed and no other stage changed anything: a refusal, not a produced edit.
+  if (director.wants("build") && !builder && undoSteps === 0) return { receipt: refused(TOOL, `Error: ${lines.join("\n")}`, { data, warnings }), images };
   return { receipt: applied(TOOL, lines.join("\n"), { data, warnings }), images };
 }
 
