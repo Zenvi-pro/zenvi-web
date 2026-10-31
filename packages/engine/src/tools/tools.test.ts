@@ -1188,6 +1188,22 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { speaker_file_ids: ["NOPE000000"], replace: "true" }, status: "refused", summary: /^Error: unknown speaker_file_ids: NOPE000000\.$/ },
   },
 
+  produce_video_tool: {
+    happy: {
+      args: { request: "A 10 second hype reel of the city", replace: "true", skip: ["footage", "music", "render", "review", "watch"] },
+      summary: /^Produced a hype-reel edit \(16:9, ~10s\) with build_reel_tool: /,
+      check: ({ receipt }) => {
+        const data = receipt.data as { style: string; brief: { auto?: boolean }; stages: { stage: string; undo_steps: number }[] };
+        expect(data.style).toBe("hype-reel");
+        // The auto brief is saved outside the undo history, as on every surface.
+        expect(data.brief.auto).toBe(true);
+        expect(data.stages.find((s) => s.stage === "brief")?.undo_steps).toBe(0);
+        expect(receipt.undoSteps).toBe(data.stages.reduce((n, s) => n + s.undo_steps, 0));
+      },
+    },
+    failure: { args: { request: "a reel" }, status: "refused", summary: /^Error: the timeline already has \d+ clip\(s\), nothing changed/ },
+  },
+
   build_trailer_tool: {
     happy: {
       args: { title: "The Long Way", act_cards: ["THIS WINTER"], replace: "true", duration_seconds: "20", braams: "false" },
@@ -1960,6 +1976,14 @@ for (const [name, spec] of Object.entries(SPECS)) {
         const undoneLabels = doc.undo();
         expect(undoneLabels).toHaveLength(1);
         expect(withoutTranscripts(snapshotOf(doc.project))).toEqual(before);
+      } else if (receipt.undoSteps > 1) {
+        // A staged tool (produce_video_tool): one undo step per stage; undoing them all restores it (the auto brief and the master mark are untracked).
+        expect(doc.undo(receipt.undoSteps)).toHaveLength(receipt.undoSteps);
+        const after = withoutTranscripts(snapshotOf(doc.project)) as { settings?: Record<string, unknown> };
+        const { zenvi_master: _m, zenvi_brief: _b, ...settings } = after.settings ?? {};
+        const was = before as unknown as { settings?: Record<string, unknown> };
+        const { zenvi_master: _wm, zenvi_brief: _wb, ...settingsBefore } = was.settings ?? {};
+        expect({ ...after, settings }).toEqual({ ...was, settings: settingsBefore });
       } else if (!["undo_tool", "redo_tool", "new_project_tool", "open_project_tool", "restore_recovery_version_tool"].includes(name)) {
         // No undo step: nothing tracked changed (untracked export overrides and kept transcripts aside).
         const after = withoutTranscripts(snapshotOf(doc.project)) as Record<string, unknown>;

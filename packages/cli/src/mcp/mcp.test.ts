@@ -70,7 +70,7 @@ describe("zenvi mcp", () => {
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {
     const client = await connect();
     const opened = await call(client, "open_project_file", { path: "plan.zvn" });
-    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: A brief first helps: get_brief_tool; to plan one, read_director_recipe \{styles: "brief"\}, then save_brief_tool \(nothing waits for it.*Then read its style's recipe, read_director_recipe \{recipe\}\..*Finish, in order: unify_grade_tool/);
+    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: produce_video_tool \{request: the person.s words, output\} does it in one call.*By hand instead: A brief first helps: get_brief_tool; to plan one, read_director_recipe \{styles: "brief"\}, then save_brief_tool \(nothing waits for it.*Then read its style's recipe, read_director_recipe \{recipe\}\..*Finish, in order: unify_grade_tool/);
     const recipe = await call(client, "read_director_recipe", { recipe: "match-cut-montage" });
     expect(recipe.receipt.status).toBe("applied");
     expect(recipe.receipt.summary).toMatch(/match_cut_montage_tool/);

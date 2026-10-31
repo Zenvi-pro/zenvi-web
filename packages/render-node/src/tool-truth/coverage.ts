@@ -260,6 +260,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   build_explainer_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
   build_product_launch_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
   build_talking_head_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
+  produce_video_tool: { reason: "not proven yet: runs whole stages through other tools (each proven on its own), like the builders", params: "*" },
   build_trailer_tool: { reason: "not proven yet: builds a whole first cut (many tools at once), like build_reel_tool", params: "*" },
   apply_motion_transitions_tool: { reason: "not proven yet: the focus point moves where a zoom or spin transition centres", params: ["focus_x", "focus_y"] },
   apply_matched_dissolve_tool: { reason: "not proven yet: needs two shots whose subjects line up at the cut", params: "*" },
