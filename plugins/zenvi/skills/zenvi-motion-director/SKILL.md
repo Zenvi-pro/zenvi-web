@@ -37,6 +37,11 @@ is the rules every genre shares. Do not plan before you have read it.
 Mixed asks: take the structure from the genre of the *first five seconds*
 and borrow single techniques from the others.
 
+**Given a bin of finished shots to re-edit** (a reference's own shots, an
+editor's selects): the order is the edit. Before any genre tool, call
+`sequence_shots_tool` on every shot (see "Re-editing shots you were given"
+below); never cut them in bin or file-name order.
+
 Every recipe ends with **Finish**: sound on every cut, `master_audio_tool`,
 `render_video`, `review_render_tool`, `watch_render_tool` once, one fix
 pass. A run that stops before it is not done, however good the picture:
@@ -66,9 +71,16 @@ unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
    when one does and say how many more to import; `strict_variety: true`
    makes them refuse instead. Short? Gather again with other words, or
    generate AI shots, before you cut; never loop five clips to fill the length.
-5. **Cut.** The genre tool first (`match_cut_montage_tool`, `build_reel_tool`,
+5. **Order, then cut.** Never cut in bin or search order: the shot order is
+   the edit. `sequence_shots_tool` orders the shots by what crosses each cut
+   (the action continues, the same shape and position, the subject where the
+   eye already is, the colour, the motion's direction), builds energy to a
+   peak and holds the strongest shot for the payoff; its receipt says why
+   each cut joins. With a genre tool, plan first (`dry_run: true`) and pass
+   `data.file_ids` in that order. Then the genre tool (`match_cut_montage_tool`, `build_reel_tool`,
    `add_motion_template_tool template=grid`), otherwise
-   `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
+   `sequence_shots_tool` itself (it lays the files on a track, `slots` =
+   the plan's shot lengths) or `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
    (`data.beats`) or `detect_beats_tool` and reuse them everywhere below.
 6. **Transitions, on by default** where the genre moves between shots
    (hype, trailer, SaaS, 3D ad, documentary, showreel: the recipe says which).
@@ -192,6 +204,29 @@ pick_best_variant_tool {"brief": "15 s hype reel for a sneaker drop", "variants"
 
 `compare_renders_tool {"a": ..., "b": ...}` is the same judgment for any two
 renders (before/after a fix pass, two music beds) without changing anything.
+
+## Re-editing shots you were given
+
+A bin of finished shots (a reference's own cut, an editor's selects, a
+client's clips) is a sequencing job first, not a montage to build: the
+shots already carry their lengths and the music already fits them.
+
+1. `sequence_shots_tool {"file_ids": [every shot], "position": 0}` lays them
+   at their own lengths in a continuity order with the strongest last. Do
+   not trim them to a beat grid or swap in a genre tool's timing: the given
+   lengths are the rhythm. `arc` only when the brief says it (`build` for a
+   hype run-up, `flat` for a match-cut chain, where continuity is all that
+   matters, with `continuity: 2`). `open` / `close` when the brief names the
+   first or last shot.
+2. Voice: shots of a speaker must land on their own words. Transcribe the
+   voice (`transcribe_media_tool`), read each speaker shot's line (its
+   burnt-in caption on `preview_frame` / `inspect_media_tool`, or its own
+   transcript) and pass it as `says` with `voice_file_id`; or `speech_at`
+   when you know the voice second. The receipt's warnings name any shot
+   that cannot start on its words.
+3. Music under it from 0, then transitions, look and sound on top of that
+   order, as the recipe says. Move a shot only for a reason you can see on
+   `preview_frame` at the cut.
 
 ## Non-negotiables
 

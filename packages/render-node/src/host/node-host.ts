@@ -12,6 +12,7 @@ import { isTranscriptionError, TranscriptionError, type AssetHost, type ExportOp
 import { backendStock } from "@zenvi/engine/tools";
 import { fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
+import { sampleFrames } from "../decode/sample-frames.js";
 import { renderMixPcm } from "../audio/mix.js";
 import { measureMix } from "../audio/measure-mix.js";
 import { transcribeMediaFile } from "../audio/speech.js";
@@ -214,6 +215,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         renderContactSheet(project, tiles, layout, { resolveMedia, engine: options.renderEngine, signal: signal ?? options.signal, log: options.log }),
       // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
       fontFamilies: () => installedFontFamilies(),
+      sampleFrames: (p, o) => sampleFrames(resolveMedia(p), { ...o, signal: o.signal ?? options.signal }),
     },
     audio: {
       analyzeAudio: (p, o) => analyzeAudio(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal }),

@@ -31,7 +31,10 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
    `"stock": true`) lands them on the content words, muted, every 5-8 s, no
    source twice, in one call. A pop-in or a hit on one spoken word:
    `place_on_word_tool` `{"word": "free", "what": "title", "args": {"style":
-   "creator"}}` or `"what": "sfx"`. Then the head's matte, once:
+   "creator"}}` or `"what": "sfx"`. Given pieces of a talking
+   head instead of one take (a re-edit, jump cuts): `sequence_shots_tool`
+   with `voice_file_id` and each piece's line in `says` (its burnt-in
+   caption or transcript) so every piece starts on its own words. Then the head's matte, once:
    `generate_subject_matte_tool` `{"clip_id": "<head clip>"}` (CLI; about 15
    frames a second). With it the captions find the head in every shot and
    put the emphasis words behind it; a refusal (no matting here) only costs

@@ -216,9 +216,9 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   update_transition_tool: { reason: "not proven yet", params: ["at_seconds", "contrast_keyframes", "mask_file_id"] },
   master_audio_tool: { reason: "not proven yet: a loudness plan over a whole mix (mastering tests cover the plan)", params: ["balance", "duck", "genre", "score", "iterate"] },
   duck_tool: { reason: "not proven yet", params: ["bed", "under", "target_vbr_db"] },
-  build_reel_tool: { reason: "not proven yet: builds a whole reel (many tools at once)", params: ["style", "music_file_id", "duration_seconds", "hook", "end_card", "end_card_subtitle", "labels", "words", "beats", "bpm", "offset_seconds", "strict_variety", "grade"] },
+  build_reel_tool: { reason: "not proven yet: builds a whole reel (many tools at once)", params: ["style", "music_file_id", "duration_seconds", "hook", "end_card", "end_card_subtitle", "labels", "words", "beats", "bpm", "offset_seconds", "strict_variety", "grade", "keep_order"] },
   align_match_cut_tool: { reason: "not proven yet: render-node/src/render/match-cut.test.ts proves the alignment end to end", params: "*" },
-  match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety"] },
+  match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety", "keep_order"] },
   unify_grade_tool: { reason: "not proven yet: iterative grade matching across clips", params: ["reference_clip_id", "reference_file_id", "strength", "look", "look_intensity", "samples", "max_iterations"] },
   kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["behind_subject", "placement", "language"] },
   add_sfx_tool: { reason: "not proven yet", params: ["provider", "sound_id", "title", "max_seconds", "allow_noncommercial", "kit"] },
@@ -251,6 +251,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   add_shape_mask_tool: { reason: "not proven yet: polygon points", params: ["points"] },
   add_type_block_tool: { reason: "not proven yet: one type block per case (text_on_path, write_on, stencil ...)", params: "*" },
   datamosh_cut_tool: { reason: "not proven yet: datamosh_carry needs two clips with motion at the cut", params: "*" },
+  sequence_shots_tool: { reason: "not proven yet: reorders shots (sequence tests cover the order)", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {

@@ -34,6 +34,7 @@ const DIRECT_TOOLS = [
   "align_match_cut_tool",
   "detect_subject_tool",
   "match_cut_montage_tool",
+  "sequence_shots_tool",
   "track_point_tool",
   "pin_to_track_tool",
   "add_guide_overlay_tool",
