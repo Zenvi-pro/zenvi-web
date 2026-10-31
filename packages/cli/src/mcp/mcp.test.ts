@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { createProject } from "@zenvi/engine";
+import { FINISH_HINT } from "@zenvi/engine/tools";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { makeTempDir, makeVideo, removeDir } from "@zenvi/render-node/test-support";
@@ -70,6 +71,9 @@ describe("zenvi mcp", () => {
     expect(Object.keys(split.inputSchema.properties ?? {})).toEqual(Object.keys(byName(full, "split_clip_tool").inputSchema.properties ?? {}));
     expect(JSON.stringify(lean).length).toBeLessThan(JSON.stringify(full).length * 0.85);
     expect(SERVER_INSTRUCTIONS).toContain("a call refused for its arguments lists them in full");
+    // The instructions carry the finish once; the whole listing keeps every description as registered.
+    expect(byName(full, "build_trailer_tool").description).toContain(FINISH_HINT);
+    expect(byName(lean, "build_trailer_tool").description).not.toContain(FINISH_HINT);
 
     const refused = await call(client, "split_clip_tool", { no_such_argument: 1 });
     expect(refused.receipt.status).toBe("refused");

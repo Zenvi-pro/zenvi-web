@@ -94,7 +94,14 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
     { capabilities: { tools: { listChanged: true }, resources: {}, prompts: {} }, instructions: SERVER_INSTRUCTIONS },
   );
   /** Engine tools listed short (FULL_LISTING); ZENVI_MCP_LISTING=full lists every one whole. */
-  const isLean = (name: string): boolean => ctx.env.ZENVI_MCP_LISTING !== "full" && !FULL_LISTING.has(name) && !extraByName.has(name);
+  const fullListing = ctx.env.ZENVI_MCP_LISTING === "full";
+  const isLean = (name: string): boolean => !fullListing && !FULL_LISTING.has(name) && !extraByName.has(name);
+  /** A short-listed tool refused for its arguments: the full argument list, so the next call can be right (portable or desktop). */
+  const withArgumentNotes = (name: string, receipt: ToolReceipt): ToolReceipt => {
+    if (receipt.status !== "refused" || !isLean(name) || !/^Error: (Invalid arguments|unknown argument)/.test(receipt.summary)) return receipt;
+    const tool = ctx.registry.get(name);
+    return tool ? { ...receipt, notes: [...receipt.notes, argumentNotes(name, tool.inputSchema)] } : receipt;
+  };
   /** The Adobe families in the client's last tools/list (undefined until it lists). */
   let listedFamilies: string | undefined;
 
@@ -110,8 +117,8 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
           return {
             name: t.name,
             title: t.title,
-            // The instructions carry the finish (DIRECTOR_CARD): once is enough on this server.
-            description: listed.description.replace(FINISH_HINT, "").trim(),
+            // The instructions carry the finish (DIRECTOR_CARD): once is enough on this server, unless the listing is asked for whole.
+            description: fullListing ? listed.description : listed.description.replace(FINISH_HINT, "").trim(),
             inputSchema: listed.inputSchema as unknown as { type: "object"; [key: string]: unknown },
             ...(t.annotations ? { annotations: { ...t.annotations, title: t.title } } : {}),
           };
@@ -182,7 +189,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       if (desktop) {
         const outcome = await desktop.call(name, args);
         const receipt = outcome.receipt ?? parseReceipt(outcome.text) ?? (outcome.ok ? undefined : failed(name, outcome.text));
-        if (receipt) return toCallResult(receipt, outcome.images, { engine: "desktop" });
+        if (receipt) return toCallResult(withArgumentNotes(name, receipt), outcome.images, { engine: "desktop" });
         return { content: [{ type: "text", text: outcome.text }], ...(outcome.ok ? {} : { isError: true }) };
       }
       state.notePortableCall();
@@ -197,11 +204,7 @@ export async function createZenviMcpServer(ctx: CommandContext, projectFile?: st
       }
       const brief = ctx.env.ZENVI_MCP_BRIEF !== "off" && isOkHostStatus(receipt.status) ? autoBriefFor(name, state.session.doc, JSON.stringify(args ?? {})) : undefined;
       if (brief) receipt.notes = [...receipt.notes, brief];
-      // A short-listed tool refused for its arguments: the full argument list, so the next call can be right.
-      if (receipt.status === "refused" && isLean(name) && /^Error: (Invalid arguments|unknown argument)/.test(receipt.summary)) {
-        const tool = ctx.registry.get(name);
-        if (tool) receipt.notes = [...receipt.notes, argumentNotes(name, tool.inputSchema)];
-      }
+      receipt.notes = withArgumentNotes(name, receipt).notes;
       if (!state.session.file && receipt.undoSteps > 0) {
         receipt.notes = [...receipt.notes, "Not saved yet: this project has no file. Call open_project_file with a .zvn path to save it (your edits are kept)."];
       }

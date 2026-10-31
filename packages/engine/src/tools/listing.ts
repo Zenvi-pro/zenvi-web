@@ -36,6 +36,8 @@ export const FULL_LISTING: ReadonlySet<string> = new Set([
   "find_style_tool", "get_style_tool", "get_technique_tool", "get_brief_tool", "inspect_media_bin_tool", "sequence_shots_tool",
   "spot_sound_tool", "review_edit_tool", "ingest_web_video_tool", "speed_ramp_tool", "build_trailer_tool", "build_explainer_tool",
   "build_talking_head_tool", "build_product_launch_tool",
+  // Its method's text warns that the default ripple moves only this track's later clips (other tracks drift).
+  "add_transitions_between_clips_tool",
 ]);
 
 /** A listed tool's first sentence at most this long. */

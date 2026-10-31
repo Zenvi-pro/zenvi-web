@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BRIEF_KEY } from "../../brief/brief.js";
 import { ProjectDocument } from "../../history/document.js";
 import { createProject } from "../../model/defaults.js";
+import { addClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
 import { STYLE_FILES } from "../../styles/library.gen.js";
 import { STYLE_TEXT_MAX, TECHNIQUE_TEXT_MAX, compactStyle, compactTechnique, rankStyles, styleChecklist, styleFinishCalls } from "../../styles/recipe.js";
@@ -110,6 +111,15 @@ describe("find_style_tool, get_style_tool, get_technique_tool", () => {
     expect(result.data?.summary).toMatch(/Next: get_style_tool \{"style": "/);
     expect(result.data?.undoSteps).toBe(0);
     expect(doc.project).toBe(before);
+  });
+
+  it("suggests a length get_style_tool takes when the timeline is shorter than 3 s", async () => {
+    const doc = project([{ path: "/m/a.mp4", seconds: 5 }]);
+    doc.transaction("clip", (tx) => {
+      addClip(tx, { fileId: "FILE0XXXXX", position: 0, layer: tx.project.layers[0]!.number, start: 0, end: 1.5, id: "CLIPAXXXXX" });
+    });
+    const result = await run(doc, "find_style_tool", { request: "a hype reel" });
+    expect(result.data?.summary).toMatch(/"length_seconds": 3\}/);
   });
 
   it("gives a style's recipe for the asked length, else the brief's", async () => {

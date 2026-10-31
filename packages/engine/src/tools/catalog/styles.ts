@@ -45,13 +45,14 @@ function binLine(bin: BinSignals): string {
   return `The bin: ${parts.join(", ")}; the frame ${bin.aspect ?? "unknown"}.`;
 }
 
-/** The length to cut a recipe for: the call's, the brief's, the timeline's, else a 15 s reel. */
+/** The length to cut a recipe for: the call's, the brief's, the timeline's (3-600 s), else a 15 s reel. */
 function askedSeconds(project: Project, given: number | undefined): number {
   if (given !== undefined) return given;
   const brief = readBrief(project);
   if (brief && !brief.auto) return brief.length_seconds;
   const end = timelineEnd(project);
-  return end >= 1 ? Math.round(end * 10) / 10 : brief?.length_seconds ?? DEFAULT_SECONDS;
+  // Within what get_style_tool's length_seconds takes (a 1.5 s or a 20 min timeline): find_style_tool suggests the call.
+  return end >= 1 ? Math.min(600, Math.max(3, Math.round(end * 10) / 10)) : brief?.length_seconds ?? DEFAULT_SECONDS;
 }
 
 function near(id: string, files: readonly StyleFile[], kinds: readonly StyleFile["kind"][]): string {
