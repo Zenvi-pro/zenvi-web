@@ -35,7 +35,7 @@ import { applied, unchanged, type ToolReceipt } from "../receipt.js";
 import { normalizeTrackOrLayerArg, lockedTrackError, formatTrackLabelForLlm } from "../tracks.js";
 import { applyClipGain } from "./mastering.js";
 import { sameCurve, shapeVolume, type GainPoint } from "../mix-curves.js";
-import { cuesOf, mixEntries, resolveTargets, targetShape, type MixEntry, type MixRole } from "../mix-roles.js";
+import { cuesOf, isMuted, mixEntries, resolveTargets, targetShape, type MixEntry, type MixRole } from "../mix-roles.js";
 import { fpsFloatOf, idList } from "./common.js";
 
 const ADJUST = { readOnlyHint: false, destructiveHint: true, openWorldHint: false } as const;
@@ -244,7 +244,7 @@ const automateVolume = directTool({
     const named = args.clip_ids !== undefined || args.track !== undefined || args.role !== undefined;
     let targets: MixEntry[] | string;
     if (!named && bedShapes.includes(args.shape)) {
-      const beds = mixEntries(project).filter((e) => e.mixRole === "music" || e.mixRole === "ambience");
+      const beds = mixEntries(project).filter((e) => (e.mixRole === "music" || e.mixRole === "ambience") && !isMuted(e));
       targets = beds.length ? beds : `Error: ${args.shape} rides the music / ambience bed, and the timeline has none: name the clips (clip_ids, track or role).`;
       const locked = beds.find((e) => e.locked);
       if (typeof targets !== "string" && locked) targets = lockedTrackError(locked.layer, project.layers);

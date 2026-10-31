@@ -276,7 +276,7 @@ const SPECS: Record<string, Spec> = {
   separate_clip_audio_tool: {
     happy: {
       args: { timeline_clip_ids: IDS.clipB },
-      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) on track\(s\) 1; the originals are muted\.$/,
+      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) \([A-Z0-9]{10}\) on track\(s\) 1; the originals are muted\.$/,
       check: ({ receipt }) => expect(receipt.createdTracks).toHaveLength(1),
     },
     failure: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Error: 'logo\.png' has no audio to separate$/ },

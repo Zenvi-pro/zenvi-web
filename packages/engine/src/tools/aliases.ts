@@ -8,10 +8,44 @@
  * returns nothing, and the caller keeps its refusal.
  */
 
-/** Argument names agents use for another tool's argument; each maps to the schema names it may mean, in order. */
-const ARGUMENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
+/** Clip id names; each maps to the schema names it may mean, in order. */
+const ID_ALIASES: Readonly<Record<string, readonly string[]>> = {
   clip_id: ["timeline_clip_id"],
   clip_ids: ["timeline_clip_ids"],
+  // trim_clip_tool and the FX tools name the same thing clip_id.
+  timeline_clip_id: ["clip_id"],
+  timeline_clip_ids: ["clip_ids"],
+};
+
+/** Argument names agents use for another tool's argument. */
+const ARGUMENT_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  ...ID_ALIASES,
+  max_results: ["count", "limit"],
+  // The moment, by the name add_sfx_tool gives it (analyze_frame_colors_tool calls it time).
+  at_seconds: ["time", "seconds", "time_seconds", "position_seconds"],
+};
+
+/**
+ * The same inside the objects of an array argument, ids only: an item's
+ * `seconds` counts from its clip or transition (set_keyframes_tool's points),
+ * so a timeline `at_seconds` has no one reading there. list_fx_tool lists
+ * effects by `id`, apply_fx_tool's items name them `effect`.
+ */
+const ITEM_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  ...ID_ALIASES,
+  id: ["effect"],
+};
+
+/** An enum value sent to the wrong argument: `ease: "linear"` is the `interpolation` the tool has next to it. */
+const VALUE_MOVES: Readonly<Record<string, string>> = {
+  ease: "interpolation",
+};
+
+/** Old or swapped spellings of enum values, read as the value the schema has. */
+const VALUE_ALIASES: Readonly<Record<string, string>> = {
+  "3d_product": "product_3d",
+  // The sound designer scores a documentary as a video essay.
+  documentary: "video_essay",
 };
 
 export interface AliasedArguments {
@@ -24,27 +58,118 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+type SchemaNode = { properties?: Record<string, unknown>; items?: unknown; enum?: unknown; anyOf?: unknown; oneOf?: unknown };
+
+/** The options of an enum property (a nullable one is an anyOf holding the enum). */
+function enumOf(node: unknown): readonly unknown[] | undefined {
+  if (!isRecord(node)) return undefined;
+  if (Array.isArray(node.enum)) return node.enum;
+  for (const part of [node.anyOf, node.oneOf]) {
+    if (!Array.isArray(part)) continue;
+    for (const option of part) {
+      const found = enumOf(option);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+/** A property typed as a string and not as an array. */
+function takesString(node: unknown): boolean {
+  if (!isRecord(node)) return false;
+  const types = Array.isArray(node.type) ? node.type : [node.type];
+  return types.includes("string") && !types.includes("array") && node.anyOf === undefined && node.oneOf === undefined;
+}
+
+/** The object schema of an array property's items. */
+function itemsOf(node: unknown): SchemaNode | undefined {
+  if (!isRecord(node)) return undefined;
+  if (isRecord(node.items) && isRecord(node.items.properties)) return node.items as SchemaNode;
+  for (const part of [node.anyOf, node.oneOf]) {
+    if (!Array.isArray(part)) continue;
+    for (const option of part) {
+      const found = itemsOf(option);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A rename that would change what the value means: a count read as a switch
+ * (master_audio_tool's `limit`), a timeline moment as a source time
+ * (detect_subject_tool's `time`). Those calls stay refused.
+ */
+function changesMeaning(key: string, target: unknown): boolean {
+  if (!isRecord(target)) return false;
+  if (target.type === "boolean") return true;
+  return key === "at_seconds" && typeof target.description === "string" && /^source\b/i.test(target.description);
+}
+
+function aliasObject(properties: Record<string, unknown>, args: Record<string, unknown>, names: Readonly<Record<string, readonly string[]>>, where: string, notes: string[]): Record<string, unknown> {
+  let out: Record<string, unknown> | undefined;
+  const edit = (): Record<string, unknown> => (out ??= { ...args });
+  for (const key of Object.keys(args)) {
+    if (Object.hasOwn(properties, key)) continue;
+    const targets = (names[key] ?? []).filter((name) => Object.hasOwn(properties, name) && !changesMeaning(key, properties[name]));
+    // One id where the tool takes only the list (separate_clip_audio_tool's timeline_clip_ids): the list of one.
+    const plural = targets.length === 0 && Object.hasOwn(properties, `${key}s`) && /_ids?$/.test(key) ? `${key}s` : undefined;
+    const target = targets.length === 1 ? targets[0]! : plural;
+    if (!target || Object.hasOwn(args, target)) continue;
+    edit()[target] = args[key];
+    delete edit()[key];
+    notes.push(`'${where}${key}' is not an argument of this tool; used it as '${where}${target}'. Pass '${where}${target}' next time.`);
+  }
+  const current = out ?? args;
+  for (const [key, value] of Object.entries(current)) {
+    // Ids as a list where the tool takes them comma-separated (the desktop's string arguments): one reading, no note.
+    if (key.endsWith("_ids") && Array.isArray(value) && value.every((v) => typeof v === "string") && takesString(properties[key])) {
+      edit()[key] = value.join(",");
+      continue;
+    }
+    if (typeof value !== "string") continue;
+    const options = enumOf(properties[key]);
+    if (!options || options.includes(value)) continue;
+    const alias = VALUE_ALIASES[value.trim().toLowerCase()];
+    if (alias !== undefined && options.includes(alias)) {
+      edit()[key] = alias;
+      notes.push(`${where}${key} '${value}' is spelled '${alias}' here; used '${alias}'.`);
+      continue;
+    }
+    const sibling = VALUE_MOVES[key];
+    if (sibling === undefined || Object.hasOwn(current, sibling) || !enumOf(properties[sibling])?.includes(value)) continue;
+    edit()[sibling] = value;
+    delete edit()[key];
+    notes.push(`'${value}' is not a value of ${where}${key}; used it as ${where}${sibling}='${value}'. Pass ${sibling} next time.`);
+  }
+  for (const [key, value] of Object.entries(out ?? args)) {
+    const items = itemsOf(properties[key]);
+    if (!items || !Array.isArray(value)) continue;
+    let changed = false;
+    const mapped = value.map((item, i) => {
+      if (!isRecord(item)) return item;
+      const next = aliasObject(items.properties!, item, ITEM_ALIASES, `${where}${key}[${i}].`, notes);
+      changed ||= next !== item;
+      return next;
+    });
+    if (changed) edit()[key] = mapped;
+  }
+  return out ?? args;
+}
+
 /**
  * Rename arguments the schema does not have to the one it does: `clip_id` →
  * `timeline_clip_id` when the tool has no `clip_id` and the call did not
  * also pass the real name (then the call is wrong in a way we cannot guess).
+ * Inside array items too (`effects[0].id` → `effects[0].effect`), and enum
+ * values: an old spelling (`3d_product`), or a value of the argument next to
+ * it (`ease: "linear"` is `interpolation: "linear"`).
  */
 export function aliasArguments(schema: { properties?: Record<string, unknown> } | undefined, args: unknown): AliasedArguments {
   const properties = schema?.properties;
   if (!properties || !isRecord(args)) return { args, notes: [] };
   const notes: string[] = [];
-  let out: Record<string, unknown> | undefined;
-  for (const key of Object.keys(args)) {
-    if (Object.hasOwn(properties, key)) continue;
-    const targets = (ARGUMENT_ALIASES[key] ?? []).filter((name) => Object.hasOwn(properties, name));
-    const target = targets.length === 1 ? targets[0]! : undefined;
-    if (!target || Object.hasOwn(args, target)) continue;
-    out ??= { ...args };
-    out[target] = out[key];
-    delete out[key];
-    notes.push(`'${key}' is not an argument of this tool; used it as '${target}'. Pass '${target}' next time.`);
-  }
-  return { args: out ?? args, notes };
+  return { args: aliasObject(properties, args, ARGUMENT_ALIASES, "", notes), notes };
 }
 
 export interface OptionMatch {
