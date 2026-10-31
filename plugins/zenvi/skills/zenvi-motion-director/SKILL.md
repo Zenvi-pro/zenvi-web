@@ -79,7 +79,10 @@ unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
    lacks; gather it with `coherence: "shoot"` (+ `match_file_id`, their
    footage) and generate shots as ONE `generate_broll_set_tool` set, so the
    cut looks like one shoot, then `unify_grade_tool`. One music track
-   (`search_freesound_music_tool` with `min_seconds` above the length), AI
+   (`search_freesound_music_tool` with `min_seconds` above the length and
+   the brief's `bpm_range` / `energy` / `energy_curve`: `save_brief_tool`
+   returns that call as `data.music_search`; pick by the measured bpm and
+   curve, never the first result, and put the climax on `drop_seconds`), AI
    stills only for what stock cannot show. Too few assets is the commonest
    cause of a slideshow: get 1.5x the shots the plan needs. Count before
    cutting: the recipe gives a **source count** for its genre (a montage at
@@ -287,6 +290,11 @@ shots already carry their lengths and the music already fits them.
   shots every second is the slideshow tell viewers notice first. A review
   that finds a repeat lists the `swap_shot_tool` call that fixes it (an
   unused clip, or a part of the clip not shown yet): make those calls.
+- **The asked length.** An edit that runs short of the brief is filled, not
+  shipped short: `fill_to_length_tool` (`seconds`) holds the last shot,
+  adds unseen footage after it, then slows the last shot. Hand-placed cuts
+  go on the beat with `snap_cuts_to_beats_tool` (roll edits: the length
+  holds).
 - **A clean end.** End on a hold, an end card or a settled final shot of 1 s
   or more, never on black and never cut off mid-motion. Sound effects and
   music end with the picture (trim what runs past the last frame), or the

@@ -10,7 +10,7 @@
 
 import { z } from "zod";
 import { SFX_LICENSE_FILTERS, allowedLicenses, licenseCode } from "../../sfx/library.js";
-import { matchTempo, parseTempoRange, rangeAround, splitTempoFromQuery, tempoDistance } from "../../stock/music.js";
+import { ENERGY_SHAPES, matchTempo, parseTempoRange, rangeAround, splitTempoFromQuery, tempoDistance } from "../../stock/music.js";
 import { clockTime, licenceName, licenceRank, pickStockFile, previewOf, type FreesoundSound } from "../../stock/stock.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { canMeasurePreviews, measurePreview, type PreviewMeasure } from "../music-measure.js";
@@ -18,6 +18,8 @@ import { applied, refused } from "../receipt.js";
 
 const SEARCH = { readOnlyHint: true, destructiveHint: false, openWorldHint: true, idempotentHint: true } as const;
 
+/** A search for tracks at least this long is for a music bed: its previews are measured unless measure=false. */
+const BED_SECONDS = 10;
 /** Previews measured at once, and at most, per search. */
 const MEASURE_BATCH = 4;
 const MAX_MEASURED = 24;
@@ -40,6 +42,9 @@ interface MusicResult {
   loudness_db?: number;
   peak_db?: number;
   energy?: string;
+  energy_curve?: string;
+  energy_levels_db?: number[];
+  drop_seconds?: number;
 }
 
 const count = z
@@ -119,7 +124,8 @@ export const stockTools: CatalogTool[] = [
     name: "search_freesound_music_tool",
     title: "Search stock music",
     description:
-      "Search Freesound music and sound effects. Returns ids, durations, licences and MP3 preview URLs, licensed for commercial use by default (licence: cc0, commercial-ok, any), CC0 first, then longer tracks. With bpm, bpm_range or energy, the previews are downloaded and measured (where the surface can) and each result gets its tempo (bpm, confidence, other octave readings), level (loudness_db) and energy; a plain search is not measured. " +
+      "Search Freesound music and sound effects. Returns ids, durations, licences and MP3 preview URLs, licensed for commercial use by default (licence: cc0, commercial-ok, any), CC0 first, then longer tracks. With bpm, bpm_range, energy or energy_curve, or a music bed (min_seconds 10 or more, or measure=true), the previews are downloaded and measured (where the surface can) and each result gets its tempo (bpm, confidence, other octave readings), level (loudness_db), energy and energy curve (build, drop with drop_seconds, steady, fade); a plain short search is not measured. " +
+        "Pick the track by its measured tempo and curve, not the first result: a bpm=null result has no beat (a drone or a pad). " +
       "Do not put a tempo in the query (Freesound matches words, so '128 bpm' finds pages that mention a number): give bpm or bpm_range and the tracks are filtered by their measured tempo, " +
       "a half- or double-time reading counts. Words like '120 bpm' in the query are moved to bpm_range for you. " +
       "To add one: import_stock_media_tool with source='freesound', its sound_id and preview_url. Credit CC BY sounds (user and link) wherever the video is published.",
@@ -140,6 +146,11 @@ export const stockTools: CatalogTool[] = [
         .describe("Wanted tempo range, [min, max] or 'min-max' BPM (instead of bpm), e.g. '150-170' for a hype cut."),
       mood: z.string().trim().max(100).optional().describe("Mood words added to the search, e.g. 'dark energetic'. Dropped if they leave no results."),
       energy: z.enum(["low", "medium", "high"]).optional().describe("Keep tracks of this energy (level and how hard the beats hit, measured); hype cuts want high."),
+      energy_curve: z
+        .enum(ENERGY_SHAPES)
+        .optional()
+        .describe("Keep tracks whose level does this over the first 45 s (measured): drop (a quiet start, then the beat lands; drop_seconds says where: put the climax on it), build (grows), steady, fade."),
+      measure: z.boolean().optional().describe(`Download and measure the previews (tempo, energy, energy curve) even without a filter. Default: with bpm / energy / energy_curve, or when min_seconds is ${BED_SECONDS} or more (a music bed); plain short searches (sound effects) are not measured.`),
       licence: z
         .enum(SFX_LICENSE_FILTERS)
         .optional()
@@ -167,16 +178,17 @@ export const stockTools: CatalogTool[] = [
         wanted = typed.range;
         warnings.push(`Moved the tempo out of the query: searching '${typed.query}' for ${Math.round(wanted[0])}-${Math.round(wanted[1])} BPM.`);
       }
-      const filtering = wanted !== undefined || args.energy !== undefined;
-      // Previews are downloaded and measured only to filter by tempo or energy: a plain search costs what it always did.
-      const measuring = filtering && canMeasurePreviews(call);
+      const filtering = wanted !== undefined || args.energy !== undefined || args.energy_curve !== undefined;
+      // Previews are downloaded and measured to filter, and for a music bed (an agent that is not shown the tempo takes the first drone);
+      // a plain sound-effect search costs what it always did.
+      const minSeconds = Number(args.min_seconds ?? 0);
+      const measuring = (args.measure ?? (filtering || minSeconds >= BED_SECONDS)) && canMeasurePreviews(call);
       if (filtering && !measuring) warnings.push("bpm / energy filters are not applied: this surface cannot measure audio previews. Check the results by ear or pick by tags.");
 
       // Mood words narrow the search; Freesound wants every word, so retry without them when nothing matches.
       const licence = args.licence ?? "commercial-ok";
       // Licences are filtered here, so CC0 only asks for more to filter.
       const pageSize = measuring || licence === "cc0" ? 60 : Math.min(30, n * 2);
-      const minSeconds = Number(args.min_seconds ?? 0);
       let found = await searchFreesound(call, args.mood ? `${typed.query} ${args.mood}` : typed.query, pageSize, minSeconds);
       if (!("error" in found) && found.sounds.length === 0 && args.mood) {
         found = await searchFreesound(call, typed.query, pageSize, minSeconds);
@@ -197,6 +209,7 @@ export const stockTools: CatalogTool[] = [
         const m = measures.get(s.id);
         if (!m) return false;
         if (wanted && !(m.bpm > 0 && matchTempo(m, wanted))) return false;
+        if (args.energy_curve && m.curve.shape !== args.energy_curve) return false;
         return !args.energy || m.energy === args.energy;
       };
       if (measuring) {
@@ -242,6 +255,9 @@ export const stockTools: CatalogTool[] = [
                 loudness_db: m.loudnessDb,
                 peak_db: m.peakDb,
                 energy: m.energy,
+                energy_curve: m.curve.shape,
+                energy_levels_db: m.curve.levels,
+                ...(m.curve.dropSeconds !== undefined ? { drop_seconds: m.curve.dropSeconds } : {}),
               }
             : {}),
         };
@@ -264,11 +280,13 @@ export const stockTools: CatalogTool[] = [
               .map(describe)
           : [];
 
-      const asked = [wanted ? `${Math.round(wanted[0])}-${Math.round(wanted[1])} BPM` : "", args.energy ? `${args.energy} energy` : ""].filter(Boolean).join(", ");
+      const asked = [wanted ? `${Math.round(wanted[0])}-${Math.round(wanted[1])} BPM` : "", args.energy ? `${args.energy} energy` : "", args.energy_curve ? `a ${args.energy_curve} curve` : ""].filter(Boolean).join(", ");
       const data = { query: typed.query, licence, ...(args.mood ? { mood: args.mood } : {}), ...(wanted ? { bpm_range: wanted } : {}), total: found.total, measured: measures.size, results, ...(nearest.length > 0 ? { nearest } : {}) };
       const line = (r: MusicResult) =>
         `  id=${r.sound_id}  duration=${clockTime(r.duration_seconds)}  licence=${r.licence}  user=${r.user}` +
-        (r.energy ? `  bpm=${r.bpm ?? "?"}${r.bpm_match ? ` (${r.bpm_match}, also ${(r.bpm_also ?? []).join("/")})` : ""}  energy=${r.energy}  loudness=${r.loudness_db}dB` : "") +
+        (r.energy
+          ? `  bpm=${r.bpm ?? "?"}${r.bpm_match ? ` (${r.bpm_match}, also ${(r.bpm_also ?? []).join("/")})` : ""}  energy=${r.energy}  curve=${r.energy_curve}${r.drop_seconds !== undefined ? ` (drop at ${r.drop_seconds}s)` : ""}  loudness=${r.loudness_db}dB`
+          : "") +
         `  tags=[${r.tags.join(", ")}]  preview_url=${r.preview_url}`;
       if (results.length === 0) {
         const none = asked && measured ? `No Freesound tracks for '${typed.query}' at ${asked} among the ${measures.size} measured.` : `No Freesound results for '${args.query}'.`;

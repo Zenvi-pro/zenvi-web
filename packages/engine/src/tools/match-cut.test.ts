@@ -10,7 +10,7 @@ import { clipKeyframe } from "../render/plan/transform.js";
 import type { RgbaImage } from "../render/types.js";
 import { frameWindow } from "../timeline/windows.js";
 import { runTool } from "./registry.js";
-import { hasDarkEdges } from "./subjects.js";
+import { hasDarkEdges, pickSubject } from "./subjects.js";
 import { fakeShotHost } from "./test-support/fake-shots.js";
 import { fakeHost } from "./test-support/fake-host.js";
 import { audioInfo, media, videoInfo } from "./test-support/fixture.js";
@@ -241,7 +241,7 @@ describe("match_cut_montage_tool", () => {
     expect(new Set(data.shots.map((s) => s.file_id))).toEqual(new Set(["F0", "F1", "F2", "F3"]));
     for (const shot of data.shots.slice(1, -1)) expect(shot.frames).toBeGreaterThanOrEqual(3);
     for (const shot of data.shots.slice(1, -1)) expect(shot.frames).toBeLessThanOrEqual(8);
-    expect(data.shots.every((s) => s.subject_from === "detected")).toBe(true);
+    expect(data.shots.every((s) => s.subject_from === "detected"), result.data?.warnings?.join(" | ")).toBe(true);
     expect(data.sfx_cues.map((c) => c.time)).toEqual(data.shots.slice(1).map((s) => s.start));
     expect(data.flashes.length).toBeGreaterThan(0);
     // Every cut frame without a flash or a motion transition: the subject at the target (±2 px; the drift zooms in after it).
@@ -420,3 +420,134 @@ describe("match_cut_montage_tool", () => {
   });
 });
 
+
+describe("measuring subjects for match cuts", () => {
+  /** Runs `body` with one file's disc replaced (the painter reads DISCS). */
+  async function withDisc<T>(path: string, disc: { x: number; y: number; r: number }, body: () => Promise<T>): Promise<T> {
+    const saved = DISCS[path]!;
+    DISCS[path] = disc;
+    try {
+      return await body();
+    } finally {
+      DISCS[path] = saved;
+    }
+  }
+
+  it("align_match_cut_tool refuses a box far smaller than the target (a wrong object), naming the clip, and max_zoom lets it through", async () => {
+    const doc = new ProjectDocument(project());
+    const host: ToolHost = { frames: pixelFrameHost(paint) };
+    // A box on a highlight: 0.02 of the frame against the eye's 0.42.
+    const clips = [{ clip_id: "C0", box: boxOf("/m/eye.mp4") }, { clip_id: "C1", box: { x: 0.3, y: 0.3, w: 0.012, h: 0.02 } }];
+    const refused = await runTool({ doc, host }, "align_match_cut_tool", { clips });
+    expect(refused.data?.summary).toMatch(/^Error: C1 would be enlarged \d+(\.\d)?x .*max_zoom 4.*wrong object/);
+    expect(doc.undoLabels).toEqual([]);
+    const allowed = await runTool({ doc, host }, "align_match_cut_tool", { clips, max_zoom: 30 });
+    expect(allowed.data?.status, allowed.data?.summary).toBe("applied");
+  });
+
+  it("zoom_all does not let one subject at the frame's edge make every subject much larger: that clip is covered on its own", async () => {
+    const doc = new ProjectDocument(project());
+    const host: ToolHost = { frames: pixelFrameHost(paint) };
+    // C1's subject sits near the right edge: centring it needs about a 3x cover zoom.
+    const result = await runTool({ doc, host }, "align_match_cut_tool", { clips: [{ clip_id: "C0", box: boxOf("/m/eye.mp4") }, { clip_id: "C1", box: { x: 0.7, y: 0.3, w: 0.28, h: 0.4 } }], cover: "zoom_all" });
+    expect(result.data?.status, result.data?.summary).toBe("applied");
+    const data = result.data?.data as { target: { size: number }; clips: { clip_id: string; cover_zoom: number }[] };
+    expect(data.target.size).toBeCloseTo(300 / 720, 2);
+    expect(data.clips[1]!.cover_zoom).toBeGreaterThan(3);
+    expect(result.data?.warnings?.join(" ")).toMatch(/C1 needed more than 3x to stay covered: it is zoomed on its own/);
+  });
+
+  it("align_match_cut_tool measures clips given without a box and lines them up (±2 px)", async () => {
+    const doc = new ProjectDocument(project());
+    const host: ToolHost = { frames: pixelFrameHost(paint) };
+    const result = await runTool({ doc, host }, "align_match_cut_tool", { clips: [{ clip_id: "C0" }, { clip_id: "C1" }, { clip_id: "C3" }] });
+    expect(result.data?.status, result.data?.summary).toBe("applied");
+    expect(result.data?.summary).toMatch(/measured 3 subject/);
+    const data = result.data?.data as { target: { size: number }; clips: { clip_id: string; measured: { box: { x: number; w: number }; confidence: number } }[] };
+    const moon = DISCS["/m/moon.mp4"]!;
+    const m1 = data.clips[1]!.measured;
+    expect(Math.abs((m1.box.x + m1.box.w / 2) * W - moon.x)).toBeLessThan(3);
+    expect(m1.confidence).toBeGreaterThan(0.5);
+    const reference = DISCS["/m/eye.mp4"]!;
+    for (const [i, frame] of [[0, 1], [1, 9], [2, 25]] as const) {
+      const seen = measure(await frameAt(host, doc.project, frame));
+      expect(Math.abs(seen.x - reference.x), `clip ${i} x`).toBeLessThanOrEqual(2);
+      expect(Math.abs(seen.r - reference.r), `clip ${i} r`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("detect_subject_tool ranks the circle near the hinted place and size first, and warns when the best is small", async () => {
+    // Two discs in one frame: a small bright spot and the large subject.
+    const two: Painter = (path, width, height) => {
+      const image = paint(path, width, height);
+      if (path !== "/m/eye.mp4") return image;
+      const sx = width / W;
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          if (Math.hypot((x + 0.5) / sx - 1100, (y + 0.5) / sx - 120) < 24) image.data.set([255, 255, 255, 255], (y * width + x) * 4);
+        }
+      }
+      return image;
+    };
+    const doc = new ProjectDocument(project());
+    const host: ToolHost = { frames: pixelFrameHost(two) };
+    const spot = await runTool({ doc, host }, "detect_subject_tool", { file_id: "F0", radius: 24 / H, near: { x: 1100 / W, y: 120 / H } });
+    const spotRows = (spot.data?.data as { subjects: { center: { x: number }; radius: number; confidence: number }[] }).subjects;
+    expect(Math.abs(spotRows[0]!.center.x * W - 1100)).toBeLessThan(4);
+    expect(spot.data?.warnings?.join(" ") ?? "").not.toMatch(/small/);
+    const eye = await runTool({ doc, host }, "detect_subject_tool", { file_id: "F0", near: { x: 0.5, y: 0.5 }, radius: 0.2 });
+    const eyeRows = (eye.data?.data as { subjects: { center: { x: number }; radius: number; confidence: number }[] }).subjects;
+    expect(Math.abs(eyeRows[0]!.center.x * W - 640)).toBeLessThan(3);
+    expect(Math.abs(eyeRows[0]!.radius * H - 150)).toBeLessThan(3);
+    expect(eyeRows[0]!.confidence).toBeGreaterThan(0.5);
+    const unhinted = await runTool({ doc, host }, "detect_subject_tool", { file_id: "F0", min_radius: 0.02, max_radius: 0.05 });
+    expect(unhinted.data?.warnings?.join(" ")).toMatch(/small \(radius 0\.03/);
+  });
+
+  it("pickSubject weighs size: a large circle beats a slightly crisper highlight, and given boxes set the size", () => {
+    const at = (radius: number, score: number) => ({ kind: "circle" as const, box: { x: 0.5 - radius, y: 0.5 - radius, w: 2 * radius, h: 2 * radius }, score, radius, confidence: score });
+    const highlight = at(0.04, 0.9);
+    const moon = at(0.2, 0.7);
+    expect(pickSubject([highlight, moon])).toBe(moon);
+    expect(pickSubject([highlight, moon], 0.05)!.radius).toBe(0.04);
+  });
+
+  it("detect_subject_tool kind=blob measures a non-round region: centroid, box and tone", async () => {
+    // A dark upright silhouette (a person-sized bar) on a bright sky.
+    const silhouette: Painter = (_path, width, height) => {
+      const data = new Uint8ClampedArray(width * height * 4);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const inside = x / width >= 0.6 && x / width < 0.7 && y / height >= 0.3 && y / height < 0.9;
+          const v = inside ? 30 : 200 + ((x * 7 + y * 13) % 9);
+          data.set([v, v, v, 255], (y * width + x) * 4);
+        }
+      }
+      return { width, height, data };
+    };
+    const doc = new ProjectDocument(project());
+    const result = await runTool({ doc, host: { frames: pixelFrameHost(silhouette) } }, "detect_subject_tool", { file_id: "F0", kind: "blob" });
+    const best = (result.data?.data as { subjects: { box: { x: number; y: number; w: number; h: number }; center: { x: number; y: number }; tone: string; confidence: number }[] }).subjects[0]!;
+    expect(best.tone).toBe("dark");
+    expect(best.center.x).toBeCloseTo(0.65, 2);
+    expect(best.center.y).toBeCloseTo(0.6, 2);
+    expect(best.box.w).toBeCloseTo(0.1, 1);
+    expect(best.box.h).toBeCloseTo(0.6, 1);
+    expect(best.confidence).toBeGreaterThan(0.5);
+  });
+
+  it("match_cut_montage_tool centres the shots of a file whose only circle would need a huge zoom, and says so", async () => {
+    await withDisc("/m/vinyl.mp4", { x: 700, y: 300, r: 32 }, async () => {
+      const base = project();
+      base.clips = [];
+      const doc = new ProjectDocument(base);
+      const host: ToolHost = { ...fakeHost(), frames: pixelFrameHost(paint) };
+      const result = await runTool({ doc, host }, "match_cut_montage_tool", { file_ids: ["F0", "F1", "F2", "F3"], duration_seconds: 6, target: { x: 0.5, y: 0.5, size: 0.4 } });
+      expect(result.data?.status, result.data?.summary).toBe("applied");
+      expect(result.data?.warnings?.join(" ")).toMatch(/vinyl.*more than 4x.*centred/);
+      const shots = (result.data?.data as { shots: { file_id: string; subject_from: string }[] }).shots;
+      expect(shots.filter((s) => s.file_id === "F3").every((s) => s.subject_from === "centred")).toBe(true);
+      expect(shots.filter((s) => s.file_id !== "F3").every((s) => s.subject_from === "detected")).toBe(true);
+    });
+  });
+});

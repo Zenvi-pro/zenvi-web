@@ -73,7 +73,7 @@ function onsetCache(call: ToolCall): (file: ProjectFile) => Promise<Onset[] | st
   };
 }
 
-function selectCuts(call: ToolCall, args: SnapInput): Cut[] {
+export function selectCuts(call: ToolCall, args: Pick<SnapInput, "clip_ids" | "track" | "start" | "end">): Cut[] {
   const project = call.doc.project;
   const layers = args.track !== undefined ? new Set([resolveLayer(project, args.track)]) : undefined;
   let cuts = listCuts(project, layers);

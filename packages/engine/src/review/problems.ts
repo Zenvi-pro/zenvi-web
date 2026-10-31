@@ -262,7 +262,7 @@ export function findProblems(input: ProblemInput): ReviewProblem[] {
       at: worst[0]?.time ?? review.range.start,
       times: worst.map((m) => m.time),
       message: `Only ${Math.round(alignment.onTransient * 100)}% of cuts land on a beat or hit (within ${Math.round(alignment.tolerance * 1000)} ms${alignment.bpm ? `; ${alignment.bpm} BPM` : "; hits only, no steady beat"}). Worst: ${worst.map((m) => `${t(m.time)} (${m.offset > 0 ? "+" : ""}${Math.round(m.offset * 1000)} ms)`).join(", ")}.`,
-      fix: "Move those cuts to the nearest beat or onset (detect_beats_tool gives the times), or rebuild the cut with build_reel_tool.",
+      fix: "Snap them to the beat: snap_cuts_to_beats_tool (roll edits, the length holds), or snap_cuts_to_onsets_tool for in-world hits; or rebuild the cut with build_reel_tool.",
     });
   }
 

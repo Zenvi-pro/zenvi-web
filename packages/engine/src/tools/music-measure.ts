@@ -6,7 +6,7 @@
  */
 
 import { BEAT_SAMPLE_RATE, detectBeats, type TempoAlternative } from "../analysis/beats.js";
-import { classifyEnergy, type Energy } from "../stock/music.js";
+import { classifyEnergy, energyCurve, type Energy, type EnergyCurve } from "../stock/music.js";
 import type { ToolCall } from "./define.js";
 
 /** Seconds of the preview measured: enough bars to hear the tempo, little enough to download quickly. */
@@ -24,6 +24,8 @@ export interface PreviewMeasure {
   /** Highest sample, dBFS. */
   peakDb: number;
   energy: Energy;
+  /** How the level moves over the measured stretch. */
+  curve: EnergyCurve;
 }
 
 const db = (linear: number) => Math.round(20 * Math.log10(Math.max(linear, 1e-6)) * 10) / 10;
@@ -48,6 +50,13 @@ export async function measurePreview(call: ToolCall, url: string): Promise<Previ
       peak = Math.max(peak, Math.abs(v));
     }
     const loudnessDb = db(Math.sqrt(energy / samples.length));
+    const perSecond: number[] = [];
+    for (let i = 0; i + sampleRate <= samples.length; i += sampleRate) {
+      let sum = 0;
+      for (let k = i; k < i + sampleRate; k += 1) sum += samples[k]! * samples[k]!;
+      // Silence floors at -60 dB: a gap in a track is quiet, not minus infinity.
+      perSecond.push(Math.max(-60, db(Math.sqrt(sum / sampleRate))));
+    }
     const beats = detectBeats(samples, sampleRate);
     const strength = beats.beats.length > 0 ? beats.beats.reduce((sum, b) => sum + b.strength, 0) / beats.beats.length : 0;
     return {
@@ -58,6 +67,7 @@ export async function measurePreview(call: ToolCall, url: string): Promise<Previ
       loudnessDb,
       peakDb: db(peak),
       energy: classifyEnergy(loudnessDb, strength),
+      curve: energyCurve(perSecond),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

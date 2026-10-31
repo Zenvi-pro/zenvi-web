@@ -77,6 +77,8 @@ const DIRECT_TOOLS = [
   "speed_ramp_tool",
   "detect_onsets_tool",
   "snap_cuts_to_onsets_tool",
+  "snap_cuts_to_beats_tool",
+  "fill_to_length_tool",
   "shot_length_ramp_tool",
   "detect_music_structure_tool",
   "spot_action_foley_tool",

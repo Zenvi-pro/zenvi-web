@@ -263,7 +263,7 @@ describe("build_reel_tool", () => {
 });
 
 describe("build_reel_tool with the beat grid given", () => {
-  type Reel = { bpm: number; beat_source: string; beats: number[]; music_tempo?: { given_bpm?: boolean; confidence: number; bpm: number } };
+  type Reel = { bpm: number; duration: number; beat_source: string; beats: number[]; music_tempo?: { given_bpm?: boolean; confidence: number; bpm: number } };
   const reel = async (args: Record<string, unknown>, doc = reelProject()) => {
     const result = await runTool({ doc, host: withAudio(fakeHost()) }, "build_reel_tool", { style: "hype", file_ids: FILES, duration_seconds: 12, ...args });
     return { result, doc, data: (result.data as { data: Reel }).data };
@@ -277,6 +277,22 @@ describe("build_reel_tool with the beat grid given", () => {
     expect(data.beat_source).toBe("160 BPM from 0.25 s");
     // The beats follow the given tempo (0.375 s apart; the in-point snaps to a frame).
     expect((data.beats[9]! - data.beats[1]!) / 8).toBeCloseTo(0.375, 2);
+  });
+
+  it("loops music shorter than the asked length on a bar line, so the reel runs the full length (not a bar line short)", async () => {
+    const doc = reelProject(false);
+    doc.transaction("short song", (tx) => addFile(tx, media("/media/short.mp3", audioInfo("/media/short.mp3", 26.3)), { id: "SHORTSONGX" }));
+    const { result, data } = await reel({ bpm: 120, offset_seconds: 0, duration_seconds: 30 }, doc);
+    expect(result.ok, result.text).toBe(true);
+    expect(data.duration).toBeCloseTo(30, 2);
+    expect((result.data as { warnings?: string[] }).warnings?.join(" ")).toMatch(/The music is 26.3 s, shorter than the 30 s asked: 4 bar\(s\) from 18 s repeat once/);
+    const bed = doc.project.clips.filter((c) => c.file_id === "SHORTSONGX").sort((a, b) => a.position - b.position);
+    expect(bed.map((c) => [c.position, c.start, c.end])).toEqual([
+      [0, 0, 26],
+      [26, 18, 22],
+    ]);
+    expect(doc.project.clips.filter((c) => c.file_id !== "SHORTSONGX").every((c) => c.position + c.end - c.start <= 30 + 1e-6)).toBe(true);
+    expect(Math.max(...doc.project.clips.filter((c) => c.layer !== bed[0]!.layer).map((c) => c.position + c.end - c.start))).toBeCloseTo(30, 2);
   });
 
   it("uses the given beat times instead of detecting", async () => {
