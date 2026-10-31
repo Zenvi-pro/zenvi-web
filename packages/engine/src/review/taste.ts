@@ -39,6 +39,7 @@ export interface TasteInput {
 const SERIF = /\b(serif|instrument serif|playfair|georgia|times|garamond|merriweather|lora|baskerville|cormorant|fraunces|bodoni|didot|caslon|libre caslon|dm serif|crimson|spectral|noto serif)\b/i;
 const CONDENSED = /\b(anton|bebas|oswald|league gothic|condensed|compressed|impact)\b/i;
 const EMOJI = /\p{Extended_Pictographic}/u;
+const KINETIC_TITLE_KEY = "zenvi_kinetic_title";
 
 /** Hue (0-360), saturation and lightness (0-1) of #rrggbb. */
 function hsl(hex: string): [number, number, number] | null {
@@ -108,6 +109,19 @@ export function houseBanFindings(input: TasteInput): TasteFinding[] {
   for (const clip of project.clips) {
     const id = String(clip.id);
     const at = clip.position;
+    // add_kinetic_title_tool outlines its words, so its style tag says the face (tools/catalog/kinetic-titles.ts).
+    const kinetic = clip[KINETIC_TITLE_KEY] as { text?: unknown; style?: unknown } | undefined;
+    if (kinetic) {
+      const style = String(kinetic.style ?? "");
+      const words = String(kinetic.text ?? "");
+      if (style === "editorial") {
+        add({ ban: "serif", clipId: id, at, message: `Title "${words}" uses the editorial style (Instrument Serif).`, fix: FIX.type });
+        add({ ban: "italic", clipId: id, at, message: `Title "${words}" uses the editorial style's italic emphasis.`, fix: FIX.type });
+      }
+      if (style === "stack" || style === "creator") add({ ban: "condensed", clipId: id, at, message: `Title "${words}" uses the ${style} style's condensed capitals (Bebas Neue): a generated-look tell.`, fix: FIX.type });
+      if (EMOJI.test(words)) add({ ban: "emoji", clipId: id, at, message: `Title "${words}" has an emoji.`, fix: FIX.decoration });
+      if (/^\s*introducing\b/i.test(words)) add({ ban: "introducing", clipId: id, at, message: `Title "${words}" opens on "Introducing".`, fix: "Open inside the problem; the product arrives as the answer, named once." });
+    }
     const svg = input.svgs?.get(id);
     if (svg) {
       const families = [...svg.matchAll(/font-family\s*[:=]\s*["']?([^;"'>]+)/gi)].map((m) => m[1]!);
