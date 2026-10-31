@@ -328,3 +328,48 @@ describe("motion transition tools", () => {
     expect(doc.undoLabels).toHaveLength(2);
   });
 });
+
+describe("flash transitions stay within 3 flashes a second (WCAG 2.3.1)", () => {
+  /** Twelve quarter-second shots back to back: a flash on every cut is 4 a second. */
+  function fastDoc(): ProjectDocument {
+    const doc = makeDoc();
+    doc.transaction("clips", (tx) => {
+      for (let i = 0; i < 12; i += 1) addClip(tx, { fileId: "VIDEO00001", position: 0.25 * i, layer: 1, start: 0.25 * i, end: 0.25 * i + 0.25, id: `FAST${String(i).padStart(2, "0")}` });
+    });
+    doc.clearHistory();
+    return doc;
+  }
+  const flashCuts = (doc: ProjectDocument): number[] => listProjectMotionTransitions(doc.project).filter((r) => r.preset === "flash_white").map((r) => r.cut);
+
+  it("leaves off the flashes past the limit, with a warning, in one undo step", async () => {
+    const doc = fastDoc();
+    const result = await call(doc, "apply_motion_transitions_tool", { track: "1", preset: "flash_white", duration: "0.1" });
+    expect(result.ok, result.text).toBe(true);
+    const cuts = flashCuts(doc);
+    expect(cuts.length).toBeGreaterThan(3);
+    expect(cuts.length).toBeLessThan(11);
+    for (const t of cuts) expect(cuts.filter((c) => c >= t && c < t + 1 - 1e-6).length).toBeLessThanOrEqual(3);
+    expect((result.data as { warnings: string[] }).warnings.join(" ")).toMatch(/flash\(es\) left off.*WCAG 2\.3\.1.*allow_strobe=true/);
+    expect(doc.undoLabels).toHaveLength(1);
+  });
+
+  it("keeps every flash with allow_strobe", async () => {
+    const doc = fastDoc();
+    const result = await call(doc, "apply_motion_transitions_tool", { track: "1", preset: "flash_white", duration: "0.1", allow_strobe: "true" });
+    expect(result.ok, result.text).toBe(true);
+    expect(flashCuts(doc)).toHaveLength(11);
+  });
+
+  it("refuses one more flash where three are already in the second, with no undo step", async () => {
+    const doc = fastDoc();
+    for (const id of ["FAST00", "FAST01", "FAST02"]) expect((await call(doc, "apply_motion_transition_tool", { preset: "flash_white", clip1_id: id, duration: "0.1" })).ok).toBe(true);
+    const steps = doc.undoLabels.length;
+    const fourth = await call(doc, "apply_motion_transition_tool", { preset: "flash_white", clip1_id: "FAST03", duration: "0.1" });
+    expect(fourth.data?.status).toBe("refused");
+    expect(summaryOf(fourth)).toMatch(/more than 3 flashes within a second/);
+    expect(doc.undoLabels).toHaveLength(steps);
+    // A move is fine there, and so is the flash a second later.
+    expect((await call(doc, "apply_motion_transition_tool", { preset: "zoom_in", clip1_id: "FAST03", duration: "0.1" })).ok).toBe(true);
+    expect((await call(doc, "apply_motion_transition_tool", { preset: "flash_white", clip1_id: "FAST07", duration: "0.1" })).ok).toBe(true);
+  });
+});

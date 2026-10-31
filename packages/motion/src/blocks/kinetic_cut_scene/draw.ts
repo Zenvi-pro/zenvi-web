@@ -29,7 +29,7 @@ import {
   type ShapeParticle,
 } from "../../runtime/kinetic.js";
 import { mulberry32 } from "../../runtime/rng.js";
-import { strobeStep, typingSeconds, type Ground, type Shot } from "./shots.js";
+import { groundAt, strobeStep, typingSeconds, type Ground, type Shot } from "./shots.js";
 
 export interface Scene {
   W: number;
@@ -181,20 +181,11 @@ function fill(g: CanvasRenderingContext2D, sc: Scene, color: string): void {
   g.fillRect(-sc.W * 0.25, -sc.H * 0.25, sc.W * 1.5, sc.H * 1.5);
 }
 
-/** The ground a shot shows at u: strobe flips its ground with the words, at most 3 flips a second (WCAG 2.3.1). */
-function groundAt(sc: Scene, shot: Shot, u: number): Ground {
-  if (shot.entrance !== "strobe") return shot.ground;
-  const step = strobeStep(shot, sc.bpm);
-  if (step < 1 / 3) return shot.ground;
-  const order: Ground[] = shot.ground === "light" ? ["light", "dark", "accent"] : shot.ground === "accent" ? ["accent", "dark", "light"] : ["dark", "light", "accent"];
-  return order[Math.floor(u / step) % order.length]!;
-}
-
 /** Everything of one shot at u s into it, in design px. */
 /** `uf` is the frame's own time in the shot: discrete things (digits, words, typed letters) step with it, not with the sub-frames, so they never ghost. */
 export function drawShot(g: CanvasRenderingContext2D, sc: Scene, shot: Shot, u: number, uf = u): void {
   const len = shot.end - shot.start;
-  const ground = groundAt(sc, shot, uf);
+  const ground = groundAt(shot, sc.bpm, uf);
   const box = layoutBox(sc, shot);
   const ink = sc.inks[ground];
   fill(g, sc, sc.colors[ground]);

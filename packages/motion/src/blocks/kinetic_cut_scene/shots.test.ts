@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { countText } from "./draw.js";
-import { parseShot, scheduleShots, shotCues, shotHits, strobeStep, type ShotSpec } from "./shots.js";
+import { flashViolations } from "@zenvi/engine/flashing";
+import { flashNote, groundChanges, limitHitFlashes, parseShot, scheduleShots, shotCues, shotHits, strobeStep, type ShotSpec } from "./shots.js";
 
 const spec = (line: string): ShotSpec => {
   const s = parseShot(line);
@@ -78,5 +79,27 @@ describe("counting", () => {
     expect(countText("2.4M users", 5, 2)).toBe("2.4M users");
     expect(countText("12,500 runners", 5, 2)).toBe("12,500 runners");
     expect(countText("NO DIGITS", 1, 2)).toBe("NO DIGITS");
+  });
+});
+
+describe("flash limit (WCAG 2.3.1)", () => {
+  // Eight 1-beat shots at 200 BPM flipping dark/light: 0.3 s cuts, every one a ground change and a hit.
+  const fast = ["1 slam A #dark", "1 slam B #light", "1 slam C #dark", "1 slam D #light", "1 slam E #dark", "1 slam F #light", "1 slam G #dark", "1 slam H #light"];
+
+  it("takes the flash off hits that would make more than 3 flashes a second with the ground changes", () => {
+    const shots = scheduleShots(fast.map(spec), 200, 2.4);
+    const hits = shotHits(shots, 200);
+    expect(limitHitFlashes(shots, hits, 200)).toBeGreaterThan(0);
+    const changes = [...groundChanges(shots, 200), ...hits.filter((h) => h.flash !== 0).flatMap((h) => [h.t, h.t + 0.12])];
+    expect(flashViolations(changes)).toEqual([]);
+    expect(flashNote({ shots: fast, bpm: 200 })).toMatch(/hit\(s\) punch without their flash.*WCAG 2\.3\.1/);
+    expect(flashNote({ shots: fast, bpm: 200, allow_strobe: true })).toBeUndefined();
+  });
+
+  it("leaves a calm storyboard's flashes alone", () => {
+    const calm = ["2 slam MAKE #dark", "2 type IT #light", "4 drop MOVE #dark"];
+    const shots = scheduleShots(calm.map(spec), 120, 4);
+    expect(limitHitFlashes(shots, shotHits(shots, 120), 120)).toBe(0);
+    expect(flashNote({ shots: calm, bpm: 120 })).toBeUndefined();
   });
 });
