@@ -5,6 +5,7 @@ export * from "./wire.js";
 export * from "./json-schema.js";
 export { aliasArguments, matchOption, type AliasedArguments, type OptionMatch } from "./aliases.js";
 export { HIDDEN_PARAMS, normalizeArgs } from "./coerce.js";
+export { settableKeys as settableClipPropertyKeys } from "./clip-props-model.js";
 export {
   CONTRACT_REF,
   CONTRACT_TOOL_NAMES,
@@ -42,6 +43,7 @@ export {
   getTool,
   listTools,
   runTool,
+  unavailableAssistantTools,
   unknownToolMessage,
   type ListToolsOptions,
   type RunToolOptions,

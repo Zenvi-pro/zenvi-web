@@ -2,7 +2,7 @@
  * Zenvi FX catalog: footage effects libopenshot 1.0 does not have (zoom and
  * directional blur, echo trails, radial chromatic aberration, bloom, glitch,
  * pixel sort, halftone, dither, mirror, optical-flow slow motion, vignette,
- * light leaks), rendered by the host with an ffmpeg filtergraph
+ * light leaks, CRT screen, screenprint ink, datamosh carry), rendered by the host with an ffmpeg filtergraph
  * (`graph.ts`) and swapped in as linked media.
  *
  * An FX stack is an ordered list of effects; each has a 0-1 `amount` (how
@@ -27,6 +27,9 @@ export const FX_IDS = [
   "optical_flow_slowmo",
   "vignette",
   "light_leak",
+  "crt",
+  "print_ink",
+  "datamosh_carry",
 ] as const;
 export type FxId = (typeof FX_IDS)[number];
 
@@ -100,6 +103,38 @@ export const FX_PARAMS = {
     color: hex.default("#FF7A2E").describe("Main leak colour, #rrggbb."),
     seed,
   }),
+  crt: z.strictObject({
+    curvature: unit(0.45, "Barrel distortion of the glass, 0 flat to 1 bulging."),
+    pitch: z.number().int().min(2).max(8).default(3).describe("Scanline spacing in pixels at 1080p (scaled with the frame)."),
+    mask: z.boolean().default(true).describe("Fine red/green/blue phosphor stripes."),
+    roll: z.boolean().default(true).describe("A slow dark hum bar rolling up the screen."),
+    bezel: z
+      .enum(["none", "rounded", "tv"])
+      .default("rounded")
+      .describe("none: the whole frame; rounded: a rounded screen with black corners; tv: a 4:3 screen inset in a black bezel (the picture is cropped to fit)."),
+  }),
+  print_ink: z.strictObject({
+    ink: hex.default("#16307A").describe("Edge line colour, #rrggbb."),
+    plate: hex.default("#E8402B").describe("Second plate: the colour printed offset from the lines, #rrggbb."),
+    paper: hex.default("#F1EADB").describe("Paper colour, #rrggbb."),
+    levels: z.number().int().min(2).max(8).default(5).describe("Tone steps per channel (fewer = flatter, more graphic)."),
+    misregister: unit(0.4, "How far the plates miss each other, 0 registered to a clear offset."),
+    bleed: unit(0.35, "Ink spread: thin lines swell and soften."),
+    grit: unit(0.4, "Paper grain and ink dropouts."),
+    seed,
+  }),
+  datamosh_carry: z.strictObject({
+    length: z.number().min(0.1).max(2).default(0.6).describe("Seconds at the start of the clip that are moshed (it lands clean after that)."),
+    block: z.number().int().min(8).max(96).default(32).describe("Macroblock size in pixels at 1080p (scaled with the frame): bigger tears in chunkier pieces."),
+    ghost: unit(0.5, "How much of the footage before the cut lingers at the start, pushed along and fading out."),
+    carry: z
+      .strictObject({
+        file_id: z.string().min(1).describe("Bin file of the footage before the cut."),
+        at: z.number().min(0).describe("Second of that file where the footage before the cut ends."),
+      })
+      .optional()
+      .describe("The footage whose motion is carried over the cut; datamosh_cut_tool fills this in."),
+  }),
 } as const satisfies Record<FxId, z.ZodObject>;
 
 export type FxParams<F extends FxId = FxId> = z.output<(typeof FX_PARAMS)[F]>;
@@ -114,6 +149,8 @@ export interface FxInfo {
   retimes: boolean;
   /** Reads earlier frames (echo, trails): the window renders from up to this many seconds earlier. */
   lookbackSeconds: number;
+  /** Works on the clip's first frames, at the cut, with its own `length` (it cannot take a window). */
+  atCut?: boolean;
 }
 
 export const FX_INFO: Readonly<Record<FxId, FxInfo>> = {
@@ -130,6 +167,9 @@ export const FX_INFO: Readonly<Record<FxId, FxInfo>> = {
   optical_flow_slowmo: { id: "optical_flow_slowmo", title: "Optical-flow slow motion", summary: "Slow the clip down with interpolated in-between frames; the clip gets longer.", defaultAmount: 0.33, retimes: true, lookbackSeconds: 0 },
   vignette: { id: "vignette", title: "Vignette", summary: "Darken the corners to pull the eye to the centre.", defaultAmount: 0.5, retimes: false, lookbackSeconds: 0 },
   light_leak: { id: "light_leak", title: "Light leak / film burn", summary: "Procedural warm light leaks or a film burn washing over the footage (no stock assets).", defaultAmount: 0.6, retimes: false, lookbackSeconds: 0 },
+  crt: { id: "crt", title: "CRT screen", summary: "Old-TV screen in one effect: scanlines, phosphor stripes, barrel distortion, red/cyan split, glow, flicker, a rolling hum bar and an optional rounded or 4:3 bezel.", defaultAmount: 0.6, retimes: false, lookbackSeconds: 0 },
+  print_ink: { id: "print_ink", title: "Screenprint ink", summary: "Screenprint / risograph look: flat tone plates on paper, Sobel ink lines that bleed, a second plate printed off register, paper grit.", defaultAmount: 0.85, retimes: false, lookbackSeconds: 0 },
+  datamosh_carry: { id: "datamosh_carry", title: "Datamosh carry", summary: "At a cut, the footage before it keeps moving: the first frames of the clip are pushed along the previous clip's motion (block tearing and smear, its last frame lingering), then land clean. Needs the clip before it: use datamosh_cut_tool.", defaultAmount: 0.6, retimes: false, lookbackSeconds: 0, atCut: true },
 };
 
 export function isFxId(value: unknown): value is FxId {
@@ -182,6 +222,7 @@ export function parseFxEffect(raw: unknown, duration: number): ParsedFxEffect {
   const out: FxEffect = { effect, amount: amount ?? info.defaultAmount, params: params.data as FxParams };
   if (start !== undefined || end !== undefined) {
     if (info.retimes) return { ok: false, error: `${effect} changes the clip's length, so it applies to the whole clip (no start/end).` };
+    if (info.atCut) return { ok: false, error: `${effect} works on the clip's first frames: set params.length, not start/end.` };
     const s = start ?? 0;
     const e = Math.min(end ?? duration, duration);
     if (s >= duration) return { ok: false, error: `${effect} starts at ${s}s, after the clip's end (${round(duration)}s).` };
@@ -206,6 +247,7 @@ export function parseFxStack(raw: readonly unknown[], duration: number): ParsedF
     if (!parsed.ok) return { ok: false, error: `effects[${i}]: ${parsed.error}` };
     effects.push(parsed.effect);
   }
+  if (effects.filter((e) => e.effect === "datamosh_carry").length > 1) return { ok: false, error: "only one datamosh_carry per clip." };
   const retiming = effects.filter((e) => FX_INFO[e.effect].retimes);
   if (retiming.length > 1) return { ok: false, error: "only one optical_flow_slowmo per clip." };
   // Windows are in clip seconds before slow motion; it goes last so they mean what they say.

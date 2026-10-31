@@ -8,6 +8,7 @@ import { addTitleClip } from "../../ops/titles.js";
 import type { MixMeasurement, SheetResult, ToolHost } from "../types.js";
 import { runTool } from "../registry.js";
 import { fakeHost, type FakeHost } from "../test-support/fake-host.js";
+import { fakeShotHost } from "../test-support/fake-shots.js";
 import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
 
 const SR = BEAT_SAMPLE_RATE;
@@ -215,5 +216,35 @@ describe("review_edit_tool", () => {
     expect(result.ok, result.text).toBe(true);
     expect((result.data as { warnings: string[] }).warnings.join(" ")).toContain("Could not measure the audio: ffmpeg exploded");
     expect(dataOf(result).mix).toBeNull();
+  });
+});
+
+describe("review_edit_tool near-duplicate shots", () => {
+  /** Four 1 s shots: shot1 and shot2 show the same city street from two files; the others differ. */
+  function lookRig(ready: boolean) {
+    const r = rig(4, 1);
+    const shots = fakeShotHost(
+      { "/media/shot0.mp4": [[0, "face"]], "/media/shot1.mp4": [[0, "city"]], "/media/shot2.mp4": [[0, "city"]], "/media/shot3.mp4": [[0, "dog"]] },
+      { ready, durations: { "/media/shot0.mp4": 20, "/media/shot1.mp4": 20, "/media/shot2.mp4": 20, "/media/shot3.mp4": 20 }, tints: { "/media/shot2.mp4": 0.2 } },
+    );
+    r.host.shots = shots;
+    return { r, shots };
+  }
+
+  it("flags back-to-back shots that look the same, with swaps for the second", async () => {
+    const { r, shots } = lookRig(true);
+    const problems = dataOf(await review(r)).problems as { code: string; at: number; shots?: number[]; message: string }[];
+    const near = problems.find((p) => p.code === "near-duplicate-shots");
+    expect(near).toMatchObject({ at: 2, shots: [2] });
+    expect(near!.message).toMatch(/shot1\.mp4 → shot2\.mp4 at 2\.00s, similarity 0\.98/);
+    // Not embedded yet: one frame from the middle of each shot, nothing cached, no download.
+    expect(shots.calls.every((c) => c.startsWith("frames "))).toBe(true);
+  });
+
+  it("does nothing without the model installed", async () => {
+    const { r, shots } = lookRig(false);
+    const problems = dataOf(await review(r)).problems as { code: string }[];
+    expect(problems.some((p) => p.code === "near-duplicate-shots")).toBe(false);
+    expect(shots.calls).toEqual([]);
   });
 });
