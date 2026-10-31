@@ -43,6 +43,21 @@ describe("the styles library as text", () => {
     expect(twenty).toContain("body, 0.8-1.6 s shots");
   });
 
+  it("reads the beats from a row a beat with a column a length, and from a column a beat", () => {
+    // "| beat | 15 s | 30 s |": the nearest column, one beat a line, its times scaled; empty cells dropped.
+    const trailer = compactStyle(STYLE_FILES.find((f) => f.id === "movie-game-trailer")!, 20);
+    expect(trailer).toContain("(20 s, scaled from the 15 s column)\n- Cold open: 1-3 slow shots, fade from black, rumble: 0-4\n");
+    expect(trailer).toContain("- Black, then title card with sub drop: 18-20");
+    const review = compactStyle(STYLE_FILES.find((f) => f.id === "tech-review")!, 15);
+    expect(review).toContain("(15 s (short))\n- Verdict hook");
+    expect(review).not.toMatch(/: [-–—]\n/);
+    // "| length | hook | setup / claim |": each time after its beat's name.
+    const essay = compactStyle(STYLE_FILES.find((f) => f.id === "video-essay-explainer")!, 20);
+    expect(essay).toContain("(20 s, scaled from the 15 s row) hook 0-2.7 s · setup / claim 2.7-5.3 s · proof run 5.3-10.7 s");
+    // Counts are not times: "3 x 3 s" stays.
+    expect(compactStyle(STYLE_FILES.find((f) => f.id === "science-curiosity")!, 20)).toMatch(/equal steps \d+(\.\d)?-\d+(\.\d)? s \(3 x 3 s\)/);
+  });
+
   it("cuts every technique, family and method to ~1.2 k tokens", () => {
     for (const file of STYLE_FILES.filter((f) => f.kind !== "style")) {
       const text = compactTechnique(file);

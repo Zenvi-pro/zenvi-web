@@ -135,33 +135,58 @@ function rowSeconds(cell: string): number | undefined {
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
-/** A beats cell's leading times ("0-4 cold open · 4 drop") scaled by `factor`; shot lengths inside a beat stay. */
+/** A beats cell's leading times ("0-4 cold open · 4 drop") scaled by `factor`; shot lengths inside a beat and counts ("3 x 3 s") stay. */
 function scaleBeats(cell: string, factor: number): string {
   return cell
     .split(" · ")
-    .map((seg) => seg.replace(/^(\s*)(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?(?=\s)/, (_m, pad: string, a: string, b?: string) => `${pad}${round1(Number(a) * factor)}${b === undefined ? "" : `-${round1(Number(b) * factor)}`}`))
+    .map((seg) => seg.replace(/^(\s*)(\d+(?:\.\d+)?)(?:-(\d+(?:\.\d+)?))?(?=\s|$)(?!\s*x\s)/, (_m, pad: string, a: string, b?: string) => `${pad}${round1(Number(a) * factor)}${b === undefined ? "" : `-${round1(Number(b) * factor)}`}`))
     .join(" · ");
 }
 
-/** The beats for `seconds`: the structure table's nearest row, its times scaled to the asked length. */
+/** A table cell that names a length ("15 s", "60-90 s (trailer)"). */
+const isLengthCell = (cell: string): boolean => /^\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\s*s\b/.test(cell);
+/** An empty cell: that length has no such beat. */
+const isEmptyCell = (cell: string | undefined): boolean => !cell || /^[-–—]$/.test(cell);
+
+/**
+ * The beats for `seconds`: the structure table's nearest length, its times
+ * scaled to the asked length. The styles write it three ways: a row a length
+ * ("15 s | 0-4 cold open · 4 drop"), a row a length with a column a beat
+ * ("length | hook | setup"), or a row a beat with a column a length
+ * ("beat | 15 s | 30 s").
+ */
 export function beatsFor(structure: Section, seconds: number): string {
   const rows = structure.text
     .split("\n")
     .filter((l) => l.trim().startsWith("|") && !/^\|\s*-/.test(l.trim()))
     .map((l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
+  const header = rows[0] ?? [];
   const body = rows.slice(1);
-  const lengths = body.map((r) => rowSeconds(r[0] ?? ""));
-  const sized = body.map((r, i) => ({ r, s: lengths[i] })).filter((x): x is { r: string[]; s: number } => x.s !== undefined && /\bs\b|sec/.test(x.r[0] ?? ""));
   const after = structure.text.replace(/^\|.*$/gm, "").trim();
+  const columns = header.flatMap((cell, i) => (i > 0 && isLengthCell(cell) ? [{ i, s: rowSeconds(cell)! }] : []));
+  const fit = <T extends { s: number }>(all: readonly T[]): { best: T; factor: number; exact: boolean } => {
+    const best = all.reduce((a, b) => (Math.abs(b.s - seconds) < Math.abs(a.s - seconds) ? b : a));
+    const factor = seconds / best.s;
+    return { best, factor, exact: Math.abs(factor - 1) < 0.05 };
+  };
+  if (columns.length >= 2) {
+    const { best, factor, exact } = fit(columns);
+    const lines = body.filter((r) => !isEmptyCell(r[best.i])).map((r) => `- ${r[0]}: ${exact ? r[best.i] : scaleBeats(r[best.i]!, factor)}`);
+    const from = exact ? header[best.i] : `${round1(seconds)} s, scaled from the ${header[best.i]} column`;
+    return clip([`(${from})`, ...lines, after ? reflow(after) : ""].filter(Boolean).join("\n"), 1100);
+  }
+  const sized = body.flatMap((r) => (isLengthCell(r[0] ?? "") ? [{ r, s: rowSeconds(r[0]!)! }] : []));
   if (sized.length === 0) {
     // A director recipe's table: one structure (its heading says the length), "t | what" rows.
     const lines = body.map((r) => `- ${r[0]}: ${r.slice(1).join(" · ")}`);
     return clip([`(${structure.heading.replace(/^Structure\s*/, "").replace(/^\(|\)$/g, "") || "as written"})`, ...lines, after ? reflow(after) : ""].filter(Boolean).join("\n"), 1100);
   }
-  const best = sized.reduce((a, b) => (Math.abs(b.s - seconds) < Math.abs(a.s - seconds) ? b : a));
-  const factor = seconds / best.s;
-  const beats = Math.abs(factor - 1) < 0.05 ? best.r.slice(1).join(" · ") : scaleBeats(best.r.slice(1).join(" · "), factor);
-  const from = Math.abs(factor - 1) < 0.05 ? `${best.r[0]}` : `${round1(seconds)} s, scaled from the ${best.r[0]} row`;
+  const { best, factor, exact } = fit(sized);
+  // A column a beat: each time goes after its beat's name, so the times scale and the names stay.
+  const named = header.length > 2;
+  const cells = best.r.slice(1).flatMap((cell, i) => (isEmptyCell(cell) ? [] : [named && header[i + 1] ? `${header[i + 1]} ${exact ? cell : scaleBeats(cell, factor)}` : exact ? cell : scaleBeats(cell, factor)]));
+  const beats = cells.join(" · ");
+  const from = exact ? `${best.r[0]}` : `${round1(seconds)} s, scaled from the ${best.r[0]} row`;
   return clip(`(${from}) ${beats}${after ? `\n${reflow(after)}` : ""}`, 1100);
 }
 
