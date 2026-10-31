@@ -200,7 +200,8 @@ describe("open_in_editor (editor embedded in the chat)", () => {
     const h = await harness();
     const client = await connect(h, await pat(h));
     const { resources } = await client.listResources();
-    expect(resources.map((r) => r.uri)).toEqual(["ui://zenvi/preview-v1.html", EDITOR_WIDGET_URI]);
+    // The MCP Apps views; the styles library (zenvi://styles/...) is listed next to them.
+    expect(resources.map((r) => r.uri).filter((uri) => uri.startsWith("ui://"))).toEqual(["ui://zenvi/preview-v1.html", EDITOR_WIDGET_URI]);
     const read = await client.readResource({ uri: EDITOR_WIDGET_URI });
     const content = read.contents[0] as unknown as { text: string; _meta: Record<string, { csp?: { frameDomains: string[] }; frame_domains?: string[] }> };
     expect(content.text).toContain("ui/initialize");

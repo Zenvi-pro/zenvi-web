@@ -133,6 +133,11 @@ export function caretBlink(el: HTMLElement, busy: (t: number) => boolean, from =
   };
 }
 
+/** A text param's lines: a new line, or a slash a space touches ("READY / 99.9%"); "MB/s" and "24/7" stay words. */
+export function textLines(text: string): string[] {
+  return text.split(/\s*\n\s*|\s+\/\s*|\s*\/\s+/).filter(Boolean);
+}
+
 export const SCRAMBLE_GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+=<>/\\[]{}";
 
 export interface ScrambleOptions {

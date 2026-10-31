@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FX_IDS, FX_INFO, fxStretch, parseFxEffect, parseFxStack, slowmoSpeed, type FxEffect } from "./catalog.js";
-import { atempoChain, buildFxGraph, mulberry32, type FxGraphInput } from "./graph.js";
+import { atempoChain, buildFxGraph, moshFrameCount, mulberry32, type FxGraphInput } from "./graph.js";
 import { fxLink, readFxLink } from "./link.js";
 
 const HD: FxGraphInput = { width: 1920, height: 1080, fps: { num: 30, den: 1 }, duration: 4, alpha: false, audio: true };
@@ -137,6 +137,86 @@ describe("FX filtergraphs", () => {
       })(),
     );
     expect(mulberry32(7)()).not.toBe(mulberry32(8)());
+  });
+});
+
+describe("CRT, print ink and datamosh graphs", () => {
+  const graph = (raw: unknown, input: FxGraphInput = HD) => buildFxGraph(stack([raw]), input).filterComplex;
+
+  it("bend the CRT picture with the glass, and only when curved", () => {
+    expect(graph({ effect: "crt" })).toContain("lenscorrection=k1=0.18:k2=0.09");
+    expect(graph({ effect: "crt", params: { curvature: 0 } })).not.toContain("lenscorrection");
+    expect(graph({ effect: "crt", params: { curvature: 1 } })).toContain("lenscorrection=k1=0.4:k2=0.2");
+  });
+
+  it("scale scanline pitch with the frame and keep it two pixels or more", () => {
+    const pitch = (input: FxGraphInput) => /cos\(2\*PI\*\(Y\+0\.5\)\/(\d+)\)/.exec(graph({ effect: "crt" }, input))?.[1];
+    expect(pitch(HD)).toBe("3");
+    expect(pitch({ ...HD, width: 3840, height: 2160 })).toBe("6");
+    expect(pitch({ ...HD, width: 480, height: 270 })).toBe("2");
+  });
+
+  it("crop a 4:3 window for the tv bezel and pad it back into the frame", () => {
+    const tv = graph({ effect: "crt", params: { bezel: "tv" } });
+    expect(tv).toContain("scale=1266:950:force_original_aspect_ratio=increase");
+    expect(tv).toMatch(/pad=1920:1080:327:65:color=black/);
+    expect(graph({ effect: "crt", params: { bezel: "rounded" } })).not.toContain("pad=");
+    expect(graph({ effect: "crt", params: { bezel: "none" } })).toContain("st(3,1)");
+  });
+
+  it("draw the CRT dimming per frame (hum bar and flicker) and keep every value in range", () => {
+    const text = graph({ effect: "crt", amount: 1 });
+    expect(text).toMatch(/clip\(255\*\(1-\(0\.035\*/);
+    expect(graph({ effect: "crt", params: { roll: false } })).not.toContain("exp(-pow(ld(0)/0.09,2))");
+  });
+
+  it("print ink: Sobel lines, two off-register line plates and a seeded noise still", () => {
+    const text = graph({ effect: "print_ink", amount: 1 });
+    expect(text).toContain("sobel");
+    expect(text.match(/maskedmerge/g)).toHaveLength(2);
+    expect(text).toContain("all_seed=7");
+    expect(graph({ effect: "print_ink", amount: 1, params: { seed: 9 } })).toContain("all_seed=9");
+    expect(graph({ effect: "print_ink", amount: 1, params: { levels: 3 } })).toContain("trunc(val*3/256)*231/2");
+    // Registered plates need no padding to slide them.
+    expect(graph({ effect: "print_ink", amount: 1, params: { misregister: 0 } })).not.toContain("pad=");
+  });
+
+  it("weigh the effect by amount: the effect comes first in the normal-mode blend", () => {
+    // blend=normal gives its first input the opacity, so amount 0.3 must be 30% effect, not 30% source.
+    const text = graph({ effect: "halftone", amount: 0.3 });
+    expect(text).toMatch(/\[v\d+\]\[s\d+\]blend=all_mode=normal:all_opacity=0\.3:shortest=1/);
+    const effectLabel = /\[(v\d+)\]\[s\d+\]blend=all_mode=normal/.exec(text)![1]!;
+    expect(text).toMatch(new RegExp(`maskedmerge\\[${effectLabel}\\]`));
+  });
+
+  it("datamosh: head frames displaced and blended with the ghost, the rest untouched", () => {
+    const text = graph({ effect: "datamosh_carry", params: { length: 0.5 } });
+    expect(text).toContain("trim=end_frame=15,setpts=PTS-STARTPTS");
+    expect(text).toContain("trim=start_frame=15,setpts=PTS-STARTPTS");
+    expect(text.match(/displace=edge=smear/g)).toHaveLength(2);
+    expect(text).toContain("[3:v]scale=1920:1080");
+    expect(text).toContain("blend=all_expr='A*(1-(0.5*pow(1-N/15,2)))+B*(0.5*pow(1-N/15,2))'");
+    expect(text).toMatch(/concat=n=2:v=1:a=0/);
+  });
+
+  it("datamosh without a ghost never reads the previous clip's last frame", () => {
+    const text = graph({ effect: "datamosh_carry", params: { ghost: 0 } });
+    expect(text).not.toContain("[3:v]");
+    expect(text.match(/nullsink/g)).toHaveLength(2);
+    expect(text.match(/displace/g)).toHaveLength(1);
+  });
+
+  it("count moshed frames: the length, never the whole clip", () => {
+    const fps = { num: 30, den: 1 };
+    expect(moshFrameCount(0.6, fps, 4)).toBe(18);
+    expect(moshFrameCount(2, fps, 1)).toBe(29);
+    expect(moshFrameCount(0.5, fps, 1 / 30)).toBe(0);
+    expect(moshFrameCount(0.5, { num: 30000, den: 1001 }, 4)).toBe(15);
+  });
+
+  it("leave a one-frame clip alone", () => {
+    const text = buildFxGraph(stack([{ effect: "datamosh_carry" }], 1 / 30), { ...HD, duration: 1 / 30 }).filterComplex;
+    expect(text).not.toContain("displace");
   });
 });
 

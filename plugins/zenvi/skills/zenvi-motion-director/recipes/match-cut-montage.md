@@ -1,3 +1,15 @@
+---
+id: match-cut-montage
+kind: style
+summary: Shots that share a shape or pose (circles, arms out) cut so the subject never jumps - ~0.3 s shots
+categories: [flash-cut-match-cut-edit, travel-cinematic-montage]
+tools: [gather_stock_footage_tool, detect_subject_tool, match_cut_montage_tool, auto_sound_design_tool]
+pace: fast
+mood: [hypnotic, clever]
+aspect: ["9:16", "16:9", "1:1"]
+pairs_with: []
+avoid_with: []
+---
 # Match-cut montage
 
 Shots that share a shape or pose (circles: cup, lamp, sun, moon, eye, vinyl,
@@ -32,7 +44,11 @@ other (dark round → dark round, warm → warm); end on the most iconic one
    means add files (one more search per shape) or lower `duration_seconds`,
    then rerun with `replace: true`. The tool runs the chain back and forth
    rather than looping it; still vary `file_ids` so the strongest match
-   (eye, sun) sits at the payoff, not in every pass.
+   (eye, sun) sits at the payoff, not in every pass. Order them with
+   `sequence_shots_tool {"file_ids": [...], "dry_run": true, "arc": "flat",
+   "continuity": 2, "close": "<payoff>"}`: it chains shapes of the same size
+   and position (read `data.cuts` reasons: `same shape and layout`,
+   `subject in place`) and returns `data.file_ids` in that order.
 2. Subjects: give **every** file a box in `subjects`. Circles:
    `detect_subject_tool` (`file_id`, `time`) and keep the candidate that is
    the subject. Poses and heads: read the person's box off

@@ -1,3 +1,15 @@
+---
+id: grid-montage
+kind: style
+summary: Many clips on one beat - a split-screen band filling a tile per beat, 3 to 4 to 6 panels, then one shot
+categories: [travel-cinematic-montage, fashion-beauty-ad, music-lyric-video, food-recipe]
+tools: [add_motion_template_tool, detect_beats_tool, auto_sound_design_tool]
+pace: fast
+mood: [rhythmic, graphic]
+aspect: ["9:16"]
+pairs_with: []
+avoid_with: []
+---
 # Grid montage
 
 A letterboxed band in a vertical frame splits into panels that fill one per

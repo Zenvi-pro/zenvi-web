@@ -1,0 +1,23 @@
+.gm-svg { position: absolute; inset: 0; overflow: visible; }
+.gm-sphere { stroke: var(--line); stroke-width: 2; }
+.gm-graticule { fill: none; stroke: var(--line); stroke-width: 1.2; }
+.gm-land path { stroke-linejoin: round; }
+.gm-route { fill: none; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+.gm-scrim { position: absolute; left: 0; right: 0; height: 30%; pointer-events: none; }
+.gm-scrim.is-top { top: 0; }
+.gm-scrim.is-bottom { bottom: 0; }
+.gm-title { position: absolute; font-family: var(--font-display); font-size: 64px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.04; color: var(--ink); max-width: 13em; }
+.gm-marker { position: absolute; width: 0; height: 0; }
+.gm-pin { position: absolute; z-index: 1; left: -15px; top: -15px; width: 30px; height: 30px; }
+.gm-dot { position: absolute; inset: 0; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 5px var(--paper), 0 6px 18px rgba(0, 0, 0, 0.35); }
+.gm-pulse { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--accent); }
+.gm-label { position: absolute; z-index: 2; top: -26px; height: 52px; display: flex; align-items: center; padding: 0 20px; border-radius: var(--radius); background: var(--surface); color: var(--ink); font-size: 30px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); }
+.gm-label.is-right { left: 26px; }
+.gm-label.is-left { right: 26px; }
+.gm-label.is-below, .gm-label.is-above { left: 0; translate: -50% 0; }
+.gm-label.is-below { top: 26px; }
+.gm-label.is-above { top: -78px; }
+.gm-legend { position: absolute; display: flex; flex-direction: column; gap: 12px; }
+.gm-legend-title { font-size: 28px; font-weight: 600; color: var(--ink); }
+.gm-ramp { height: 18px; border-radius: 9px; transform-origin: 0 50%; }
+.gm-ends { display: flex; justify-content: space-between; font-size: 24px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }

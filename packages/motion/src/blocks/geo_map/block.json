@@ -1,0 +1,147 @@
+{
+  "id": "geo_map",
+  "version": 1,
+  "title": "Geo map",
+  "description": "A real map (Natural Earth borders, public domain) on a turning globe or a flat Mercator map. The camera pushes from the whole world into a place (country, continent, region like \"Western Europe\", city or \"lat, lon\"); highlighted countries fill with the accent, markers pop in 0.2 s apart with labels while the camera is still moving, routes draw between them as lifted flight arcs, and values per country colour a choropleth with a legend band. For news explainers, \"where we operate\", travel routes, launches by market and data maps.",
+  "tags": [
+    "map",
+    "geo",
+    "globe",
+    "world",
+    "country",
+    "markers",
+    "route",
+    "choropleth",
+    "data",
+    "infographic"
+  ],
+  "duration": {
+    "default": 6,
+    "min": 3,
+    "max": 15
+  },
+  "aspects": [
+    "9:16",
+    "16:9",
+    "1:1",
+    "4:5"
+  ],
+  "alpha": false,
+  "tokens": {
+    "palette": "night",
+    "display": "sans",
+    "radius": 999
+  },
+  "params": {
+    "projection": {
+      "type": "enum",
+      "options": [
+        "globe",
+        "flat"
+      ],
+      "default": "globe",
+      "aliases": {
+        "sphere": "globe",
+        "3d": "globe",
+        "mercator": "flat",
+        "2d": "flat",
+        "map": "flat"
+      },
+      "description": "globe (orthographic, turns as it pushes in) or flat (Mercator, pans and zooms)."
+    },
+    "focus": {
+      "type": "string",
+      "maxLength": 60,
+      "default": "",
+      "description": "Where the camera ends: a country, continent, Natural Earth subregion (\"South America\", \"Western Africa\"), city (\"Lisbon\", \"Paris, France\"), \"lat, lon\" or \"world\" (stay wide and turn). Empty: fit the markers, highlights and values."
+    },
+    "start": {
+      "type": "string",
+      "maxLength": 60,
+      "default": "",
+      "description": "Where the camera starts, same forms as focus (empty: the whole world, turned away a little so the globe spins in)."
+    },
+    "highlight": {
+      "type": "strings",
+      "maxItems": 40,
+      "maxLength": 60,
+      "default": [
+        "Portugal",
+        "Spain",
+        "France",
+        "Netherlands",
+        "Germany",
+        "Italy"
+      ],
+      "description": "Countries or regions filled with the accent, one after another (the default is a Western Europe demo: pass [] for none)."
+    },
+    "markers": {
+      "type": "strings",
+      "maxItems": 12,
+      "maxLength": 60,
+      "default": [
+        "Lisbon",
+        "Madrid",
+        "Paris",
+        "Amsterdam",
+        "Berlin",
+        "Rome"
+      ],
+      "description": "Places that get a pin, in the order they pop (cities, countries, \"lat, lon\"; the default is a Western Europe demo: pass [] for none)."
+    },
+    "labels": {
+      "type": "strings",
+      "maxItems": 12,
+      "maxLength": 28,
+      "default": [],
+      "description": "Label of each marker (empty or missing: the place's name; \"-\": no label)."
+    },
+    "route": {
+      "type": "enum",
+      "options": [
+        "none",
+        "path",
+        "hub"
+      ],
+      "default": "none",
+      "aliases": {
+        "line": "path",
+        "chain": "path",
+        "flights": "hub",
+        "spokes": "hub"
+      },
+      "description": "Arcs between markers: none, path (each to the next, in order) or hub (the first to each of the others)."
+    },
+    "values": {
+      "type": "strings",
+      "maxItems": 80,
+      "maxLength": 72,
+      "default": [],
+      "description": "Choropleth: \"Place=number\" per country or region (\"France=31\", \"Africa=12.5\"); colours run from the land tone to the accent."
+    },
+    "legend": {
+      "type": "string",
+      "maxLength": 40,
+      "default": "",
+      "description": "Title of the colour legend (shown with values)."
+    },
+    "prefix": {
+      "type": "string",
+      "maxLength": 4,
+      "default": "",
+      "description": "Before the legend numbers, e.g. $."
+    },
+    "suffix": {
+      "type": "string",
+      "maxLength": 6,
+      "default": "",
+      "description": "After the legend numbers, e.g. % or t."
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 60,
+      "default": "Six cities, one launch week",
+      "description": "Headline at the top (empty: none)."
+    }
+  }
+}
