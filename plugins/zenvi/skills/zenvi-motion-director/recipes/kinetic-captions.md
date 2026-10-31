@@ -21,11 +21,17 @@ insert shots and one pan transition. Reference feel: ~1 s shots, words every
 
 1. Voice: `generate_tts_and_add_to_timeline_tool` `text` (write it to be
    said: short sentences, the emphasis words on stressed beats), `voice:
-   "onyx"` or `"nova"`, `position_seconds: 0`. Then `transcribe_media_tool`
-   (`file_id` of the narration) and `get_transcript_tool` with
-   `includeWords: true` for word times.
+   "onyx"` or `"nova"`, `position_seconds: 0`. Its receipt says how the
+   script's words are timed (where they are heard in the voice when speech
+   recognition runs on device, else over its pauses); `get_transcript_tool`
+   with `includeWords: true` gives the word times.
 2. Picture: talking-head clip on track 1 for the whole length; inserts on the
-   same track at the noun times, 0.8-1.5 s each. Then the head's matte, once:
+   same track at the noun times, 0.8-1.5 s each: `insert_broll_on_words_tool`
+   `{"timeline_clip_ids": ["<head clip>"], "file_ids": [...]}` (or
+   `"stock": true`) lands them on the content words, muted, every 5-8 s, no
+   source twice, in one call. A pop-in or a hit on one spoken word:
+   `place_on_word_tool` `{"word": "free", "what": "title", "args": {"style":
+   "creator"}}` or `"what": "sfx"`. Then the head's matte, once:
    `generate_subject_matte_tool` `{"clip_id": "<head clip>"}` (CLI; about 15
    frames a second). With it the captions find the head in every shot and
    put the emphasis words behind it; a refusal (no matting here) only costs

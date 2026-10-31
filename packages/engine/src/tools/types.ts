@@ -21,11 +21,14 @@ import type { ProjectDocument } from "../history/document.js";
 import type { FxEffect } from "../fx/catalog.js";
 import type { FxRender } from "../fx/link.js";
 import type { CloudMediaRef, FileFingerprint, Project, ProjectFile, ReaderInfo } from "../model/types.js";
+import type { LumaFrames } from "../analysis/action.js";
 import type { Scene3dId, Scene3dParams } from "../scenes3d/catalog.js";
 import type { FreesoundSound, PexelsVideo } from "../stock/stock.js";
 import type { Scene3dQuality, Scene3dRender } from "../scenes3d/link.js";
 import type { RgbaImage } from "../render/types.js";
 import type { PictureEvent } from "../sfx/events.js";
+import type { WatchCritique, WatchRequest } from "../review/watch.js";
+import type { CompareRequest, CompareVerdict } from "../review/compare.js";
 import type { WebVideoDownload, WebVideoRequest } from "../web-video/web-video.js";
 
 export type ToolSurface = "assistant" | "mcp" | "cli" | "editor";
@@ -162,6 +165,13 @@ export interface MediaHost {
    * Zenvi Cloud's workers).
    */
   inspectRender?(path: string, options: RenderInspectOptions): Promise<RenderInspection>;
+  /**
+   * Decode `path`'s picture to small greyscale frames, scaled to `width` x
+   * `height` at a constant `fps`, from `startSeconds` for at most `maxSeconds`:
+   * what motion analysis (analysis/action.ts) reads. Hosts with ffmpeg have it.
+   * Rejects when the file has no video stream.
+   */
+  decodeLuma?(path: string, options: { width: number; height: number; fps: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal }): Promise<LumaFrames>;
 }
 
 /** Detector thresholds for `MediaHost.inspectRender`. */
@@ -555,6 +565,12 @@ export interface AudioHost {
    */
   transcribe?(path: string, options?: TranscribeOptions): Promise<Transcription>;
   /**
+   * `transcribe` runs on this machine (Whisper, `zenvi speech setup`): free
+   * and offline, so tools may transcribe to improve timings nobody asked to
+   * pay for (a TTS voice's words, given lyrics).
+   */
+  transcribesOnDevice?: boolean;
+  /**
    * Generate a sound effect from a text prompt (sfx/generate.ts checks the
    * request first) into a local audio file, cached by request: the same
    * request is never paid for twice. Present only where a provider whose
@@ -609,6 +625,8 @@ export interface TranscribeOptions {
   language?: string;
   /** Text that steers the recognizer, such as `FILLER_PROMPT` (`transcriptionPrompt`). */
   prompt?: string;
+  /** Only on this machine: a call made because it is free never falls back to the paid Zenvi server. */
+  onDeviceOnly?: boolean;
   signal?: AbortSignal;
 }
 
@@ -659,6 +677,16 @@ export interface StorageHost {
    * Refuses to replace an existing file unless `overwrite`.
    */
   writeBytes?(path: string, bytes: Uint8Array, contentType: string, options?: { overwrite?: boolean }): Promise<string>;
+  /**
+   * Keep a copy of a project as another project (a variant to try a
+   * different cut on), without making it the open one: the CLI writes
+   * `path` (relative to the project's folder) with the same media, Zenvi
+   * Cloud creates a new cloud project named `path`. Refuses to replace an
+   * existing file unless `overwrite`. Returns what opens the copy.
+   */
+  saveCopy?(project: Project, path: string, options?: { overwrite?: boolean }): Promise<string>;
+  /** Read another project (a variant `saveCopy` kept) without opening it: the open project and its file stay as they are. */
+  readCopy?(path: string): Promise<Project>;
   /**
    * Give the person a copy of a project file's media (Project Files > Export
    * Selected Clips) named `name`: the CLI copies it into `folder` (relative
@@ -974,6 +1002,29 @@ export interface MotionHost {
   setup?(signal?: AbortSignal): Promise<MotionRuntimeStatus>;
 }
 
+/**
+ * Watching a rendered file with sound (review/watch.ts): the host makes a
+ * small proxy of the file and has it critiqued, through the Zenvi backend as
+ * the signed-in person or Gemini with a developer key. Rejects with a
+ * `WatchError` in words (signed out, out of credits, too long).
+ */
+export interface WatchHost {
+  watch(path: string, request?: WatchRequest): Promise<WatchCritique>;
+  /** Seconds of the file `watch` would open (the same path resolution); absent = the tool asks `media.probe`. */
+  length?(path: string, signal?: AbortSignal): Promise<number>;
+  /**
+   * Watch a render this host made of the open project, by its id (Zenvi
+   * Cloud: what render_project returned). Absent = renders are watched by path.
+   */
+  watchRender?(renderId: string, request?: WatchRequest): Promise<WatchCritique>;
+  /**
+   * Watch two renders in one go, `first` shown as A (review/compare.ts).
+   * One order per call; the tools run both. Absent = compared from two
+   * separate `watch` calls.
+   */
+  compare?(first: string, second: string, request?: CompareRequest): Promise<CompareVerdict>;
+}
+
 export interface ToolHost {
   media?: MediaHost;
   player?: PlayerHost;
@@ -990,6 +1041,7 @@ export interface ToolHost {
   scenes3d?: Scene3dHost;
   fx?: FxHost;
   library?: LibraryHost;
+  watch?: WatchHost;
   /** Diagnostic log line (never shown to the model). */
   log?: (message: string) => void;
 }

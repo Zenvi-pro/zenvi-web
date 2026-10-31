@@ -19,7 +19,8 @@
     "lint": "eslint .",
     "dev:editor": "npm run dev -w @zenvi/editor",
     "zenvi": "tsx packages/cli/src/bin.ts",
-    "acceptance": "tsx packages/cli/src/acceptance/main.ts"
+    "acceptance": "tsx packages/cli/src/acceptance/main.ts",
+    "tool-truth": "tsx packages/render-node/scripts/tool-truth.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
