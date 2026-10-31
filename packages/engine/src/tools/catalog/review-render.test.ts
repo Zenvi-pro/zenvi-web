@@ -11,6 +11,7 @@ import { ProjectDocument } from "../../history/document.js";
 import { repeatedCut } from "../test-support/repeated-cut.js";
 import { runTool } from "../registry.js";
 import { EditHarness } from "../test-support/edit-harness.js";
+import { fakeShotHost } from "../test-support/fake-shots.js";
 import { pixelFrameHost } from "../test-support/pixel-host.js";
 import type { RenderInspection, RenderInspectOptions } from "../types.js";
 
@@ -77,6 +78,9 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
     expect(receipt.summary).toContain("- PROBLEM: ends on 0.80s of black from 9.20s");
     expect(receipt.summary).toContain("- PROBLEM: true peak +0.5 dBTP is over the -1.0 dBTP ceiling: it clips; master the audio");
     expect(receipt.summary).toContain("- warning: the same shot appears 2 times (shots #1, #3 at 0.00s, 4.00s)");
+    // The watch is of the render made after the fixes, not this one.
+    expect(receipt.summary).toContain("rendered again with no PROBLEM left: watch_render_tool {path: the new render} once");
+    expect(receipt.summary).not.toContain('watch_render_tool {"path":"out.mp4"}');
     const data = receipt.data as Row;
     expect(data.ok).toBe(false);
     expect(data.repeats).toEqual([{ shots: [1, 3], minGapSeconds: 4 }]);
@@ -85,6 +89,19 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
     expect(tiles.map((t) => t.flag)).toEqual([null, null, "REPEAT of #1", null, "BLACK", "ENDS ON BLACK"]);
     expect(result.images).toHaveLength(1);
     expect(result.images![0]!.mimeType).toBe("image/png");
+  });
+
+  it("warns about back-to-back shots that look the same when the shot model is installed", async () => {
+    const ed = painted();
+    ed.host.media!.inspectRender = async (path) => inspection(path);
+    const shots = fakeShotHost({ "/renders/out.mp4": [[0, "face"], [2, "city"], [6, "dog"], [9.2, "moon"]] });
+    ed.host.shots = shots;
+    const receipt = (await runTool({ doc: ed.doc, host: ed.host }, "review_render_tool", { path: "out.mp4" })).data!;
+    const problems = (receipt.data as Row).problems as { kind: string; at: number; message: string }[];
+    expect(problems.filter((p) => p.kind === "near_duplicate_shots")).toEqual([
+      expect.objectContaining({ at: 4, message: expect.stringMatching(/^shots 2 and 3 look almost the same \(similarity 1\.00\)/) }),
+    ]);
+    expect(shots.calls).toEqual(["frames /renders/out.mp4 1.00,3.00,5.00,7.60,9.60"]);
   });
 
   it("hands back the swap that fixes a repeated shot when the render is of the open timeline", async () => {
@@ -117,6 +134,7 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
       /0 problem\(s\), 0 warning\(s\)\. 2 shot\(s\), 2 distinct, 0\.2 cuts\/s; -14\.1 LUFS, true peak -1\.4 dBTP; ends on a 1\.50s hold\./,
     );
     expect((ok.data as Row).ok).toBe(true);
+    expect(ok.summary).toContain('\nNext: watch_render_tool {"path":"out.mp4"} once');
 
     ed.host.media!.inspectRender = async () => {
       throw new Error("No such file");

@@ -10,7 +10,17 @@ receipt); your job is the decisions a senior editor makes before touching the
 timeline and the frames you check after. `zenvi-reels` is the one-call reel;
 this skill is for edits that must hold up next to a professional one.
 
-## Start here: the genre and its recipe
+## Start here: the brief, then its style's recipe
+
+**Step 0 is the brief**, on the project it belongs to: editing an existing
+`.zvn`, `open_project_file` it first (opening a file replaces the session's
+project, brief and all). `get_brief_tool`; when there is none, load the
+`zenvi-styles` skill and compile it (its `BRIEF.md`: `inspect_media_bin_tool`,
+one style, up to four techniques, the self-critique, `save_brief_tool`;
+without the plugin, `read_director_recipe` `{"styles": "brief"}`). The
+brief's style is the genre below when it is one of these recipes; a style
+from `zenvi-styles/styles/` carries its own tool sequence and uses the rules
+of this file the same way.
 
 Pick the genre, then **read its recipe now with the Read tool**:
 `<this skill's base directory>/recipes/<file>.md` (the recipes are part of this
@@ -28,6 +38,7 @@ is the rules every genre shares. Do not plan before you have read it.
 | one product, 3D, "spins in" | `recipes/3d-product-ad.md` | add_3d_scene_tool (device_mockup, glass_hero, title_3d), prompt_bar, particle_burst |
 | type is the picture, design study, brand | `recipes/editorial-type.md` | kinetic_headline, text_scramble, hud_callouts, crop_labels, flash_white |
 | tiles filling on the beat, split screen | `recipes/grid-montage.md` | add_motion_template_tool template=grid |
+| map, countries, stats, "over the years", data explainer | `recipes/data-explainer.md` | add_motion_block_tool (geo_map, pictogram_morph, bar_race, data_clock, chart_build) |
 | voice-over essay, story, explainer | `recipes/documentary.md` | TTS, kinetic_captions_tool documentary, add_kinetic_title_tool, build_reel_tool cinematic, grid collage |
 | sport, cars, launch hype, "fast", "hype", "trailer", "edit to this song" | `recipes/hype-reel.md` | **build_reel_tool hype first** (ramp, glitch drop, whips, flashes, one look built in), auto_sound_design_tool every_cut, review_edit_tool |
 | how-to, effect breakdown, tips | `recipes/tutorial.md` | build_reel_tool tutorial, step_card, end_card save |
@@ -36,17 +47,24 @@ is the rules every genre shares. Do not plan before you have read it.
 Mixed asks: take the structure from the genre of the *first five seconds*
 and borrow single techniques from the others.
 
+**Given a bin of finished shots to re-edit** (a reference's own shots, an
+editor's selects): the order is the edit. Before any genre tool, call
+`sequence_shots_tool` on every shot (see "Re-editing shots you were given"
+below); never cut them in bin or file-name order.
+
 Every recipe ends with **Finish**: sound on every cut, `master_audio_tool`,
-`render_video`, `review_render_tool`, one fix pass. A run that stops before
-it is not done, however good the picture: unmastered edits arrive 9-17 dB
-too quiet and nobody has looked at the file.
+`render_video`, `review_render_tool`, `watch_render_tool` once, one fix
+pass. A run that stops before it is not done, however good the picture:
+unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
 
 ## The director loop
 
-1. **Brief.** One line each: format (size, fps, seconds), story in shot order,
-   pace, look, type, sound, the *one bold moment*, following the recipe. Use
-   the brief's own words, colours and names exactly.
-2. **Plan with timings.** Write the edit as a table before any tool call:
+1. **Brief.** The saved brief (`get_brief_tool`) is the plan: format, the
+   style, the borrowed techniques, the hook, the beats with timings, the shot
+   plan, type, palette, music, sound and the *one bold moment*. Use the
+   person's own words, colours and names exactly. Changing your mind is fine:
+   `save_brief_tool` again, never drift silently.
+2. **Plan with timings.** Turn the brief's beats and shots into a table before any tool call:
    `t (s) | shot / element | length (frames) | entrance / transition | sound`.
    Every row has a sound. Times snap to frames; music edits snap to beats.
 3. **Project.** `open_project_file`, then `set_project_setting_tool`
@@ -65,9 +83,21 @@ too quiet and nobody has looked at the file.
    when one does and say how many more to import; `strict_variety: true`
    makes them refuse instead. Short? Gather again with other words, or
    generate AI shots, before you cut; never loop five clips to fill the length.
-5. **Cut.** The genre tool first (`match_cut_montage_tool`, `build_reel_tool`,
+   To pick footage by what it shows, not its file name: `find_shots_tool`
+   ("close-up of hands typing" → file and seconds); `shot_similarity_tool`
+   orders shots so each looks like the one before (`match_cut_montage_tool
+   order=look` does it in the montage). They need the shot model: ask the
+   person once before its 213 MB download (`download=true`).
+5. **Order, then cut.** Never cut in bin or search order: the shot order is
+   the edit. `sequence_shots_tool` orders the shots by what crosses each cut
+   (the action continues, the same shape and position, the subject where the
+   eye already is, the colour, the motion's direction), builds energy to a
+   peak and holds the strongest shot for the payoff; its receipt says why
+   each cut joins. With a genre tool, plan first (`dry_run: true`) and pass
+   `data.file_ids` in that order. Then the genre tool (`match_cut_montage_tool`, `build_reel_tool`,
    `add_motion_template_tool template=grid`), otherwise
-   `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
+   `sequence_shots_tool` itself (it lays the files on a track, `slots` =
+   the plan's shot lengths) or `add_clip_to_timeline_tool` per row. Get `beats` from the receipt
    (`data.beats`) or `detect_beats_tool` and reuse them everywhere below.
 6. **Transitions, on by default** where the genre moves between shots
    (hype, trailer, SaaS, 3D ad, documentary, showreel: the recipe says which).
@@ -92,11 +122,19 @@ too quiet and nobody has looked at the file.
    (word by word, emphasis words big; a TTS voice-over keeps its script's word
    timings, so pass its clip in `timeline_clip_ids`; `cues` when there is no
    voice to time to, or the TTS receipt says it has no word timings (then say
-   the captions are hand-timed), `text_size`, `animation`); it places each caption in the shot's
+   the captions are hand-timed), `text_size`, `animation`); song lyrics on
+   screen: `align_lyrics_tool` (`text`: the lyrics, one line per sung line;
+   `timeline_clip_id`: the song) first, then the captions and
+   `place_on_word_tool` use the lyrics at their sung times; it places each caption in the shot's
    negative space and, after `generate_subject_matte_tool` on the footage,
    puts emphasis words behind the head. Title cards and word cards:
    `add_kinetic_title_tool` (`animation`: pop, slam, tilt, scramble,
-   letters, typewriter, slide_up, rise; never a bare fade).
+   letters, typewriter, slide_up, rise; never a bare fade). Designed type
+   moves: `add_type_block_tool` (`block`: text_on_path for a spinning ring,
+   write_on for drawn strokes or SVG paths, stencil for the shot inside the
+   letters, echo_stack, strobe for a word every 3-6 frames ending on a
+   lockup, wheel for a word flipper, paper for stop-motion paper type);
+   put a hit on each of its `data.hits`.
    `text_behind_subject_tool` for one full-width hero word; `add_title_tool`
    with a bundled family (`font: "Anton"`, `"Instrument Serif"`, `"Space
    Mono"`...) only for static labels and logo bugs.
@@ -133,14 +171,81 @@ too quiet and nobody has looked at the file.
     `search_freesound_music_tool` is commercial-use by default.
 11. **Master always last.** Any later audio edit means mastering again. An
     unmastered edit arrives 2-5 LU quiet and clips on the platforms.
-12. **Verify** (below), fix, verify again. Then `render_video` and
-    **review the file**: `review_render_tool` with the path it wrote. One
-    fix pass: every `PROBLEM` line, render again, review again, report.
+12. **Verify** (below) and check the brief: `review_edit_tool` lists beats
+    without a picture change, borrowed techniques the timeline does not
+    show and the style's checklist to look for. Fix, verify again. Then `render_video` and
+    **review the file**: `review_render_tool` with the path it wrote, then
+    **watch it**: `watch_render_tool` once, with the brief. One fix pass:
+    every `PROBLEM` line and every `HIGH` watch issue (each names its shots
+    and tools), render again, review again, watch again at most once, report
+    both watch scores.
 
 Order matters: speed ramps change clip lengths (`ripple: true`), transitions
 read the cuts, sound design reads cuts, transitions and titles. Anything that
 moves a cut after step 6 means removing and re-applying the transitions on
 that track (`remove_motion_transition_tool track=...`) and re-running sound.
+
+## Best of three (when the brief allows)
+
+One run of the same brief swings 12-16 bench points; making three cuts that
+differ on purpose and keeping the best is the cheapest gain. Do it when the
+piece is 60 s or shorter, watching works (`watch_render_tool` was not
+refused), and the person did not ask for one quick version. Skip it for the
+one-call `zenvi-reels` and say so under gaps when you skip.
+
+1. **Base.** Run the loop to a finished edit (sound designed, mastered) and
+   save it. This is variant 1.
+2. **Two deliberate variants, one axis each**, taken from the brief, never
+   random: **pacing** (shots 30 % shorter or longer, a speed ramp into the
+   drop), **type system** (the other family or animation from the style),
+   **grade** (the other look the style allows), or **music** (the second
+   track from the search). Pick the two axes the brief is least sure about.
+   For each: `fork_project_tool {"name": "fast-cuts"}`, `open_project_tool`
+   the path it returns, make the change (a moved cut means re-running
+   transitions and sound), `master_audio_tool` again, and render a proxy:
+   `render_video {"output": "renders/fast-cuts.mp4", "width": 540, "quality": "low"}`.
+   Render the base's proxy the same way.
+3. **Tournament.** `open_project_tool` the base again, then
+   `pick_best_variant_tool` with all three (base first) and the brief: each
+   match is watched side by side in both orders, and the winner becomes the
+   open project in one undo step.
+4. **Refine the winner** with the 3 fixes the receipt lists (each names its
+   tools), render the full-size file, `review_render_tool`, and
+   `watch_render_tool` once. Report the ranking, the winner and both scores.
+
+```json
+fork_project_tool {"name": "warm-grade"}
+pick_best_variant_tool {"brief": "15 s hype reel for a sneaker drop", "variants": [
+  {"name": "base", "project": "reel.zvn", "render": "renders/base.mp4"},
+  {"name": "fast-cuts", "project": "reel-fast-cuts.zvn", "render": "renders/fast-cuts.mp4"},
+  {"name": "warm-grade", "project": "reel-warm-grade.zvn", "render": "renders/warm-grade.mp4"}]}
+```
+
+`compare_renders_tool {"a": ..., "b": ...}` is the same judgment for any two
+renders (before/after a fix pass, two music beds) without changing anything.
+
+## Re-editing shots you were given
+
+A bin of finished shots (a reference's own cut, an editor's selects, a
+client's clips) is a sequencing job first, not a montage to build: the
+shots already carry their lengths and the music already fits them.
+
+1. `sequence_shots_tool {"file_ids": ["<every shot>"], "position": 0}` lays them
+   at their own lengths in a continuity order with the strongest last. Do
+   not trim them to a beat grid or swap in a genre tool's timing: the given
+   lengths are the rhythm. `arc` only when the brief says it (`build` for a
+   hype run-up, `flat` for a match-cut chain, where continuity is all that
+   matters, with `continuity: 2`). `open` / `close` when the brief names the
+   first or last shot.
+2. Voice: shots of a speaker must land on their own words. Transcribe the
+   voice (`transcribe_media_tool`), read each speaker shot's line (its
+   burnt-in caption on `preview_frame` / `inspect_media_tool`, or its own
+   transcript) and pass it as `says` with `voice_file_id`; or `speech_at`
+   when you know the voice second. The receipt's warnings name any shot
+   that cannot start on its words.
+3. Music under it from 0, then transitions, look and sound on top of that
+   order, as the recipe says. Move a shot only for a reason you can see on
+   `preview_frame` at the cut.
 
 ## Non-negotiables
 
@@ -231,12 +336,22 @@ past the last picture and render again; true peak → `master_audio_tool`;
 repeated shot → the `swap_shot_tool` calls it lists (one per repeat; none
 listed means import more footage). Report the final review's numbers.
 
+**Then watch it, once.** Frames and meters cannot hear a silent whip or feel
+a sagging middle. `watch_render_tool` with the path and the brief has an
+editor watch the file with its sound: a 1-10 score per dimension and 3-6
+timestamped issues, each with the shots it falls on and the tools that fix
+it. Fix the `HIGH` ones (and any `MEDIUM` that is one call), render, and
+watch again at most once; report the score before and after. It costs a few
+credits and needs a Zenvi sign-in: refused (signed out, no credits) means
+skip it and say so under gaps, never retry.
+
 The finishing calls, in order (after the picture and the sound are locked):
 
 ```json
 unify_grade_tool {"look": "teal_punch", "look_intensity": 0.6}
 master_audio_tool {"preset": "social", "genre": "hype", "iterate": true}
 review_render_tool {"path": "reel.mp4"}
+watch_render_tool {"path": "reel.mp4", "brief": "15 s hype reel for a sneaker drop"}
 ```
 
 ## When a tool is missing
@@ -246,6 +361,7 @@ review_render_tool {"path": "reel.mp4"}
 | motion blocks (`add_motion_block_tool`) | CLI and `zenvi mcp` with headless Chrome (`zenvi motion setup`) | `add_motion_template_tool` (ui_cards, type_search, kinetic_type, word_scroll, callout, end_card) or `build_reel_tool` motion styles |
 | 3D scenes (`add_3d_scene_tool`) | CLI with Blender 4.2+ | AI product still + `set_keyframes_tool` scale/rotation pop + soft `impact_thud`; `add_animated_title_tool` on desktop |
 | subject mattes (`generate_subject_matte_tool` and composites) | CLI with onnxruntime-node; editor/cloud only with a matte already in the bin | big type beside the subject in its negative space |
+| shot search and look order (`find_shots_tool`, `shot_similarity_tool`, `embed_media_tool`) | CLI with onnxruntime-node, after the person agrees to the model download | file names, `inspect_media_tool` frames |
 | frame checks (`preview_frame`) | `zenvi mcp`; the editor has its own viewer | `inspect_timeline_tool` frames, or ask the person to look |
 | desktop app | engine tools reach it through the bridge; direct tools (sfx, transitions, blocks, 3D, mattes, ramps) are web/CLI only | build in `zenvi mcp`, then `launch_editor` |
 

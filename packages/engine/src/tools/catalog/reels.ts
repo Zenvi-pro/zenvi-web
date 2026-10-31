@@ -53,6 +53,7 @@ import { effectFactory, mergedGradeEffects } from "./color-agent.js";
 import { gradeFootage, gradeReport, measureFootage, resolveReelLook, type ReelGrade } from "./reel-grade.js";
 import type { ImportedMedia } from "../types.js";
 import { FINISH_HINT } from "../director-card.js";
+import { inBinOrder, sequenceFiles } from "./sequence.js";
 
 const TOOL = "build_reel_tool";
 /** How long a white flash fades, seconds (three frames at 30 fps). */
@@ -87,7 +88,7 @@ const input = z.strictObject({
     .min(1)
     .max(60)
     .optional()
-    .describe("Media-bin videos and images to use, in story order; the last one closes the reel. Default: every video and image in the bin (not SVG titles), in bin order."),
+    .describe("Media-bin videos and images to use, in story order; the last one closes the reel. Bin order is not a story order: get one from sequence_shots_tool (dry_run: true, its data.file_ids). Default: every video and image in the bin (not SVG titles), in bin order."),
   music_file_id: z.string().optional().describe("Music in the media bin to cut to. Default: the longest audio file in the bin. Without music the cuts follow the style's own tempo."),
   duration_seconds: z.number().min(4).max(120).optional().describe("Target length, seconds (default per style, 12-20). The reel ends on a bar line: the first at or after it (at most a bar longer), else the nearest; the summary says the final length and why."),
   hook: z.string().max(80).optional().describe("Opening title over the first shots: 2-6 punchy words."),
@@ -105,6 +106,7 @@ const input = z.strictObject({
     .describe("Motion styles only: the scrolling word list (ui_promo), kinetic words (editorial_motion), the features as 'Name: value' (product_callout), each step's label box (tutorial)."),
   ...beatOverrideShape,
   replace: z.boolean().optional().describe("Clear the timeline first when it already has clips (they are removed in the same undo step)."),
+  keep_order: z.boolean().optional().describe("Cut styles without file_ids: keep the bin's own order (by default the bin is ordered by continuity first, like sequence_shots_tool)."),
   strict_variety: z
     .boolean()
     .optional()
@@ -404,7 +406,17 @@ export const reelTools: CatalogTool[] = [
       if (gradeMode !== "none" && !measured) warnings.push("This surface cannot render frames: the shots keep their own colour (no one-look grade).");
       const look = measured && gradeMode !== "none" ? await resolveReelLook(call, gradeMode, texts, [...measured.profiles.values()]) : null;
       let ordered = media;
-      if (measured && look && !args.file_ids) {
+      const orderNotes: string[] = [];
+      // The default list is the bin's own order, no story: ordered by continuity first (re-edit bench,
+      // 2026-10-28), else by fit to the look below. file_ids given are a story order, even when it is the bin's.
+      if (!args.file_ids && !args.keep_order && inBinOrder(project, ids)) {
+        const sequenced = await sequenceFiles(call, ids, { arc: styleId === "hype" ? "build" : "peak" }, "keep_order");
+        if (sequenced && "ids" in sequenced) {
+          ordered = sequenced.ids.map((id) => media.find((m) => m.fileId === id)!);
+          orderNotes.push(sequenced.note);
+        } else if (sequenced) warnings.push(sequenced.warning);
+      }
+      if (orderNotes.length === 0 && measured && look && !args.file_ids) {
         // Bin order has no story: the clips that already fit the look open the reel and close it.
         const order = orderByFit(media.map((m) => m.fileId), measured.profiles, lookTarget(look.choice.look, [...measured.profiles.values()]));
         ordered = order.map((id) => media.find((m) => m.fileId === id)!);
@@ -561,6 +573,7 @@ export const reelTools: CatalogTool[] = [
       return applied(TOOL, `Built a ${style.name.toLowerCase()} reel: ${plan.shots.length} shots cut to ${Math.round(plan.bpm)} BPM, ${brief.format}. Length ${plan.lengthNote}.${accentNote}${gradeNote}`, {
         warnings,
         notes: [
+          ...orderNotes,
           ...(style.id === "hype" ? ["Sound design: auto_sound_design_tool with the receipt's sound_design args puts a sound on nearly every cut."] : []),
           "Finish with master_audio_tool (preset social) after the sound is in place: it sets the loudness and balance.",
         ],

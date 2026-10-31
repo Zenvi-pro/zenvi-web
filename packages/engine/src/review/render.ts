@@ -9,6 +9,7 @@
  * Repeated shots are found by a difference hash of each shot's middle frame.
  */
 
+import { cosine, NEAR_DUPLICATE, type Vector } from "../shots/vectors.js";
 import type { RenderInspection, RenderInspectOptions, TimeRange } from "../tools/types.js";
 
 /** Detector thresholds review_render_tool asks the host for. */
@@ -59,6 +60,7 @@ export type ProblemKind =
   | "black_frames"
   | "frozen_picture"
   | "repeated_shot"
+  | "near_duplicate_shots"
   | "true_peak"
   | "loudness"
   | "silent_audio"
@@ -260,6 +262,7 @@ export function renderProblems(
   repeats: readonly RepeatGroup[],
   end: EndVerdict,
   targets: DeliveryTargets = SOCIAL_TARGETS,
+  looks?: readonly (Vector | null)[],
 ): Problem[] {
   const { duration } = inspection;
   const timed: Problem[] = [];
@@ -311,6 +314,22 @@ export function renderProblems(
     for (const silence of inspection.silences) {
       if (silence.start <= EDGE_SECONDS || tail(silence)) continue;
       timed.push({ kind: "audio_dropout", severity: "warning", at: r2(silence.start), message: `audio drops out ${fmt(silence.start)}–${fmt(silence.end)}` });
+    }
+  }
+  // Back-to-back shots that look the same (shot embeddings of each shot's middle frame): the cut reads as a jump.
+  if (looks) {
+    for (let i = 1; i < shots.length; i += 1) {
+      const a = looks[i - 1];
+      const b = looks[i];
+      if (!a || !b) continue;
+      const similarity = cosine(a, b);
+      if (similarity < NEAR_DUPLICATE) continue;
+      timed.push({
+        kind: "near_duplicate_shots",
+        severity: "warning",
+        at: r2(shots[i]!.start),
+        message: `shots ${shots[i - 1]!.index} and ${shots[i]!.index} look almost the same (similarity ${similarity.toFixed(2)}): the cut at ${fmt(shots[i]!.start)} reads as a jump, not a new shot`,
+      });
     }
   }
   if (!end.ok)

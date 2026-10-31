@@ -16,6 +16,7 @@ export {
   scramble,
   scrambledText,
   splitText,
+  textLines,
   typedCount,
   typewriter,
   typingSeconds,

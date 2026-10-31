@@ -1,0 +1,43 @@
+{
+  "id": "bar_race",
+  "version": 1,
+  "title": "Bar chart race",
+  "description": "A ranked bar chart that races through time: values glide between periods, bars overtake each other with a slide, the leader (or the highlighted series) takes the accent, and a huge ghost year counts through the periods. For growth over years, market share shifts and \"who leads\" stories in explainers.",
+  "tags": ["chart", "data", "race", "ranking", "bar", "timeline", "infographic"],
+  "duration": { "default": 10, "min": 5, "max": 30 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": false,
+  "tokens": { "palette": "graphite", "display": "sans", "radius": 8 },
+  "params": {
+    "series": {
+      "type": "strings",
+      "minItems": 2,
+      "maxItems": 16,
+      "maxLength": 240,
+      "default": [
+        "Northwind=4, 9, 15, 22, 30, 36, 41",
+        "Atlas=12, 15, 17, 18, 19, 21, 22",
+        "Kite=1, 3, 8, 16, 27, 39, 52",
+        "Harbor=8, 10, 13, 14, 16, 17, 19",
+        "Juniper=6, 7, 7, 9, 12, 16, 23",
+        "Quill=10, 11, 12, 12, 11, 10, 9",
+        "Ember=2, 2, 4, 6, 8, 9, 14"
+      ],
+      "description": "\"Name=v1, v2, …\": one value per period, separated by commas or spaces (no thousands commas: 1240, not 1,240)."
+    },
+    "periods": {
+      "type": "strings",
+      "minItems": 2,
+      "maxItems": 40,
+      "maxLength": 16,
+      "default": ["2018", "2019", "2020", "2021", "2022", "2023", "2024"],
+      "description": "The period of each value (years count through between periods; other labels step)."
+    },
+    "top": { "type": "integer", "min": 3, "max": 12, "default": 6, "description": "Bars shown at once (the rest wait below and slide in when they climb)." },
+    "highlight": { "type": "string", "maxLength": 40, "default": "", "description": "Series in the accent all the way (empty: the accent follows whoever leads)." },
+    "title": { "type": "string", "maxLength": 60, "default": "Weekly users, millions", "description": "What the bars measure (empty: none)." },
+    "prefix": { "type": "string", "maxLength": 4, "default": "", "description": "Before every value, e.g. $." },
+    "suffix": { "type": "string", "maxLength": 6, "default": "M", "description": "After every value, e.g. %, k or M." },
+    "decimals": { "type": "integer", "min": 0, "max": 2, "default": 0, "description": "Decimal places shown." }
+  }
+}

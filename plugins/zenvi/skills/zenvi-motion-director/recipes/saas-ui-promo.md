@@ -1,3 +1,15 @@
+---
+id: saas-ui-promo
+kind: style
+summary: An app, AI tool or SaaS launch - glass UI cards over soft photos, prompt bar, counters, a URL end card
+categories: [saas-app-launch, product-launch-film, animated-explainer]
+tools: [add_motion_block_tool, apply_motion_transitions_tool, color_grade_clip_tool, auto_sound_design_tool]
+pace: medium
+mood: [calm, premium, optimistic]
+aspect: ["16:9", "9:16"]
+pairs_with: []
+avoid_with: []
+---
 # SaaS / UI promo
 
 Glass UI over landscape photos, big headline with a serif-italic accent,

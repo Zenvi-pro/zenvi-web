@@ -4,13 +4,17 @@
  * frames from the middle of longer shots) and the numbers a person feels
  * while watching: shot lengths, cuts per second, cuts against the music's
  * beats and hits, holds, black and empty frames, flashes, text, loudness,
- * silence, and a ranked list of problems with timestamps.
+ * silence, and a ranked list of problems with timestamps. With a saved
+ * creative brief, also the edit against it (brief/check.ts): beats, borrowed
+ * techniques and the style's checklist to look for on the sheet.
  *
  * Reads the project and renders; changes nothing, records no undo step.
  * review/ holds the rules; this tool gathers what the host can measure.
  */
 
 import { z } from "zod";
+import { readBrief } from "../../brief/brief.js";
+import { checkBrief, type BriefCheck } from "../../brief/check.js";
 import { BEAT_SAMPLE_RATE, detectBeats } from "../../analysis/beats.js";
 import { evaluate, getCount } from "../../keyframe/evaluate.js";
 import type { Keyframe, Project } from "../../model/types.js";
@@ -22,9 +26,11 @@ import { DEFAULT_SHEET_PIXELS, MAX_SHEET_PIXELS, planSheet, sheetLayout } from "
 import { titleTextBoxes } from "../../review/text-boxes.js";
 import { swapSuggestions } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
+import type { Vector } from "../../shots/vectors.js";
 import type { BeatAlignment, MixReview, ReviewProblem, ReviewShot, TextBox } from "../../review/types.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, refused } from "../receipt.js";
+import { shotVectors } from "../shots.js";
 import type { ToolImage } from "../types.js";
 
 const TOOL = "review_edit_tool";
@@ -106,6 +112,25 @@ async function textBoxesOf(call: ToolCall, titles: readonly { clipId: string; pa
   return boxes;
 }
 
+/**
+ * Shot embeddings for the near-duplicate check, when the host has the shot
+ * model installed (never a download): cached keyframes, else one frame per shot.
+ */
+async function shotLooks(call: ToolCall, shots: readonly ReviewShot[]): Promise<Map<number, Vector> | undefined> {
+  const host = call.host.shots;
+  if (!host || shots.length < 2) return undefined;
+  try {
+    if (!(await host.status()).ready) return undefined;
+    const files = new Map((call.doc.project.files ?? []).map((f) => [f.id, f]));
+    const known = shots.filter((s) => files.has(s.fileId));
+    const vectors = await shotVectors(call, host, known.map((s) => ({ file: files.get(s.fileId)!, start: s.sourceStart, end: s.sourceEnd })));
+    return new Map(known.flatMap((s, i) => (vectors[i] ? [[s.index, vectors[i]!] as const] : [])));
+  } catch (error) {
+    call.host.log?.(`shot embeddings for review failed: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
+}
+
 function reportText(data: Record<string, unknown>, problems: readonly ReviewProblem[], sheetNote: string): string {
   const shots = data.shots as { count: number; medianSeconds: number; maxSeconds: number };
   const cuts = data.cuts as { count: number; perSecond: number; transitions: number };
@@ -122,6 +147,13 @@ function reportText(data: Record<string, unknown>, problems: readonly ReviewProb
       ? "No problems found."
       : `${problems.length} problem${problems.length === 1 ? "" : "s"}, worst first (messages and fixes in data.problems): ${problems.map((p) => `${p.code}@${p.at.toFixed(2)}s`).join(", ")}.`,
   );
+  const brief = data.brief as BriefCheck | null;
+  if (brief) {
+    const used = brief.techniques.filter((t) => t.status === "used").length;
+    lines.push(`Brief (${brief.style}): ${brief.beats.filter((b) => b.hit).length}/${brief.beats.length} beats start on a picture change, ${used}/${brief.techniques.length} borrowed techniques on the timeline.`);
+    for (const miss of brief.misses) lines.push(`BRIEF: ${miss.message}`);
+    if (brief.checklist.length > 0) lines.push(`Look for on the sheet (the style's checklist): ${brief.checklist.join(" · ")}`);
+  }
   const swaps = problems.flatMap((p) => p.swaps ?? []);
   if (swaps.length > 0) {
     lines.push(`Swaps for the repeated shots (one swap_shot_tool call each):`);
@@ -138,7 +170,8 @@ export const reviewTools: CatalogTool[] = [
     description:
       "Watch your own cut. Returns ONE contact sheet image of the timeline at its cut points (each cut's last and first frame, labelled with times, plus frames from long shots; bright flash frames and black frames get a coloured border) " +
       "and numbers a viewer feels: shot count and lengths, cuts per second, how many cuts land on the music's beats or hits, the longest hold, empty and black frames, flashes, titles on screen, loudness and silences, " +
-      "and a ranked list of problems with timestamps and fixes (shots held too long for the pace, cuts off the beat, black or empty frames, silent stretches, text outside the safe area). " +
+      "and a ranked list of problems with timestamps and fixes (shots held too long for the pace, cuts off the beat, black or empty frames, silent stretches, text outside the safe area, back-to-back shots that look the same when the shot model is installed). " +
+      "With a saved brief (save_brief_tool) it also checks the cut against it: beats, borrowed techniques, and the style's checklist to look for. " +
       "Call it after cutting, fix the problems it lists, and call it again; a 20-shot reel costs about 1,500 image tokens. Zoom in with start/end. Changes nothing.",
     input,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
@@ -219,7 +252,8 @@ export const reviewTools: CatalogTool[] = [
       }
 
       const textBoxes = await textBoxesOf(call, review.titleClips);
-      const problems = findProblems({ review, pace, alignment, mix, frames, textBoxes, frame: { width: project.width, height: project.height } });
+      const looks = await shotLooks(call, review.shots);
+      const problems = findProblems({ review, pace, alignment, mix, frames, textBoxes, looks, frame: { width: project.width, height: project.height } });
       // One pass over every footage problem's shots, so two problems are never offered the same unused clip.
       const footage = problems.filter((p) => p.shots);
       const swaps = swapSuggestions(project, review, footage.flatMap((p) => p.shots!));
@@ -229,6 +263,8 @@ export const reviewTools: CatalogTool[] = [
         for (const s of p.swaps) swaps.splice(swaps.indexOf(s), 1);
       }
 
+      const saved = readBrief(project);
+      const brief = saved ? checkBrief(project, saved) : null;
       const lengths = review.shots.map((s) => s.duration);
       const data = {
         range: review.range,
@@ -265,7 +301,8 @@ export const reviewTools: CatalogTool[] = [
         audioClips: review.audioClips,
         sheet,
         problems,
-        ok: problems.every((p) => p.severity === "low"),
+        brief,
+        ok: problems.every((p) => p.severity === "low") && !brief?.misses.some((m) => m.hard),
       };
       const receipt = applied(TOOL, reportText(data, problems, sheetNote), { data, warnings }, 0);
       return image ? { receipt, images: [image] } : receipt;

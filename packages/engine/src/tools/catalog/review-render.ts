@@ -39,6 +39,7 @@ import { finishGaps, finishLines } from "../../review/finish.js";
 import { onsetRatios, rhythmReview } from "../../review/rhythm.js";
 import { swapSuggestions, type ShotSwap } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
+import type { Vector } from "../../shots/vectors.js";
 import { FrameRenderError, mediaFileProject, renderPixels, secondsToFrame } from "../color-frames.js";
 import { directTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
 import { applied, failed, refused } from "../receipt.js";
@@ -78,6 +79,19 @@ const fmt = (value: number): string => `${(Math.round(value * 100) / 100).toFixe
 
 function escapeXml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Shot embeddings of each shot's middle frame, when the host has the shot model installed (never a download). */
+async function renderLooks(call: ToolCall, path: string, shots: readonly Shot[]): Promise<(Vector | null)[] | undefined> {
+  const host = call.host.shots;
+  if (!host || shots.length < 2 || shots.length > MAX_HASHED_SHOTS) return undefined;
+  try {
+    if (!(await host.status()).ready) return undefined;
+    return await host.embedFrames(path, shots.map((s) => s.mid), call.signal);
+  } catch (error) {
+    call.host.log?.(`shot embeddings of ${path} failed: ${error instanceof Error ? error.message : String(error)}`);
+    return undefined;
+  }
 }
 
 /** The labels and red frames of the sheet, drawn over the grid of tiles. */
@@ -213,10 +227,10 @@ export const reviewRenderTools: CatalogTool[] = [
     title: "Review the rendered file",
     description:
       "Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), " +
-      "how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame), " +
+      "how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), " +
       "and for a fast cut its rhythm (shot lengths that never vary, shots that go still, brightness and colour that never move, cuts with no sound), " +
       "with one contact sheet of the shots and the last frame (problems framed red). Call it on the file render/export wrote, after mastering; " +
-      "fix every PROBLEM line and render again. Changes nothing.",
+      "fix every PROBLEM line and render again, then watch_render_tool once for the critique by eye and ear. Changes nothing.",
     input,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     requires: ["media", "frames"],
@@ -260,7 +274,8 @@ export const reviewRenderTools: CatalogTool[] = [
       }
       const repeats = repeatedShots(shots, hashes, graphic);
       const end = endVerdict(inspection, shots);
-      const problems = renderProblems(inspection, shots, repeats, end, targets);
+      const looks = await renderLooks(call, inspection.path, shots);
+      const problems = renderProblems(inspection, shots, repeats, end, targets, looks);
       let onsets: number[] | null = null;
       if (inspection.hasAudio && call.host.audio?.decodePcm && shots.length > 1) {
         try {
@@ -301,7 +316,13 @@ export const reviewRenderTools: CatalogTool[] = [
         (swaps && swaps.length > 0 ? `\nSwap the repeats for footage not on screen yet (one call each, then render and review again):\n${swapLines(swaps)}` : "") +
         (swaps && swaps.length === 0 && repeats.length > 0 ? "\nNo unused clip or unused part of a clip is left to swap in: import more footage for the repeats." : "") +
         (finish.length > 0 ? `\nNot finished (the open project), fix in this order, then render and review again:\n${finishLines(finish).map((l) => `- FINISH: ${l}`).join("\n")}` : "") +
-        (images.length > 0 ? "\nContact sheet attached: shots in order, the last tile is the end; problems are framed red." : "");
+        (images.length > 0 ? "\nContact sheet attached: shots in order, the last tile is the end; problems are framed red." : "") +
+        // Meters and frames cannot hear a silent whip or feel a sagging middle; a watch can.
+        (call.host.watch
+          ? count("problem") === 0
+            ? `\nNext: watch_render_tool ${JSON.stringify({ path: args.path })} once, so an editor watches it with sound and names what to fix.`
+            : "\nOnce the PROBLEM lines are fixed and rendered again with no PROBLEM left: watch_render_tool {path: the new render} once, so an editor watches it with sound and names what to fix."
+          : "");
       const data = {
         path: args.path,
         duration: inspection.duration,
