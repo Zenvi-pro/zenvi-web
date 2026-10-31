@@ -132,6 +132,13 @@ describe("save_brief_tool / get_brief_tool", () => {
     const search = (saved.data?.data as { music_search?: Record<string, unknown> }).music_search;
     expect(search).toEqual({ query: "dark trap", bpm_range: [133, 147], energy: "high", energy_curve: "drop", min_seconds: 10 });
     expect(saved.data?.summary).toMatch(/No music in the bin: fetch it measured, search_freesound_music_tool \{"query":"dark trap"/);
+    // Saving the same brief again (an agent resuming) changes nothing and still hands the search over.
+    const steps = doc.undoLabels.length;
+    const again = await runTool({ doc, host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, music: "dark trap, 140 bpm, high energy, drop on the hook" });
+    expect(again.data?.status).toBe("unchanged");
+    expect((again.data?.data as { music_search?: unknown }).music_search).toEqual(search);
+    expect(again.data?.summary).toMatch(/No music in the bin/);
+    expect(doc.undoLabels).toHaveLength(steps);
     // With a song in the bin there is nothing to fetch.
     const withSong = await runTool({ doc: bin(), host: fakeHost() as ToolHost }, "save_brief_tool", { ...BRIEF, music: "dark trap, 140 bpm" });
     expect((withSong.data?.data as { music_search?: unknown }).music_search).toBeUndefined();

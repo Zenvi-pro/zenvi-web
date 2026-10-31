@@ -10,6 +10,7 @@ export {
   caretBlink,
   counter,
   counterValue,
+  decimalsFor,
   formatNumber,
   odometer,
   odometerPositions,
