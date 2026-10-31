@@ -28,15 +28,21 @@ export function transitionFlashChanges(cut: number, frames: number, fps: number)
 
 /**
  * The flash changes on the timeline: flash motion transitions (but those on
- * cuts out of the clips in `skipOutClipIds`, which the caller is replacing)
- * and flash cards.
+ * cuts out of the clips in `skipOutClipIds`, which the caller is replacing),
+ * one per cut, and flash cards.
  */
 export function timelineFlashChanges(project: Project, skipOutClipIds: ReadonlySet<string> = new Set()): number[] {
   const fps = rateOf(project);
   const out: number[] = [];
+  // Flashes on one cut (a grid's tiles re-cut together) are one flash, as long as the longest.
+  const byCut = new Map<number, { cut: number; frames: number }>();
   for (const r of listProjectMotionTransitions(project)) {
-    if (FLASH_PRESETS.has(r.preset) && !skipOutClipIds.has(r.outClipId)) out.push(...transitionFlashChanges(r.cut, r.frames, fps));
+    if (!FLASH_PRESETS.has(r.preset) || skipOutClipIds.has(r.outClipId)) continue;
+    const frame = Math.round(r.cut * fps);
+    const seen = byCut.get(frame);
+    if (!seen || r.frames > seen.frames) byCut.set(frame, { cut: r.cut, frames: r.frames });
   }
+  for (const { cut, frames } of byCut.values()) out.push(...transitionFlashChanges(cut, frames, fps));
   const files = new Map(project.files.map((f) => [String(f.id), String(f.path ?? "")]));
   for (const clip of project.clips) {
     const seconds = Number(clip.end) - Number(clip.start);

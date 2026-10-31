@@ -479,19 +479,24 @@ export const motionTemplateTools: CatalogTool[] = [
           const presets = gridRecutPresets(recutChoice === "auto" ? "whip" : recutChoice, groups.length);
           const recuts = groups.flatMap(({ at, cuts }, k): MotionTransitionResult[][] => {
             let preset = presets[k]!;
+            // Every tile of a re-cut on the same frames: the length the shortest tile fits.
+            const fitted = (p: typeof preset) => {
+              const fits = cuts.map((c) => fitMontageFrames(p, c.outFrames, c.inFrames, fps)).filter((f) => f !== null);
+              return fits.length > 0 ? Math.min(...fits) : null;
+            };
             if (FLASH_PRESETS.has(preset)) {
               // The tiles flash together, one flash; past 3 flashes a second with the timeline's own it glitches instead (WCAG 2.3.1).
-              const longest = Math.max(...cuts.map((c) => fitMontageFrames(preset, c.outFrames, c.inFrames, fps) ?? 0));
-              const changes = longest > 0 ? transitionFlashChanges(start + at / fps, longest, fps) : [];
+              const frames = fitted(preset);
+              const changes = frames === null ? [] : transitionFlashChanges(start + at / fps, frames, fps);
               if (fitsFlashLimit(flashes, changes)) flashes.push(...changes);
               else {
                 preset = "glitch";
                 glitched += 1;
               }
             }
+            const frames = fitted(preset);
             const done = cuts.flatMap((cut): MotionTransitionResult[] => {
-              const frames = fitMontageFrames(preset, cut.outFrames, cut.inFrames, fps);
-              const r = frames === null ? null : applyFittedMotionTransition(tx, { outClipId: cut.outClipId, inClipId: cut.inClipId, preset, frames, direction: "auto" });
+              const r = frames === null || fitMontageFrames(preset, cut.outFrames, cut.inFrames, fps) === null ? null : applyFittedMotionTransition(tx, { outClipId: cut.outClipId, inClipId: cut.inClipId, preset, frames, direction: "auto" });
               return r ? [r] : [];
             });
             return done.length > 0 ? [done] : [];
