@@ -5,7 +5,9 @@ import { createProject } from "../../model/defaults.js";
 import { addFile } from "../../ops/files.js";
 import { STYLE_FILES } from "../../styles/library.gen.js";
 import { STYLE_TEXT_MAX, TECHNIQUE_TEXT_MAX, compactStyle, compactTechnique, rankStyles, styleChecklist, styleFinishCalls } from "../../styles/recipe.js";
-import { runTool } from "../registry.js";
+import { normalizeArgs } from "../coerce.js";
+import { isLookId } from "../luts.js";
+import { getTool, runTool } from "../registry.js";
 import type { ToolHost } from "../types.js";
 import { fakeHost } from "../test-support/fake-host.js";
 import { audioInfo, media, videoInfo } from "../test-support/fixture.js";
@@ -75,6 +77,15 @@ describe("the styles library as text", () => {
     ]);
     const recipe = STYLE_FILES.find((f) => f.id === "hype-reel")!;
     expect(styleFinishCalls(recipe)).toContainEqual({ tool: "master_audio_tool", args: { preset: "social", genre: "hype", iterate: true } });
+  });
+
+  it("writes finish calls their tools accept, for every style (the builders hand them on as next_calls)", () => {
+    for (const file of STYLE_FILES.filter((f) => f.kind === "style")) {
+      for (const { tool, args } of styleFinishCalls(file, isLookId)) {
+        const spec = getTool(tool)!;
+        expect(spec.input.safeParse(normalizeArgs(spec.inputSchema, args)).success, `${file.id} ${tool} ${JSON.stringify(args)}`).toBe(true);
+      }
+    }
   });
 
   it("ranks styles by the request's words and the bin, a reason for each point", () => {
