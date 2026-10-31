@@ -78,6 +78,11 @@ export function mixEntries(project: Project): MixEntry[] {
   }));
 }
 
+/** A clip at volume 0 the whole way (muted footage): a role names the clips you hear, so it is in none. */
+export function isMuted(entry: MixEntry): boolean {
+  return entry.level === 0;
+}
+
 const roleArg = z.enum(MIX_ROLES);
 
 /** How a mixing tool names the clips it changes; any mix of the three, at least one. */
@@ -119,7 +124,7 @@ export function resolveTargets(project: Project, args: TargetArgs): MixEntry[] |
     for (const e of onTrack) picked.add(e.id);
   }
   for (const role of roles) {
-    const ofRole = entries.filter((e) => e.mixRole === role);
+    const ofRole = entries.filter((e) => e.mixRole === role && !isMuted(e));
     if (ofRole.length === 0) return `Error: no clips play in the ${role} stem (analyze_mix_tool lists each clip's stem; set_track_role_tool files a track under one).`;
     for (const e of ofRole) picked.add(e.id);
   }

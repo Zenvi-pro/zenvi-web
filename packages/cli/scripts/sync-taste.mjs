@@ -33,13 +33,16 @@ export function tasteModule(markdown) {
   ].join("\n");
 }
 
+const FRONT_MATTER = /^---\n[\s\S]*?\n---\n+/;
+
 /** A skill's SKILL.md without its front matter, and the markdown files of its `sub` folder by genre (file name without .md), sorted. */
 export function readSkill(dir, sub) {
-  const skill = readFileSync(path.join(dir, "SKILL.md"), "utf8").replace(/^---\n[\s\S]*?\n---\n+/, "");
+  const skill = readFileSync(path.join(dir, "SKILL.md"), "utf8").replace(FRONT_MATTER, "");
   const recipes = readdirSync(path.join(dir, sub))
     .filter((name) => name.endsWith(".md"))
     .sort()
-    .map((name) => ({ genre: name.slice(0, -3), markdown: readFileSync(path.join(dir, sub, name), "utf8") }));
+    // A recipe's front matter is the styles index's (gen-styles-index.mjs), not part of the recipe.
+    .map((name) => ({ genre: name.slice(0, -3), markdown: readFileSync(path.join(dir, sub, name), "utf8").replace(FRONT_MATTER, "") }));
   return { skill, recipes };
 }
 

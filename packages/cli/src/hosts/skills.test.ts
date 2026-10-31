@@ -14,7 +14,7 @@ import { checkParams, getBlock } from "@zenvi/motion";
 import { describe, expect, it } from "vitest";
 
 const SKILLS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../plugins/zenvi/skills");
-const CHECKED = ["zenvi-motion-director", "zenvi-reels", "zenvi-sound-designer"];
+const CHECKED = ["zenvi-motion-director", "zenvi-reels", "zenvi-sound-designer", "zenvi-styles"];
 /** Tools `zenvi mcp` adds next to the engine catalog (src/mcp/extra-tools.ts). */
 const MCP_TOOLS = new Set(["open_project_file", "render_video", "preview_frame", "launch_editor", "push_to_cloud", "list_hosts"]);
 

@@ -78,3 +78,21 @@ export async function renderFrame(project: Project, seconds: number, options: Re
   const image = await renderFrameImage(project, seconds, options);
   return options.format === "jpeg" ? encodeJpeg(image, options.jpegQuality, options.signal) : encodePng(image);
 }
+
+/**
+ * The frames at `seconds` (in order), decoders kept open between them so a
+ * forward walk through a shot reads on instead of seeking each time (a
+ * tracker reads every frame).
+ */
+export async function* renderFrameImages(project: Project, seconds: readonly number[], options: RenderFrameOptions): AsyncGenerator<RgbaImage> {
+  const sources =
+    options.sources ?? new SourceManager(project, { resolveMedia: options.resolveMedia, quality: options.scaleQuality ?? "export", signal: options.signal });
+  try {
+    for (const t of seconds) {
+      if (options.signal?.aborted) return;
+      yield await renderFrameImage(project, t, { ...options, sources });
+    }
+  } finally {
+    if (options.sources === undefined) await sources.close();
+  }
+}

@@ -54,6 +54,7 @@ beforeAll(async () => {
       ZENVI_CONFIG_DIR: path.join(home, ".config", "zenvi"),
       ZENVI_DESKTOP_DIR: path.join(home, ".openshot_qt"),
       ZENVI_MCP_ENGINE: "portable",
+      ZENVI_MCP_BRIEF: "off",
       ZENVI_NO_BROWSER: "1",
     },
   });
