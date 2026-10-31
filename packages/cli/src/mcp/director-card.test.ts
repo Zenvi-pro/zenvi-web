@@ -16,7 +16,7 @@ describe("director card", () => {
   });
 
   it("sends whole videos to the style tools, and names only tools this server lists", () => {
-    expect(DIRECTOR_CARD).toMatch(/find_style_tool \{request\}.*get_style_tool \{style, length_seconds\}.*get_technique_tool/);
+    expect(DIRECTOR_CARD).toMatch(/Before the first edit: find_style_tool \{"request": .*then get_style_tool \{"style": .*get_technique_tool/);
     const tools = new Set(engineRegistry().list("mcp", {}, { includeUnavailable: true }).map((t) => t.name));
     for (const name of DIRECTOR_CARD.match(/\b[a-z0-9]+(?:_[a-z0-9]+)*_tool\b/g) ?? []) expect(tools, name).toContain(name);
   });

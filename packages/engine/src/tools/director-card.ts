@@ -20,10 +20,12 @@ export const FINISH_HINT =
 /**
  * The style router: the styles library through its tools (styles.ts), on
  * every surface. Fleet ab10: with the recipes named here and read through
- * read_director_recipe, no agent ever opened a zenvi-styles file.
+ * read_director_recipe, no agent ever opened a zenvi-styles file. Said as
+ * the first step with the calls written out: W70's first runs, told only
+ * what the tools do, skipped them.
  */
 const STYLE =
-  "find_style_tool {request} picks the style for the request and the bin; get_style_tool {style, length_seconds} gives its recipe (beats timed for that length, look, type, sound, the tool calls, the checklist); get_technique_tool for a technique it borrows.";
+  'Before the first edit: find_style_tool {"request": "<the person\'s words>"}, then get_style_tool {"style": "<its pick>", "length_seconds": <the length>}: the beats timed for that length, look, type, sound, the exact tool calls and the checklist. get_technique_tool for a technique the style borrows.';
 
 /** The brief (plugins/zenvi/skills/zenvi-styles/BRIEF.md): it lets review check the edit; nothing waits for it. */
 const BRIEF = "A brief lets review check the edit: save_brief_tool, get_brief_tool (nothing waits for it: the first cut saves a minimal one).";
@@ -56,4 +58,4 @@ const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
 /** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
-export const DIRECTOR_START: string = `A new edit: ${STYLE} ${BRIEF} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;
+export const DIRECTOR_START: string = `A new edit. ${STYLE} ${BRIEF} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;

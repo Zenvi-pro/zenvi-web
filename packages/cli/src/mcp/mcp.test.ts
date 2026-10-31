@@ -90,7 +90,7 @@ describe("zenvi mcp", () => {
   it("puts the director's plan on a new project's receipt and hands out the recipes as a tool", async () => {
     const client = await connect();
     const opened = await call(client, "open_project_file", { path: "plan.zvn" });
-    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit: find_style_tool \{request\} picks the style.*get_style_tool \{style, length_seconds\}.*save_brief_tool, get_brief_tool \(nothing waits for it.*Finish, in order: unify_grade_tool/);
+    expect(opened.receipt.notes.join(" ")).toMatch(/^A new edit\. Before the first edit: find_style_tool \{"request": .*then get_style_tool \{"style": .*save_brief_tool, get_brief_tool \(nothing waits for it.*Finish, in order: unify_grade_tool/);
     const recipe = await call(client, "read_director_recipe", { recipe: "match-cut-montage" });
     expect(recipe.receipt.status).toBe("applied");
     expect(recipe.receipt.summary).toMatch(/match_cut_montage_tool/);
