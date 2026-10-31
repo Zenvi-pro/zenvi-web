@@ -395,8 +395,10 @@ export const effectsColorLookTools: CatalogTool[] = [
           for (const [cid, effects] of changes) setClipEffects(tx, cid, effects);
         });
         const wheelNames = hasWheels ? Object.keys(wheels).filter((n) => n !== "enabled") : [];
-        const changed = [...Object.keys(explicitParams).sort(), ...(lut ? ["lut"] : []), ...(wheelNames.length > 0 ? [`wheels (${wheelNames.join(", ")})`] : []), ...(hasCurves ? ["curves"] : [])];
-        const what = look ? `look ${look}` : changed.join(", ") || "grade";
+        const shaped = [...(wheelNames.length > 0 ? [`wheels (${wheelNames.join(", ")})`] : []), ...(hasCurves ? ["curves"] : [])];
+        const changed = [...Object.keys(explicitParams).sort(), ...(lut ? ["lut"] : []), ...shaped];
+        // A look with wheels or curves on top names both, so the receipt is the whole grade.
+        const what = look ? [`look ${look}`, ...shaped].join(", ") : changed.join(", ") || "grade";
         const receipt = ok(call, `Graded ${changes.length} clip(s): ${what}.`, { look, changed: true, clips: rows, skipped });
         if (faintWheels.size > 0) {
           const names = [...faintWheels].join(", ");
