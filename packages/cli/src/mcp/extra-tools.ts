@@ -6,11 +6,12 @@
 
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { finishGaps, finishLines, type ToolImage } from "@zenvi/engine";
+import { finishGaps, finishLines, readBrief, type ToolImage } from "@zenvi/engine";
 import type { JsonSchemaObject } from "@zenvi/engine/tools";
 import { applied, DIRECTOR_START, failed, refused, type ToolReceipt } from "@zenvi/engine/tools";
 import { frameCaption, type RenderResult } from "@zenvi/render-node";
 import { pushProject } from "../cloud/sync.js";
+import { drawText } from "./directions.js";
 import { openInDesktop } from "../desktop/open.js";
 import { CliError } from "../output.js";
 import { isProjectPath } from "../project/select.js";
@@ -57,6 +58,10 @@ const bool = (description: string) => ({ type: "boolean" as const, description }
 function text(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : typeof v === "number" ? String(v) : undefined;
 }
+
+/** What a recipe read before any brief starts with. */
+const BRIEF_FIRST =
+  'No brief saved yet. A short one plans the edit and lets review check it: read_director_recipe {styles: "brief"}, then save_brief_tool. Nothing waits for it: the first cut saves a minimal one if you skip it.';
 
 /** On an empty project, the plan: open_project_file is the one receipt every agent reads before its first edit. */
 function startNotes(state: McpState): { notes?: string[] } {
@@ -118,24 +123,38 @@ export function extraTools(ctx: CommandContext): ExtraTool[] {
       title: "Read a director recipe",
       description:
         "The motion director's recipe for a genre (structure in seconds, shot lengths, sound plan, the exact tool calls and the finish), the same text as the resource zenvi://director/<recipe> and the zenvi-motion-director skill's recipes/. " +
-        "Read it before the first edit of a whole video. recipe=director gives the director's shared rules; sound_palette a sound designer palette (zenvi://sound/<palette>). Read-only.",
+        "Read it before the first edit of a whole video. recipe=director gives the director's shared rules; sound_palette a sound designer palette (zenvi://sound/<palette>); styles the brief compiler (brief, step 0 of every edit), the styles index (index) or one style or technique by id (zenvi://styles/<id>). Read-only.",
       inputSchema: {
         type: "object",
         properties: {
           recipe: { type: "string", enum: ["director", ...DIRECTOR_RECIPES.map((r) => r.genre)], description: "The genre's recipe, or director for the shared rules." },
           sound_palette: { type: "string", enum: SOUND_PALETTES.map((p) => p.genre), description: "Instead: a sound designer palette." },
+          styles: { type: "string", description: "Instead: brief (the brief compiler), index (every style and technique, one line each) or a style or technique id from the index." },
         },
         additionalProperties: false,
       },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-      async run(_state, args) {
+      async run(state, args) {
         const tool = "read_director_recipe";
         const recipe = text(args.recipe);
         const palette = text(args.sound_palette);
-        if ((recipe === undefined) === (palette === undefined)) return { receipt: refused(tool, "Error: give recipe or sound_palette (one of them)."), engine: null };
+        const styles = text(args.styles);
+        if ([recipe, palette, styles].filter((v) => v !== undefined).length !== 1) return { receipt: refused(tool, "Error: give one of recipe, sound_palette or styles."), engine: null };
+        if (styles !== undefined) {
+          const uri = styles === "index" ? "zenvi://styles" : `zenvi://styles/${styles}`;
+          const markdown = guideText(uri);
+          if (!markdown) return { receipt: refused(tool, `Error: no style or technique ${styles}; styles=index lists them.`), engine: null };
+          const text = styles === "brief" ? `${markdown}\n\n${await drawText(ctx.config.configDir, String(state.session.doc.project.id))}` : markdown;
+          return { receipt: applied(tool, text, { data: { uri } }, 0), engine: null };
+        }
         const uri = palette ? `zenvi://sound/${palette}` : recipe === "director" ? "zenvi://director" : `zenvi://director/${recipe}`;
         const markdown = guideText(uri);
         if (!markdown) return { receipt: refused(tool, `Error: no ${palette ? `sound palette ${palette}` : `recipe ${recipe}`}; recipes: director, ${DIRECTOR_RECIPES.map((r) => r.genre).join(", ")}.`), engine: null };
+        // A genre recipe read before any brief opens with one line pointing at the brief compiler (it used to carry
+        // all of BRIEF.md: bench rounds 6-7 put the brief step's cost at a third of a run's).
+        if (recipe !== undefined && recipe !== "director" && !readBrief(state.session.doc.project)) {
+          return { receipt: applied(tool, `${BRIEF_FIRST}\n\n${markdown}`, { data: { uri, brief: "zenvi://styles/brief" } }, 0), engine: null };
+        }
         return { receipt: applied(tool, markdown, { data: { uri } }, 0), engine: null };
       },
     },

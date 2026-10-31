@@ -10,8 +10,13 @@
  * Mastering leaves a marker (`settings.zenvi_master`) holding a fingerprint
  * of what the mix is made of; an audio edit after it changes the fingerprint,
  * so a stale master reads as unmastered.
+ *
+ * A saved creative brief (brief/brief.ts) adds its hard misses first: the
+ * wrong frame, the wrong length, most beats or a borrowed technique gone.
  */
 
+import { readBrief } from "../brief/brief.js";
+import { checkBrief } from "../brief/check.js";
 import type { ProjectDocument } from "../history/document.js";
 import { isAudioOnlyMedia } from "../model/media.js";
 import type { Clip, Project } from "../model/types.js";
@@ -34,7 +39,7 @@ export interface MasterMark {
   fingerprint: string;
 }
 
-export type FinishGapKind = "grade" | "transitions" | "sound" | "master";
+export type FinishGapKind = "brief" | "grade" | "transitions" | "sound" | "master";
 
 export interface FinishCall {
   tool: string;
@@ -127,6 +132,16 @@ export function markMastered(doc: ProjectDocument, preset: string, lufs: number 
 export function finishGaps(project: Project): FinishGap[] {
   const gaps: FinishGap[] = [];
   const review = reviewTimeline(project);
+
+  const brief = readBrief(project);
+  const misses = brief ? checkBrief(project, brief).misses.filter((m) => m.hard) : [];
+  if (brief && misses.length > 0) {
+    gaps.push({
+      kind: "brief",
+      message: `Off its brief (${brief.style}): ${misses.map((m) => m.message).join(" ")}`,
+      next: [{ tool: "get_brief_tool", args: {} }],
+    });
+  }
 
   const footage = project.clips.filter((c) => isGradedFootage(project, c));
   const sources = new Set(footage.map((c) => String(c.file_id)));

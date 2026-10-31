@@ -51,7 +51,9 @@ HyperFrames code the `code-video-handoff` skill.
    `track`, source `start_seconds`/`end_seconds`), then trim, split, move and
    delete clips; `apply_transition_tool` between clips; `add_title_tool` for
    static text, `add_kinetic_title_tool` for titles that animate in
-   (pop, slam, tilt, scramble, letters, typewriter), `kinetic_captions_tool`
+   (pop, slam, tilt, scramble, letters, typewriter), `add_type_block_tool`
+   for type moves (`block`: text_on_path ring, write_on, stencil, echo_stack,
+   strobe, wheel, paper), `kinetic_captions_tool`
    for word-by-word captions of speech; `add_effect_tool` for looks; `set_clip_volume_tool` and
    `set_keyframes_tool` for levels and motion; `add_marker_tool` for notes.
    `get_timeline_state_tool` / `list_clips_tool` describe the timeline.

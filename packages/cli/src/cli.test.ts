@@ -269,3 +269,24 @@ describe("zenvi render options", () => {
   });
 });
 
+
+describe("zenvi call preview_frame", () => {
+  it("writes the MCP server's preview frame to a file, under either name", async () => {
+    // Regression (sk2-product-brand): preview_frame was only on the MCP server.
+    const dir = await makeTempDir("zenvi-cli-preview-");
+    try {
+      expect((await run(["new", "look.zvn"], dir)).code).toBe(0);
+      const r = await run(["call", "preview_frame", "seconds=0", "--images", "shots", "--json"], dir);
+      expect(r.code, r.stderr).toBe(0);
+      expect(r.json()).toMatchObject({ status: "applied", file: path.join(dir, "shots", "frame-0.jpg"), mimeType: "image/jpeg" });
+      const jpeg = await readFile(path.join(dir, "shots", "frame-0.jpg"));
+      expect([...jpeg.subarray(0, 2)]).toEqual([0xff, 0xd8]);
+      const named = await run(["call", "preview_frame_tool", "seconds=0", "format=png", "--json"], dir);
+      expect(named.json()).toMatchObject({ file: path.join(dir, "frame-0.png") });
+      expect((await run(["call", "preview_frame"], dir)).stderr).toMatch(/preview_frame needs seconds/);
+      expect((await run(["call", "preview_frame", "seconds=0", "format=webp"], dir)).stderr).toMatch(/format is jpeg or png/);
+    } finally {
+      await removeDir(dir);
+    }
+  });
+});
