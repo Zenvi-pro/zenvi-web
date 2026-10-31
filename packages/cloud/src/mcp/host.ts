@@ -32,6 +32,9 @@ import { join } from "node:path";
 import {
   TRANSCRIPTION_PATH,
   transcriptionHttpError,
+  WATCH_PATH,
+  WatchError,
+  watchHttpError,
   type BackendHost,
   type CloudMediaRef,
   type HostCapability,
@@ -39,9 +42,11 @@ import {
   type Project,
   type StockHost,
   type ToolHost,
+  type WatchCritique,
+  type WatchRequest,
 } from "@zenvi/engine";
 import { backendStock } from "@zenvi/engine/tools";
-import { ffmpegCanWrite } from "@zenvi/render-node";
+import { critiqueFromBackend, ffmpegCanWrite, watchForm } from "@zenvi/render-node";
 import { ApiError, tooLarge } from "../http/errors.js";
 import { withSuffix } from "../projects/files.js";
 import { displayName, fileSha256, isBundledAsset } from "../projects/model.js";
@@ -49,7 +54,7 @@ import { isRenderFormat } from "../render/options.js";
 import { filesByPath, projectPathResolver } from "../render/resolve.js";
 import { attachmentDisposition, cleanFileName, normalizeContentType, sha256File } from "../services/media.js";
 import { contentTypeForName } from "../services/importer.js";
-import { exportPath, mediaPath } from "../services/paths.js";
+import { exportPath, mediaPath, renderPath } from "../services/paths.js";
 import { sha256Hex } from "../util/crypto.js";
 import type { Services } from "../container.js";
 import type { McpCallContext } from "./types.js";
@@ -95,8 +100,13 @@ export function cloudCapabilities(services: Services): Set<HostCapability> {
   // Both keep what they render as project media, which needs probing.
   if (services.motion && caps.has("media")) caps.add("motion");
   if (services.mattes && caps.has("media")) caps.add("mattes");
+  // A render the person put in the bin, watched through the backend as them.
+  if (services.watchProxy && services.backendSessions.enabled && caps.has("media")) caps.add("watch");
   return caps;
 }
+
+/** Render formats a watch can open (render_project also makes gif and audio-only files). */
+const WATCHABLE_FORMATS: ReadonlySet<string> = new Set(["mp4", "webm", "mov", "mkv"]);
 
 function backendFor(services: Services, userId: string, signal: AbortSignal): BackendHost {
   return {
@@ -272,6 +282,40 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
   }
 
   if (caps.has("backend")) host.backend = backendFor(services, userId, ctx.signal);
+
+  const watchProxy = services.watchProxy;
+  if (watchProxy && caps.has("watch")) {
+    /** One watch of a local file through the backend, as the connected person. */
+    const watchFile = async (file: string, request: WatchRequest): Promise<WatchCritique> => {
+      const signal = request.signal ?? ctx.signal;
+      const proxy = await watchProxy(file, signal);
+      const answer = await services.backendSessions.send(userId, WATCH_PATH, { form: watchForm(proxy, request), signal });
+      if (answer.status < 200 || answer.status >= 300) throw watchHttpError(answer.status, answer.body);
+      return critiqueFromBackend(answer.body, proxy);
+    };
+    host.watch = {
+      watch: async (path, request = {}) => watchFile(await localCopy(path), request),
+      // What render_project made of this project: the render blob, fetched to scratch.
+      watchRender: async (renderId, request = {}) => {
+        let job;
+        try {
+          if (!/^r_[a-z0-9]{16}$/.test(renderId)) throw new Error("not a render id");
+          job = await services.renders.get(userId, projectId, renderId);
+        } catch {
+          throw new WatchError("rejected", `there is no render ${renderId} of this project; pass the render_id render_project returned`);
+        }
+        if (job.status !== "done") throw new WatchError("rejected", `render ${renderId} is ${job.status}; wait until get_render_status says done`);
+        if (!WATCHABLE_FORMATS.has(job.format)) throw new WatchError("rejected", `render ${renderId} is ${job.format}, not a video with sound to watch`);
+        const file = join(await scratchDir(), `watch-${renderId}.${job.format}`);
+        try {
+          await services.blobs.readToFile(renderPath(userId, projectId, renderId, job.format), file);
+          return await watchFile(file, request);
+        } finally {
+          await rm(file, { force: true });
+        }
+      },
+    };
+  }
   host.stock = stockSearch(services, userId, ctx.signal);
 
   /** An export blob of this project and its download link (24 h). */

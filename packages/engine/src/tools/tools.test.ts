@@ -276,7 +276,7 @@ const SPECS: Record<string, Spec> = {
   separate_clip_audio_tool: {
     happy: {
       args: { timeline_clip_ids: IDS.clipB },
-      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) on track\(s\) 1; the originals are muted\.$/,
+      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) \([A-Z0-9]{10}\) on track\(s\) 1; the originals are muted\.$/,
       check: ({ receipt }) => expect(receipt.createdTracks).toHaveLength(1),
     },
     failure: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Error: 'logo\.png' has no audio to separate$/ },
@@ -560,6 +560,30 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { path: "/out/captions.srt", clipId: "NOPE" }, summary: /^Error: Unknown clipId 'NOPE'\.$/ },
   },
   detect_beats_tool: { happy: { args: { fileId: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
+  detect_onsets_tool: {
+    happy: { args: { file_id: IDS.music }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { clip_id: "NOPE" }, status: "refused", summary: /^Error: No timeline clip with id='NOPE'\.$/ },
+  },
+  detect_music_structure_tool: {
+    happy: { args: { clip_id: IDS.clipMusic }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { file_id: IDS.music, add_markers: "true" }, status: "refused", summary: /^Error: add_markers needs clip_id/ },
+  },
+  spot_action_foley_tool: {
+    happy: { args: { clip_id: IDS.clipB }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { clip_id: IDS.clipMusic }, status: "refused", summary: /is not video: nothing moves in it\.$/ },
+  },
+  shot_length_ramp_tool: {
+    happy: {
+      args: { file_ids: [IDS.broll, IDS.logo], shots: "6", first_shot_seconds: "2", last_shot_seconds: "0.5", position: "30", track: "1" },
+      summary: /^Cut a 6-shot ramp from 2\.00 s to 0\.50 s on track 1, 30\.00-\d+\.\d\d s\.$/,
+      check: ({ doc }) => expect(doc.project.clips.filter((c) => c.position >= 30)).toHaveLength(6),
+    },
+    failure: { args: { file_ids: ["NOPE"] }, status: "refused", summary: /^Error: Unknown file_id 'NOPE'\.$/ },
+  },
+  snap_cuts_to_onsets_tool: {
+    happy: { args: { track: "1" }, status: "refused", summary: /not available in this Zenvi surface/ },
+    failure: { args: { onsets_from: "clip" }, status: "refused", summary: /^Error: onsets_from=clip needs onset_clip_id\.$/ },
+  },
   diarize_media_tool: { happy: { args: { fileId: IDS.interview }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
   search_media_local_tool: { happy: { args: { query: "dog" }, status: "refused", summary: /not available in this Zenvi surface/ }, failure: null },
 
@@ -1149,6 +1173,34 @@ const SPECS: Record<string, Spec> = {
     },
     failure: { args: { file_ids: [IDS.interview], subjects: [{ file_id: IDS.broll, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.2 } }], replace: "true" }, status: "refused", summary: /^Error: subjects names .*, which is not in file_ids\.$/ },
   },
+  track_point_tool: {
+    happy: { args: { clip_id: IDS.clipA, point: { x: 0.5, y: 0.5 }, max_samples: "5" }, summary: /^Tracked CLIPINTV01 over /, check: ({ receipt }) => expect(receipt.undoSteps).toBe(0) },
+    failure: { args: { clip_id: "NOPE000000", point: { x: 0.5, y: 0.5 } }, status: "refused", summary: /^Error: unknown clip_id NOPE000000\.$/ },
+  },
+  pin_to_track_tool: {
+    happy: { args: { footage_clip_id: IDS.clipB, point: { x: 0.5, y: 0.5 }, label: "Lens" }, summary: /^Pinned \w+ to a position track of CLIPBROL01: \d+ keyframes/ },
+    failure: { args: { footage_clip_id: IDS.clipB, point: { x: 0.5, y: 0.5 }, clip_id: IDS.clipA, label: "x" }, status: "refused", summary: /^Error: give exactly one of clip_id/ },
+  },
+  add_guide_overlay_tool: {
+    happy: { args: { kind: "golden_spiral", clip_id: IDS.clipB, box: { x: 0.4, y: 0.3, w: 0.2, h: 0.3 } }, summary: /^Added a golden_spiral guide \(\w+\) on CLIPBROL01's subject at \(0\.5, 0\.45\)\.$/ },
+    failure: { args: { kind: "ring", clip_id: IDS.clipB }, status: "refused", summary: /^Error: give exactly one of point, box or quad\.$/ },
+  },
+  hold_point_reframe_tool: {
+    happy: { args: { clip_id: IDS.clipB, point: { x: 0.5, y: 0.5 }, zoom: "1.3" }, summary: /^Held CLIPBROL01's tracked point at \(0\.5, 0\.5\) with \d+ keyframes, scale 1\.3-1\.3\.$/ },
+    failure: { args: { clip_id: "NOPE000000", point: { x: 0.5, y: 0.5 } }, status: "refused", summary: /^Error: unknown clip_id NOPE000000\.$/ },
+  },
+  auto_reframe_tool: {
+    happy: {
+      args: { clip_ids: [IDS.clipB], subjects: [{ clip_id: IDS.clipB, box: { x: 0.45, y: 0.2, w: 0.1, h: 0.2 } }], follow: "false" },
+      summary: /^Reframed 1 clip\(s\) to 1080×1920: the crop follows the subject \(fixed\), close \(1\.3×\) every other 4 s\.$/,
+      check: ({ doc }) => expect([doc.project.width, doc.project.height]).toEqual([1080, 1920]),
+    },
+    failure: { args: { clip_ids: ["NOPE000000"] }, status: "refused", summary: /^Error: unknown clip_id NOPE000000\.$/ },
+  },
+  screen_zoom_follow_tool: {
+    happy: { args: { clip_id: IDS.clipB, stops: [{ start: 1, end: 3, x: 0.7, y: 0.3 }] }, summary: /^Zoomed CLIPBROL01 onto 1 stop\(s\) from the stops \(1\.3×, \d+ keyframes\)\.$/ },
+    failure: { args: { clip_id: IDS.clipB, stops: [{ start: 2, end: 1, x: 0.5, y: 0.5 }] }, status: "refused", summary: /^Error: stop 2-1s must end after it starts\.$/ },
+  },
 
   unify_grade_tool: {
     happy: { args: { timeline_clip_ids: [IDS.clipA, IDS.clipB], dry_run: true }, summary: /^Dry run: \d+ of 2 clip\(s\) brought within the band/ },
@@ -1173,6 +1225,52 @@ const SPECS: Record<string, Spec> = {
       check: ({ host }) => expect(host.calls).toContain("inspectRender /out/reel.mp4"),
     },
     failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for review_render_tool/ },
+  },
+  watch_render_tool: {
+    happy: {
+      args: { path: "/out/reel.mp4", brief: "a reel" },
+      summary: /^Watched \/out\/reel\.mp4 \(8\.00s, with sound\) via the Zenvi backend: overall 5\/10, would not post yet\. Watched for "a reel"\./,
+      check: ({ host }) => expect(host.calls).toContain("watch /out/reel.mp4"),
+    },
+    failure: { args: { path: "" }, status: "refused", summary: /^Error: pass either path \(the rendered file\) or render_id/ },
+  },
+  fork_project_tool: {
+    happy: {
+      args: { name: "fast-cuts" },
+      summary: /^Kept the edit \(\d+ clips\) as variant "fast-cuts" at \/projects\/current-fast-cuts\.zvn\. The open project is unchanged\./,
+      check: ({ host, receipt }) => {
+        expect(host.calls).toContain("saveCopy /projects/current-fast-cuts.zvn");
+        expect(receipt.undoSteps).toBe(0);
+      },
+    },
+    failure: { args: { name: "Fast Cuts" }, status: "refused", summary: /^Error: Invalid arguments for fork_project_tool/ },
+  },
+  compare_renders_tool: {
+    happy: {
+      args: { a: "/out/a.mp4", b: "/out/b.mp4" },
+      // The fake judge prefers whichever render is shown first: both orders disagree, the scores tie, a is kept.
+      summary: /^\/out\/a\.mp4 is the better edit \(a tie in both orders and scores; margin \+0 for \/out\/a\.mp4\)\./,
+      check: ({ host }) => expect(host.calls.filter((c) => c.startsWith("compare "))).toEqual(["compare /out/a.mp4 /out/b.mp4", "compare /out/b.mp4 /out/a.mp4"]),
+    },
+    failure: { args: { a: "/out/a.mp4", b: "/out/a.mp4" }, status: "refused", summary: /same render/ },
+  },
+  pick_best_variant_tool: {
+    happy: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      setup: (doc, host) => {
+        host.storage!.readCopy = async (path) => ({ ...structuredClone(doc.project), clips: path.endsWith("a.zvn") ? [] : doc.project.clips });
+      },
+      summary: /^Best of 2: a\.zvn \(\/out\/a\.mp4\)\. a\.zvn is now the open project/,
+      check: ({ doc, receipt }) => {
+        expect(doc.project.clips).toEqual([]);
+        expect(receipt.undoSteps).toBe(1);
+      },
+    },
+    failure: {
+      args: { variants: [{ project: "/projects/variants/a.zvn", render: "/out/a.mp4" }, { project: "/projects/variants/b.zvn", render: "/out/b.mp4" }] },
+      status: "refused",
+      summary: /^Error: could not open variant a\.zvn/,
+    },
   },
   swap_shot_tool: {
     happy: {
@@ -1200,6 +1298,49 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
   },
 
+  align_lyrics_tool: {
+    happy: {
+      args: { timeline_clip_id: IDS.clipA, text: "Hello and welcome,\ntoday we talk about cameras!" },
+      summary: /^Aligned 8 words in 2 line\(s\) to clip CLIPINTV01: 100% heard \(whisper-1\)\.$/,
+      check: ({ receipt, doc }) => {
+        const file = doc.project.files.find((f) => f.id === IDS.interview)!;
+        const asr = (file.ai_metadata as { asr: { transcriptionSource: string; words: { text: string }[] } }).asr;
+        expect(asr.transcriptionSource).toBe("aligned_text");
+        expect(asr.words.map((w) => w.text)).toContain("cameras!");
+        expect(receipt.data).toMatchObject({ lines: [{ text: "Hello and welcome,", start: 0.5, end: 2 }, { text: "today we talk about cameras!", start: 3, end: 4.6 }] });
+        expect(doc.undoLabels).toHaveLength(0);
+      },
+    },
+    failure: { args: { text: "words" }, status: "refused", summary: /^Error: pass timeline_clip_id or file_id \(one of them\)\.$/ },
+  },
+
+  place_on_word_tool: {
+    happy: {
+      args: { word: "today", what: "cut" },
+      summary: /^Placed 1 cut\(s\) on "today" at 2\.\d\ds, each on its word's frame\.$/,
+      check: ({ doc }) => {
+        expect(doc.undoLabels.at(-1)).toBe('Place cut on "today"');
+        expect(doc.project.clips.filter((c) => c.file_id === IDS.interview)).toHaveLength(3);
+      },
+    },
+    failure: { args: { word: "zebra", what: "cut" }, status: "refused", summary: /^Error: "zebra" is not said in the speech searched\./ },
+  },
+
+  insert_broll_on_words_tool: {
+    happy: {
+      args: { keywords: ["cameras"] },
+      summary: /^Inserted 1 B-roll cutaway\(s\) on track \d+, muted:\n {2}\d+\.\d\ds "cameras" 1\.2s {2}file_id=FILEBROL01/,
+      check: ({ receipt, doc }) => {
+        const id = (receipt.data as { created: string[] }).created[0]!;
+        const clip = doc.project.clips.find((c) => c.id === id)!;
+        expect(clip.start).toBe(1);
+        expect((clip.volume as { Points: { co: { Y: number } }[] }).Points[0]!.co.Y).toBe(0);
+        expect(doc.undoLabels.at(-1)).toBe("Insert B-roll on words (1)");
+      },
+    },
+    failure: { args: { timeline_clip_ids: ["NOPE"] }, status: "refused", summary: /^Error: unknown timeline clip NOPE\.$/ },
+  },
+
   add_kinetic_title_tool: {
     happy: {
       args: { text: "No lights no brakes", position_seconds: "1", duration_seconds: "2", animation: "letters" },
@@ -1210,6 +1351,18 @@ const SPECS: Record<string, Spec> = {
       },
     },
     failure: { args: { text: "one two three four five six seven eight nine ten eleven twelve thirteen" }, status: "refused", summary: /^Error: a title has at most 12 words \(got 13\)/ },
+  },
+
+  add_type_block_tool: {
+    happy: {
+      args: { block: "text_on_path", text: "SPIN THE RECORD", position_seconds: "1", duration_seconds: "2", spin: "60" },
+      summary: /^Added text_on_path at 1\.00-3\.00s: 1 clip\(s\) on 1 track\(s\)\.$/,
+      check: ({ doc, host }) => {
+        expect(doc.undoLabels.at(-1)).toBe("Add type block (text on path)");
+        expect([...host.written.keys()].some((p) => p.startsWith("/generated/type-text-on-path-"))).toBe(true);
+      },
+    },
+    failure: { args: { block: "stencil", text: "HI", copies: "5" }, status: "refused", summary: /^Error: copies do not apply to stencil/ },
   },
 
   // --- sound design --------------------------------------------------------------------
@@ -1263,6 +1416,18 @@ const SPECS: Record<string, Spec> = {
       summary: /^Removed 1 motion transition\(s\); restored clips CLIPBROL01, CLIPINTV02\.$/,
     },
     failure: { args: { transition_id: "MTNOPE" }, status: "refused", summary: /^Error: no motion transition with id MTNOPE\.$/ },
+  },
+  add_plate_wipe_tool: {
+    happy: {
+      args: { clip1_id: IDS.clipB, shape: "burst" },
+      summary: /^Added a burst plate wipe on the cut at 15\.00s \(track 1\): covers in 6 frames, holds 2, leaves \(through\) in 9, the next clip pulling back behind it\.$/,
+      check: ({ receipt }) => expect((receipt.data as { sfx_cues: { kind: string }[] }).sfx_cues.map((c) => c.kind)).toEqual(["whoosh", "hit"]),
+    },
+    failure: { args: { track: String(L1), time: 3 }, status: "refused", summary: /^Error: No cut on track/ },
+  },
+  make_transition_mask_tool: {
+    happy: { args: { pattern: "rings", count: 4 }, summary: /^Made a 1280×720 transition mask of 4 rings \(4 steps\): file [A-Z0-9]+\. Pass it to update_transition_tool as mask_file_id\.$/ },
+    failure: { args: { pattern: "hexagons" }, status: "refused", summary: /^Error: Invalid arguments/ },
   },
 
   speed_ramp_tool: {
@@ -1341,7 +1506,7 @@ const SPECS: Record<string, Spec> = {
   },
 
   // --- Zenvi FX (catalog/fx.test.ts covers stacks, windows, slow motion, restoring) ------
-  list_fx_tool: { happy: { summary: /^13 FX\.$/ }, failure: null },
+  list_fx_tool: { happy: { summary: /^16 FX\.$/ }, failure: null },
   apply_fx_tool: {
     happy: {
       args: { clip_id: IDS.clipB, effects: JSON.stringify([{ effect: "bloom", amount: 0.6 }]) },
@@ -1370,6 +1535,15 @@ const SPECS: Record<string, Spec> = {
       check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === IDS.clipB)?.file_id).toBe(IDS.broll),
     },
     failure: { args: { clip_id: "NOPE000000" }, status: "refused", summary: /^Error: unknown timeline clip NOPE000000\.$/ },
+  },
+
+  datamosh_cut_tool: {
+    happy: {
+      args: { clip_id: IDS.clipB, length: "0.4" },
+      summary: /^Clip CLIPBROL01 now plays datamosh_carry \(rendered in 1\.5s\)\.$/,
+      check: ({ host }) => expect(host.calls).toContain("fx /media/broll.mp4 0-5 datamosh_carry carry /media/interview.mp4@10"),
+    },
+    failure: { args: { clip_id: IDS.clipA }, status: "refused", summary: /^Error: no clip ends at the start of CLIPINTV01 on its track; give previous_clip_id\.$/ },
   },
 
   search_sfx_tool: {

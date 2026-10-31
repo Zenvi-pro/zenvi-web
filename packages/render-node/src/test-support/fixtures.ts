@@ -100,6 +100,27 @@ export async function makeImage(dir: string, name: string, opts: { width?: numbe
   return out;
 }
 
+/**
+ * Spoken `text` as 16 kHz mono WAV from the system's text-to-speech (`say`
+ * on macOS, `espeak-ng` elsewhere), or undefined where there is none: speech
+ * recognition tests skip then. Silence of `padSeconds` goes before the voice.
+ */
+export async function makeSpeech(dir: string, name: string, text: string, opts: { padSeconds?: number } = {}): Promise<string | undefined> {
+  await mkdir(dir, { recursive: true });
+  const raw = path.join(dir, `${name}.raw${process.platform === "darwin" ? ".aiff" : ".wav"}`);
+  try {
+    if (process.platform === "darwin") await exec("say", ["-o", raw, text]);
+    else await exec("espeak-ng", ["-w", raw, text]);
+  } catch {
+    return undefined;
+  }
+  const out = path.join(dir, name);
+  const pad = opts.padSeconds ?? 0;
+  const delay = pad > 0 ? ["-af", `adelay=${Math.round(pad * 1000)}:all=1`] : [];
+  await ffmpeg(["-i", raw, ...delay, "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", out]);
+  return out;
+}
+
 export async function writeText(dir: string, name: string, text: string): Promise<string> {
   const out = path.join(dir, name);
   await writeFile(out, text);

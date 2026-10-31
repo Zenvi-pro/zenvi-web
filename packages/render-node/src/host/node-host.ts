@@ -8,7 +8,7 @@
 import { mkdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import type { AssetHost, ExportOptions, ToolHost } from "@zenvi/engine";
+import { isTranscriptionError, TranscriptionError, type AssetHost, type ExportOptions, type ToolHost } from "@zenvi/engine";
 import { backendStock } from "@zenvi/engine/tools";
 import { fetchLibraryHost, type LibraryFetch } from "@zenvi/engine/tools";
 import { analyzeAudio, decodePcm } from "../audio/analyze.js";
@@ -16,24 +16,27 @@ import { sampleFrames } from "../decode/sample-frames.js";
 import { renderMixPcm } from "../audio/mix.js";
 import { measureMix } from "../audio/measure-mix.js";
 import { transcribeMediaFile } from "../audio/speech.js";
+import { localSpeechReady, transcribeLocally } from "../speech/local.js";
 import { engineAssetsDir } from "../resources.js";
 import { encoderNames } from "../ffmpeg/capabilities.js";
 import { ffmpegCanWrite, FORMATS } from "../render/encoder.js";
 import type { RenderEngine } from "../render/engine.js";
 import { renderContactSheet } from "../render/contact-sheet.js";
 import { inspectRender } from "../render/inspect-render.js";
-import { renderFrame } from "../render/render-frame.js";
+import { decodeLuma } from "../decode/luma.js";
+import { renderFrame, renderFrameImages } from "../render/render-frame.js";
 import { renderProject, type RenderProgress } from "../render/render-project.js";
 import { installedFontFamilies } from "../svg/fonts.js";
 import { createNodeMatteHost } from "../matte/host.js";
 import { onnxRuntimeAvailable, rvmModel, type MatteModel } from "../matte/rvm.js";
 import { backendSpeechUpload, createBackendHost, type BackendHostOptions } from "./backend.js";
+import { createNodeWatchHost } from "./watch.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createSfxGenerator } from "./sfx-generate.js";
 import { cacheDir } from "../svg/fonts.js";
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
-import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile } from "./files-out.js";
+import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile, writeProjectCopy } from "./files-out.js";
 import { createNodeScenes3d } from "./scenes3d.js";
 import { createNodeFx } from "./fx.js";
 import { readProjectFile, writeFileAtomic, writeProjectFile } from "./storage.js";
@@ -67,6 +70,12 @@ export interface NodeHostOptions {
   scenes3d?: boolean;
   /** Zenvi FX (ffmpeg footage effects; default true). */
   fx?: boolean;
+  /**
+   * Where speech is transcribed: "auto" (on device once `zenvi speech setup`
+   * ran, else the Zenvi backend when signed in), "local", "cloud" or "off".
+   * Default `ZENVI_SPEECH`, else auto.
+   */
+  speech?: SpeechMode;
   signal?: AbortSignal;
   log?: (message: string) => void;
 }
@@ -76,6 +85,13 @@ export interface NodeHost extends ToolHost {
   resolveMedia(projectPath: string): string;
   /** The open project file, if any. */
   projectFile(): string | undefined;
+}
+
+export type SpeechMode = "auto" | "local" | "cloud" | "off";
+
+export function speechMode(env: NodeJS.ProcessEnv = process.env): SpeechMode {
+  const asked = env.ZENVI_SPEECH?.trim().toLowerCase();
+  return asked === "local" || asked === "cloud" || asked === "off" ? asked : "auto";
 }
 
 const MAX_TEXT_BYTES = 16 * 1024 * 1024;
@@ -144,6 +160,7 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
       reclaimable: (files) => reclaimableMedia(files, collectOptions()),
       removeCopies: (paths) => removeMediaCopies(paths, collectOptions()),
       inspectRender: (p, o) => inspectRender(exportPath(p), { ...o, signal: o.signal ?? options.signal }),
+      decodeLuma: (p, o) => decodeLuma(resolveMedia(p), { ...o, signal: o.signal ?? options.signal }),
     },
     exporter: {
       delivery: "files",
@@ -192,6 +209,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         });
         return { mimeType: format === "jpeg" ? "image/jpeg" : "image/png", data: bytes.toString("base64") };
       },
+      renderFrames: (project, seconds, frameOptions = {}) =>
+        renderFrameImages(project, seconds, { resolveMedia, width: frameOptions.width, engine: options.renderEngine, signal: frameOptions.signal ?? options.signal }),
       renderSheet: (project, tiles, layout, signal) =>
         renderContactSheet(project, tiles, layout, { resolveMedia, engine: options.renderEngine, signal: signal ?? options.signal, log: options.log }),
       // The fonts SVG titles render with here (this computer's fonts and the bundled Lato).
@@ -225,6 +244,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
         return file;
       },
       writeBytes: (p, bytes, _contentType, opts) => writeBytesFile(inProject(p), bytes, opts?.overwrite),
+      readCopy: (p) => readProjectFile(inProject(p)),
+      saveCopy: (project, p, opts) => writeProjectCopy(inProject(p), project, { engineAssetsDir: assets, overwrite: opts?.overwrite }),
       exportMedia: (file, name, folder, render) =>
         exportMediaFile({
           source: resolveMedia(String(file.path ?? "")),
@@ -276,9 +297,32 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
   if (options.backend) {
     host.backend = createBackendHost(options.backend);
     host.stock = backendStock(host.backend);
-    // Speech recognition through the Zenvi backend, as the person `zenvi login` signed in.
-    const upload = backendSpeechUpload(options.backend);
-    host.audio!.transcribe = (p, o) => transcribeMediaFile(resolveMedia(p), { ...o, signal: o?.signal ?? options.signal, upload });
   }
+  const mode = options.speech ?? speechMode(options.env);
+  // On device once set up (free, offline); else through the Zenvi backend, as the person `zenvi login` signed in.
+  const local = (mode === "auto" || mode === "local") && localSpeechReady({ env: options.env });
+  const upload = options.backend && (mode === "auto" || mode === "cloud") ? backendSpeechUpload(options.backend) : undefined;
+  if (local || upload) {
+    host.audio!.transcribe = async (p, o) => {
+      const file = resolveMedia(p);
+      const signal = o?.signal ?? options.signal;
+      if (!local) {
+        if (o?.onDeviceOnly) throw new TranscriptionError("unavailable", "speech recognition is not set up on this machine (zenvi speech setup)");
+        return transcribeMediaFile(file, { ...o, signal, upload: upload! });
+      }
+      try {
+        return await transcribeLocally(file, { ...o, signal, env: options.env, log: options.log });
+      } catch (error) {
+        // A runtime that will not start falls back to the server; anything else (no audio, a failed run) is the answer.
+        if (!upload || o?.onDeviceOnly || !isTranscriptionError(error) || error.code !== "unavailable") throw error;
+        options.log?.(`${error.message}; transcribing through the Zenvi backend instead`);
+        return transcribeMediaFile(file, { ...o, signal, upload });
+      }
+    };
+    if (local) host.audio!.transcribesOnDevice = true;
+  }
+  // Watching a render with sound: the backend as the person `zenvi login` signed in, or a developer Gemini key.
+  const watch = createNodeWatchHost({ env: options.env, backend: options.backend, resolvePath: exportPath, signal: options.signal });
+  if (watch) host.watch = watch;
   return host;
 }

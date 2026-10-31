@@ -34,14 +34,28 @@ const DIRECT_TOOLS = [
   "align_match_cut_tool",
   "detect_subject_tool",
   "match_cut_montage_tool",
+  "track_point_tool",
+  "pin_to_track_tool",
+  "add_guide_overlay_tool",
+  "hold_point_reframe_tool",
+  "auto_reframe_tool",
+  "screen_zoom_follow_tool",
   "sequence_shots_tool",
   "unify_grade_tool",
   "review_edit_tool",
   "review_render_tool",
+  "watch_render_tool",
+  "fork_project_tool",
+  "compare_renders_tool",
+  "pick_best_variant_tool",
   "swap_shot_tool",
   "add_motion_template_tool",
   "kinetic_captions_tool",
+  "align_lyrics_tool",
+  "place_on_word_tool",
+  "insert_broll_on_words_tool",
   "add_kinetic_title_tool",
+  "add_type_block_tool",
   "list_sfx_tool",
   "add_sfx_tool",
   "spot_sound_tool",
@@ -50,7 +64,14 @@ const DIRECT_TOOLS = [
   "apply_motion_transition_tool",
   "apply_motion_transitions_tool",
   "remove_motion_transition_tool",
+  "add_plate_wipe_tool",
+  "make_transition_mask_tool",
   "speed_ramp_tool",
+  "detect_onsets_tool",
+  "snap_cuts_to_onsets_tool",
+  "shot_length_ramp_tool",
+  "detect_music_structure_tool",
+  "spot_action_foley_tool",
   "list_motion_blocks_tool",
   "setup_motion_runtime_tool",
   "add_motion_block_tool",
@@ -62,6 +83,7 @@ const DIRECT_TOOLS = [
   "apply_fx_tool",
   "update_fx_tool",
   "remove_fx_tool",
+  "datamosh_cut_tool",
   "search_sfx_tool",
   "list_credits_tool",
   "create_sound_kit_tool",
@@ -141,6 +163,7 @@ describe("tool catalog", () => {
         else if (key === "effects") args[key] = [{ effect: "bloom", amount: 0.5 }];
         else if (key === "subclips") args[key] = [{ source_start_seconds: 1, source_end_seconds: 2 }];
         else if (key === "clips") args[key] = [{ clip_id: "x", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }];
+        else if (key === "variants") args[key] = [{ project: "a.zvn", render: "a.mp4" }, { project: "b.zvn", render: "b.mp4" }];
         else if (type === "array") args[key] = ["x"];
         // update_effect_tool's properties are an effect's (sigma is Blur's); set_clip_properties_tool takes any object.
         else if (type === "object") args[key] = key === "properties" ? { sigma: 1 } : { x: 1 };
@@ -223,8 +246,8 @@ describe("availability matrix", () => {
   it("agrees with the capability check on every web surface", () => {
     const profiles: Record<"editor" | "cli" | "cloud", HostCapability[]> = {
       editor: ["media", "player", "ui", "exporter", "frames", "backend", "stock", "storage", "assets", "audio"],
-      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx"],
-      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion"],
+      cli: ["media", "exporter", "frames", "audio", "storage", "backend", "stock", "assets", "mattes", "motion", "scenes3d", "fx", "watch"],
+      cloud: ["media", "frames", "storage", "assets", "audio", "backend", "stock", "exporter", "mattes", "motion", "watch"],
     };
     for (const tool of allTools) {
       const a = toolAvailability(tool);

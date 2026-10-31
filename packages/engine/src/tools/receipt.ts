@@ -152,6 +152,9 @@ export function failed(tool: string, message: string, fields: ReceiptFields = {}
 /** Phrases that mark a legacy informational no-op (receipt.py from_handler_str). */
 const UNCHANGED_PHRASES = ["nothing to", "no speech", "already", "no timeline", "no clips", "no files"];
 
+/** Stock failures the desktop words without "Error" (zenvi-backend core/workflows/parse.py is_error_result). */
+const STOCK_FAILURE = /^(pexels|freesound) (search|download) error/i;
+
 /**
  * Wrap a legacy prose / "Error:" handler string as a receipt, exactly like
  * receipt.py `from_handler_str`: errors by prefix, empty text as "No
@@ -159,7 +162,7 @@ const UNCHANGED_PHRASES = ["nothing to", "no speech", "already", "no timeline", 
  */
 export function fromHandlerText(tool: string, text: string, mutated: boolean): ToolReceipt {
   const raw = text ?? "";
-  if (raw.startsWith("Error")) return failed(tool, raw);
+  if (raw.startsWith("Error") || STOCK_FAILURE.test(raw)) return failed(tool, raw);
   if (raw.trim() === "") return unchanged(tool, "No changes.");
   const lower = raw.toLowerCase();
   if (!mutated && UNCHANGED_PHRASES.some((p) => lower.includes(p))) return unchanged(tool, raw);
@@ -186,7 +189,7 @@ export function parseReceipt(text: string): ToolReceipt | null {
 /** The legacy classifier: empty, "Error"-prefixed, or an error/refused receipt (receipt.py is_error_result). */
 export function isErrorResult(text: string): boolean {
   if (!text) return true;
-  if (text.startsWith("Error")) return true;
+  if (text.startsWith("Error") || STOCK_FAILURE.test(text)) return true;
   const receipt = parseReceipt(text);
   if (!receipt) return false;
   return receipt.status === "error" || receipt.status === "refused" || String(receipt.summary ?? "").startsWith("Error");

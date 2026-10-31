@@ -34,6 +34,8 @@ export interface Transcription {
   segments: TimedText[];
   /** Seconds of audio transcribed. */
   durationSeconds: number;
+  /** Heard on this machine (kept as transcriptionSource "local", like the desktop's), not by the Zenvi server. */
+  onDevice?: boolean;
 }
 
 /** The backend route (zenvi-backend PR #67). */

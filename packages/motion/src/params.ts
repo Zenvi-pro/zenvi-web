@@ -5,6 +5,7 @@
  */
 
 import { matchOption } from "@zenvi/engine/tools";
+import { BLOCK_CHECKS } from "./checks.js";
 import { FONT_ROLES, PALETTE_NAMES } from "./tokens.js";
 
 interface ParamBase {
@@ -192,5 +193,7 @@ export function checkParams(manifest: BlockManifest, raw: Readonly<Record<string
     params[name] = coerced.value;
     if (coerced.warning) warnings.push(coerced.warning);
   }
+  const error = BLOCK_CHECKS[manifest.id]?.(params);
+  if (error) return { ok: false, error };
   return { ok: true, params, warnings };
 }
