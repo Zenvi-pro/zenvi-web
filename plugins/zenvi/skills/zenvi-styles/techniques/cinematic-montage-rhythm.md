@@ -33,7 +33,7 @@ Related shot cards: `shot-trailer-grammar-moves`, `shot-beat-cut-moves`, `shot-s
    "start_seconds", "end_seconds"}` - the source window where the subject moves.
 4. One grade over all of it: `unify_grade_tool` `{"strength": 1.0, "look": "<lut>", "look_intensity": 0.4}`
    (fast cuts expose every mismatch).
-5. Quick first cut instead: `build_reel_tool` `{"style": "cinematic", "music_file_id", "duration_seconds"}`,
+5. Quick first cut instead: `build_reel_tool` `{"style": "cinematic", "music_file_id": "<music_file_id>", "duration_seconds": "<duration_seconds>"}`,
    then retime the shots to the plan. A tool that writes the ramp in one call is the missing
    `shot-length-ramp` (GAPS #18).
 

@@ -30,7 +30,7 @@ Related shot card: `shot-grain-dissolve` (grain as a transition into a wordmark)
    (A stock film LUT is optional at 0.4-0.5; `classic_film` at 0.6 blew a blue sky to cyan in the test.)
 2. Grain: `apply_look_tool` `{"clip_ids": "all", "look_id": "grain:35mm_classic"}` (`grain:35mm_fine`
    for clean product shots, `grain:16mm_classic` for documentary).
-3. Halation: `apply_fx_tool` `{"clip_id", "effects": [{"effect": "bloom", "amount": 0.3,
+3. Halation: `apply_fx_tool` `{"clip_id": "<clip_id>", "effects": [{"effect": "bloom", "amount": 0.3,
    "params": {"threshold": 0.72, "radius": 0.35}}]}` on shots with bright edges.
 4. Gate weave: `set_keyframes_tool` `scale_x`/`scale_y` 1.01, then `location_x` and `location_y` with
    8-9 points over the shot, values within +-0.002 (e.g. 0, 0.0018, -0.0012, 0.0022, -0.0019, 0.0008, ...),

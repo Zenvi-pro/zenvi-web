@@ -27,7 +27,7 @@ Related shot cards: `shot-letterspace-materialize` (wide-tracked wordmark drawn 
 
 1. Background shot, slow and dark, at least title + 2 s long: `add_clip_to_timeline_tool`; check the
    file is long enough for `start_seconds` + duration (short stock silently ends early).
-2. `fade_clip_tool` `{"clip_id", "fade_in_seconds": 1.5, "fade_out_seconds": 1.5}`.
+2. `fade_clip_tool` `{"clip_id": "<clip_id>", "fade_in_seconds": 1.5, "fade_out_seconds": 1.5}`.
 3. `add_kinetic_title_tool` `{"text": "THE LONG WINTER", "position_seconds": 1.4, "duration_seconds": 3.4,
    "style": "editorial", "animation": "fade", "stagger_seconds": 0, "emphasis": "none",
    "text_size": 0.11, "y": 0.5}` - `documentary` style for a sans, `stack` for a trailer card on
