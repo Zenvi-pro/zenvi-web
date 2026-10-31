@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger) {
-    if (!stagger || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger === "number" ? { each: stagger } : stagger;
+  function staggerOffsets(count, stagger2) {
+    if (!stagger2 || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -695,6 +695,13 @@ ${error.stack ?? ""}` : String(error);
     const climax = 2.2 * k;
     const side = W > H * 1.3;
     const contentW = W - safe.left - safe.right;
+    const plateKind = String(p.plate ?? "auto");
+    if (plateKind === "glass" || plateKind === "solid" || plateKind === "auto" && ctx.alpha) {
+      const pad = Math.min(48, safe.left * 0.8, safe.top * 0.8);
+      const plate = ctx.el("div", `cb-plate${plateKind === "solid" ? " is-solid" : ""}`);
+      Object.assign(plate.style, { left: `${safe.left - pad}px`, top: `${safe.top - pad}px`, width: `${contentW + 2 * pad}px`, height: `${H - safe.top - safe.bottom + 2 * pad}px` });
+      tl.fromTo(plate, { y: H * 0.03, scale: 0.98, opacity: 0, blur: 10 }, { y: 0, scale: 1, opacity: 1, blur: 0 }, { at: 0, duration: 0.6, ease: "out" });
+    }
     const head = ctx.el("div", "cb-head");
     Object.assign(head.style, { left: `${safe.left}px`, top: `${safe.top}px`, width: `${side ? contentW * 0.38 : contentW}px` });
     if (side) Object.assign(head.style, { height: `${H - safe.top - safe.bottom - 40}px`, justifyContent: "space-between" });

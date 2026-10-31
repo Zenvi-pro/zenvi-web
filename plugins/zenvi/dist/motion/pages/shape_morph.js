@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger) {
-    if (!stagger || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger === "number" ? { each: stagger } : stagger;
+  function staggerOffsets(count, stagger2) {
+    if (!stagger2 || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
