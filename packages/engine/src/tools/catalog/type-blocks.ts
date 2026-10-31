@@ -14,6 +14,7 @@ import { z } from "zod";
 import type { ProjectFile } from "../../model/types.js";
 import { updateFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
+import { timelineFlashChanges } from "../../review/timeline-flashes.js";
 import {
   ECHO_STYLES,
   PATH_SHAPES,
@@ -271,7 +272,7 @@ export const typeBlockTools: CatalogTool[] = [
             });
             break;
           case "strobe":
-            out = buildStrobe({ ...base, words, starts, lockup, ground, ink, accent, layouts: args.layouts ?? STROBE_LAYOUTS, allowStrobe: args.allow_strobe ?? false });
+            out = buildStrobe({ ...base, words, starts, lockup, ground, ink, accent, layouts: args.layouts ?? STROBE_LAYOUTS, allowStrobe: args.allow_strobe ?? false, flashes: timelineFlashChanges(project).map((t) => t - blockStart) });
             break;
         }
       } catch (error) {
