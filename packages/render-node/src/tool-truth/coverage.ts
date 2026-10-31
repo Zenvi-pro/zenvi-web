@@ -218,7 +218,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   duck_tool: { reason: "not proven yet", params: ["bed", "under", "target_vbr_db"] },
   build_reel_tool: { reason: "not proven yet: builds a whole reel (many tools at once)", params: ["style", "music_file_id", "duration_seconds", "hook", "end_card", "end_card_subtitle", "labels", "words", "beats", "bpm", "offset_seconds", "strict_variety", "grade", "keep_order"] },
   align_match_cut_tool: { reason: "not proven yet: render-node/src/render/match-cut.test.ts proves the alignment end to end", params: "*" },
-  match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety", "keep_order"] },
+  match_cut_montage_tool: { reason: "not proven yet: builds a montage from detected subjects", params: ["subjects", "music_file_id", "beats", "bpm", "offset_seconds", "duration_seconds", "target", "fit", "cover", "min_frames", "max_frames", "flash", "zoom_drift", "transitions", "strict_variety", "keep_order", "order"] },
   unify_grade_tool: { reason: "not proven yet: iterative grade matching across clips", params: ["reference_clip_id", "reference_file_id", "strength", "look", "look_intensity", "samples", "max_iterations"] },
   kinetic_captions_tool: { reason: "not proven yet: script cues work without a transcript; cases to write", params: ["behind_subject", "placement", "language"] },
   add_sfx_tool: { reason: "not proven yet", params: ["provider", "sound_id", "title", "max_seconds", "allow_noncommercial", "kit"] },
