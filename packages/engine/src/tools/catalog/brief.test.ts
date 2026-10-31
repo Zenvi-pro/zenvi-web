@@ -160,6 +160,22 @@ describe("save_brief_tool / get_brief_tool", () => {
     expect(doc.undoLabels).toEqual(["fixture", "Save brief", "Save brief", "Save brief"]);
   });
 
+  it("keeps an agent's own draw only when the house library could have drawn it", async () => {
+    const doc = bin();
+    const ctx = { doc, host: fakeHost() };
+    const cinetic = { ...BRIEF, style: "cinetic-launch-film", aspect: "16:9", length_seconds: 25, beats: [{ start: 0, end: 25, name: "all" }], techniques: [] };
+    expect((await runTool(ctx, "save_brief_tool", cinetic)).ok).toBe(true);
+    const own = readBrief(doc.project)!.draw!;
+    const ownSaved = await runTool(ctx, "save_brief_tool", { ...cinetic, goal: "Kiln, again", draw: own });
+    expect(ownSaved.ok, ownSaved.text).toBe(true);
+    const fake = { ...own, picks: [...own.picks.slice(1), { technique: "cin-glow-orb-burst", id: "glow-orb-burst", category: "opening_hook", role: "signature", ban_safe_variant: false }] };
+    const bad = await runTool(ctx, "save_brief_tool", { ...cinetic, goal: "Kiln, made up", draw: fake });
+    expect(bad.ok).toBe(false);
+    expect(bad.text).toContain("draw: glow-orb-burst is not in the cinetic library");
+    expect((await runTool(ctx, "save_brief_tool", { ...BRIEF, draw: own })).text).toContain("draws no techniques");
+    expect(readBrief(doc.project)!.goal).toBe("Kiln, again");
+  });
+
   it("hands over a measured music search when the bin has no music, built from the brief's music line", async () => {
     const doc = bin();
     doc.transaction("no song", (tx) => tx.replace(["files"], doc.project.files.filter((f) => f.id !== "SONGXXXXXX")));

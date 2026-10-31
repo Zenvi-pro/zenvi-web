@@ -9,7 +9,7 @@
 
 import type { Brief, BriefAspect, BriefDraw } from "./brief.js";
 import { CINETIC_TECHNIQUES } from "./cinetic-library.js";
-import { drawSeed, drawTechniques, type Draw, type DrawEnergy, type DrawEntry, type DrawFormat } from "./draw.js";
+import { drawSeed, drawTechnique, drawTechniques, type Draw, type DrawEnergy, type DrawEntry, type DrawFormat } from "./draw.js";
 
 export type TasteProfile = "cinetic";
 
@@ -70,4 +70,27 @@ export function drawForBrand(draw: BriefDraw, style: string, brand?: string): Br
   if (!house) return draw;
   const bans = new Map(house.library.map((e) => [e.id, (e.bans ?? []).length > 0]));
   return { ...draw, picks: draw.picks.map((p) => ({ ...p, ban_safe_variant: !brand && (bans.get(p.id) ?? p.ban_safe_variant) })) };
+}
+
+/**
+ * Why a draw saved with `style` is not one its library could have drawn
+ * (an agent's own `draw` in save_brief_tool), or null when it is: the house
+ * style's library, picks that are its entries with their own technique,
+ * category and role, none twice. The draw is how films stop converging on the
+ * same moves, so a hand-made one is refused, not saved.
+ */
+export function drawProblem(draw: BriefDraw, style: string): string | null {
+  const house = houseStyle(style);
+  if (!house) return `${style} draws no techniques (only the cinetic-* styles do): leave draw out.`;
+  if (draw.library !== house.profile) return `${style} draws from the ${house.profile} library, not ${draw.library}.`;
+  const entries = new Map(house.library.map((e) => [e.id, e]));
+  const seen = new Set<string>();
+  for (const p of draw.picks) {
+    const e = entries.get(p.id);
+    if (!e) return `${p.id} is not in the ${house.profile} library: keep the picks Zenvi drew (get_brief_tool), or save without draw to draw again.`;
+    if (p.technique !== drawTechnique(e) || p.category !== e.category || p.role !== e.role) return `${p.id} is ${drawTechnique(e)} (${e.category}, ${e.role}) in the library, not ${p.technique} (${p.category}, ${p.role}).`;
+    if (seen.has(p.id)) return `${p.id} is drawn twice.`;
+    seen.add(p.id);
+  }
+  return null;
 }

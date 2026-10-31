@@ -9,7 +9,7 @@ import { z } from "zod";
 import { BRIEF_KEY, briefSchema, briefShape, briefSummary, readBrief, type Brief } from "../../brief/brief.js";
 import { checkBrief } from "../../brief/check.js";
 import { coverageLines, footageCoverage } from "../../brief/coverage.js";
-import { drawForBrand, houseDraw, houseStyle } from "../../brief/house.js";
+import { drawForBrand, drawProblem, houseDraw, houseStyle } from "../../brief/house.js";
 import { methodProblems } from "../../brief/method.js";
 import {
   brightnessOf,
@@ -182,7 +182,11 @@ export const briefTools: CatalogTool[] = [
       let brief = briefSchema.parse(fields);
       // A house style keeps the draw it was given for the same film (style, frame and length); else it draws now, away from recent films.
       let drawn = false;
-      if (!brief.draw && houseStyle(brief.style)) {
+      if (brief.draw) {
+        const problem = drawProblem(brief.draw, brief.style);
+        if (problem) return refused(SAVE, `Error: draw: ${problem} Nothing changed.`);
+        brief = { ...brief, draw: drawForBrand(brief.draw, brief.style, brief.brand) };
+      } else if (houseStyle(brief.style)) {
         const before = readBrief(call.doc.project);
         const same = before?.style === brief.style && before.aspect === brief.aspect && before.length_seconds === brief.length_seconds;
         const kept = before?.draw && same ? drawForBrand(before.draw, brief.style, brief.brand) : null;
