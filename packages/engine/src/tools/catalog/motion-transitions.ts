@@ -103,17 +103,21 @@ function thinFlashes(project: Project, cuts: readonly { outClip: { id: string };
   const cutOf = new Map(cuts.map((c) => [c.outClip.id, c.cut]));
   const flashes = timelineFlashChanges(project, new Set(inputs.map((i) => i.outClipId)));
   const before = new Map(listProjectMotionTransitions(project).filter((r) => FLASH_PRESETS.has(r.preset)).map((r) => [r.outClipId, transitionFlashChanges(r.cut, r.frames, fps)]));
+  // The old flash on a cut whose new flash is not decided yet may stay, so earlier cuts count it.
+  const pending = new Map(inputs.filter((i) => FLASH_PRESETS.has(i.preset) && before.has(i.outClipId)).map((i) => [i, before.get(i.outClipId)!]));
   const left = new Set<MotionTransitionInput>();
   const dropped: number[] = [];
   for (const input of [...inputs].sort((a, b) => cutOf.get(a.outClipId)! - cutOf.get(b.outClipId)!)) {
     if (!FLASH_PRESETS.has(input.preset)) continue;
     const cut = cutOf.get(input.outClipId)!;
     const changes = flashOf(project, input.preset, cut, input.frames);
-    if (fitsFlashLimit(flashes, changes)) flashes.push(...changes);
+    const old = pending.get(input) ?? [];
+    pending.delete(input);
+    if (fitsFlashLimit([...flashes, ...[...pending.values()].flat()], changes)) flashes.push(...changes);
     else {
       left.add(input);
       dropped.push(cut);
-      flashes.push(...(before.get(input.outClipId) ?? []));
+      flashes.push(...old);
     }
   }
   return { kept: inputs.filter((i) => !left.has(i)), dropped };
