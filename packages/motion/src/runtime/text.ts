@@ -202,6 +202,12 @@ export function formatNumber(value: number, format: NumberFormat = {}): string {
   return `${format.prefix ?? ""}${sign}${grouped}${frac ? `.${frac}` : ""}${format.suffix ?? ""}`;
 }
 
+/** The fewest decimals (at most `max`: labels, not a data table) that show every value as given: 0.25 and 0.75 need 2. */
+export function decimalsFor(values: readonly number[], max = 3): number {
+  for (let d = 0; d < max; d += 1) if (values.every((v) => Math.abs(Number(v.toFixed(d)) - v) < 1e-9)) return d;
+  return max;
+}
+
 export interface CounterOptions extends NumberFormat {
   from: number;
   to: number;
