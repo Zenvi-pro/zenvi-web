@@ -25,6 +25,7 @@ import {
   nodeProber,
   nodeRenderer,
   nodeTranscribeMedia,
+  nodeWatchProxy,
 } from "./render/node.js";
 import { unavailableProber } from "./render/renderer.js";
 import { AzureBlobStore, AzureTableStore } from "./storage/azure.js";
@@ -89,6 +90,7 @@ async function main(): Promise<void> {
     decodePcm: haveFfmpeg ? nodeDecodePcm : undefined,
     mixPcm: haveFfmpeg && haveFfprobe ? nodeMixPcm : undefined,
     transcribeMedia: haveFfmpeg && haveFfprobe ? nodeTranscribeMedia : undefined,
+    watchProxy: haveFfmpeg && haveFfprobe ? nodeWatchProxy : undefined,
     fontFamilies: nodeFontFamilies,
     supabase: createSupabaseVerifier({ supabaseUrl: config.supabaseUrl, log: (message) => log.warn(message) }),
     renderDispatch,

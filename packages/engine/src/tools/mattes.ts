@@ -197,6 +197,12 @@ export async function generatedSvg(call: ToolCall, stem: string, svg: string): P
   return { hash, media: { path, info: await call.host.media!.probe(path), name: `${stem}.svg` } };
 }
 
+/** A generated drawing as an effect's `mask_reader` (its probed reader JSON, at its path). */
+export function maskReaderOf(asset: GeneratedAsset): Record<string, unknown> {
+  const { media_type: _mediaType, ...reader } = asset.media.info as unknown as Record<string, unknown>;
+  return { ...reader, path: asset.media.path };
+}
+
 /** Write (or reuse) a `.cube` LUT and return a ColorMap effect reading it. */
 export async function generatedLut(call: ToolCall, stem: string, cube: string): Promise<(id: string) => Effect> {
   const { hash, path } = await writeAsset(call, stem, "cube", cube, "text/plain");

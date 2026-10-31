@@ -1,4 +1,4 @@
-import { scrambledText, type BlockContext } from "../../runtime/index.js";
+import { scrambledText, textLines, type BlockContext } from "../../runtime/index.js";
 
 const GLYPHS: Readonly<Record<string, string>> = {
   letters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
@@ -9,7 +9,7 @@ const GLYPHS: Readonly<Record<string, string>> = {
 
 export function build(ctx: BlockContext): void {
   const { tl, params: p, width: W, height: H, safe } = ctx;
-  const lines = String(p.text).split(/\s*(?:\/|\n)\s*/).filter(Boolean);
+  const lines = textLines(String(p.text));
   const box = ctx.el("div", "ts");
   const align = p.align === "left" ? "flex-start" : "center";
   box.style.alignItems = align;

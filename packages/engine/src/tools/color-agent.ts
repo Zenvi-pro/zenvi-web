@@ -371,15 +371,23 @@ export function mergeColorGrade(effect: Json | null, rawPatch: Json): Json {
   if (sat !== undefined && sat !== null && sat !== "") {
     if (toFloat(sat, "saturation") < 0.5) throw new ColorValueError(SATURATION_REFUSAL);
   }
-  // A full paste replaces the colour fields but keeps id and order.
+  // A paste lays its fields over the grade and keeps id and order. zenvi-core's merge_color_grade
+  // (src/classes/color_agent.py) replaces the payload instead: the same result for a full paste,
+  // but a partial one there drops the fields (and the `type`) it leaves out.
   const colorObj = patch.color;
   if (isRecord(colorObj)) {
     const keepId = payload.id;
     const keepOrder = payload.order;
-    payload = structuredClone(colorObj);
+    payload = { ...payload, ...structuredClone(colorObj) };
     payload.class_name = COLOR_GRADE_CLASS_NAME;
     if (keepId) payload.id = keepId;
     if (keepOrder !== undefined && keepOrder !== null) payload.order = keepOrder;
+    // A hand-written paste ({"exposure": 1}) gives plain numbers; libopenshot (and the engine's
+    // kernel) read only keyframes, so a plain number would silently grade nothing.
+    for (const key of SCALAR_KEYS) {
+      const value = payload[key];
+      if (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) setScalar(payload, key, toFloat(value, key));
+    }
   }
   for (const [key, raw] of Object.entries(patch)) {
     if (["color", "lut", "wheels", "reset"].includes(key) || (CURVE_KEYS as readonly string[]).includes(key) || key in CURVE_ALIASES) continue;
