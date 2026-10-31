@@ -24,6 +24,7 @@
 
 import { z } from "zod";
 import { ensureBrief, nearestAspect } from "../../brief/auto.js";
+import { houseStyle } from "../../brief/house.js";
 import { briefSummary, readBrief, type Brief, type BriefAspect } from "../../brief/brief.js";
 import { inventoryEntry, inventoryFiles } from "../../brief/inventory.js";
 import { readRequest } from "../../director/request.js";
@@ -296,7 +297,10 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     else {
       const firstSentence = args.request.split(/(?<=[.!?])\s|\n/)[0] ?? args.request;
       const bpm = args.bpm ?? facts.bpm ?? rule.music.bpm;
+      // A house style draws its techniques away from what the last films on this host drew.
+      const avoid = houseStyle(rule.id) && call.host.draws ? await call.host.draws.recent().catch(() => []) : [];
       brief = ensureBrief(call.doc, args.request, STYLES, {
+        avoid,
         style: rule.id,
         aspect,
         length_seconds: seconds,
@@ -310,6 +314,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
       });
       const auto = brief ?? readBrief(project());
       brief = auto;
+      if (auto?.draw) await call.host.draws?.remember(auto.draw.picks.map((p) => p.technique), project().id).catch(() => undefined);
       director.stages.push({ stage: "brief", tool: TOOL, outcome: "applied", summary: auto ? `saved a minimal brief (auto): ${auto.style}, ${auto.aspect} ${auto.length_seconds}s` : "no brief saved", undo_steps: 0 });
     }
   }
@@ -478,6 +483,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     made,
     `Style: ${rule.id} because ${plan.why}${plan.fallback ? `; ${plan.fallback.wanted} could not run (${plan.fallback.why})` : ""}.`,
     brief ? briefSummary(brief).split("\n")[0]! : "No brief.",
+    ...(brief?.draw ? [`Drawn techniques (${brief.draw.format}, ${brief.draw.energy}): ${brief.draw.picks.map((p) => p.technique).join(", ")}. get_style_tool each; build the ones the concept carries in the film's own objects, drop the rest with a reason.`] : []),
     `Stages (${undoSteps} undo step${undoSteps === 1 ? "" : "s"}, one per stage): ${director.stages.map((s) => `${s.stage} ${s.outcome === "applied" ? "ok" : s.outcome}${s.tool !== "-" && s.outcome !== "applied" ? ` (${s.tool}: ${s.summary})` : ""}`).join(" · ")}`,
     ...(rendered ? [`Render: ${rendered.path}${rendered.seconds ? ` (${rendered.seconds.toFixed(1)} s)` : ""}.`] : []),
     ...(findings.length > 0

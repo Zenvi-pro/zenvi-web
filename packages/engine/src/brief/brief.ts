@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import type { Project } from "../model/types.js";
+import { DRAW_CATEGORIES, DRAW_ENERGIES, DRAW_FORMATS } from "./draw.js";
 
 /** The `settings` key a saved brief lives under. */
 export const BRIEF_KEY = "zenvi_brief";
@@ -70,6 +71,25 @@ export const briefDirectionSchema = z.strictObject({
   why: line(200).describe("Why this pick for this subject, and how it differs from the last edit's."),
 });
 
+/** A house style's technique draw (draw.ts): what to build, in the order the format needs it. */
+export const briefDrawSchema = z.strictObject({
+  library: line(40).describe("The drawn library (cinetic)."),
+  seed: z.coerce.number().int().min(0).max(2 ** 32 - 1),
+  format: z.enum(DRAW_FORMATS),
+  energy: z.enum(DRAW_ENERGIES),
+  picks: z
+    .array(
+      z.strictObject({
+        technique: line(80).describe("The technique file: get_style_tool / zenvi://styles/<technique>."),
+        id: line(80).describe("The library id it was drawn as."),
+        category: z.enum(DRAW_CATEGORIES),
+        role: z.enum(["workhorse", "accent", "signature"]),
+        ban_safe_variant: z.boolean().describe("Build the file's ban-safe variant (the house bans hold)."),
+      }),
+    )
+    .max(24),
+});
+
 export const briefShape = {
   goal: line(300).describe("What the video must make the viewer do or feel, in one sentence."),
   audience: line(200).optional(),
@@ -101,6 +121,8 @@ export const briefShape = {
   checklist: z.array(line(200)).max(16).default([]).describe("The style's finish checklist, the lines review checks before done."),
   critique: line(800).optional().describe("What the self-critique against the style's best-vs-average list changed."),
   missing: z.array(line(200)).max(8).default([]).describe("Facts the person must supply (brand name, URL, price): never invented."),
+  brand: line(300).optional().describe("The person's own brand as they gave it (colours, fonts, logo, tone). It wins over a style's house taste: with it, a cinetic style's bans do not apply."),
+  draw: briefDrawSchema.optional().describe("A house style's technique draw (cinetic-* styles; Zenvi draws it): build the picks the concept can carry, reroll at most twice by saving another, never add one the draw did not give."),
   auto: z.boolean().optional().describe("Set by Zenvi when the first cut saved a minimal brief for an agent that had none; a brief you save yourself leaves it out."),
 };
 
@@ -109,6 +131,7 @@ export const briefSchema = z.strictObject(briefShape);
 export type Brief = z.output<typeof briefSchema>;
 export type BriefBeat = z.output<typeof briefBeatSchema>;
 export type BriefTechnique = z.output<typeof briefTechniqueSchema>;
+export type BriefDraw = z.output<typeof briefDrawSchema>;
 
 /** The brief saved on `project`, or null (none, or one this version cannot read). */
 export function readBrief(project: Project): Brief | null {
@@ -133,6 +156,7 @@ export function briefSummary(brief: Brief): string {
     `Hook: ${brief.hook}`,
     `Beats: ${beats}.`,
     techniques ? `Techniques: ${techniques}.` : "",
+    brief.draw ? `Drawn (${brief.draw.library}, ${brief.draw.format}, ${brief.draw.energy}, seed ${brief.draw.seed}): ${brief.draw.picks.map((p) => `${p.technique}${p.ban_safe_variant ? " (ban-safe variant)" : ""}`).join(", ")}.` : "",
     brief.missing.length > 0 ? `Missing from the person: ${brief.missing.join("; ")}.` : "",
   ]
     .filter(Boolean)

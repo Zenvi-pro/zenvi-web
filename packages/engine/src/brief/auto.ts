@@ -9,13 +9,15 @@
  * and its receipt says so. A brief the agent saves replaces it; checks
  * against it only advise (`auto`, check.ts). produce_video_tool saves the
  * same auto brief with what it read of the whole request (a plan: the routed
- * style, the length, the hook, the music).
+ * style, the length, the hook, the music). A house style's brief also gets
+ * its technique draw (house.ts), avoiding what recent films drew.
  */
 
 import type { ProjectDocument } from "../history/document.js";
 import type { Project } from "../model/types.js";
 import { timelineEnd } from "../timeline/queries.js";
 import { aspectRatio, BRIEF_ASPECTS, BRIEF_KEY, readBrief, type Brief, type BriefAspect } from "./brief.js";
+import { houseDraw } from "./house.js";
 
 /** Length of an auto brief when the timeline is still empty: a social reel. */
 export const AUTO_LENGTH_SECONDS = 15;
@@ -42,6 +44,10 @@ const STYLE_WORDS: Readonly<Record<string, readonly string[]>> = {
   "grid-montage": ["grid", "split", "tiles", "panels", "collage"],
   tutorial: ["tutorial", "how-to", "howto", "tips", "steps", "recipe", "breakdown"],
   "showreel-intro": ["showreel", "intro", "portfolio", "studio", "about"],
+  "cinetic-launch-film": ["cinetic"],
+  "cinetic-logo-sting": ["sting", "logo-sting"],
+  "cinetic-ui-walkthrough": ["walkthrough", "walk-through", "onboarding"],
+  "cinetic-feature-loop": ["loop", "looping"],
 };
 
 const STOP = new Set(["the", "and", "for", "with", "a", "an", "of", "to", "in", "on", "it", "is", "my", "your", "this", "that", "from", "one", "use", "when", "into"]);
@@ -113,6 +119,10 @@ export interface AutoBriefPlan {
   sound?: string;
   end_card?: string;
   missing?: string[];
+  /** The person's own brand, when they gave one: it wins over a house style's bans. */
+  brand?: string;
+  /** Techniques recent films drew (the host's memory): a house style's draw skips them. */
+  avoid?: readonly string[];
 }
 
 /** A minimal brief for `project` from what is known: the words of the request so far, the frame, the timeline, a caller's plan. */
@@ -120,12 +130,14 @@ export function autoBrief(project: Project, text = "", candidates: readonly { id
   const aspect = plan.aspect ?? nearestAspect(project);
   const end = timelineEnd(project);
   const length = Math.round((plan.length_seconds ?? (end >= 1 ? end : AUTO_LENGTH_SECONDS)) * 10) / 10;
+  const style = plan.style ?? matchStyle(text, candidates);
+  const draw = houseDraw({ style, aspect, seconds: length, text, avoid: plan.avoid, brand: plan.brand });
   return {
     goal: plan.goal ?? "Not given yet: refine with save_brief_tool.",
     platform: plan.platform ?? PLATFORM[aspect],
     aspect,
     length_seconds: length,
-    style: plan.style ?? matchStyle(text, candidates),
+    style,
     techniques: [],
     hook: plan.hook ?? "The strongest shot first, with motion and sound from frame 1.",
     beats: [{ start: 0, end: length, name: "whole piece" }],
@@ -138,6 +150,8 @@ export function autoBrief(project: Project, text = "", candidates: readonly { id
     ...(plan.sound ? { sound: plan.sound } : {}),
     ...(plan.end_card ? { end_card: plan.end_card } : {}),
     missing: plan.missing ?? [],
+    ...(plan.brand ? { brand: plan.brand } : {}),
+    ...(draw ? { draw } : {}),
     auto: true,
   };
 }

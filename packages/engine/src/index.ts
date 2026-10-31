@@ -69,6 +69,8 @@ export * from "./brief/brief.js";
 export * from "./brief/check.js";
 export * from "./brief/method.js";
 export * from "./brief/auto.js";
+export * from "./brief/draw.js";
+export * from "./brief/house.js";
 export * from "./motion/index.js";
 export * from "./typography/index.js";
 export * from "./links/zenvi-link.js";

@@ -35,6 +35,7 @@ import { createNodeWatchHost } from "./watch.js";
 import { createNodeMediaHost, missingOnDisk, type ImportPolicy } from "./media.js";
 import { createSfxGenerator } from "./sfx-generate.js";
 import { cacheDir } from "../svg/fonts.js";
+import { createDrawMemory } from "./draw-memory.js";
 import { createMediaResolver } from "./paths.js";
 import { customProfileFiles, desktopRecentProjects, recoveryCopiesFor, removeCustomProfileFile, restoreRecoveryCopy, writeCustomProfileFile } from "./desktop-files.js";
 import { collectMedia, exportMediaFile, reclaimableMedia, removeMediaCopies, writeBytesFile, writeProjectCopy } from "./files-out.js";
@@ -266,6 +267,8 @@ export function createNodeHost(options: NodeHostOptions = {}): NodeHost {
     log: options.log,
   };
   if (assets) host.assets = createAssetHost(assets);
+  // What recent films drew, so a house style's next draw differs (machine-wide, next to the other caches).
+  host.draws = createDrawMemory(cacheDir(options.env));
   // Sound effects generated for cues the recorded kit lacks, where a paid ElevenLabs key is configured.
   const generateSfx = createSfxGenerator({ env: options.env, cacheRoot: cacheDir(options.env) });
   if (generateSfx) host.audio!.generateSfx = generateSfx;
