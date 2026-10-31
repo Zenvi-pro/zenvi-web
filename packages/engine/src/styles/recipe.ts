@@ -89,12 +89,21 @@ function sections(body: string): { title: string; intro: string; sections: Secti
   };
 }
 
-/** Markdown reflowed: paragraphs joined onto one line, list items and table rows kept one a line. */
+/** Markdown reflowed: paragraphs joined onto one line, list items, table rows and code lines kept one a line. */
 function reflow(text: string): string {
   const out: string[] = [];
+  let fenced = false;
   for (const raw of text.split("\n")) {
     const line = raw.trim();
-    if (line.startsWith("```")) continue;
+    // A code block is one call a line: kept as lines, the fence dropped.
+    if (line.startsWith("```")) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) {
+      if (line !== "") out.push(line);
+      continue;
+    }
     if (line === "") {
       if (out.length > 0 && out[out.length - 1] !== "") out.push("");
       continue;
