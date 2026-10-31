@@ -77,6 +77,9 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
     expect(receipt.summary).toContain("- PROBLEM: ends on 0.80s of black from 9.20s");
     expect(receipt.summary).toContain("- PROBLEM: true peak +0.5 dBTP is over the -1.0 dBTP ceiling: it clips; master the audio");
     expect(receipt.summary).toContain("- warning: the same shot appears 2 times (shots #1, #3 at 0.00s, 4.00s)");
+    // The watch is of the render made after the fixes, not this one.
+    expect(receipt.summary).toContain("rendered again with no PROBLEM left: watch_render_tool {path: the new render} once");
+    expect(receipt.summary).not.toContain('watch_render_tool {"path":"out.mp4"}');
     const data = receipt.data as Row;
     expect(data.ok).toBe(false);
     expect(data.repeats).toEqual([{ shots: [1, 3], minGapSeconds: 4 }]);
@@ -130,6 +133,7 @@ describe("review_render_tool", { timeout: 30_000 }, () => {
       /0 problem\(s\), 0 warning\(s\)\. 2 shot\(s\), 2 distinct, 0\.2 cuts\/s; -14\.1 LUFS, true peak -1\.4 dBTP; ends on a 1\.50s hold\./,
     );
     expect((ok.data as Row).ok).toBe(true);
+    expect(ok.summary).toContain('\nNext: watch_render_tool {"path":"out.mp4"} once');
 
     ed.host.media!.inspectRender = async () => {
       throw new Error("No such file");

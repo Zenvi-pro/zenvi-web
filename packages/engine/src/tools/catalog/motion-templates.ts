@@ -21,7 +21,7 @@ import { createLayer } from "../../model/defaults.js";
 import { generateId, idFactory } from "../../model/ids.js";
 import { isAudioOnlyMedia, isSingleImageMedia } from "../../model/media.js";
 import { findLayer } from "../../model/query.js";
-import type { Clip, Project, ProjectFile } from "../../model/types.js";
+import type { Clip, Effect, Project, ProjectFile } from "../../model/types.js";
 import { addClip, setClipProperty, setClipSpeed } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
 import { patchClip } from "../../ops/internal.js";
@@ -60,6 +60,11 @@ const DEFAULT_PALETTE: Readonly<Record<MotionTemplateId, PaletteId>> = {
   grid_background: "ui_light",
   end_card: "ui_light",
   grid: "ui_dark",
+  card_cascade: "ui_light",
+  compare: "ui_dark",
+  window_cascade: "ui_dark",
+  pass_wipe: "ui_dark",
+  reflow: "ui_dark",
 };
 
 const TEMPLATE_LINES = MOTION_TEMPLATE_IDS.map((id) => `${id}: ${TEMPLATES[id].summary} Reads ${TEMPLATES[id].reads}.`).join(" ");
@@ -78,7 +83,7 @@ const input = z.strictObject({
   text: z.string().max(200).optional().describe("Main text: the typed phrase (type_search), the headline (kinetic_type; * stands for an image tile), the title (end_card), the caption (step_card), the product name (callout)."),
   subtitle: z.string().max(120).optional().describe("A second line: end_card's subtitle, the text cards' line (ui_cards), the prompt above the search (type_search), a still header at the top (step_card)."),
   words: z.array(z.string().min(1).max(40)).max(12).optional().describe("word_scroll: the word list (2-10 words)."),
-  file_ids: z.array(z.string().min(1)).max(9).optional().describe("Media-bin videos or photos: the cards (ui_cards), the shot (crop_labels), the product (callout), the step's footage (step_card), the image tiles (kinetic_type), the clips that fill the tiles (grid; cycled when there are fewer than tiles; one clip for layout repeat or kaleidoscope)."),
+  file_ids: z.array(z.string().min(1)).max(9).optional().describe("Media-bin videos or photos: the cards (ui_cards), the shot (crop_labels), the product (callout), the step's footage (step_card), the image tiles (kinetic_type), the clips that fill the tiles (grid; cycled when there are fewer than tiles; one clip for layout repeat or kaleidoscope), the cards (card_cascade, 2-9), the clips to compare (compare, 2-4, raw first), the panes (window_cascade, 2-6), the passes in order (pass_wipe, 2-6), the cells (reflow, 2-9, the first on top)."),
   labels: z.array(z.string().max(48)).max(8).optional().describe("Short labels: card captions (ui_cards), suggestions under the search (type_search), crop box labels (crop_labels), callout names (callout), corner labels (grid_background editorial)."),
   values: z.array(z.string().max(48)).max(8).optional().describe("callout: the second line of each callout (a spec, a number)."),
   points: z.array(z.strictObject({ x: unit, y: unit })).max(8).optional().describe("callout: anchor points on the product picture (0-1 from its top left); step_card: the point the label's arrow points at; grid kaleidoscope: [the mirror centre on the shot] (default its middle)."),
@@ -86,8 +91,20 @@ const input = z.strictObject({
   button: z.string().max(24).optional().describe("A button's label: type_search's search button, ui_cards' button the pointer clicks."),
   tag: z.string().max(32).optional().describe("A small tag: kinetic_type's (e.g. NO. 01), end_card plain's, step_card's label box, type_search's brand row, crop_labels' label prefix, callout's heading prefix (default ANATOMY)."),
   step: z.number().int().min(1).max(99).optional().describe("step_card: the step number."),
-  highlight: z.number().int().min(0).max(30).optional().describe("kinetic_type: index of the word the highlighter marks."),
-  variant: z.string().max(20).optional().describe("grid_background: paper | editorial | dots | plain; end_card: logo | save | plain."),
+  highlight: z.number().int().min(0).max(30).optional().describe("kinetic_type: index of the word the highlighter marks; window_cascade: the pane (0-based) that goes full bleed."),
+  sound: z.boolean().optional().describe("card_cascade: each card plays its own sound until the next one lands; compare: keep the first clip's sound. Default: muted under the music."),
+  replay: z.boolean().optional().describe("compare: end on the last clip alone, the split growing back into one full frame on a beat about 60 % of the way in."),
+  states: z
+    .array(z.array(z.strictObject({ x: unit, y: unit, w: unit.gt(0), h: unit.gt(0) })).min(2).max(9))
+    .min(1)
+    .max(4)
+    .optional()
+    .describe("reflow: the layouts the cells move to after the first (a grid), one every two beats: each a list of boxes, one per file_id in order (centre x, y and size w, h, 0-1 of the frame). Default: a bento, then the first cell alone."),
+  variant: z
+    .string()
+    .max(20)
+    .optional()
+    .describe("grid_background: paper | editorial | dots | plain; end_card: logo | save | plain; card_cascade: paper | blur | none (the field under the cards); compare: side_by_side | stacked | diagonal | offset; pass_wipe: right | left | down | up (the way the wipe's edge travels)."),
   align: z.enum(["left", "center"]).optional().describe("Text alignment (kinetic_type, end_card plain)."),
   position: z.enum(["top", "center", "bottom"]).optional().describe("Where the text sits (kinetic_type)."),
   backdrop: z.boolean().optional().describe("Draw the template's own background (end_card and grid default true; type_search and word_scroll default false)."),
@@ -197,19 +214,33 @@ export type Written = Map<string, ImportedMedia>;
 export async function writeDrawings(call: ToolCall, plan: MotionPlan, prefix: string): Promise<Written | string> {
   const media = call.host.media!;
   const out: Written = new Map();
-  for (const layer of plan.layers) {
-    if (layer.source.kind !== "svg") continue;
-    const name = `${prefix}-${layer.source.name}.svg`;
+  // A window's mask is written like a drawing (its own file, so a failed call deletes only its own).
+  const files = plan.layers.flatMap((layer): [string, string, string][] => [
+    ...(layer.source.kind === "svg" ? [[layer.name, `${prefix}-${layer.source.name}.svg`, layer.source.svg] as [string, string, string]] : []),
+    ...(layer.mask ? [[maskKey(layer.name), `${prefix}-${layer.name}-mask.svg`, layer.mask.svg] as [string, string, string]] : []),
+  ]);
+  for (const [key, name, svg] of files) {
     let path: string | undefined;
     try {
-      path = await media.writeGenerated!(name, new TextEncoder().encode(layer.source.svg), "image/svg+xml");
-      out.set(layer.name, { path, info: await media.probe(path), name });
+      path = await media.writeGenerated!(name, new TextEncoder().encode(svg), "image/svg+xml");
+      out.set(key, { path, info: await media.probe(path), name });
     } catch (error) {
       await discardDrawings(call, [...[...out.values()].map((m) => m.path), ...(path === undefined ? [] : [path])]);
       return `Error: could not write the template's drawing ${name}: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
   return out;
+}
+
+const maskKey = (layer: string): string => `${layer}#mask`;
+
+/** A layer's effects with ids, its window's Mask effect last, reading the written mask image. */
+function layerEffects(layer: MotionLayer, written: Written, nextId: () => string): Effect[] {
+  const effects = layer.effects.map((e) => ({ ...e, id: nextId() }) as Effect);
+  if (!layer.mask) return effects;
+  const image = written.get(maskKey(layer.name))!;
+  const { media_type: _mediaType, ...reader } = image.info as unknown as Record<string, unknown>;
+  return [...effects, { ...layer.mask.effect, id: nextId(), mask_reader: { ...reader, path: image.path } } as unknown as Effect];
 }
 
 /** Delete drawings no bin file points at (the call that wrote them failed), where the host can. */
@@ -251,7 +282,7 @@ export function placeMotionPlan(
     const at = position + layer.start / fps;
     const seconds = layer.frames / fps;
     const track = tracks[layer.track]!;
-    const effects = layer.effects.map((e) => ({ ...e, id: nextId() }));
+    const effects = layerEffects(layer, written, nextId);
     const clipTitle = `${title} ${layer.name}`;
     if (layer.source.kind === "svg") {
       const file = addFile(tx, written.get(layer.name)!, { mediaType: "image" });
@@ -312,7 +343,8 @@ export const motionTemplateTools: CatalogTool[] = [
     title: "Add a motion template",
     description:
       "Place one motion-design template on the timeline, timed to the beat: UI cards that slide in with depth, a search field that types, a scrolling word list with a selection box, " +
-      "labelled crop boxes over a shot, a product callout with leader lines, kinetic type with image tiles, a tutorial step card, a grid background or an end card. " +
+      "labelled crop boxes over a shot, a product callout with leader lines, kinetic type with image tiles, a tutorial step card, a grid background, an end card, " +
+      "a cascade of video cards dropping in, a frame-locked A/B compare (split, diagonal or offset boxes), skewed parallelogram windows snapping to full bleed, a layer-pass breakdown wiped on with a travelling hairline, or footage cells reflowing between grid layouts. " +
       "Drawings are SVG titles and the media plays inside them, all animated with clip keyframes, so the result renders the same on every Zenvi surface and stays editable. " +
       `One undo step; the layers go on the lowest free tracks above the video. For a whole motion-led video use build_reel_tool with a motion style (ui_promo, editorial_motion, product_callout, tutorial). ${FINISH_HINT}`,
     input,
@@ -366,6 +398,9 @@ export const motionTemplateTools: CatalogTool[] = [
         ...(args.align ? { align: args.align } : {}),
         ...(args.position ? { position: args.position } : {}),
         ...(args.backdrop !== undefined ? { backdrop: args.backdrop } : {}),
+        ...(args.sound !== undefined ? { sound: args.sound } : {}),
+        ...(args.replay !== undefined ? { replay: args.replay } : {}),
+        ...(args.states ? { states: args.states } : {}),
         ...(gridOptions ? { grid: gridOptions } : {}),
       };
       const [width, height] = projectSize(project);

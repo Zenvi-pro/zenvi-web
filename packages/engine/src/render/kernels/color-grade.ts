@@ -286,7 +286,7 @@ function isPresent(v: EvaluatedParam | undefined): boolean {
  * `*_keyframes` beats the scalar key; a scalar amount/luma is narrowed to
  * float and clamped to ±1; a `color` string replaces white only when valid.
  */
-function wheelBias(entry: Params | undefined): Bias {
+export function wheelBias(entry: Params | undefined): Bias {
   let rgba: RGBA = WHITE;
   let amount = 0;
   let lumaShift = 0;

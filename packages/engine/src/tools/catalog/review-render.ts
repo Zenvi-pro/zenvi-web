@@ -223,7 +223,7 @@ export const reviewRenderTools: CatalogTool[] = [
       "Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), " +
       "how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), " +
       "with one contact sheet of the shots and the last frame (problems framed red). Call it on the file render/export wrote, after mastering; " +
-      "fix every PROBLEM line and render again. Changes nothing.",
+      "fix every PROBLEM line and render again, then watch_render_tool once for the critique by eye and ear. Changes nothing.",
     input,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     requires: ["media", "frames"],
@@ -295,7 +295,13 @@ export const reviewRenderTools: CatalogTool[] = [
         (swaps && swaps.length > 0 ? `\nSwap the repeats for footage not on screen yet (one call each, then render and review again):\n${swapLines(swaps)}` : "") +
         (swaps && swaps.length === 0 && repeats.length > 0 ? "\nNo unused clip or unused part of a clip is left to swap in: import more footage for the repeats." : "") +
         (finish.length > 0 ? `\nNot finished (the open project), fix in this order, then render and review again:\n${finishLines(finish).map((l) => `- FINISH: ${l}`).join("\n")}` : "") +
-        (images.length > 0 ? "\nContact sheet attached: shots in order, the last tile is the end; problems are framed red." : "");
+        (images.length > 0 ? "\nContact sheet attached: shots in order, the last tile is the end; problems are framed red." : "") +
+        // Meters and frames cannot hear a silent whip or feel a sagging middle; a watch can.
+        (call.host.watch
+          ? count("problem") === 0
+            ? `\nNext: watch_render_tool ${JSON.stringify({ path: args.path })} once, so an editor watches it with sound and names what to fix.`
+            : "\nOnce the PROBLEM lines are fixed and rendered again with no PROBLEM left: watch_render_tool {path: the new render} once, so an editor watches it with sound and names what to fix."
+          : "");
       const data = {
         path: args.path,
         duration: inspection.duration,

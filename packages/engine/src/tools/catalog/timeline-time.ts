@@ -390,7 +390,8 @@ async function separateClipAudio(call: ToolCall, input: ContractInput<"separate_
   const tracks = [...new Set(created.map((c) => String(c.track)))].sort();
   return ok(
     call,
-    `Separated the audio of ${clips.length} clip(s) into ${created.length} audio clip(s) on track(s) ${tracks.join(", ") || "-"}; the originals are muted.`,
+    // The new ids in the line itself (skc-cinematic: agents read the summary, not data.audio_clips).
+    `Separated the audio of ${clips.length} clip(s) into ${created.length} audio clip(s) (${created.map((c) => c.timeline_clip_id).join(", ")}) on track(s) ${tracks.join(", ") || "-"}; the originals are muted.`,
     { audio_clips: created, originals },
   );
 }

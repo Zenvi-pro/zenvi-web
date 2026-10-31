@@ -12,8 +12,9 @@
 import { createHash } from "node:crypto";
 import { mkdir, rename, rm, stat } from "node:fs/promises";
 import path from "node:path";
-import { buildFxGraph, FX_RENDERER_VERSION, type FxHost, type FxRender, type FxRenderRequest } from "@zenvi/engine";
+import { buildFxGraph, FX_RENDERER_VERSION, type FxEffect, type FxHost, type FxRender, type FxRenderRequest } from "@zenvi/engine";
 import { runBinary } from "../ffmpeg/process.js";
+import { prepareCarry, type CarryInputs } from "./datamosh.js";
 
 export interface FxRendererOptions {
   ffmpeg: string;
@@ -86,7 +87,7 @@ export async function probeFxSource(ffprobe: string, file: string, signal?: Abor
 }
 
 /** sha256 of what a render depends on (hex). */
-export function fxFingerprint(parts: { source: string; size: number; mtimeMs: number; start: number; end: number; graph: string }): string {
+export function fxFingerprint(parts: { source: string; size: number; mtimeMs: number; start: number; end: number; graph: string; carry?: { source: string; size: number; mtimeMs: number; at: number } }): string {
   const text = JSON.stringify({ v: FX_RENDERER_VERSION, ...parts });
   return createHash("sha256").update(text).digest("hex");
 }
@@ -119,7 +120,16 @@ export function createFxRenderer(options: FxRendererOptions): FxHost {
       if (!(end > start)) throw new Error(`the range ${request.start}-${request.end}s is outside ${path.basename(source)} (${info.duration}s).`);
       const duration = end - start;
       const graph = buildFxGraph(request.effects, { width: info.width, height: info.height, fps: info.fps, duration, alpha: info.alpha, audio: info.audio, sar: info.sar });
-      const fingerprint = fxFingerprint({ source, size: st.size, mtimeMs: Math.round(st.mtimeMs), start, end, graph: graph.filterComplex });
+      const mosh = request.effects.find((e): e is FxEffect<"datamosh_carry"> => e.effect === "datamosh_carry");
+      let carry: { source: string; size: number; mtimeMs: number; at: number } | undefined;
+      if (mosh) {
+        if (!request.carry) throw new Error("datamosh_carry needs the footage before the cut (use datamosh_cut_tool).");
+        const before = path.resolve(options.resolveMedia(request.carry.path));
+        const bst = await stat(before).catch(() => null);
+        if (!bst?.isFile()) throw new Error(`the footage before the cut, ${request.carry.path}, is missing.`);
+        carry = { source: before, size: bst.size, mtimeMs: Math.round(bst.mtimeMs), at: request.carry.at };
+      }
+      const fingerprint = fxFingerprint({ source, size: st.size, mtimeMs: Math.round(st.mtimeMs), start, end, graph: graph.filterComplex, ...(carry ? { carry } : {}) });
       const name = `${fingerprint.slice(0, 20)}.mov`;
       const outDir = options.outputDir();
       const frames = Math.max(1, Math.ceil((graph.duration * info.fps.num) / info.fps.den - 1e-6));
@@ -146,6 +156,8 @@ export function createFxRenderer(options: FxRendererOptions): FxHost {
       await mkdir(outDir, { recursive: true });
       const out = path.join(outDir, name);
       const partial = path.join(outDir, `.${fingerprint.slice(0, 20)}.partial.mov`);
+      let mosher: CarryInputs | null = null;
+      if (mosh && carry) mosher = await prepareCarry({ ffmpeg: options.ffmpeg, ffprobe: options.ffprobe, source: carry.source, at: carry.at, effect: mosh, target: info, duration, signal: request.signal });
       const hw = options.hwaccel !== false && process.platform === "darwin" && /^(h264|hevc|prores)$/.test(info.codec);
       const audio = graph.audioLabel ? ["-map", `[${graph.audioLabel}]`] : info.audio ? ["-map", "0:a:0?"] : [];
       const args = [
@@ -161,6 +173,7 @@ export function createFxRenderer(options: FxRendererOptions): FxHost {
         String(duration),
         "-i",
         source,
+        ...(mosher?.args ?? []),
         "-filter_complex",
         graph.filterComplex,
         "-map",
@@ -188,6 +201,8 @@ export function createFxRenderer(options: FxRendererOptions): FxHost {
       } catch (error) {
         await rm(partial, { force: true });
         throw error;
+      } finally {
+        await mosher?.dispose();
       }
       const seconds = (Date.now() - t0) / 1000;
       options.log?.(`zenvi fx: ${request.effects.map((e) => e.effect).join("+")} ${info.width}x${info.height} ${duration.toFixed(2)}s in ${seconds.toFixed(1)}s`);
