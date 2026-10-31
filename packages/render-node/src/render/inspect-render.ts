@@ -1,20 +1,25 @@
 /**
  * `MediaHost.inspectRender`: ffmpeg's detectors over a rendered file in one
  * decode pass. `blackdetect`, `freezedetect` and `scdet` read the picture;
- * `silencedetect` and `ebur128` (true peak) read the mix. The engine's
+ * `silencedetect` and `ebur128` (true peak) read the mix; after them, a
+ * small copy at PICTURE_FPS is measured by `signalstats` (mean luma, chroma
+ * and change per frame) for the rhythm checks. The engine's
  * review_render_tool sets the thresholds and turns the stretches into
  * verdicts; this only runs ffmpeg and parses its log.
  */
 
-import type { RenderInspection, RenderInspectOptions, TimeRange } from "@zenvi/engine";
+import type { PictureSeries, RenderInspection, RenderInspectOptions, TimeRange } from "@zenvi/engine";
 import { resolveBinary } from "../ffmpeg/binaries.js";
 import { runBinary } from "../ffmpeg/process.js";
 import { probe } from "../probe/probe.js";
 
 /** Longest file inspected, seconds: a review is of a short edit, not a feature. */
 const MAX_SECONDS = 900;
-/** The detectors log a line per stretch; this holds thousands of them. */
-const LOG_LIMIT = 4 * 1024 * 1024;
+/** The detectors log a line per stretch and the picture series 8 lines a sample: this holds 900 s of them. */
+const LOG_LIMIT = 16 * 1024 * 1024;
+/** Samples a second of the picture series: enough to see a 0.6 s still and every shot's colour. */
+export const PICTURE_FPS = 15;
+const SERIES_KEYS = ["YAVG", "UAVG", "VAVG", "YDIF"] as const;
 
 const round = (value: number): number => Math.round(value * 1000) / 1000;
 
@@ -61,6 +66,7 @@ export function parseInspectLog(
   for (const match of log.matchAll(/lavfi\.scd\.score:\s*([\d.]+),\s*lavfi\.scd\.time:\s*([\d.]+)/g)) {
     cuts.push({ time: round(Number(match[2])), score: Math.round(Number(match[1]) * 10) / 10 });
   }
+  const picture = parsePictureSeries(log);
   let loudness: RenderInspection["loudness"] = null;
   if (hasAudio) {
     const at = log.lastIndexOf("Summary:");
@@ -75,7 +81,35 @@ export function parseInspectLog(
       truePeakDb: peak === null || peak <= -120 ? null : Math.round(peak * 10) / 10,
     };
   }
-  return { black, frozen, cuts, silences, loudness };
+  return { black, frozen, cuts, silences, loudness, ...(picture ? { picture } : {}) };
+}
+
+/** The `metadata=mode=print` lines of the signalstats branch as a series (8-bit studio range to 0-1 and -1..1). */
+export function parsePictureSeries(log: string): PictureSeries | null {
+  const rows = new Map<number, Partial<Record<(typeof SERIES_KEYS)[number], number>>>();
+  let t: number | null = null;
+  for (const line of log.split(/\r?\n/)) {
+    if (!line.includes("Parsed_metadata")) continue;
+    const time = /pts_time:\s*(-?[\d.]+)/.exec(line);
+    if (time) {
+      t = Math.round(Number(time[1]) * 1000) / 1000;
+      continue;
+    }
+    const kv = /lavfi\.signalstats\.(YAVG|UAVG|VAVG|YDIF)=(-?[\d.]+)/.exec(line);
+    if (kv && t !== null) rows.set(t, { ...rows.get(t), [kv[1]!]: Number(kv[2]) });
+  }
+  const times = [...rows.keys()].sort((a, b) => a - b).filter((k) => SERIES_KEYS.every((key) => rows.get(k)![key] !== undefined));
+  if (times.length === 0) return null;
+  const r3 = (v: number): number => Math.round(v * 1000) / 1000;
+  const clampTo = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+  return {
+    fps: PICTURE_FPS,
+    t: times,
+    luma: times.map((k) => r3(clampTo((rows.get(k)!.YAVG! - 16) / 219, 0, 1))),
+    u: times.map((k) => r3(clampTo((rows.get(k)!.UAVG! - 128) / 112, -1, 1))),
+    v: times.map((k) => r3(clampTo((rows.get(k)!.VAVG! - 128) / 112, -1, 1))),
+    motion: times.map((k) => r3(rows.get(k)!.YDIF! / 219)),
+  };
 }
 
 export async function inspectRender(file: string, options: RenderInspectOptions): Promise<RenderInspection> {
@@ -88,6 +122,10 @@ export async function inspectRender(file: string, options: RenderInspectOptions)
     `blackdetect=d=${options.blackMinSeconds}:pix_th=${options.blackPixel}`,
     `freezedetect=n=${options.freezeNoiseDb}dB:d=${options.freezeMinSeconds}`,
     `scdet=threshold=${options.sceneThreshold}`,
+    `fps=${PICTURE_FPS}`,
+    "scale=96:-2",
+    "signalstats",
+    ...SERIES_KEYS.map((key) => `metadata=mode=print:key=lavfi.signalstats.${key}`),
   ].join(",");
   const args = ["-hide_banner", "-nostats", "-nostdin", "-t", String(MAX_SECONDS), "-i", file, "-map", "0:v:0", "-vf", video];
   if (hasAudio) {

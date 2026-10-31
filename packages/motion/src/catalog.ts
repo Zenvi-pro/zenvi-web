@@ -20,6 +20,7 @@ import cursorPath from "./blocks/cursor_path/block.json" with { type: "json" };
 import gradientField from "./blocks/gradient_field/block.json" with { type: "json" };
 import hyperspace from "./blocks/hyperspace/block.json" with { type: "json" };
 import hudCallouts from "./blocks/hud_callouts/block.json" with { type: "json" };
+import kineticCutScene from "./blocks/kinetic_cut_scene/block.json" with { type: "json" };
 import kineticHeadline from "./blocks/kinetic_headline/block.json" with { type: "json" };
 import liquidGlass from "./blocks/liquid_glass/block.json" with { type: "json" };
 import masonryGrid from "./blocks/masonry_grid/block.json" with { type: "json" };
@@ -38,7 +39,7 @@ import textScramble from "./blocks/text_scramble/block.json" with { type: "json"
 import togglePanel from "./blocks/toggle_panel/block.json" with { type: "json" };
 import wordRotator from "./blocks/word_rotator/block.json" with { type: "json" };
 
-export const BLOCKS: readonly BlockManifest[] = [promptBar, kineticHeadline, wordRotator, counter, textScramble, hudCallouts, gradientField, glassCards, particleBurst, hyperspace, dotGridReveal, liquidGlass, masonryGrid, dockMagnify, rippleLogo, cardShuffle, chartBuild, notificationStack, chatThread, togglePanel, cursorPath, codeCard, lowerThird, logoRevealEnd, shapeMorph, typeMorph, lineTrails, logoBuild, geoMap, pictogramMorph, barRace, dataClock] as BlockManifest[];
+export const BLOCKS: readonly BlockManifest[] = [promptBar, kineticHeadline, wordRotator, counter, textScramble, hudCallouts, gradientField, glassCards, particleBurst, hyperspace, dotGridReveal, liquidGlass, masonryGrid, dockMagnify, rippleLogo, cardShuffle, chartBuild, notificationStack, chatThread, togglePanel, cursorPath, codeCard, lowerThird, logoRevealEnd, shapeMorph, typeMorph, lineTrails, logoBuild, geoMap, pictogramMorph, barRace, dataClock, kineticCutScene] as BlockManifest[];
 
 export function getBlock(id: string): BlockManifest | undefined {
   return BLOCKS.find((b) => b.id === id);

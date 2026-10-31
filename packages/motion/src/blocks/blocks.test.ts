@@ -11,7 +11,7 @@ import { createContext, pictureEvents, type BlockBuild } from "../runtime/index.
 import { mixHex } from "./ui.js";
 
 /** Blocks that draw only into a canvas, which jsdom does not paint. */
-const CANVAS_ONLY = new Set(["gradient_field", "ripple_logo", "line_trails"]);
+const CANVAS_ONLY = new Set(["gradient_field", "ripple_logo", "line_trails", "kinetic_cut_scene"]);
 
 /** The root's HTML with each style attribute's declarations sorted (setting a property again may move it). */
 function normalized(root: HTMLElement): string {
