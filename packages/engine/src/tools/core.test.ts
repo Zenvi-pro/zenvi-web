@@ -87,6 +87,9 @@ describe("receipts (receipt.py)", () => {
     expect(isErrorResult("")).toBe(true);
     expect(isErrorResult("Error: x")).toBe(true);
     expect(isErrorResult("plain text")).toBe(false);
+    // The desktop's stock failures, which the backend counts as failed calls.
+    expect(isErrorResult("Freesound download error: Download failed (404).")).toBe(true);
+    expect(isErrorResult("Pexels search error: timeout")).toBe(true);
   });
 });
 
