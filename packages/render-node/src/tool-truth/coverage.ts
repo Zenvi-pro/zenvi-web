@@ -249,6 +249,7 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   add_motion_template_tool: { reason: "not proven yet: one template per case (ui_cards, kinetic_type, end_card, grid …)", params: ["labels", "values", "points", "boxes", "button", "step", "steps", "phase", "transitions", "strict_variety", "sound", "replay", "states"] },
   add_plate_wipe_tool: { reason: "not proven yet", params: "*" },
   add_shape_mask_tool: { reason: "not proven yet: polygon points", params: ["points"] },
+  add_type_block_tool: { reason: "not proven yet: one type block per case (text_on_path, write_on, stencil ...)", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {

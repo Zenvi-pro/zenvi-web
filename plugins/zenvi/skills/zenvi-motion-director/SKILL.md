@@ -99,7 +99,12 @@ unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
    negative space and, after `generate_subject_matte_tool` on the footage,
    puts emphasis words behind the head. Title cards and word cards:
    `add_kinetic_title_tool` (`animation`: pop, slam, tilt, scramble,
-   letters, typewriter, slide_up, rise; never a bare fade).
+   letters, typewriter, slide_up, rise; never a bare fade). Designed type
+   moves: `add_type_block_tool` (`block`: text_on_path for a spinning ring,
+   write_on for drawn strokes or SVG paths, stencil for the shot inside the
+   letters, echo_stack, strobe for a word every 3-6 frames ending on a
+   lockup, wheel for a word flipper, paper for stop-motion paper type);
+   put a hit on each of its `data.hits`.
    `text_behind_subject_tool` for one full-width hero word; `add_title_tool`
    with a bundled family (`font: "Anton"`, `"Instrument Serif"`, `"Space
    Mono"`...) only for static labels and logo bugs.
