@@ -272,7 +272,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const name = args.title ?? facts.name;
   const hook = args.hook ?? facts.headline;
   const endCard = args.end_card ?? facts.url;
-  const style = args.style ?? (saved && STYLE_RULES.some((r) => r.id === saved.style) ? saved.style : undefined);
+  // The saved brief's style leads when the index has it, with a builder of its own or not (route.ts ruleFor).
+  const style = args.style ?? (saved && STYLES.some((s) => s.id === saved.style) ? saved.style : undefined);
   const route = (chosen: string | undefined): Route =>
     routeRequest({ request: `${args.request} ${saved && !chosen ? saved.style : ""}`, candidates: STYLES, style: chosen, bin: binFacts(entries()), product: name ?? undefined, features: args.features?.length, script: Boolean(args.script) });
   let plan = route(style);

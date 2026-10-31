@@ -48,6 +48,15 @@ describe("produce_video_tool", () => {
     expect(readBrief(doc.project)?.goal).toBe("The agent's plan");
   });
 
+  it("cuts a saved brief's style that has no builder of its own under its id, whatever the request reads as", async () => {
+    const doc = fixtureDoc(createProject({ id: "PRODUCEGRD" }));
+    const skip = ["format", "footage", "music", "build", "render"];
+    await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "A 12 second grid", skip });
+    doc.setUntracked(["settings"], { ...doc.project.settings, zenvi_brief: { ...readBrief(doc.project)!, auto: false, style: "grid-montage" } });
+    const result = await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request: "A 12 second travel film of Lisbon", skip });
+    expect(result.data?.summary).toMatch(/^Produced a grid-montage edit/);
+  });
+
   it("sets the frame rate the request names even when the frame already matches", async () => {
     const doc = fixtureDoc(createProject({ id: "PRODUCEFPS" }));
     expect(projectFps(doc.project)).toEqual({ num: 30, den: 1 });
