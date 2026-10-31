@@ -160,6 +160,7 @@ export const OFFSCREEN: Readonly<Record<string, string>> = {
   fork_project_tool: "writes a copy of the project file and stays on the open one",
   pick_best_variant_tool: "opens the winning variant's project (like open_project_tool)",
   align_lyrics_tool: "word timings on the file's transcript, read by the caption and word tools",
+  detect_music_structure_tool: "the song's sections as snap points and timeline markers",
 };
 
 export interface BacklogEntry {
@@ -237,6 +238,9 @@ export const BACKLOG: Readonly<Record<string, BacklogEntry>> = {
   pop_out_tool: { reason: "needs a subject matte (RVM model)", params: ["band_aspect", "bar_color", "subject"] },
   place_on_word_tool: { reason: "needs word timings (speech recognition)", params: "*" },
   insert_broll_on_words_tool: { reason: "needs word timings (speech recognition)", params: "*" },
+  snap_cuts_to_onsets_tool: { reason: "not proven yet: needs a fixture with audible onsets off the cuts", params: "*" },
+  shot_length_ramp_tool: { reason: "not proven yet: builds a montage of ramping shot lengths", params: "*" },
+  spot_action_foley_tool: { reason: "not proven yet: needs footage with visible impacts and taps", params: "*" },
 };
 
 export function paramNoteKeys(): string[] {
