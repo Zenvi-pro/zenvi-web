@@ -17,12 +17,14 @@ export function placeMusicBed(tx: Transaction, musicId: string, start: number | 
   const beds = parts.map((p) => addClip(tx, { fileId: musicId, position: p.at, layer, start: p.from, end: p.to, title }));
   const first = beds[0]!;
   const last = beds[beds.length - 1]!;
-  const lastLength = parts[parts.length - 1]!.to - parts[parts.length - 1]!.from;
+  const lastPart = parts[parts.length - 1]!;
+  const lastLength = lastPart.to - lastPart.from;
   const out = Math.min(1.2, duration / 4, lastLength);
   const fadeIn = from > 0 ? [{ time: 0, value: 0, interpolation: Interpolation.LINEAR }, { time: 0.12, value: 1, interpolation: Interpolation.LINEAR }] : [];
+  // Keyframe times are timeline seconds: the last loop clip starts at its own position.
   const fadeOut = [
-    { time: lastLength - out, value: 1, interpolation: Interpolation.LINEAR },
-    { time: lastLength, value: 0, interpolation: Interpolation.LINEAR },
+    { time: lastPart.at + lastLength - out, value: 1, interpolation: Interpolation.LINEAR },
+    { time: lastPart.at + lastLength, value: 0, interpolation: Interpolation.LINEAR },
   ];
   if (first === last) setClipKeyframes(tx, first.id, "volume", fadeIn.length > 0 ? [...fadeIn, ...fadeOut] : [{ time: 0, value: 1, interpolation: Interpolation.LINEAR }, ...fadeOut]);
   else {

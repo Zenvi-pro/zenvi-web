@@ -184,7 +184,8 @@ export function musicSearchFromText(text: string, seconds: number): MusicSearch 
   const curve = CURVES.find(([re]) => re.test(text))?.[1];
   const energy: Energy | undefined = HIGH.test(text) ? "high" : LOW.test(text) ? "low" : undefined;
   // The genre leads a music line ("dark trap, 140 bpm, drop on the hook"): the first clause with words left in it.
-  const clauses = typed.query.split(/[,;.:]/).map((part) =>
+  // A "Music:" label is not the genre.
+  const clauses = typed.query.replace(/^\s*music\s*:\s*/i, "").split(/[,;.:]/).map((part) =>
     part
       .replace(/[^\p{L}\p{N}\s-]/gu, " ")
       .replace(NOT_GENRE, " ")
@@ -198,7 +199,7 @@ export function musicSearchFromText(text: string, seconds: number): MusicSearch 
   );
   return {
     query: clauses.find(Boolean) ?? "music",
-    ...(typed.range ? { bpm_range: [Math.round(typed.range[0]), Math.round(typed.range[1])] as [number, number] } : {}),
+    ...(typed.range ? { bpm_range: [Math.max(40, Math.round(typed.range[0])), Math.min(300, Math.round(typed.range[1]))] as [number, number] } : {}),
     ...(energy ? { energy } : {}),
     ...(curve ? { energy_curve: curve } : {}),
     min_seconds: Math.max(BED_MIN, Math.ceil(seconds)),

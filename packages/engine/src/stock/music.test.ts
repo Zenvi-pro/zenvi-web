@@ -95,5 +95,7 @@ describe("musicSearchFromText", () => {
       min_seconds: 15,
     });
     expect(musicSearchFromText("soft acoustic guitar", 6)).toEqual({ query: "acoustic guitar", energy: "low", min_seconds: 10 });
+    // A "Music:" label is not the genre, and the range stays inside the search's 40-300 BPM.
+    expect(musicSearchFromText("Music: dark trap, 290 bpm", 15)).toMatchObject({ query: "dark trap", bpm_range: [276, 300] });
   });
 });

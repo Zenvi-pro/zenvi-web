@@ -100,8 +100,10 @@ export function hintFit(s: { box: SubjectBox; radius: number }, hint: SubjectHin
 
 /** `subjects` ordered by confidence under `hint` (the detector's order without one). */
 export function rankByHint(subjects: readonly DetectedSubject[], hint: SubjectHint): DetectedSubject[] {
-  const ranked = subjects.map((s) => ({ ...s, confidence: Math.round(s.score * hintFit(s, hint) * 1000) / 1000 }));
-  return hint.near || hint.radius !== undefined ? ranked.sort((a, b) => b.confidence - a.confidence) : ranked;
+  // Sorted on the unrounded fit, so candidates far off the hint keep their order instead of tying at 0.
+  const ranked = subjects.map((s) => ({ s, fit: s.score * hintFit(s, hint) }));
+  if (hint.near || hint.radius !== undefined) ranked.sort((a, b) => b.fit - a.fit);
+  return ranked.map(({ s, fit }) => ({ ...s, confidence: Math.round(fit * 1000) / 1000 }));
 }
 
 /** Radius (of the frame height) from which a candidate counts fully big in `pickSubject`. */
