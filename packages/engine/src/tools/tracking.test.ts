@@ -84,7 +84,10 @@ function drawnAt(p: Project, clipId: string, t: number, u: number, v: number): {
   return { x: x / p.width, y: y / p.height };
 }
 
-describe("track_point_tool", () => {
+/** Each case tracks real ffmpeg frames: about 2.5 s alone, over vitest's 5 s on a loaded CI runner. */
+const TRACKING_TIMEOUT_MS = 60_000;
+
+describe("track_point_tool", { timeout: TRACKING_TIMEOUT_MS }, () => {
   it("follows a moving subject and reads only", async () => {
     const { doc, host } = setup();
     const result = await runTool({ doc, host }, "track_point_tool", { clip_id: "CSUB", box: startBox() });
@@ -106,7 +109,7 @@ describe("track_point_tool", () => {
   });
 });
 
-describe("pin_to_track_tool", () => {
+describe("pin_to_track_tool", { timeout: TRACKING_TIMEOUT_MS }, () => {
   it("creates a callout whose dot rides on the subject, in one undo step", async () => {
     const { doc, host } = setup();
     const result = await runTool({ doc, host }, "pin_to_track_tool", { footage_clip_id: "CSUB", point: subjectAt(0), label: "SENSOR" });
@@ -163,7 +166,7 @@ describe("pin_to_track_tool", () => {
   });
 });
 
-describe("hold_point_reframe_tool", () => {
+describe("hold_point_reframe_tool", { timeout: TRACKING_TIMEOUT_MS }, () => {
   it("keeps the tracked point still while it punches in", async () => {
     const { doc, host } = setup();
     const result = await runTool({ doc, host }, "hold_point_reframe_tool", { clip_id: "CSUB", box: startBox(), target: { x: 0.5, y: 0.5 }, zoom: 1.3 });
@@ -180,7 +183,7 @@ describe("hold_point_reframe_tool", () => {
   });
 });
 
-describe("auto_reframe_tool", () => {
+describe("auto_reframe_tool", { timeout: TRACKING_TIMEOUT_MS }, () => {
   it("goes vertical, follows the subject and alternates medium and close", async () => {
     const { doc, host } = setup();
     const result = await runTool({ doc, host }, "auto_reframe_tool", { subjects: [{ clip_id: "CSUB", box: startBox() }], rhythm_seconds: 1, head_y: 0.5 });
@@ -201,7 +204,7 @@ describe("auto_reframe_tool", () => {
   });
 });
 
-describe("screen_zoom_follow_tool", () => {
+describe("screen_zoom_follow_tool", { timeout: TRACKING_TIMEOUT_MS }, () => {
   it("pushes in on the busy card and pulls back", async () => {
     const { doc, host } = setup();
     doc.transaction("screen", (tx) => addClip(tx, { fileId: "FSCR", position: 3, layer: 2, start: 0, end: 4, id: "CSCR" }));
@@ -234,7 +237,7 @@ describe("screen_zoom_follow_tool", () => {
   });
 });
 
-describe("add_guide_overlay_tool", () => {
+describe("add_guide_overlay_tool", { timeout: TRACKING_TIMEOUT_MS }, () => {
   it("draws a golden spiral on the subject", async () => {
     const { doc, host } = setup();
     const result = await runTool({ doc, host }, "add_guide_overlay_tool", { kind: "golden_spiral", clip_id: "CSUB", box: startBox() });
