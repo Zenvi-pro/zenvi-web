@@ -129,8 +129,19 @@ const IMAGE_SEQUENCE = ["-f", "image2", "-start_number", "1"];
 
 /** Raw frames must have even sizes for 4:2:0 codecs; pad instead of scaling. */
 const PAD_EVEN = "pad=ceil(iw/2)*2:ceil(ih/2)*2";
-/** RGB → BT.709 limited range, tagged below, so players reproduce the colors. */
-const TO_YUV = (pixFmt: string) => `scale=out_color_matrix=bt709:out_range=tv,format=${pixFmt}`;
+/** RGB → BT.709 limited range, tagged below, so players reproduce the colors; `deband` dithers smooth gradients on the way. */
+export const TO_YUV = (pixFmt: string, deband = false): string =>
+  deband ? `${DEBAND},scale=out_color_matrix=bt709:out_range=tv:sws_dither=a_dither,format=${pixFmt},${DITHER}` : `scale=out_color_matrix=bt709:out_range=tv,format=${pixFmt}`;
+/**
+ * `deband`: smooth gradients that arrive as flat 8-bit plateaus (CSS and SVG
+ * grounds) at 16 bits, dither them down to the output's depth, and add a
+ * static luma dither of +-3 levels that survives the encoder (alone, the
+ * 16-bit ramp quantizes back into bands): cinetic's dithered gradients
+ * (finishing.md, MIT, (c) 2026 Leonxlnx) for every source at once.
+ * Thresholds of 2 % only smooth flat areas; the dither does not move per frame.
+ */
+const DEBAND = "format=gbrp16le,deband=1thr=0.02:2thr=0.02:3thr=0.02:4thr=0.02:range=16:blur=1";
+const DITHER = "noise=c0s=3:c0f=u";
 const COLOR_TAGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
 
 /** The options `encoderRates` sees: the frame actually encoded, quality defaulting to the dialog's "high". */
@@ -184,7 +195,7 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
     case "webm": {
       const codec = job.options.videoCodec ?? "libvpx-vp9";
       return {
-        chain: `[0:v]${PAD_EVEN},${TO_YUV("yuv420p")}[vout]`,
+        chain: `[0:v]${PAD_EVEN},${TO_YUV("yuv420p", job.options.deband)}[vout]`,
         codecArgs: ["-c:v", codec, ...videoRateArgs(rate, codec), "-deadline", "good", "-cpu-used", String(VP9_CPU[preset]), "-row-mt", "1", ...COLOR_TAGS],
       };
     }
@@ -193,14 +204,15 @@ function videoChain(job: EncodeJob): { chain: string; codecArgs: string[] } {
       if (codec.startsWith("prores")) {
         const profile = quality === "low" ? "0" : quality === "medium" ? "2" : quality === "high" ? "3" : "4";
         return {
-          chain: `[0:v]${PAD_EVEN},${TO_YUV(profile === "4" ? "yuva444p10le" : "yuv422p10le")}[vout]`,
+          // The 4444 profile keeps alpha, which the deband pass would drop.
+          chain: `[0:v]${PAD_EVEN},${TO_YUV(profile === "4" ? "yuva444p10le" : "yuv422p10le", profile !== "4" && job.options.deband)}[vout]`,
           codecArgs: ["-c:v", codec, "-profile:v", profile, ...COLOR_TAGS],
         };
       }
       const lossless = rate?.mode === "lossless";
       const speed = codec === "libx264" || codec === "libx265" ? ["-preset", preset] : [];
       return {
-        chain: `[0:v]${PAD_EVEN},${TO_YUV(lossless ? "yuv444p" : "yuv420p")}[vout]`,
+        chain: `[0:v]${PAD_EVEN},${TO_YUV(lossless ? "yuv444p" : "yuv420p", job.options.deband)}[vout]`,
         codecArgs: ["-c:v", codec, ...speed, ...videoRateArgs(rate, codec), ...COLOR_TAGS],
       };
     }

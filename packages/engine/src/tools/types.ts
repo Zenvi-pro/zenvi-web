@@ -390,6 +390,12 @@ export interface ExportOptions {
    * mix exactly as the timeline plays (clipping included).
    */
   truePeakLimit?: boolean;
+  /**
+   * Smooth 8-bit gradient banding and dither it to the output's depth
+   * (hosts that encode with ffmpeg): for flat graphic grounds and gradients.
+   * review_render_tool reports banding; a cinetic house style exports this way.
+   */
+  deband?: boolean;
   /** Output location (CLI path). Hosts choose one when omitted. */
   output?: string;
 }

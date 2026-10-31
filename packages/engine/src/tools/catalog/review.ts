@@ -23,6 +23,7 @@ import { frameContaining } from "../../timeline/time.js";
 import { frameWindow, localFrame, windowContains } from "../../timeline/windows.js";
 import { alignCuts, findProblems, flashAndBlack, tileMark, BLACK_LUMA, BLACK_PEAK, FLASH_LUMA, type SampledFrame } from "../../review/problems.js";
 import { DEFAULT_SHEET_PIXELS, MAX_SHEET_PIXELS, planSheet, sheetLayout } from "../../review/sheet.js";
+import { filmChecks } from "../../review/film-checks.js";
 import { titleTextBoxes } from "../../review/text-boxes.js";
 import { swapSuggestions } from "../../review/swaps.js";
 import { reviewTimeline } from "../../review/timeline.js";
@@ -93,10 +94,11 @@ function fadingAt(project: Project, shot: ReviewShot | undefined, seconds: numbe
   return top !== undefined && getCount(top.alpha) >= 2 && evaluate(top.alpha, top.local, 1) < 1;
 }
 
-/** Text boxes of the titles whose SVG the host can read. */
-async function textBoxesOf(call: ToolCall, titles: readonly { clipId: string; path: string }[]): Promise<TextBox[]> {
+/** Text boxes of the titles whose SVG the host can read, and the SVGs by clip id. */
+export async function textBoxesOf(call: ToolCall, titles: readonly { clipId: string; path: string }[]): Promise<{ boxes: TextBox[]; svgs: Map<string, string> }> {
+  const svgs = new Map<string, string>();
   const read = call.host.storage?.readText;
-  if (!read) return [];
+  if (!read) return { boxes: [], svgs };
   const project = call.doc.project;
   const clips = new Map(project.clips.map((c) => [String(c.id), c]));
   const cache = new Map<string, string | null>();
@@ -107,9 +109,12 @@ async function textBoxesOf(call: ToolCall, titles: readonly { clipId: string; pa
     if (!clip || !title.path) continue;
     if (!cache.has(title.path)) cache.set(title.path, await read.call(call.host.storage, title.path).catch(() => null));
     const svg = cache.get(title.path);
-    if (svg) boxes.push(...titleTextBoxes(project, clip, svg));
+    if (svg) {
+      boxes.push(...titleTextBoxes(project, clip, svg));
+      svgs.set(title.clipId, svg);
+    }
   }
-  return boxes;
+  return { boxes, svgs };
 }
 
 /**
@@ -251,9 +256,11 @@ export const reviewTools: CatalogTool[] = [
         }
       }
 
-      const textBoxes = await textBoxesOf(call, review.titleClips);
+      const { boxes: textBoxes, svgs } = await textBoxesOf(call, review.titleClips);
       const looks = await shotLooks(call, review.shots);
+      const saved = readBrief(project);
       const problems = findProblems({ review, pace, alignment, mix, frames, textBoxes, looks, frame: { width: project.width, height: project.height } });
+      problems.push(...filmChecks({ project, brief: saved, titles: review.titleClips, svgs, textBoxes }));
       // One pass over every footage problem's shots, so two problems are never offered the same unused clip.
       const footage = problems.filter((p) => p.shots);
       const swaps = swapSuggestions(project, review, footage.flatMap((p) => p.shots!));
@@ -263,7 +270,6 @@ export const reviewTools: CatalogTool[] = [
         for (const s of p.swaps) swaps.splice(swaps.indexOf(s), 1);
       }
 
-      const saved = readBrief(project);
       const brief = saved ? checkBrief(project, saved) : null;
       const lengths = review.shots.map((s) => s.duration);
       const data = {

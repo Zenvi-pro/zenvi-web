@@ -73,7 +73,14 @@ export type ProblemKind =
   | "flat_hue"
   | "cut_without_sound"
   // More than 3 flashes in a second (review/flashing.ts, WCAG 2.3.1).
-  | "flashing";
+  | "flashing"
+  // The finishing checks after cinetic (review/banding.ts, av-sync.ts, film-checks.ts).
+  | "banding"
+  | "sound_without_cause"
+  | "too_fast"
+  | "text_overlap"
+  | "copy_pacing"
+  | "house_ban";
 
 export interface Problem {
   kind: ProblemKind;
