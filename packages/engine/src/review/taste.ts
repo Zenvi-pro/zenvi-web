@@ -136,7 +136,8 @@ export function houseBanFindings(input: TasteInput): TasteFinding[] {
       const words = svgText(svg);
       if (EMOJI.test(words)) add({ ban: "emoji", clipId: id, at, message: `Title ${id} has an emoji.`, fix: FIX.decoration });
       if (/^\s*introducing\b/i.test(words)) add({ ban: "introducing", clipId: id, at, message: `Title ${id} opens on "Introducing".`, fix: "Open inside the problem; the product arrives as the answer, named once." });
-      // Overshoot on copy: a text curve that passes its target between two keys.
+      // Overshoot on copy: a text curve that passes its target between two keys (one finding per title).
+      const overshoots: string[] = [];
       for (const k of ["location_x", "location_y", "scale_x", "scale_y"] as const) {
         const points = (clip[k] as { Points?: { co?: { X?: number; Y?: number } }[] } | undefined)?.Points ?? [];
         for (let i = 1; i < points.length; i += 1) {
@@ -149,12 +150,14 @@ export function houseBanFindings(input: TasteInput): TasteFinding[] {
           for (let x = a.X + 1; x < b.X; x += 1) {
             const v = evaluate(clip[k], x, 0);
             if (v > hi + slack || v < lo - slack) {
-              add({ ban: "bounce", clipId: id, at, message: `Title ${id} overshoots on ${k} (a back or bounce ease on copy).`, fix: "Copy settles on an ease-out with no overshoot (ease_out_expo / ease_out_cubic); only a true landing bounces." });
+              overshoots.push(k);
               break;
             }
           }
+          if (overshoots.includes(k)) break;
         }
       }
+      if (overshoots.length > 0) add({ ban: "bounce", clipId: id, at, message: `Title ${id} overshoots on ${overshoots.join(", ")} (a back or bounce ease on copy).`, fix: "Copy settles on an ease-out with no overshoot (ease_out_expo / ease_out_cubic); only a true landing bounces." });
     }
     const file = files.get(String(clip.file_id));
     if (!file) continue;

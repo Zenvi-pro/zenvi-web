@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Brief } from "../brief/brief.js";
-import { openshotPoint } from "../keyframe/edit.js";
+import { makeKeyframePoint, openshotPoint } from "../keyframe/edit.js";
 import { createProject } from "../model/defaults.js";
 import { Interpolation, type Clip, type Project, type ProjectFile } from "../model/types.js";
 import { sfxHits, syncMisses, timelineCauses } from "./av-sync.js";
 import { bandingOf } from "./banding.js";
 import { copyPacing } from "./copy-pacing.js";
-import { filmChecks } from "./film-checks.js";
+import { copyFragments, filmChecks } from "./film-checks.js";
 import { clipSpeeds } from "./motion-speed.js";
 import { bannedColour, houseBanFindings } from "./taste.js";
 
@@ -69,6 +69,17 @@ describe("copy pacing (cinetic text flow)", () => {
     expect(codes).toEqual(expect.arrayContaining(["copy-fragment-long", "copy-short-hold", "copy-together", "copy-share", "copy-no-breath"]));
     expect(copyPacing([{ id: "a", text: "Ship it.", start: 1, end: 2.5 }, { id: "b", text: "Sooner.", start: 5, end: 6.4 }], 10)).toEqual([]);
   });
+
+  it("reads a line typed on, one title per keystroke, as one fragment", () => {
+    const typed = ["S |", "Sh |", "Ship |", "Ship it |", "Ship it"];
+    const p = project([...typed.map((_, i) => ({ position: i * 0.1, end: 0.1 })), { position: 3, end: 1.5 }]);
+    const titles = p.clips.map((c) => ({ clipId: String(c.id), start: c.position, end: c.position + c.end }));
+    titles[4]!.end = 2;
+    const svgs = new Map([...typed, "Sooner."].map((t, i) => [`C${i}`, `<svg><text>${t}</text></svg>`]));
+    const fragments = copyFragments(p, titles, svgs);
+    expect(fragments.map((f) => [f.text, f.start, f.end])).toEqual([["Ship it", 0, 2], ["Sooner.", 3, 4.5]]);
+    expect(copyPacing(fragments, 10)).toEqual([]);
+  });
 });
 
 describe("the cinetic house bans", () => {
@@ -92,6 +103,14 @@ describe("the cinetic house bans", () => {
     ];
     const bans = houseBanFindings({ project: p, svgs, textBoxes: boxes }).map((f) => f.ban);
     expect(bans).toEqual(expect.arrayContaining(["serif", "italic", "orange", "introducing", "eyebrow"]));
+  });
+
+  it("flag an overshooting title once, whatever curves overshoot", () => {
+    const back = { Points: [makeKeyframePoint(1, 0.4, Interpolation.BEZIER, { handleRight: { X: 0.4, Y: 1.8 } }), makeKeyframePoint(31, 1, Interpolation.BEZIER, { handleLeft: { X: 0.6, Y: 1.4 } })] };
+    const p = project([{ position: 0, end: 3, scale_x: back, scale_y: back } as never]);
+    const bounce = houseBanFindings({ project: p, svgs: new Map([["C0", "<svg><text>Kiln</text></svg>"]]) }).filter((f) => f.ban === "bounce");
+    expect(bounce).toHaveLength(1);
+    expect(bounce[0]!.message).toContain("scale_x, scale_y");
   });
 
   it("read the face of an outlined kinetic title from its style tag", () => {

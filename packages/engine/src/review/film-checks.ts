@@ -23,6 +23,8 @@ const KINETIC_TITLE_KEY = "zenvi_kinetic_title";
 const KINETIC_CAPTIONS_KEY = "zenvi_kinetic_captions";
 /** Boxes overlapping by more than this share of the smaller one collide. */
 const OVERLAP_SHARE = 0.25;
+/** A keystroke's title starting this soon after the last one ends continues its line. */
+const TYPED_GAP_SECONDS = 0.05;
 
 export interface FilmCheckInput {
   project: Project;
@@ -43,6 +45,7 @@ export function copyFragments(project: Project, titles: FilmCheckInput["titles"]
   const clips = new Map(project.clips.map((c) => [String(c.id), c]));
   const out: CopyFragment[] = [];
   const groups = new Map<string, CopyFragment>();
+  let typing: { fragment: CopyFragment; line: string } | null = null;
   for (const t of [...titles].sort((a, b) => a.start - b.start)) {
     const clip = clips.get(t.clipId);
     if (!clip || clip[KINETIC_CAPTIONS_KEY]) continue;
@@ -60,7 +63,18 @@ export function copyFragments(project: Project, titles: FilmCheckInput["titles"]
     }
     const svg = svgs.get(t.clipId);
     const text = svg ? svgWords(svg) : "";
-    if (text) out.push({ id: t.clipId, text, start: t.start, end: t.end });
+    if (!text) continue;
+    // A line typed on (one title per keystroke, the cursor last) is one fragment while it grows.
+    const line = text.replace(/\s*[|▌_]+$/u, "");
+    if (typing && t.start <= typing.fragment.end + TYPED_GAP_SECONDS && line.startsWith(typing.line)) {
+      typing.fragment.end = Math.max(typing.fragment.end, t.end);
+      typing.fragment.text = line;
+      typing.line = line;
+      continue;
+    }
+    const f = { id: t.clipId, text: line, start: t.start, end: t.end };
+    typing = { fragment: f, line };
+    out.push(f);
   }
   return out;
 }
