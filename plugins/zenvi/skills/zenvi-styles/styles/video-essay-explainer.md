@@ -86,7 +86,7 @@ start is known) or use the user's recording; cut picture on the line starts.
 
 1. VO: one `generate_tts_and_add_to_timeline_tool` per line (`position_seconds` back to back) or the recording,
    then `get_transcript_tool` `{"includeWords": true}`; `set_track_role_tool` `{"track": "<vo>", "role": "voice"}`.
-2. Footage: `gather_stock_footage_tool` `{"queries": [one per claim noun], "count": 12}`.
+2. Footage: `gather_stock_footage_tool` `{"queries": ["<one per claim noun>"], "count": 12}`.
 3. Proof run: `add_clip_to_timeline_tool` per shot with `position_seconds` = the line or word start and
    `start_seconds`/`end_seconds` cut to the next word; mute all with `set_clip_audio_video_tool` `{"audio": "off"}`.
 4. Grade once: `color_grade_clip_tool` `{"timeline_clip_ids": [...], "saturation": 0.6, "contrast": 0.2,
@@ -98,7 +98,7 @@ start is known) or use the user's recording; cut picture on the line starts.
 7. Turn (t119): `add_kinetic_title_tool` `{"text": "DO NOT OPEN", "style": "stack", "animation": "slam",
    "background": "#0b0b0b", "accent": "#e1261c", "emphasis": ["OPEN"], "text_size": 0.2}` + `add_sfx_tool`
    `sub_drop` and `impact_slam` (-10 dB) + `automate_volume_tool` `{"role": "music", "shape": "dip", "db": -14}`.
-8. Payoff word in the serif accent: `add_kinetic_title_tool` `{"style": "editorial", "animation": "rise",
+8. Payoff word in the serif accent: `add_kinetic_title_tool {"style": "editorial", "animation": "rise",
    "emphasis": ["out"], "accent": "#e1261c", "text_size": 0.09}` over the longest hold.
 9. Music: `search_freesound_music_tool` `{"query": "lofi chill hip hop", "bpm_range": "80-95"}`,
    `import_stock_media_tool`, `add_clip_to_timeline_tool`, `set_track_role_tool` music, `set_audio_gain_tool`
