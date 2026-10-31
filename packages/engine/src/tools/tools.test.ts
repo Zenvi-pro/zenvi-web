@@ -276,7 +276,7 @@ const SPECS: Record<string, Spec> = {
   separate_clip_audio_tool: {
     happy: {
       args: { timeline_clip_ids: IDS.clipB },
-      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) on track\(s\) 1; the originals are muted\.$/,
+      summary: /^Separated the audio of 1 clip\(s\) into 1 audio clip\(s\) \([A-Z0-9]{10}\) on track\(s\) 1; the originals are muted\.$/,
       check: ({ receipt }) => expect(receipt.createdTracks).toHaveLength(1),
     },
     failure: { args: { timeline_clip_ids: IDS.clipLogo }, summary: /^Error: 'logo\.png' has no audio to separate$/ },
@@ -1167,7 +1167,7 @@ const SPECS: Record<string, Spec> = {
       summary: /^Watched \/out\/reel\.mp4 \(8\.00s, with sound\) via the Zenvi backend: overall 5\/10, would not post yet\. Watched for "a reel"\./,
       check: ({ host }) => expect(host.calls).toContain("watch /out/reel.mp4"),
     },
-    failure: { args: { path: "" }, status: "refused", summary: /^Error: Invalid arguments for watch_render_tool/ },
+    failure: { args: { path: "" }, status: "refused", summary: /^Error: pass either path \(the rendered file\) or render_id/ },
   },
   fork_project_tool: {
     happy: {

@@ -19,7 +19,7 @@ Availability follows each tool's required host capabilities and the host methods
 
 - **Web editor (Zenvi Assistant, command palette)**: media, player, ui, exporter, frames, backend, stock, storage, assets, audio, library; methods media.importUrl, media.pickFiles, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, ui.openExportDialog, audio.decodePcm, audio.mixPcm, audio.transcribe, ui.selection, ui.setSelection, ui.timelineView, ui.showTimelineRange, ui.setTimelineMode, ui.layout, ui.preferences, ui.clearPlaybackCache, exporter.supports; only sometimes: exporter (browsers with WebCodecs export), backend (signed in to Zenvi), stock (signed in to Zenvi).
 - **CLI and local MCP server (zenvi, zenvi mcp)**: media, exporter, frames, audio, storage, backend, stock, assets, mattes, motion, scenes3d, fx, library, watch; methods media.importPath, media.listPaths, media.importUrl, media.writeGenerated, media.missing, media.fetchWebVideo, media.kitSample, media.inspectRender, storage.open, storage.readText, storage.writeText, storage.writeBytes, storage.saveCopy, storage.readCopy, storage.exportMedia, storage.currentPath, storage.recentProjects, storage.recoveryCopies, storage.customProfiles, media.collect, audio.decodePcm, audio.mixPcm, audio.transcribe, audio.generateSfx, exporter.supports, frames.fontFamilies, frames.renderSheet, audio.measureMix; only sometimes: backend (signed in with zenvi login), stock (signed in with zenvi login), media.fetchWebVideo (yt-dlp is installed; zenvi doctor checks), audio.generateSfx (ELEVENLABS_API_KEY is set to a key on a paid ElevenLabs plan), mattes (onnxruntime-node is installed; the matting model downloads on first use), motion (headless Chrome is installed: zenvi motion setup), scenes3d (Blender 4.2+ is installed (or ZENVI_BLENDER points to it)), fx (ffmpeg is installed (ZENVI_FX=0 turns it off)), watch (signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)).
-- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, stock, exporter, mattes, motion, watch; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.mixPcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), audio.mixPcm (ffprobe is available), backend (the server is set up to call the Zenvi backend), stock (the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY), mattes (onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)), motion (the image has chrome-headless-shell (one block renders at a time)), watch (the server calls the Zenvi backend and has ffmpeg; the render must be media in the project's bin); hides 17 local-app tools.
+- **Zenvi Cloud remote MCP server (ChatGPT, Claude.ai)**: media, frames, storage, assets, audio, backend, stock, exporter, mattes, motion, watch; methods media.importUrl, media.writeGenerated, media.missing, storage.readText, storage.writeText, storage.writeBytes, storage.exportMedia, storage.currentPath, storage.recentProjects, audio.decodePcm, audio.mixPcm, audio.transcribe, frames.fontFamilies, exporter.supports; only sometimes: frames (the render worker is configured), exporter (the render worker is configured), media (ffprobe is available), assets (the engine's assets (title templates, emoji) are bundled), audio (ffmpeg is available), audio.mixPcm (ffprobe is available), backend (the server is set up to call the Zenvi backend), stock (the server calls the Zenvi backend, or has its own PEXELS_API_KEY / FREESOUND_API_KEY), mattes (onnxruntime-node is in the image (the matting model downloads on first use; up to 10 s of video per call)), motion (the image has chrome-headless-shell (one block renders at a time)), watch (the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin); hides 17 local-app tools.
 
 ## Matrix
 
@@ -3244,7 +3244,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffmpeg is available and 
 | `music_clip_ids` | string \| string[] |  | Clips to treat as music. |
 | `sfx_clip_ids` | string \| string[] |  | Clips to treat as sound effects. |
 | `dry_run` | boolean |  | Measure and plan only: report the loudness before and after, change nothing. (default false) |
-| `genre` | "hype" \| "flash_montage" \| "saas_ui" \| "talking_head" \| "match_cut" \| "3d_product" \| "video_essay" \| "editorial" \| "multiplicity" \| "general" |  | The Sound Score's target bands (analyze_mix_tool genre) for score and iterate. (default "general") |
+| `genre` | "hype" \| "flash_montage" \| "saas_ui" \| "talking_head" \| "match_cut" \| "product_3d" \| "video_essay" \| "editorial" \| "multiplicity" \| "general" |  | The Sound Score's target bands (analyze_mix_tool genre) for score and iterate. (default "general") |
 | `score` | boolean |  | Score the mastered mix with analyze_mix_tool's Sound Score (in data.score). (default true) |
 | `limit` | boolean |  | When the true-peak ceiling stops the mix short of the target, ride the frames that peak down (volume keyframes: the music and ambience under a hit up to 10 dB, else every clip playing there up to 4 dB; a look-ahead limiter the desktop plays too), so the mix gets there. (default true) |
 | `iterate` | boolean |  | Before mastering, run analyze_mix_tool's loop: apply its top fixes and re-score, up to 3 rounds, until 85+ with no gate failed; a round that lowers the score is dropped. The whole run is one undo step. (default false) |
@@ -3259,7 +3259,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffmpeg is available and 
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `genre` | "hype" \| "flash_montage" \| "saas_ui" \| "talking_head" \| "match_cut" \| "3d_product" \| "video_essay" \| "editorial" \| "multiplicity" \| "general" |  | Sets the target bands (loudness range, cue density, hit coverage): hype, flash_montage, saas_ui, talking_head, match_cut, 3d_product, video_essay, editorial, multiplicity, general. (default "general") |
+| `genre` | "hype" \| "flash_montage" \| "saas_ui" \| "talking_head" \| "match_cut" \| "product_3d" \| "video_essay" \| "editorial" \| "multiplicity" \| "general" |  | Sets the target bands (loudness range, cue density, hit coverage): hype, flash_montage, saas_ui, talking_head, match_cut, product_3d (3d_product also read), video_essay, editorial, multiplicity, general. (default "general") |
 | `hit_times` | number[] |  | Timeline seconds that want a sound. Default: spot_sound_tool's hit points (cuts, transitions, titles, flashes, moves, block and 3D events). |
 | `detail` | "compact" \| "full" |  | compact: failing metrics, their fixes and the top 3; full: every metric and every clip's stem. (default "compact") |
 
@@ -3552,11 +3552,12 @@ Availability: editor — (needs reading a rendered file with ffmpeg (the zenvi C
 
 Surfaces: mcp, cli, editor. read-only, open world. Needs: watch.
 
-Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; the render must be media in the project's bin); desktop — (web-only direct tool).
+Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `path` | string | yes | The rendered video to watch, as render/export wrote it (a path relative to the project's folder, or absolute). |
+| `path` | string |  | The rendered video to watch, as render/export wrote it (a path relative to the project's folder, or absolute). |
+| `render_id` | string |  | Zenvi Cloud: the render_id render_project returned, once get_render_status says done (instead of path). |
 | `brief` | string |  | What the edit was asked to be, in a sentence or two; the critic judges against it. |
 | `focus` | "hook" \| "pacing" \| "structure" \| "motion" \| "transitions" \| "typography" \| "look" \| "sound_design" \| "mix" \| "ending"[] |  | Dimensions to weigh most, e.g. ["sound_design", "mix"] after sound design. |
 
@@ -3580,7 +3581,7 @@ Availability: editor — (needs saving a copy of the project as another project)
 
 Surfaces: mcp, cli, editor. read-only, open world. Needs: watch.
 
-Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; the render must be media in the project's bin); desktop — (web-only direct tool).
+Availability: editor — (needs watching a render with sound (the zenvi CLI and Zenvi Cloud, signed in to Zenvi)); cli yes (only when signed in with zenvi login (or ZENVI_GEMINI_API_KEY is set, for development)); cloud yes (only when the server calls the Zenvi backend and has ffmpeg; it watches a render_project render (render_id) or video in the project's bin); desktop — (web-only direct tool).
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |

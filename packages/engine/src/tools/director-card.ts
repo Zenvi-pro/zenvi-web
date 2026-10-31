@@ -14,7 +14,7 @@
 
 /** The finish, for the descriptions of the tools that start a whole video (on every surface: Zenvi Cloud renders with render_project). */
 export const FINISH_HINT =
-  "Then finish, in order, skipping what its receipt says it did: unify_grade_tool, apply_motion_transitions_tool, spot_sound_tool and auto_sound_design_tool, master_audio_tool iterate=true, render (render_video; Zenvi Cloud: render_project), review_render_tool, watch_render_tool once (fix its HIGH issues, render, watch again at most once).";
+  "Then finish, in order, skipping what its receipt says it did: unify_grade_tool, apply_motion_transitions_tool, spot_sound_tool and auto_sound_design_tool, master_audio_tool iterate=true, render (render_video; Zenvi Cloud: render_project), review_render_tool where available, watch_render_tool once on the render (its path; Zenvi Cloud: the render_id) where available: fix its HIGH issues, render, watch again at most once.";
 
 /** The genre router: which recipe to read. */
 const RECIPES =

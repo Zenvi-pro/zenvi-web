@@ -72,13 +72,12 @@ and master: `iterate` runs it.
 | app, AI tool, UI blocks, glass cards | `saas_ui` | `saas_ui` | `palettes/saas.md` |
 | person talking, captions | `talking_head` | `talking_head` | `palettes/talking-head.md` |
 | pose / shape / circle matches | `match_cut` | `match_cut` | `palettes/match-cut.md` |
-| one product, 3D, device spin | `product_3d` | `3d_product` | `palettes/3d-product.md` |
+| one product, 3D, device spin | `product_3d` | `product_3d` | `palettes/3d-product.md` |
 | voice-over essay, documentary, explainer | `video_essay` / `documentary` | `video_essay` | `palettes/essay.md` |
 | type is the picture, brutalist, glitch | `editorial` | `editorial` | `palettes/editorial.md` |
 | tiles, grids, split screens, kaleidoscope | `multiplicity` | `multiplicity` | `palettes/multiplicity.md` |
 
-The two enums differ: `product_3d` designs, `3d_product` scores;
-`documentary` designs, `video_essay` scores.
+`documentary` designs; score and master it as `video_essay` (`documentary` is read as that).
 
 ## The numbers (reference reels, CRAFT.md §11-12)
 

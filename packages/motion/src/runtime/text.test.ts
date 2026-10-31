@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { random01 } from "./rng.js";
-import { formatNumber, odometerPositions, scrambledText, splitText, typedCount } from "./text.js";
+import { formatNumber, odometerPositions, scrambledText, splitText, textLines, typedCount } from "./text.js";
 
 describe("text animators", () => {
   it("types at the given rate and erases", () => {
@@ -50,5 +50,14 @@ describe("text animators", () => {
   it("seeds randomness", () => {
     expect(random01(1, 2, 3)).toBe(random01(1, 2, 3));
     expect(random01(1, 2, 3)).not.toBe(random01(2, 2, 3));
+  });
+});
+
+describe("textLines", () => {
+  it("breaks on a slash with a space beside it, not inside MB/s or 24/7", () => {
+    // Regression (skk-kinetic): text_scramble broke "1.2 GB/s" into two lines.
+    expect(textLines("ALL SYSTEMS READY / 99.9% UPTIME")).toEqual(["ALL SYSTEMS READY", "99.9% UPTIME"]);
+    expect(textLines("1.2 GB/s / LIVE 24/7")).toEqual(["1.2 GB/s", "LIVE 24/7"]);
+    expect(textLines("ONE\nTWO")).toEqual(["ONE", "TWO"]);
   });
 });

@@ -130,4 +130,32 @@ describe("watch_render_tool", () => {
     expect(receipt.summary).toMatch(/^Error: watch_render_tool is not available in this Zenvi surface: it needs watching a render with sound/);
   });
 
+
+  it("watches a render by id where the host has one (Zenvi Cloud), and asks for exactly one of path and render_id", async () => {
+    const ed = new EditHarness();
+    const byId: string[] = [];
+    watching(ed, 9, async () => critique(9));
+    ed.host.watch!.watchRender = async (renderId) => {
+      byId.push(renderId);
+      return critique(9);
+    };
+    const receipt = (await runTool({ doc: ed.doc, host: ed.host }, "watch_render_tool", { render_id: "r_0123456789abcdef" })).data!;
+    expect(byId).toEqual(["r_0123456789abcdef"]);
+    expect(receipt.summary).toMatch(/^Watched render r_0123456789abcdef \(9\.00s, with sound\)/);
+    expect((receipt.data as Row).render_id).toBe("r_0123456789abcdef");
+
+    const both = (await runTool({ doc: ed.doc, host: ed.host }, "watch_render_tool", { path: "out.mp4", render_id: "r_0123456789abcdef" })).data!;
+    expect(both.summary).toMatch(/^Error: pass either path .* or render_id/);
+    expect((await runTool({ doc: ed.doc, host: ed.host }, "watch_render_tool", {})).data!.status).toBe("refused");
+
+    delete ed.host.watch!.watchRender;
+    const local = (await runTool({ doc: ed.doc, host: ed.host }, "watch_render_tool", { render_id: "r_0123456789abcdef" })).data!;
+    expect(local.summary).toBe("Error: render_id is for Zenvi Cloud's render_project; here pass path, the file render/export wrote.");
+    expect(byId).toHaveLength(1);
+  });
+
+  it("does not presume review_render_tool exists", async () => {
+    const { getTool } = await import("../registry.js");
+    expect(getTool("watch_render_tool")!.description).toContain("where review_render_tool exists");
+  });
 });
