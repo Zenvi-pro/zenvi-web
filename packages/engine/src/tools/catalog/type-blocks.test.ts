@@ -7,6 +7,7 @@ import { maskGrayTable } from "../../render/kernels/mask.js";
 import { runTool } from "../registry.js";
 import { fakeHost } from "../test-support/fake-host.js";
 import { snapshotOf } from "../test-support/fixture.js";
+import { flashViolations, isFlashChange, relativeLuminance } from "../../review/flashing.js";
 import { TYPE_BLOCK_KEY } from "./type-blocks.js";
 
 const doc = () => new ProjectDocument(createProject({ id: "TYPEBLOCK1", profile: findProfile("HD 1080p 30 fps")! }));
@@ -162,6 +163,29 @@ describe("add_type_block_tool", () => {
     expect(new Set(tagged(long).map((c) => c.layer)).size).toBe(6);
     const few = await runTool({ doc: doc(), host: fakeHost() }, "add_type_block_tool", { block: "wheel", words: ["ONLY"] });
     expect(few.text).toContain("Error: wheel takes 2-12 words");
+  });
+
+  it("holds the strobe's ground past 3 flashes a second (WCAG 2.3.1) unless allow_strobe", async () => {
+    const words = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN", "ELEVEN", "TWELVE"];
+    const run = async (extra: Record<string, unknown>) => {
+      const d = doc();
+      const h = fakeHost();
+      const r = await runTool({ doc: d, host: h }, "add_type_block_tool", { block: "strobe", words, lockup: "", ...extra });
+      expect(r.ok, r.text).toBe(true);
+      const paths = new Map(d.project.files.map((f) => [f.id, String(f.path)]));
+      const cards = tagged(d).sort((a, b) => Number(a.position) - Number(b.position));
+      const grounds = cards.map((c) => /<rect[^>]*fill="([^"]+)"/.exec(text(h.written.get(paths.get(c.file_id)!)!))![1]!);
+      const changes = cards.flatMap((c, i) => (i > 0 && isFlashChange(relativeLuminance(grounds[i - 1]!), relativeLuminance(grounds[i]!)) ? [Number(c.position)] : []));
+      return { changes, warnings: (r.data as { warnings: string[] }).warnings };
+    };
+    const safe = await run({});
+    expect(flashViolations(safe.changes)).toEqual([]);
+    expect(safe.changes.length).toBeGreaterThan(3);
+    expect(safe.warnings.join(" ")).toMatch(/the ground holds on \d+ of 12 cuts.*WCAG 2\.3\.1/);
+    const strobe = await run({ allow_strobe: true });
+    expect(strobe.changes).toHaveLength(11);
+    expect(flashViolations(strobe.changes).length).toBeGreaterThan(0);
+    expect(strobe.warnings.join(" ")).not.toMatch(/ground holds/);
   });
 
   it("boils paper-cut type on twos, the same boil for the same seed", async () => {

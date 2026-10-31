@@ -71,7 +71,9 @@ export type ProblemKind =
   | "static_shot"
   | "flat_brightness"
   | "flat_hue"
-  | "cut_without_sound";
+  | "cut_without_sound"
+  // More than 3 flashes in a second (review/flashing.ts, WCAG 2.3.1).
+  | "flashing";
 
 export interface Problem {
   kind: ProblemKind;

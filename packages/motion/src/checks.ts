@@ -8,6 +8,7 @@
 import { checkRace } from "./blocks/bar_race/race.js";
 import { checkClock } from "./blocks/data_clock/dates.js";
 import { checkGeoMap } from "./blocks/geo_map/plan.js";
+import { flashNote } from "./blocks/kinetic_cut_scene/shots.js";
 import { checkPictogram } from "./blocks/pictogram_morph/layout.js";
 import type { Params } from "./params.js";
 
@@ -16,4 +17,9 @@ export const BLOCK_CHECKS: Readonly<Record<string, (params: Params) => string | 
   data_clock: checkClock,
   geo_map: checkGeoMap,
   pictogram_morph: checkPictogram,
+};
+
+/** Warnings a block's valid parameters still earn, by block id. */
+export const BLOCK_NOTES: Readonly<Record<string, (params: Params) => string | undefined>> = {
+  kinetic_cut_scene: flashNote,
 };
