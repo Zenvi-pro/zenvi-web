@@ -21,7 +21,9 @@ function unwrap(schema: ZodLike): ZodLike {
 }
 
 /** FX params that show nothing alone in a still frame of these fixtures, with why. */
-export const FX_INERT: ReadonlyMap<string, string> = new Map([]);
+export const FX_INERT: ReadonlyMap<string, string> = new Map([
+  ["crt.pitch", "scanline spacing scales with the frame: every value is the 2 px floor on these 180 px fixtures"],
+]);
 
 /** Params both runs set so the one under test shows (`id.*` for every case of the effect). */
 const FX_CONTEXT: Readonly<Record<string, Record<string, unknown>>> = {
@@ -36,6 +38,8 @@ const FX_VALUES: Readonly<Record<string, unknown>> = {
   "dither.pixel": 12,
   // From the context's 12 bursts a second down to the minimum.
   "glitch.rate": 0.2,
+  // rounded -> none only changes the corners; tv insets a 4:3 screen in a black bezel.
+  "crt.bezel": "tv",
 };
 
 function changed(schema: ZodLike, current: unknown): unknown {
@@ -64,6 +68,8 @@ const spec: ToolSpec = { tool: "apply_fx_tool", args: { clip_id: A }, clips: BAR
 export function fxCases(): TruthCase[] {
   const cases: TruthCase[] = [];
   for (const id of FX_IDS as readonly FxId[]) {
+    // An effect at a cut needs the clip before it: apply_fx_tool refuses it and its own tool applies it (datamosh_cut_tool, BACKLOG).
+    if (FX_INFO[id].atCut) continue;
     const schema = FX_PARAMS[id] as unknown as { shape: Record<string, ZodLike>; parse(v: unknown): Record<string, unknown> };
     const defaults = schema.parse({});
     const all = FX_CONTEXT[`${id}.*`] ?? {};
