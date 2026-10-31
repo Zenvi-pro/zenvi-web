@@ -15,6 +15,7 @@ import type { Project } from "../../model/types.js";
 import { isOpError } from "../../ops/errors.js";
 import {
   applyMotionTransition,
+  cutBetween,
   cutNear,
   listProjectMotionTransitions,
   motionRecords,
@@ -28,6 +29,8 @@ import {
 import { rateOf } from "../../ops/internal.js";
 import { DISSOLVE_DRIFTS, applyMatchedDissolve } from "../../ops/matched-dissolve.js";
 import { readBrief } from "../../brief/brief.js";
+import { fitsFlashLimit } from "../../review/flashing.js";
+import { FLASH_PRESETS, timelineFlashChanges, transitionFlashChanges } from "../../review/timeline-flashes.js";
 import {
   MOTION_DIRECTIONS,
   MOTION_TRANSITION_IDS,
@@ -58,6 +61,10 @@ const common = {
   duration: z.number().min(0.03).max(4).optional().describe("Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3)."),
   direction: z.enum([...MOTION_DIRECTIONS, "auto"]).optional().describe("whip/slide/squash: left, right, up, down; tilt: up, down; spin: cw, ccw. auto (default) keeps the track's current: the direction of the previous motion transition on the track, else left (tilt: up, spin: cw). Keep one direction per sequence; a whip up is a reserved accent (a camera tilt is the tilt preset)."),
   intensity: z.number().min(0.25).max(2).optional().describe("0.25-2, default 1: scales travel, zoom, blur and flash strength."),
+  allow_strobe: z
+    .boolean()
+    .optional()
+    .describe("true: keep every flash (white/black/invert) even past 3 flashes in a second. Default false: flashes stay within WCAG 2.3.1 (photosensitive viewers), counting the flashes already on the timeline; only when the user asks for a strobe."),
 };
 
 const focus = {
@@ -76,6 +83,41 @@ const STYLE_LINES = MOTION_TRANSITION_STYLE_IDS.map((k) => {
 
 /** A preset on this many cuts or more reads as a template rather than an edit. */
 const SAME_PRESET_WARN = 4;
+
+/** Why a flash is left out, for the receipt. */
+const STROBE_NOTE = "more than 3 flashes in a second can trigger seizures (WCAG 2.3.1); pass allow_strobe=true only when the user asks for a strobe";
+
+/** The flash changes a transition with this preset and length makes on `cut`. */
+function flashOf(project: Project, preset: MotionTransitionId, cut: number, frames: number | undefined): [number, number] {
+  return transitionFlashChanges(cut, frames ?? defaultFrames(preset, rateOf(project)), rateOf(project));
+}
+
+/**
+ * The inputs with each flash that would make more than 3 flashes in a second
+ * left off, in cut order, counting the flashes on the timeline the call does
+ * not replace (a flash on a cut whose new flash is left off stays); and the
+ * cuts left off.
+ */
+function thinFlashes(project: Project, cuts: readonly { outClip: { id: string }; cut: number }[], inputs: readonly MotionTransitionInput[]): { kept: MotionTransitionInput[]; dropped: number[] } {
+  const fps = rateOf(project);
+  const cutOf = new Map(cuts.map((c) => [c.outClip.id, c.cut]));
+  const flashes = timelineFlashChanges(project, new Set(inputs.map((i) => i.outClipId)));
+  const before = new Map(listProjectMotionTransitions(project).filter((r) => FLASH_PRESETS.has(r.preset)).map((r) => [r.outClipId, transitionFlashChanges(r.cut, r.frames, fps)]));
+  const left = new Set<MotionTransitionInput>();
+  const dropped: number[] = [];
+  for (const input of [...inputs].sort((a, b) => cutOf.get(a.outClipId)! - cutOf.get(b.outClipId)!)) {
+    if (!FLASH_PRESETS.has(input.preset)) continue;
+    const cut = cutOf.get(input.outClipId)!;
+    const changes = flashOf(project, input.preset, cut, input.frames);
+    if (fitsFlashLimit(flashes, changes)) flashes.push(...changes);
+    else {
+      left.add(input);
+      dropped.push(cut);
+      flashes.push(...(before.get(input.outClipId) ?? []));
+    }
+  }
+  return { kept: inputs.filter((i) => !left.has(i)), dropped };
+}
 
 const listInput = z.strictObject({});
 
@@ -270,6 +312,12 @@ export const motionTransitionTools: CatalogTool[] = [
         if (error instanceof ToolError || isOpError(error)) return refused(APPLY, `Error: ${message(error)}`);
         throw error;
       }
+      if (FLASH_PRESETS.has(args.preset) && !args.allow_strobe) {
+        const cut = cutBetween(project, input.outClipId, input.inClipId, input.acrossTracks).cut;
+        if (!fitsFlashLimit(timelineFlashChanges(project, new Set([input.outClipId])), flashOf(project, args.preset, cut, input.frames))) {
+          return refused(APPLY, `Error: ${args.preset} at ${cut.toFixed(2)}s makes more than 3 flashes within a second with the flashes already there: ${STROBE_NOTE}. Use a move (whip, zoom_in) here or flash a later cut.`);
+        }
+      }
       const r = call.commit((tx) => applyMotionTransition(tx, input), `Motion transition ${args.preset}`);
       const after = call.doc.project;
       const dir = r.direction ? ` ${r.direction}` : "";
@@ -327,9 +375,14 @@ export const motionTransitionTools: CatalogTool[] = [
       if (args.preset !== undefined && cuts.length >= SAME_PRESET_WARN) {
         warnings.push(`${args.preset} on all ${cuts.length} cuts reads as a template: style (auto reads the brief) varies the moves and leaves most cuts hard; or keep ${args.preset} on the 2-3 cuts that need it (apply_motion_transition_tool).`);
       }
+      const thinned = args.allow_strobe ? { kept: inputs, dropped: [] } : thinFlashes(project, cuts, inputs);
+      if (thinned.dropped.length > 0) {
+        warnings.push(`${thinned.dropped.length} flash(es) left off, those cuts stay as they were (${thinned.dropped.map((t) => `${t.toFixed(2)}s`).join(", ")}): ${STROBE_NOTE}.`);
+      }
+      if (thinned.kept.length === 0 && inputs.length > 0) return refused(APPLY_ALL, `Error: every transition here is a flash past the limit: ${warnings.join("; ")}`);
       const results = call.commit((tx) => {
         const done: MotionTransitionResult[] = [];
-        for (const input of inputs) {
+        for (const input of thinned.kept) {
           // A preset without the requested direction (spin vs left) falls back to auto rather than failing the mix.
           const tryInput = input.direction !== undefined && input.direction !== "auto" && !directionFits(input.preset, input.direction) ? { ...input, direction: "auto" as const } : input;
           try {

@@ -3907,7 +3907,7 @@ Availability: editor partial (without frame composing there is no contact sheet,
 
 ### review_render_tool
 
-**Review the rendered file** (direct tool). Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), and for a fast cut its rhythm (shot lengths that never vary, shots that go still, brightness and colour that never move, cuts with no sound), with one contact sheet of the shots and the last frame (problems framed red).
+**Review the rendered file** (direct tool). Watch the final render before delivering it: reports black frames, frozen picture, audio dropouts, true peak and loudness (EBU R128), how it ends (a hold or end card, never black or cut off), shots repeated too soon (perceptual hash of each shot's middle frame) and back-to-back shots that look the same (when the shot model is installed), and for a fast cut its rhythm (shot lengths that never vary, shots that go still, brightness and colour that never move, cuts with no sound), flashing past 3 flashes in a second (WCAG 2.3.1, a seizure risk), with one contact sheet of the shots and the last frame (problems framed red).
 
 Surfaces: mcp, cli, editor. read-only. Needs: media, frames.
 
@@ -4195,6 +4195,7 @@ Availability: editor yes; cli yes; cloud yes (only when ffprobe is available); d
 | `seed` | integer |  | paper: seed of the boil (default 1): the same seed boils the same. (min 0, max 2147483648) |
 | `marks` | boolean |  | paper: the hand-drawn marks orbiting the word (default true). |
 | `layouts` | ("fit" \| "bleed" \| "outline" \| "mirror" \| "tall" \| "stack")[] |  | strobe: layouts cycled cut by cut (default all: fit, bleed, outline, mirror, tall, stack). |
+| `allow_strobe` | boolean |  | strobe: true flips the ground on every cut even past 3 flashes a second. Default false: past that the ground holds while the words keep cutting (WCAG 2.3.1, photosensitive viewers); only when the user asks for a strobe. |
 
 ### list_sfx_tool
 
@@ -4302,6 +4303,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `duration` | number |  | Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3). (min 0.03, max 4) |
 | `direction` | "left" \| "right" \| "up" \| "down" \| "cw" \| "ccw" \| "auto" |  | whip/slide/squash: left, right, up, down; tilt: up, down; spin: cw, ccw. auto (default) keeps the track's current: the direction of the previous motion transition on the track, else left (tilt: up, spin: cw). Keep one direction per sequence; a whip up is a reserved accent (a camera tilt is the tilt preset). |
 | `intensity` | number |  | 0.25-2, default 1: scales travel, zoom, blur and flash strength. (min 0.25, max 2) |
+| `allow_strobe` | boolean |  | true: keep every flash (white/black/invert) even past 3 flashes in a second. Default false: flashes stay within WCAG 2.3.1 (photosensitive viewers), counting the flashes already on the timeline; only when the user asks for a strobe. |
 | `focus_x` | number |  | zoom_through: point of the outgoing shot to fly into, 0 = left edge, 1 = right (default 0.5): a doorway, a face, the product. (min 0, max 1) |
 | `focus_y` | number |  | zoom_through: 0 = top, 1 = bottom (default 0.5). (min 0, max 1) |
 
@@ -4321,6 +4323,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 | `duration` | number |  | Length of the move in seconds, both clips together (default per preset, from docs/TASTE.md: whip 8 frames at 30 fps, zoom 7, spin 12, glitch 5, flash 3). (min 0.03, max 4) |
 | `direction` | "left" \| "right" \| "up" \| "down" \| "cw" \| "ccw" \| "auto" |  | whip/slide/squash: left, right, up, down; tilt: up, down; spin: cw, ccw. auto (default) keeps the track's current: the direction of the previous motion transition on the track, else left (tilt: up, spin: cw). Keep one direction per sequence; a whip up is a reserved accent (a camera tilt is the tilt preset). |
 | `intensity` | number |  | 0.25-2, default 1: scales travel, zoom, blur and flash strength. (min 0.25, max 2) |
+| `allow_strobe` | boolean |  | true: keep every flash (white/black/invert) even past 3 flashes in a second. Default false: flashes stay within WCAG 2.3.1 (photosensitive viewers), counting the flashes already on the timeline; only when the user asks for a strobe. |
 | `focus_x` | number |  | zoom_through: point of the outgoing shot to fly into, 0 = left edge, 1 = right (default 0.5): a doorway, a face, the product. (min 0, max 1) |
 | `focus_y` | number |  | zoom_through: 0 = top, 1 = bottom (default 0.5). (min 0, max 1) |
 

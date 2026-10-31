@@ -77,6 +77,7 @@ const INERT: Readonly<Record<string, string>> = {
   dry_run: "a preview: by contract it writes nothing",
   dryRun: "a preview: by contract it writes nothing",
   allow_overlap: "a permission: lets an edit through that would otherwise be refused",
+  allow_strobe: "a permission: keeps flashes past WCAG 2.3.1's 3 a second that would otherwise be left off; one flash renders the same",
   confirm: "a confirmation for a destructive step",
   name: "a display name",
   label: "a display name",
