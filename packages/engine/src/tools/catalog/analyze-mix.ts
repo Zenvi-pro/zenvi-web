@@ -22,7 +22,7 @@ const input = z.strictObject({
   genre: z
     .enum(MIX_GENRES)
     .default("general")
-    .describe("Sets the target bands (loudness range, cue density, hit coverage): hype, flash_montage, saas_ui, talking_head, match_cut, 3d_product, video_essay, editorial, multiplicity, general."),
+    .describe("Sets the target bands (loudness range, cue density, hit coverage): hype, flash_montage, saas_ui, talking_head, match_cut, product_3d (3d_product also read), video_essay, editorial, multiplicity, general."),
   hit_times: z.array(z.number().min(0)).max(500).optional().describe("Timeline seconds that want a sound. Default: spot_sound_tool's hit points (cuts, transitions, titles, flashes, moves, block and 3D events)."),
   detail: z.enum(["compact", "full"]).default("compact").describe("compact: failing metrics, their fixes and the top 3; full: every metric and every clip's stem."),
 });

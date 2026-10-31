@@ -11,7 +11,7 @@
 import { ENVELOPE_HOP, bandPowerDb, differenceOf, median, monoOf, onsetStrength, percentile, phoneOf, rmsEnvelopeDb, spectrumOf, sumOf } from "./analysis.js";
 import { loudnessSeries, measureLoudness, SILENCE_LUFS } from "./loudness.js";
 
-export const MIX_GENRES = ["hype", "flash_montage", "saas_ui", "talking_head", "match_cut", "3d_product", "video_essay", "editorial", "multiplicity", "general"] as const;
+export const MIX_GENRES = ["hype", "flash_montage", "saas_ui", "talking_head", "match_cut", "product_3d", "video_essay", "editorial", "multiplicity", "general"] as const;
 export type MixGenre = (typeof MIX_GENRES)[number];
 
 export const STEM_NAMES = ["voice", "music", "sfx", "ambience"] as const;
@@ -22,12 +22,12 @@ export type CueRole = "hero" | "sweetener" | "micro";
 /** METRICS.md L5 bands, LU. */
 const LRA_BAND: Record<MixGenre, [number, number]> = {
   hype: [3, 9], flash_montage: [2, 6], saas_ui: [2, 6], talking_head: [2, 6], match_cut: [2, 6],
-  "3d_product": [1.5, 6], video_essay: [3, 10], editorial: [1.5, 6], multiplicity: [3, 9], general: [2, 8],
+  "product_3d": [1.5, 6], video_essay: [3, 10], editorial: [1.5, 6], multiplicity: [3, 9], general: [2, 8],
 };
 /** METRICS.md V3 bands, cues per second. */
 const DENSITY: Record<MixGenre, [number, number]> = {
   hype: [1.5, 3.5], flash_montage: [1, 3], saas_ui: [1.5, 3.5], talking_head: [0.3, 1.2], match_cut: [0.8, 2],
-  "3d_product": [0.8, 2], video_essay: [0.5, 1.5], editorial: [0.8, 2], multiplicity: [0.8, 2], general: [0.8, 2],
+  "product_3d": [0.8, 2], video_essay: [0.5, 1.5], editorial: [0.8, 2], multiplicity: [0.8, 2], general: [0.8, 2],
 };
 const COVERAGE_MIN: Partial<Record<MixGenre, number>> = { talking_head: 0.6, video_essay: 0.6 };
 /** METRICS.md B5: cue prominence over the local bed, dB. */
@@ -45,6 +45,8 @@ export interface HitPoint {
   t: number;
   kind: string;
   needsCue: boolean;
+  /** The sound that covers it on its own (the spotter's pick); default by kind. */
+  recipe?: string;
 }
 
 /** A placed sound effect: `t` is its hit point on the timeline. */
@@ -408,7 +410,7 @@ export function scoreMix(input: ScoreInput): MixScore {
   const mono = monoOf(mix);
   const spectrum = spectrumOf(mono, sr);
   {
-    const [lo, hi] = genre === "3d_product" ? [1000, 1800] : [1600, 3200];
+    const [lo, hi] = genre === "product_3d" ? [1000, 1800] : [1600, 3200];
     const cen = spectrum.centroidHz;
     put(
       "F1_centroid_hz",
@@ -447,7 +449,7 @@ export function scoreMix(input: ScoreInput): MixScore {
     const recipe = (kind: string): string => (kind === "transition" ? "whoosh_short" : kind === "title" ? "pop" : kind === "ui" ? "ui_tap" : "impact_punch");
     put("H1_coverage", need.length ? (need.length - uncovered.length) / need.length : null, COVERAGE_MIN[genre] ?? 0.9, 1, "placement", {
       text: `${uncovered.length} hit point(s) have no cue: ${uncovered.slice(0, 5).map((h) => `${h.kind} @${h.t.toFixed(2)}`).join(", ")}`,
-      calls: uncovered.slice(0, 5).map((h) => ({ tool: "add_sfx_tool", args: { recipe: recipe(h.kind), at_seconds: r2(h.t) } })),
+      calls: uncovered.slice(0, 5).map((h) => ({ tool: "add_sfx_tool", args: { recipe: h.recipe ?? recipe(h.kind), at_seconds: r2(h.t) } })),
     });
     const untiedCues = cues.filter((c) => c.role !== "micro" && !hits.some((h) => Math.abs(h.t - c.t) <= tol));
     const placed = untiedCues.filter((c) => !c.auto);

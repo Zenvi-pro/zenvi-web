@@ -69,7 +69,7 @@ afterEach(() => {
 
 describe("runChatTurn", () => {
   it("sends user_message on open with the desktop payload shape", () => {
-    const { socket } = start({ agentMode: "planning", images: [{ name: "a.png", mime_type: "image/png", image_base64: "AAAA" }] });
+    const { socket } = start({ agentMode: "planning", images: [{ name: "a.png", mime_type: "image/png", image_base64: "AAAA" }], unavailableTools: ["create_media_with_comfyui_tool"] });
     socket.open();
     expect(socket.url).toBe("wss://api.example/api/v1/chat/ws");
     expect(socket.sent[0]).toEqual({
@@ -82,6 +82,7 @@ describe("runChatTurn", () => {
         client: "web",
         agent_mode: "planning",
         images: [{ name: "a.png", mime_type: "image/png", image_base64: "AAAA" }],
+        unavailable_tools: ["create_media_with_comfyui_tool"],
       },
     });
   });
