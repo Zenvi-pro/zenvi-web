@@ -672,7 +672,7 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
       }
       // The file itself, measured: what the checks saw came from the scene's own page, so the render
       // must show the same pictures (a scene that draws differently when captured is refused) and keep the flash limit.
-      const rendered = await decodeLuma(partial, { width: PROBE_W, height: PROBE_H, fps: rate, signal: job.signal });
+      const rendered = await decodeLuma(partial, { width: PROBE_W, height: PROBE_H, fps: rate, overBlack: alpha, signal: job.signal });
       const drift = renderDrift(checked.luma, rendered.frames, samples > 1);
       if (drift) return { ok: false, problems: [{ code: "nondeterministic", severity: "error", message: `the render's frame ${drift.frame} is not the picture the check drew (a mean difference of ${drift.diff} levels): draw must depend only on t, api and the params, not on the size it renders at or the order frames are drawn in`, frames: { from: Math.round((drift.frame * info.fps) / rate), to: Math.round((drift.frame * info.fps) / rate) } }], info };
       if (!job.allowStrobe) {
@@ -702,7 +702,8 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
  * The first rendered frame whose thumbnail is not the checked one: mean
  * absolute difference per pixel over the threshold (ffmpeg's area scaling,
  * chroma subsampling and the encode move a few levels; motion blur averages
- * moving edges). `rendered` is the file's limited-range luma.
+ * moving edges). Both are full-range luma, a transparent render's over
+ * black like the page's.
  */
 export function renderDrift(checked: readonly Uint8Array[], rendered: readonly Uint8Array[], blurred: boolean): { frame: number; diff: number } | null {
   const limit = blurred ? 40 : 20;
@@ -711,8 +712,7 @@ export function renderDrift(checked: readonly Uint8Array[], rendered: readonly U
     const a = checked[f]!;
     const b = rendered[f]!;
     let sum = 0;
-    // The encodes are limited range (16-235): back to the page's full range before comparing.
-    for (let i = 0; i < a.length; i += 1) sum += Math.abs(a[i]! - (((b[i] ?? 16) - 16) * 255) / 219);
+    for (let i = 0; i < a.length; i += 1) sum += Math.abs(a[i]! - (b[i] ?? 0));
     const diff = sum / a.length;
     if (diff > limit) return { frame: f, diff: Math.round(diff) };
   }

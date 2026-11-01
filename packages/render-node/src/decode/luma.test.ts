@@ -48,6 +48,15 @@ describe("decodeLuma", () => {
     expect(flashingOf(await decodeLuma(await strobe("strobe1.mp4", 30), { width: 48, height: 27, fps: 30 }))).toEqual([]);
   });
 
+  it("writes full-range luma, a file with alpha over black when asked", async () => {
+    const file = path.join(dir, "glass.mov");
+    await exec(resolveBinary("ffmpeg"), ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=white@0.5:s=64x36:r=30:d=0.2,format=rgba", "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", "-y", file]);
+    const straight = await decodeLuma(file, { width: 16, height: 9, fps: 30 });
+    expect(straight.frames[0]![0]).toBeGreaterThan(250);
+    const over = await decodeLuma(file, { width: 16, height: 9, fps: 30, overBlack: true });
+    expect(Math.abs(over.frames[0]![0]! - 128)).toBeLessThan(4);
+  });
+
   it("names a file without a picture", async () => {
     const file = path.join(dir, "tone.wav");
     await exec(resolveBinary("ffmpeg"), ["-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-y", file]);

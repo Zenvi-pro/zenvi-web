@@ -72,9 +72,9 @@ describe("scenes in the sandbox", () => {
 
   it("refuses a render that differs from the picture the check drew", () => {
     const a = [new Uint8Array(48 * 27).fill(40), new Uint8Array(48 * 27).fill(40)];
-    // The file's luma is limited range: 50 there is 40 on the page.
-    expect(renderDrift(a, [new Uint8Array(48 * 27).fill(50), new Uint8Array(48 * 27).fill(52)], false)).toBeNull();
-    expect(renderDrift(a, [new Uint8Array(48 * 27).fill(50), new Uint8Array(48 * 27).fill(200)], false)).toEqual({ frame: 1, diff: 174 });
+    // The encode moves a few levels; a different picture moves many.
+    expect(renderDrift(a, [new Uint8Array(48 * 27).fill(44), new Uint8Array(48 * 27).fill(37)], false)).toBeNull();
+    expect(renderDrift(a, [new Uint8Array(48 * 27).fill(44), new Uint8Array(48 * 27).fill(200)], false)).toEqual({ frame: 1, diff: 160 });
   });
 
   it("stops a scene that never finishes a frame", async (t) => {
@@ -147,6 +147,17 @@ describe("scenes in the sandbox", () => {
     const full = await renderScene({ ...job(scene(draw, "", `export const fps = 30;\nexport const duration = 24;\nexport const alpha = true;\n${cues}`)), alpha: false });
     expect(full.ok, full.ok ? "" : full.problems.map((p) => p.message).join("; ")).toBe(true);
     expect(full).toMatchObject({ codec: "h264" });
+  });
+
+  it("compares bright and half-transparent renders with the check without calling them drift", async (t) => {
+    if (!chrome) t.skip();
+    const head = (alpha: boolean) => `export const fps = 30;\nexport const duration = 24;\nexport const alpha = ${alpha};\nexport const cues = { land: { at: 20, kind: 'land' } };`;
+    // White is 255 on the page and in the file's full-range luma.
+    const white = await renderScene(job(scene("  ctx.fillStyle = '#fff';\n  ctx.fillRect(0, 0, 4000, 4000);\n  api.rect(api.tween(0, 20, 0, 1600), 400, 100, 100, { fill: '#000' });", "", head(false))));
+    expect(white.ok, white.ok ? "" : white.problems.map((p) => p.message).join("; ")).toBe(true);
+    // Half-transparent white is measured over black on the page; the file is too.
+    const glass = await renderScene(job(scene("  ctx.fillStyle = 'rgba(255,255,255,0.5)';\n  ctx.fillRect(0, 0, 4000, 4000);\n  api.rect(api.tween(0, 20, 0, 1600), 400, 100, 100, { fill: '#fff' });", "", head(true))));
+    expect(glass.ok, glass.ok ? "" : glass.problems.map((p) => p.message).join("; ")).toBe(true);
   });
 
   it("audits the layout of the text it draws", async (t) => {

@@ -3,7 +3,9 @@
  * constant rate, for motion analysis (engine analysis/action.ts). ffmpeg
  * seeks accurately (decoding from the keyframe before `startSeconds`),
  * scales with area averaging (so a fine texture does not alias into
- * motion) and writes raw 8-bit luma.
+ * motion) and writes raw 8-bit full-range luma (what review/flashing.ts
+ * reads). `overBlack` composites a file with alpha over black first, as a
+ * transparent picture is measured where it is drawn.
  */
 
 import type { LumaFrames } from "@zenvi/engine";
@@ -19,7 +21,7 @@ export class NoVideoError extends Error {
 
 export async function decodeLuma(
   file: string,
-  options: { width: number; height: number; fps: number; startSeconds?: number; maxSeconds?: number; signal?: AbortSignal },
+  options: { width: number; height: number; fps: number; startSeconds?: number; maxSeconds?: number; overBlack?: boolean; signal?: AbortSignal },
 ): Promise<LumaFrames> {
   const width = Math.trunc(options.width);
   const height = Math.trunc(options.height);
@@ -32,7 +34,7 @@ export async function decodeLuma(
     resolveBinary("ffmpeg"),
     [
       "-hide_banner", "-loglevel", "error", "-nostdin", ...seek, "-i", file, ...limit,
-      "-map", "0:v:0", "-an", "-vf", `fps=${options.fps},scale=${width}:${height}:flags=area,format=gray`, "-f", "rawvideo", "pipe:1",
+      "-map", "0:v:0", "-an", "-vf", `fps=${options.fps},${options.overBlack ? "format=yuva444p,premultiply=inplace=1," : ""}scale=${width}:${height}:flags=area:out_range=pc,format=gray`, "-f", "rawvideo", "pipe:1",
     ],
     { signal: options.signal },
   );
