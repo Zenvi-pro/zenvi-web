@@ -127,8 +127,8 @@ export interface ScenePageApi {
   start(info: SceneModuleInfo): Promise<void>;
   /** Draw output frame n (fractional for motion-blur sub-frames); resolves once painted (media decoded). */
   seek(frame: number): Promise<void>;
-  /** Draw each output frame and measure it; stops at the first frame that throws. */
-  probe(frames: readonly number[]): Promise<FrameProbe[]>;
+  /** Draw each output frame and measure it; stops at the first frame that throws or takes longer than `maxMs`. */
+  probe(frames: readonly number[], maxMs: number): Promise<FrameProbe[]>;
   /** Draw the frames into one labelled contact sheet; a JPEG data URL. */
   sheet(cells: readonly { frame: number; label: string }[], columns: number, cellWidth: number): Promise<string>;
 }
@@ -147,4 +147,9 @@ export const SCENE_LIMITS = {
   heapMb: 512,
   /** A draw slower than this is reported (the final render would crawl). */
   slowFrameMs: 120,
+  /** Memory of the job's browser (every process), MB: the heap flag does not cover typed arrays and pixels. */
+  processMb: 2_000,
+  /** Wall-clock budget of a check, and of a render (check included), seconds. */
+  checkSeconds: 600,
+  renderSeconds: 3_600,
 } as const;

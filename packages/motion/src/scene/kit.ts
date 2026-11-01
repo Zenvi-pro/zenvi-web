@@ -133,6 +133,15 @@ interface FrameState {
 }
 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+/** Frozen all the way down: params are data the scene reads, never a place to keep state between frames. */
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const v of Object.values(value)) deepFreeze(v);
+    Object.freeze(value);
+  }
+  return value;
+}
 const lerp = (a: number, b: number, u: number): number => a + (b - a) * u;
 
 function roundRectPath(g: CanvasRenderingContext2D | Path2D, x: number, y: number, w: number, h: number, r: number): void {
@@ -680,7 +689,7 @@ export function createKit(host: KitHost) {
     /** Title-safe insets, design px (9:16 keeps text out of the top 12 % and bottom 20 %). */
     safe: Object.freeze(safeArea(W, H)),
     /** The params (the tools' over the module's defaults). */
-    p: Object.freeze({ ...host.params }) as Readonly<Record<string, unknown>>,
+    p: deepFreeze(structuredClone(host.params)),
     palette: Object.freeze({ ...palette }),
     /** Frame of a cue. */
     cue: frameOf,

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { findChrome } from "./chrome.js";
-import { draftScene, renderScene, sceneHtml, SCENE_CSP, wrapScene } from "./scene-render.js";
+import { draftScene, renderDrift, renderScene, sceneHtml, SCENE_CSP, wrapScene } from "./scene-render.js";
 
 let dir: string;
 let env: NodeJS.ProcessEnv;
@@ -30,6 +30,8 @@ describe("scene page", () => {
     const wrapped = wrapScene("const fps = 30;", [{ name: "fps", local: "fps" }]);
     expect(wrapped).toContain("function (window, self, globalThis, document");
     expect(wrapped).toContain("return { fps: fps }");
+    // A factory: the runtime makes the module again for every draw.
+    expect(wrapped).toMatch(/start\(function \(\) \{\n {4}return \(function \(window/);
     expect(SCENE_CSP).toContain("connect-src 'none'");
     expect(SCENE_CSP).not.toContain("unsafe-eval");
     // A param cannot close the config's script element.
@@ -50,10 +52,27 @@ describe("scenes in the sandbox", () => {
     expect(existsSync(path.join(dir, "sheet.jpg"))).toBe(true);
   });
 
-  it("finds a scene that keeps state between frames", async (t) => {
+  it("makes the module again for every draw, so state a scene keeps never outlives a frame", async (t) => {
     if (!chrome) t.skip();
-    const r = await draftScene(job(scene("  n += 1;\n  api.rect(0, 0, (n * 37) % 900, 200, { fill: '#f00' });", "let n = 0;")));
-    expect(codes(r)).toContain("error nondeterministic");
+    const kept = scene("  n += 1;\n  api.rect(0, 0, 100 + ((n * 37) % 900), 200, { fill: '#f00' });\n  api.rect(api.tween(0, 20, 0, 1600), 400, 100, 100, { fill: '#00f' });", "let n = 0;", "export const fps = 30;\nexport const duration = 24;\nexport const cues = { a: { at: 4, kind: 'pop' } };");
+    expect(codes(await draftScene(job(kept)))).toEqual([]);
+    // Params are frozen all the way down: no place to keep state there either.
+    const params = await draftScene(job(scene("  (api.p.list as number[]).push(1);"), { params: { list: [1] } }));
+    expect(codes(params)).toEqual(["error draw-error"]);
+  });
+
+  it("refuses a render that draws something else than the check saw (here: it reads the size it draws at)", async (t) => {
+    if (!chrome) t.skip();
+    const code = scene("  const full = ctx.getTransform().a > 0.75;\n  api.rect(0, 0, api.W, api.H, { fill: full ? '#ff0000' : '#0000ff' });\n  api.rect(t * 40, 100, 100, 100, { fill: '#fff' });", "", "export const fps = 30;\nexport const duration = 6;\nexport const cues = { a: { at: 2, kind: 'pop' } };");
+    const r = await renderScene({ ...job(code, { width: 1920, height: 1080 }), motionBlurSamples: 1 });
+    expect(r).toMatchObject({ ok: false, problems: [expect.objectContaining({ code: "nondeterministic" })] });
+  });
+
+  it("refuses a render that differs from the picture the check drew", () => {
+    const a = [new Uint8Array(48 * 27).fill(40), new Uint8Array(48 * 27).fill(40)];
+    // The file's luma is limited range: 50 there is 40 on the page.
+    expect(renderDrift(a, [new Uint8Array(48 * 27).fill(50), new Uint8Array(48 * 27).fill(52)], false)).toBeNull();
+    expect(renderDrift(a, [new Uint8Array(48 * 27).fill(50), new Uint8Array(48 * 27).fill(200)], false)).toEqual({ frame: 1, diff: 174 });
   });
 
   it("stops a scene that never finishes a frame", async (t) => {
@@ -75,6 +94,8 @@ describe("scenes in the sandbox", () => {
     const tamper = await draftScene(job(scene("  (Math as any).round = () => 0;")));
     expect(codes(tamper)).toEqual(["error draw-error"]);
     // V8's stack-trace hook would hand out call sites (and their receivers): Error is frozen.
+    const strings = await draftScene(job(scene("  (String as any).fromCharCode = () => '';")));
+    expect(codes(strings)).toEqual(["error draw-error"]);
     const stack = await draftScene(job(scene("  (Error as any).prepareStackTrace = (_e: unknown, sites: unknown[]) => sites;")));
     expect(codes(stack)).toEqual(["error draw-error"]);
     const shadow = await draftScene(job(scene("  (ctx as any).getImageData = () => ({ data: new Uint8ClampedArray(4) });")));

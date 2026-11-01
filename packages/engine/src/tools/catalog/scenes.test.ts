@@ -78,6 +78,8 @@ describe("scene tools", () => {
     expect(said(media)).toMatch(/unknown file id NOPE/);
     const named = await runTool({ doc, host: host() }, "create_scene_tool", { code: CODE, media: { image: "SHOTXXXXXX" } });
     expect(said(named)).toMatch(/media name "image"/);
+    const proto = await runTool({ doc, host: host() }, "create_scene_tool", { code: CODE, params: '{"__proto__": {"x": 1}}' });
+    expect(said(proto)).toMatch(/cannot have a key named __proto__/);
     expect(doc.undoLabels).toEqual([]);
   });
 

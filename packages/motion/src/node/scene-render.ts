@@ -147,20 +147,16 @@ function checkJob(job: SceneJob): { fps: Fps; rate: number } {
  */
 export function wrapScene(body: string, exports: readonly SceneExport[]): string {
   const hidden = ["window", "self", "globalThis", "document", "top", "parent", "frames", "opener", "location", "navigator", "fetch", "XMLHttpRequest", "WebSocket", "Function", "setTimeout", "setInterval", "Date", "performance", "__zenviScene", "__zenviSceneStart"];
+  // The runtime makes the module again for every draw: no state the scene keeps survives a frame.
   return `(function (start) {
   "use strict";
-  var made;
-  try {
-    made = (function (${hidden.join(", ")}) {
+  start(function () {
+    return (function (${hidden.join(", ")}) {
       "use strict";
 ${body}
       ;return { ${exports.map((e) => `${e.name}: ${e.local}`).join(", ")} };
     }).call(undefined);
-  } catch (error) {
-    start(null, error);
-    return;
-  }
-  start(made, null);
+  }, null);
 })(window.__zenviSceneStart);
 `;
 }
@@ -262,6 +258,8 @@ async function startTab(tab: Tab, info: SceneInfo): Promise<void> {
 /** Map a failure inside the page to a problem. */
 function pageFailure(tab: Tab, error: unknown): SceneProblem {
   if (error instanceof SceneStop) return error.problem;
+  const stopped = stops.get(tab.page.browser());
+  if (stopped) return stopped;
   if (tab.crashed()) return { code: "crash", severity: "error", message: `the scene's page crashed: it ran out of memory (a scene has ${SCENE_LIMITS.heapMb} MB) or drew something Chrome could not` };
   return { code: "draw-error", severity: "error", message: error instanceof Error ? error.message.split("\n")[0]! : String(error) };
 }
@@ -272,7 +270,7 @@ async function probeFrames(tab: Tab, frames: readonly number[], frameMs: number)
   const out: FrameProbe[] = [];
   for (let i = 0; i < frames.length; i += BATCH) {
     const batch = frames.slice(i, i + BATCH);
-    const run = tab.page.evaluate((fs: number[]) => (globalThis as unknown as PageGlobals).__zenviScene!.probe(fs), batch);
+    const run = tab.page.evaluate((fs: number[], ms: number) => (globalThis as unknown as PageGlobals).__zenviScene!.probe(fs, ms), batch, frameMs);
     const got = await timed(run, frameMs * batch.length + 2_000, () => ({ code: "timeout", severity: "error", message: `frames ${batch[0]}-${batch[batch.length - 1]} did not finish drawing (a loop that never ends, or far too much work: a frame has ${frameMs / 1000} s)` }));
     out.push(...got);
     if (got.some((p) => p.error)) break;
@@ -339,6 +337,8 @@ function pageConfig(width: number, height: number, rate: number, params: Readonl
 const outputFrames = (info: SceneInfo, rate: number): number => Math.max(1, Math.round((info.duration / info.fps) * rate));
 
 interface Checked {
+  /** The luma thumbnail of every output frame as checked (the render is compared with it). */
+  luma: Uint8Array[];
   info: SceneInfo;
   problems: SceneProblem[];
   /** The tab that drew every frame (still open: the draft draws the sheet in it). */
@@ -403,7 +403,7 @@ async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: 
     throw new SceneStop(pageFailure(a, error));
   }
   const failed = probes.find((p) => p.error);
-  if (failed) throw new SceneStop({ code: "draw-error", severity: "error", message: failed.error!, frames: { from: sceneFrame(failed.frame), to: sceneFrame(failed.frame) } });
+  if (failed) throw new SceneStop({ code: /took \d+ ms to draw/.test(failed.error!) ? "timeout" : "draw-error", severity: "error", message: failed.error!, frames: { from: sceneFrame(failed.frame), to: sceneFrame(failed.frame) } });
 
   // Frame t drawn twice, in another tab and the other order, must be the same picture.
   const again = sampleSceneFrames(info, 12)
@@ -426,7 +426,8 @@ async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: 
     });
   }
 
-  const flashes = flashingOf({ fps: rate, width: PROBE_W, height: PROBE_H, startSeconds: 0, frames: probes.map((p) => new Uint8Array(Buffer.from(p.luma, "base64"))) });
+  const luma = probes.map((p) => new Uint8Array(Buffer.from(p.luma, "base64")));
+  const flashes = flashingOf({ fps: rate, width: PROBE_W, height: PROBE_H, startSeconds: 0, frames: luma });
   for (const w of flashes) {
     problems.push({
       code: "flashing",
@@ -446,19 +447,73 @@ async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: 
   else if (slowest.ms > SCENE_LIMITS.slowFrameMs) problems.push({ code: "slow", severity: "warning", message: `frame ${sceneFrame(slowest.frame)} took ${Math.round(slowest.ms)} ms to draw at half size; the render will be slow (cache paths, draw fewer particles)` });
   if (info.cues.length === 0) problems.push({ code: "cues", severity: "warning", message: "the scene has no cues: name its beats (export const cues = { land: 30, … }) so the sound design can hit them" });
   else if (!info.cues.some((c) => c.kind)) problems.push({ code: "cues", severity: "warning", message: "no cue names a picture event kind (click, land, impact, whoosh…), so the scene makes no sound; give its hits a kind" });
-  return { info, problems, tab: a, media, mediaDirs };
+  return { info, problems, tab: a, media, mediaDirs, luma };
 }
 
-async function withSandbox<T>(env: NodeJS.ProcessEnv | undefined, signal: AbortSignal | undefined, run: (browser: Browser) => Promise<T>): Promise<T> {
+/** Why the watchdog stopped a job's browser, by browser. */
+const stops = new WeakMap<Browser, SceneProblem>();
+
+/** Resident memory of a process and its descendants, MB (`ps`; null where there is none, as on Windows). */
+async function treeMb(pid: number): Promise<number | null> {
+  if (process.platform === "win32") return null;
+  const { execFile } = await import("node:child_process");
+  const out = await new Promise<string | null>((resolve) => execFile("ps", ["-A", "-o", "pid=,ppid=,rss="], (error, stdout) => resolve(error ? null : stdout)));
+  if (out === null) return null;
+  const children = new Map<number, number[]>();
+  const rss = new Map<number, number>();
+  for (const line of out.split("\n")) {
+    const [p, pp, kb] = line.trim().split(/\s+/).map(Number);
+    if (!p || pp === undefined || kb === undefined) continue;
+    rss.set(p, kb);
+    children.set(pp, [...(children.get(pp) ?? []), p]);
+  }
+  let total = 0;
+  const todo = [pid];
+  while (todo.length > 0) {
+    const p = todo.pop()!;
+    total += rss.get(p) ?? 0;
+    todo.push(...(children.get(p) ?? []));
+  }
+  return total / 1024;
+}
+
+/**
+ * A browser for one job, under a watchdog: the whole job has `budgetMs`, and
+ * the browser's processes `SCENE_LIMITS.processMb` of memory (the heap flag
+ * does not cover typed arrays and pixels). Past either the browser is killed.
+ */
+async function withSandbox<T>(env: NodeJS.ProcessEnv | undefined, signal: AbortSignal | undefined, budgetMs: number, run: (browser: Browser) => Promise<T>): Promise<T> {
   const browser = await launchChrome(env, { args: sandboxArgs() });
-  const onAbort = (): void => void browser.process()?.kill("SIGKILL");
-  signal?.addEventListener("abort", onAbort, { once: true });
+  const kill = (): void => void browser.process()?.kill("SIGKILL");
+  signal?.addEventListener("abort", kill, { once: true });
+  const pid = browser.process()?.pid;
+  let polling = false;
+  const watch = setInterval(() => {
+    if (polling || pid === undefined) return;
+    polling = true;
+    void treeMb(pid)
+      .then((mb) => {
+        if (mb !== null && mb > SCENE_LIMITS.processMb && !stops.has(browser)) {
+          stops.set(browser, { code: "memory", severity: "error", message: `the scene's page used ${Math.round(mb)} MB; a scene has ${SCENE_LIMITS.processMb} MB (keep big arrays and image data out of draw)` });
+          kill();
+        }
+      })
+      .finally(() => {
+        polling = false;
+      });
+  }, 1_000);
+  watch.unref();
   try {
-    return await run(browser);
+    return await timed(run(browser), budgetMs, () => ({ code: "timeout", severity: "error", message: `the job ran past its ${Math.round(budgetMs / 60_000)} minutes: draw less per frame, or make the scene shorter` }));
+  } catch (error) {
+    const stopped = stops.get(browser);
+    if (stopped) throw new SceneStop(stopped);
+    throw error;
   } finally {
-    signal?.removeEventListener("abort", onAbort);
+    clearInterval(watch);
+    signal?.removeEventListener("abort", kill);
     // A renderer stuck in a scene's loop does not answer close: kill it after a moment.
-    await timed(browser.close(), 5_000, () => ({ code: "timeout", severity: "error", message: "close" })).catch(() => browser.process()?.kill("SIGKILL"));
+    await timed(browser.close(), 5_000, () => ({ code: "timeout", severity: "error", message: "close" })).catch(kill);
   }
 }
 
@@ -492,7 +547,7 @@ export async function draftScene(job: DraftOptions): Promise<DraftResult> {
   const servers: Served[] = [];
   const tabs: Tab[] = [];
   try {
-    return await withSandbox(job.env, job.signal, async (browser) => {
+    return await withSandbox(job.env, job.signal, SCENE_LIMITS.checkSeconds * 1000, async (browser) => {
       let checked: Checked;
       try {
         checked = await check(browser, job, prepared, work, servers, tabs, { width: even(job.width / 2), height: even(job.height / 2) });
@@ -522,6 +577,9 @@ export async function draftScene(job: DraftOptions): Promise<DraftResult> {
       }
       return done({ info: checked.info, problems: checked.problems, ...(sheet ? { sheet } : {}), cells: cells.map(({ frame, label }) => ({ frame, label })) });
     });
+  } catch (error) {
+    if (error instanceof SceneStop) return done({ problems: [error.problem], cells: [] });
+    throw error;
   } finally {
     await cleanup(servers, tabs);
     await rm(work, { recursive: true, force: true });
@@ -572,7 +630,7 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
   const servers: Served[] = [];
   const tabs: Tab[] = [];
   try {
-    return await withSandbox(job.env, job.signal, async (browser) => {
+    return await withSandbox(job.env, job.signal, SCENE_LIMITS.renderSeconds * 1000, async (browser) => {
       let checked: Checked;
       try {
         checked = await check(browser, job, prepared, work, servers, tabs, { width, height });
@@ -607,9 +665,13 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
         if (error instanceof CaptureError || job.signal?.aborted) throw error;
         return { ok: false, problems: [pageFailure(tabs.find((t) => t.crashed()) ?? tabs[0]!, error)], info };
       }
-      // The flash limit once more, on the file itself: what the page measured came from the scene's own page.
+      // The file itself, measured: what the checks saw came from the scene's own page, so the render
+      // must show the same pictures (a scene that draws differently when captured is refused) and keep the flash limit.
+      const rendered = await decodeLuma(partial, { width: PROBE_W, height: PROBE_H, fps: rate, signal: job.signal });
+      const drift = renderDrift(checked.luma, rendered.frames, samples > 1);
+      if (drift) return { ok: false, problems: [{ code: "nondeterministic", severity: "error", message: `the render's frame ${drift.frame} is not the picture the check drew (a mean difference of ${drift.diff} levels): draw must depend only on t, api and the params, not on the size it renders at or the order frames are drawn in`, frames: { from: Math.round((drift.frame * info.fps) / rate), to: Math.round((drift.frame * info.fps) / rate) } }], info };
       if (!job.allowStrobe) {
-        const flashes = flashingOf(await decodeLuma(partial, { width: PROBE_W, height: PROBE_H, fps: rate, signal: job.signal }));
+        const flashes = flashingOf(rendered);
         if (flashes.length > 0) {
           const w = flashes[0]!;
           return { ok: false, problems: [{ code: "flashing", severity: "error", message: `the render flashes ${w.flashes} times in one second from ${round(w.start)} s to ${round(w.end)} s (measured on the file): more than 3 a second can trigger seizures (WCAG 2.3.1)`, frames: { from: Math.round(w.start * info.fps), to: Math.round(w.end * info.fps) } }], info };
@@ -622,10 +684,34 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
       await rename(partial, cached);
       return deliver(cached, result, alpha, false, round((Date.now() - started) / 1000, 1));
     });
+  } catch (error) {
+    if (error instanceof SceneStop) return { ok: false, problems: [error.problem] };
+    throw error;
   } finally {
     await cleanup(servers, tabs);
     await rm(work, { recursive: true, force: true });
   }
+}
+
+/**
+ * The first rendered frame whose thumbnail is not the checked one: mean
+ * absolute difference per pixel over the threshold (ffmpeg's area scaling,
+ * chroma subsampling and the encode move a few levels; motion blur averages
+ * moving edges). `rendered` is the file's limited-range luma.
+ */
+export function renderDrift(checked: readonly Uint8Array[], rendered: readonly Uint8Array[], blurred: boolean): { frame: number; diff: number } | null {
+  const limit = blurred ? 40 : 20;
+  const n = Math.min(checked.length, rendered.length);
+  for (let f = 0; f < n; f += 1) {
+    const a = checked[f]!;
+    const b = rendered[f]!;
+    let sum = 0;
+    // The encodes are limited range (16-235): back to the page's full range before comparing.
+    for (let i = 0; i < a.length; i += 1) sum += Math.abs(a[i]! - (((b[i] ?? 16) - 16) * 255) / 219);
+    const diff = sum / a.length;
+    if (diff > limit) return { frame: f, diff: Math.round(diff) };
+  }
+  return null;
 }
 
 /** ffmpeg failed (not the scene). */

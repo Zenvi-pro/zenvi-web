@@ -99,20 +99,27 @@ Scene code is untrusted, so it runs only here, in layers:
    `Math.random` are refused; no imports, async code, `with`, `import.meta`.
 2. The page (`scene/page.ts`): before the scene's script runs, the runtime
    takes away the clock, randomness, timers, network APIs, the Function
-   constructors and the canvas's way back to the document; the scene's body
-   runs in a strict function whose parameters hide `window`, `document`,
-   `globalThis` and friends.
+   constructors and the canvas's way back to the document, and freezes the
+   shared built-ins and the scene's context (so it cannot blind what the
+   runtime measures); the scene's body runs in a strict function whose
+   parameters hide `window`, `document`, `globalThis` and friends, and is
+   made again for every draw, so no state it keeps outlives a frame (params
+   are frozen all the way down).
 3. The page's Content-Security-Policy: no eval, no connections, no workers,
    no frames, images and fonts only from the job's own server.
 4. The browser: Chrome launched for the one job with a 512 MB heap, every
    non-loopback request sent to a proxy that does not exist and WebRTC kept
    off UDP; every request but the job's loopback server (the runtime, the
    scene, the fonts, the media passed in) is refused; every call into the
-   page is timed out (2 s a frame) and the browser is killed after.
+   page is timed out (2 s a frame), a watchdog kills the browser past 2 GB
+   across its processes (typed arrays and pixels are outside the heap) or
+   past the job's budget (10 min a check, 60 min a render), and the browser
+   is killed after.
 
 The check then draws every frame at half size (pixel hash, luma thumbnail,
 text boxes, draw time), draws a sample again in another tab in reverse
 order (frame t twice must be identical), measures flashes against WCAG
 2.3.1 and audits the text (safe zone, overlap, 22/32 px minimum, 8 words to
-read at once). Errors refuse the render; warnings come back to the agent
-with the contact sheet. Zenvi Cloud runs the same code in its render worker.
+read at once). A render is decoded again and compared with what the check
+drew, frame by frame, and its flashes measured on the file. Errors refuse the render; warnings come back to the agent
+with the contact sheet. Zenvi Cloud runs the same code in its render worker. Known: a scene's own `new Error().stack` shows the loopback port and the bundle's path (nothing it can reach); text drawn with `ctx.fillText` directly skips the layout audit (use `api.text`).

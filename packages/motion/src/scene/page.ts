@@ -26,12 +26,15 @@ interface SceneModule {
 declare global {
   interface Window {
     __zenviScene?: ScenePageApi;
-    __zenviSceneStart?: (module: SceneModule | null, error: unknown) => void;
+    __zenviSceneStart?: (factory: (() => SceneModule) | null, error: unknown) => void;
   }
 }
 
 const doc = document;
 const now = performance.now.bind(performance);
+// Kept before the scene runs, so nothing it does to the built-ins changes what the runtime reports.
+const fromCharCode = String.fromCharCode;
+const toBase64 = btoa;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -61,9 +64,14 @@ function harden(): void {
   Object.defineProperty(CanvasRenderingContext2D.prototype, "canvas", { get: () => undefined, configurable: false });
   // The shared built-ins frozen, so a scene cannot change what the runtime measures it with (a Math.round that
   // returns 0 would blind the flash check; the render is measured again from the file all the same).
-  const typed = Object.getPrototypeOf(Uint8Array.prototype) as object;
-  for (const v of [Object, Object.prototype, Array, Array.prototype, Function.prototype, String.prototype, Number.prototype, Boolean.prototype, Symbol, Symbol.prototype, Math, JSON, Map.prototype, Set.prototype, WeakMap.prototype, WeakSet.prototype, Promise, Promise.prototype, Error, Error.prototype, RegExp.prototype, typed, Uint8Array.prototype, Uint8ClampedArray.prototype, Uint32Array.prototype, Float32Array.prototype, Float64Array.prototype, CanvasRenderingContext2D.prototype, Path2D.prototype, DOMMatrix.prototype]) {
+  const typed = Object.getPrototypeOf(Uint8Array) as object;
+  const arrays = [Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array, Float32Array, Float64Array];
+  const builtIns: object[] = [Object, Array, Function, String, Number, Boolean, Symbol, Math, JSON, Map, Set, WeakMap, WeakSet, Promise, Error, TypeError, RangeError, RegExp, typed, ...arrays, ArrayBuffer, DataView];
+  const dom: object[] = [CanvasRenderingContext2D, Path2D, DOMMatrix, DOMMatrixReadOnly, TextMetrics, CanvasGradient, CanvasPattern, ImageData, DOMException];
+  for (const v of [...builtIns, ...dom]) {
     Object.freeze(v);
+    const proto = (v as { prototype?: unknown }).prototype;
+    if (proto && typeof proto === "object") Object.freeze(proto);
   }
 }
 
@@ -86,8 +94,8 @@ function pixelHash(data: Uint8ClampedArray): string {
 
 function base64(bytes: Uint8Array): string {
   let s = "";
-  for (let i = 0; i < bytes.length; i += 1) s += String.fromCharCode(bytes[i]!);
-  return btoa(s);
+  for (let i = 0; i < bytes.length; i += 1) s += fromCharCode(bytes[i]!);
+  return toBase64(s);
 }
 
 function boot(): void {
@@ -112,6 +120,8 @@ function boot(): void {
   });
   loaded.catch(() => undefined);
   let module: SceneModule | null = null;
+  // The scene's module, made again for every draw: nothing it keeps at its top level outlives one frame.
+  let factory: (() => SceneModule) | null = null;
   let kit: ReturnType<typeof createKit> | undefined;
   let info: SceneInfo | undefined;
 
@@ -141,14 +151,15 @@ function boot(): void {
   };
 
   const draw = async (frame: number): Promise<number> => {
-    if (!kit || !info || !module?.draw) throw new Error("the scene has not started");
+    if (!kit || !info || !module?.draw || !factory) throw new Error("the scene has not started");
     const t = (frame * info.fps) / config.renderFps;
     let ms = 0;
     for (let pass = 0; ; pass += 1) {
       const started = now();
       kit.begin(t);
       try {
-        module.draw(ctx, t, kit.api);
+        const fresh = factory();
+        fresh.draw!(ctx, t, kit.api);
       } catch (error) {
         throw new Error(`draw threw at frame ${Math.round(t * 100) / 100}: ${message(error)}`);
       }
@@ -197,7 +208,7 @@ function boot(): void {
     async seek(frame) {
       await seek(frame);
     },
-    async probe(frames) {
+    async probe(frames, maxMs) {
       const out: FrameProbe[] = [];
       for (const frame of frames) {
         let ms: number;
@@ -205,6 +216,10 @@ function boot(): void {
           ms = await seek(frame);
         } catch (error) {
           out.push({ frame, hash: "", luma: "", coverage: 0, boxes: [], ms: 0, error: message(error) });
+          break;
+        }
+        if (ms > maxMs) {
+          out.push({ frame, hash: "", luma: "", coverage: 0, boxes: [], ms, error: `frame ${frame} took ${Math.round(ms)} ms to draw; a frame has ${maxMs} ms` });
           break;
         }
         const { width, height } = canvas;
@@ -254,13 +269,18 @@ function boot(): void {
   Object.defineProperty(window, "__zenviScene", { value: Object.freeze(api), writable: false, configurable: false });
 
   let started = false;
-  const handOver = (made: SceneModule | null, error: unknown): void => {
+  const handOver = (make: (() => SceneModule) | null, error: unknown): void => {
     if (started) return;
     started = true;
-    if (!made) {
-      rejectLoaded(new Error(`the scene threw while loading: ${message(error)}`));
+    let made: SceneModule;
+    try {
+      if (!make) throw error;
+      made = make();
+    } catch (e) {
+      rejectLoaded(new Error(`the scene threw while loading: ${message(e)}`));
       return;
     }
+    factory = make;
     module = made;
     try {
       // Plain data only: what the Node side checks (a getter or a function in cues would not survive the trip).

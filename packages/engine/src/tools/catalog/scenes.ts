@@ -48,16 +48,23 @@ const objectArg = (what: string) =>
     .optional()
     .describe(what);
 
+/** Keys that would rewire an object's prototype when merged. */
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function parseObject(raw: Record<string, unknown> | string | undefined, name: string): Record<string, unknown> | string {
   if (raw === undefined || raw === "") return {};
-  if (typeof raw !== "string") return raw;
-  try {
-    const value: unknown = JSON.parse(raw);
-    if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
-  } catch {
-    // fall through
+  let value: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      value = null;
+    }
   }
-  return `Error: ${name} must be a JSON object.`;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return `Error: ${name} must be a JSON object.`;
+  const unsafe = Object.keys(value).find((k) => UNSAFE_KEYS.has(k));
+  if (unsafe) return `Error: ${name} cannot have a key named ${unsafe}.`;
+  return value as Record<string, unknown>;
 }
 
 function fpsOf(project: Project): { num: number; den: number } {
@@ -211,7 +218,7 @@ function merged(current: Record<string, unknown>, patch: Record<string, unknown>
   const out = { ...current };
   for (const [k, v] of Object.entries(patch)) {
     if (v === null) delete out[k];
-    else out[k] = v;
+    else Object.defineProperty(out, k, { value: v, enumerable: true, writable: true, configurable: true });
   }
   return out;
 }
