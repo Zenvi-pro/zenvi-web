@@ -102,6 +102,8 @@ export class ChromeLaunchError extends Error {
 
 export interface LaunchDeps {
   launch?: typeof puppeteer.launch;
+  /** Flags on top of chromeArgs (a scene's sandbox). */
+  args?: readonly string[];
 }
 
 function launchTimeout(env: NodeJS.ProcessEnv): number {
@@ -118,7 +120,7 @@ export async function launchChrome(env: NodeJS.ProcessEnv = process.env, deps: L
   let last: unknown;
   for (let attempt = 1; attempt <= LAUNCH_TRIES; attempt += 1) {
     try {
-      return await launch({ executablePath, headless: "shell", args: chromeArgs(env), protocolTimeout: 120_000, timeout });
+      return await launch({ executablePath, headless: "shell", args: [...chromeArgs(env), ...(deps.args ?? [])], protocolTimeout: 120_000, timeout });
     } catch (error) {
       last = error;
     }

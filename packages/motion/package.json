@@ -16,6 +16,7 @@
     "@puppeteer/browsers": "^3.2.6",
     "@zenvi/engine": "*",
     "@zenvi/render-node": "*",
+    "acorn": "^8.15.0",
     "esbuild": "^0.28.2",
     "puppeteer-core": "^25.16.0"
   },

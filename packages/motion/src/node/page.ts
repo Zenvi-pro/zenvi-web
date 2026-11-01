@@ -83,7 +83,8 @@ async function buildPage(root: string, id: string): Promise<BlockPage> {
   return { script, css, codeHash: await pageHash(root, script, css) };
 }
 
-async function pageHash(root: string, script: string, css: string): Promise<string> {
+/** Hash of a page's script, CSS and the bundled fonts. */
+export async function pageHash(root: string, script: string, css: string): Promise<string> {
   const hash = createHash("sha256").update(script).update("\0").update(css);
   const fonts = path.join(root, "fonts");
   for (const name of (await readdir(fonts)).sort()) hash.update(name).update(await readFile(path.join(fonts, name)));

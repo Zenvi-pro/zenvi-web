@@ -17,12 +17,8 @@ import { FONT_FACES, FONT_STACKS, PALETTES, withAccent, type FontRole, type Pale
 import { videoTrack } from "./effects.js";
 import { Timeline } from "./timeline.js";
 
-export interface Rect {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
+export { safeArea, type Rect } from "./safe.js";
+import { safeArea, type Rect } from "./safe.js";
 
 /** Where a picture event happens: an element (its centre at the event's time) or a design-px point. */
 export type CuePlace = Element | { x: number; y: number };
@@ -72,12 +68,6 @@ declare global {
     __zenvi?: ZenviPageApi;
     __hf?: { duration: number; seek(t: number): void };
   }
-}
-
-/** Title-safe insets of a design frame. */
-export function safeArea(width: number, height: number): Rect {
-  if (height > width * 1.2) return { top: Math.round(height * 0.12), bottom: Math.round(height * 0.2), left: Math.round(width * 0.1), right: Math.round(width * 0.1) };
-  return { top: Math.round(height * 0.1), bottom: Math.round(height * 0.1), left: Math.round(width * 0.1), right: Math.round(width * 0.1) };
 }
 
 const EXIT_SECONDS = 0.4;

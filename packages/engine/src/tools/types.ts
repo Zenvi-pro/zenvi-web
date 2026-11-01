@@ -1078,6 +1078,116 @@ export interface MotionRuntimeStatus {
   path?: string;
 }
 
+/** Something a scene's check found: errors stop a render (scene code that cannot run, frames that differ, flashing), warnings are for the agent to fix. */
+export interface SceneProblem {
+  /** lint, compile, load, exports, cues, draw-error, timeout, crash, nondeterministic, flashing, safe-area, overlap, small-text, words, slow, blank. */
+  code: string;
+  severity: "error" | "warning";
+  message: string;
+  /** The stretch of scene frames it covers. */
+  frames?: { from: number; to: number };
+  /** Line of the scene's source. */
+  line?: number;
+}
+
+/** A scene's named cue, on its frame grid (`@zenvi/motion` scene/contract.ts). */
+export interface SceneCueInfo {
+  name: string;
+  frame: number;
+  /** The picture event the ear should hear; absent = a beat that makes no sound. */
+  kind?: PictureEvent["kind"];
+  weight: number;
+  x: number;
+  y: number;
+  /** Runs: the frame the run ends. */
+  until?: number;
+  rate?: number;
+  /** Strength of the hit FX that land on it. */
+  hit?: number;
+  shake?: number;
+  flash?: number;
+  /** A picture cut (motion blur stops at it). */
+  cut?: boolean;
+}
+
+/** What a scene module declares. */
+export interface SceneModuleInfo {
+  fps: number;
+  /** Frames of `fps`. */
+  duration: number;
+  alpha: boolean;
+  cues: SceneCueInfo[];
+  /** The module's own param defaults. */
+  params: Record<string, unknown>;
+  title?: string;
+}
+
+export interface SceneRequest {
+  /** The scene's source (TypeScript or JavaScript module). */
+  code: string;
+  /** Params over the module's defaults. */
+  params: Record<string, unknown>;
+  /** Project media path of each media name the scene draws. */
+  media: Record<string, string>;
+  width: number;
+  height: number;
+  /** The project's rate: output frame n draws scene frame n × scene fps / this. */
+  fps: { num: number; den: number };
+  /** Keep flashes past WCAG 2.3.1 (the user asked for a strobe): a warning, not an error. */
+  allowStrobe?: boolean;
+}
+
+/** A scene's check: it ran in the sandbox, every frame was drawn and measured, a few were drawn twice. */
+export interface SceneDraft {
+  /** Absent when the code did not run. */
+  info?: SceneModuleInfo;
+  problems: SceneProblem[];
+  /** The contact sheet (cue frames and frames between), when the scene drew. */
+  sheet?: ToolImage;
+  /** Where the sheet was written. */
+  sheetPath?: string;
+  /** The sheet's cells: scene frame and label. */
+  cells: { frame: number; label: string }[];
+  /** Wall-clock seconds the check took. */
+  checkSeconds: number;
+}
+
+export interface SceneRenderRequest extends SceneRequest {
+  /** Transparent (ProRes 4444) instead of opaque H.264; default the scene's `alpha`. */
+  alpha?: boolean;
+  /** Sub-frames per frame (1 = no motion blur); they never cross a cue marked `cut`. */
+  motionBlurSamples: number;
+  draft: boolean;
+}
+
+export type SceneRenderResult =
+  | {
+      ok: true;
+      media: ImportedMedia;
+      codec: "prores4444" | "h264";
+      width: number;
+      height: number;
+      fps: { num: number; den: number };
+      frames: number;
+      fingerprint: string;
+      cached: boolean;
+      renderSeconds: number;
+      /** The cues that make a sound, as picture events (seconds from the scene's start). */
+      events: PictureEvent[];
+      info: SceneModuleInfo;
+      /** Warnings the check found (errors refuse the render). */
+      problems: SceneProblem[];
+    }
+  | { ok: false; problems: SceneProblem[]; info?: SceneModuleInfo };
+
+/** Running agent-written scenes: only inside the host's sandboxed headless Chrome. */
+export interface SceneHost {
+  /** Check a scene and draw its contact sheet; never throws for the scene's own faults (they are problems). */
+  draft(request: SceneRequest, signal?: AbortSignal): Promise<SceneDraft>;
+  /** Check, then render the whole scene; refuses (ok: false) on any error problem. */
+  render(request: SceneRenderRequest, signal?: AbortSignal): Promise<SceneRenderResult>;
+}
+
 /** Rendering Zenvi Motion blocks (headless Chrome on the person's computer: the CLI and `zenvi mcp`). */
 export interface MotionHost {
   blocks(): readonly MotionBlockInfo[];
@@ -1093,6 +1203,8 @@ export interface MotionHost {
    * the person's computer have it; it runs only when `setup_motion_runtime_tool` is called.
    */
   setup?(signal?: AbortSignal): Promise<MotionRuntimeStatus>;
+  /** Agent-written scenes (create_scene_tool…), where this host can sandbox them. */
+  scenes?: SceneHost;
 }
 
 /**
