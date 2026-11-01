@@ -84,6 +84,19 @@ describe("scenes in the sandbox", () => {
     expect(thrown.problems[0]!.message).toMatch(/nope/);
   });
 
+  it("draws the project's photos and video frames, and refuses media it was not given", async (t) => {
+    if (!chrome) t.skip();
+    const photo = path.join(dir, "photo.png");
+    const clip = path.join(dir, "clip.mp4");
+    execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30", "-frames:v", "1", photo]);
+    execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30", "-t", "1", "-pix_fmt", "yuv420p", clip]);
+    const code = scene("  api.image('photo', 0, 0, api.W / 2, api.H, { fit: 'cover' });\n  api.video('clip', api.W / 2, 0, api.W / 2, api.H, { radius: 24 });", "", "export const fps = 30;\nexport const duration = 24;\nexport const cues = { a: { at: 4, kind: 'pop' } };");
+    const r = await draftScene(job(code, { media: { photo, clip } }));
+    expect(codes(r)).toEqual([]);
+    const missing = await draftScene(job(scene("  api.image('nope', 0, 0, 10, 10);")));
+    expect(missing.problems[0]!.message).toMatch(/no media named "nope"/);
+  });
+
   it("holds flashes to WCAG 2.3.1 unless the user asked for a strobe", async (t) => {
     if (!chrome) t.skip();
     const strobe = scene("  ctx.fillStyle = Math.floor(t / 2) % 2 ? '#fff' : '#000';\n  ctx.fillRect(0, 0, api.W, api.H);");
