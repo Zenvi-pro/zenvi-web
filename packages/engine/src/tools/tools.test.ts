@@ -20,6 +20,7 @@ import { createProject } from "../model/defaults.js";
 import { addClip } from "../ops/clips.js";
 import { addFile, updateFile } from "../ops/files.js";
 import { motionLink } from "../links/zenvi-link.js";
+import { SCENES_KEY, withScene } from "../links/scene-store.js";
 import { addTransition } from "../ops/transitions.js";
 import { parseTitleSvg, setFieldText, titleFields, titleSvgText } from "../titles/title-svg.js";
 import type { ToolResult } from "./types.js";
@@ -46,6 +47,24 @@ interface Spec {
   happy: Case;
   /** null: no failure beyond invalid arguments (covered for every tool in registry.test.ts). */
   failure: Case | null;
+}
+
+const SCENE_CODE = "export const fps = 60; // seconds=2\nexport const duration = 120;\nexport function draw(ctx, t, api) {}";
+
+/** A checked scene in the project's settings, as create_scene_tool keeps one (fake-scenes.ts's info). */
+function storeScene(doc: ProjectDocument, code = SCENE_CODE): void {
+  const info = {
+    fps: 60,
+    duration: 120,
+    alpha: false,
+    cues: [
+      { name: "click", frame: 30, kind: "click" as const, weight: 0.4, x: 0.6, y: 0.5 },
+      { name: "land", frame: 60, kind: "land" as const, weight: 0.6, x: 0.5, y: 0.5, hit: 1 },
+      { name: "beat", frame: 90, weight: 0.5, x: 0.5, y: 0.5 },
+    ],
+    params: {},
+  };
+  doc.transaction("scene", (tx) => tx.update(["settings"], { [SCENES_KEY]: withScene(tx.project, { id: "SCENE00001", name: "Opener", code, params: {}, media: {}, allowStrobe: false, info, problems: [], checkedAt: "2026-11-01T00:00:00Z" }) }));
 }
 
 const SRT = "1\n00:00:01,000 --> 00:00:02,500\nHello there\n\n2\n00:00:03,000 --> 00:00:04,000\nSecond line\n";
@@ -1620,6 +1639,37 @@ const SPECS: Record<string, Spec> = {
       check: ({ doc }) => expect(doc.project.clips.find((c) => c.id === "MOTIONCLIP")?.reader).toMatchObject({ path: "/links/kinetic_headline-1.mov" }),
     },
     failure: { args: { file_id: IDS.broll }, status: "refused", summary: /is not a Zenvi Motion block/ },
+  },
+
+  // --- Zenvi scenes (scenes.test.ts covers checks, edits, re-rendering, cues) ----------------
+  create_scene_tool: {
+    happy: {
+      args: { code: SCENE_CODE, name: "Opener" },
+      summary: /^Created scene Opener \(\w+\): 2 s at 60 fps \(120 frames\), 3 cue\(s\), 2 with a sound\./,
+      check: ({ doc }) => expect(Object.keys((doc.project.settings as { zenvi_scenes: object }).zenvi_scenes)).toHaveLength(1),
+    },
+    failure: { args: { code: "BROKEN" }, status: "refused", summary: /^Error: the scene did not run/ },
+  },
+  update_scene_tool: {
+    happy: {
+      setup: (doc) => storeScene(doc),
+      args: { scene_id: "SCENE00001", edits: [{ find: "seconds=2", replace: "seconds=3" }] },
+      summary: /^Updated scene Opener: 3 s at 60 fps/,
+    },
+    failure: { args: { scene_id: "NOPE" }, status: "refused", summary: /^Error: unknown scene NOPE/ },
+  },
+  render_scene_tool: {
+    happy: {
+      setup: (doc) => storeScene(doc),
+      args: { scene_id: "SCENE00001", position_seconds: "1" },
+      summary: /^Rendered Opener at 1\.00-3\.00s on track \d+ full frame, with 2 picture event\(s\) for the sound design\.$/,
+      check: ({ doc, receipt }) => expect(doc.project.files.find((f) => f.id === (receipt.data as { file_id: string }).file_id)?.zenvi_link).toMatchObject({ kind: "zenvi-scene" }),
+    },
+    failure: { setup: (doc) => storeScene(doc, `${SCENE_CODE} FLASH`), args: { scene_id: "SCENE00001" }, status: "error", summary: /^Error: the scene was not rendered/ },
+  },
+  scene_cues_tool: {
+    happy: { setup: (doc) => storeScene(doc), args: { scene_id: "SCENE00001" }, status: "applied", summary: /^Opener \(SCENE00001\), 60 fps, 120 frames:\nclick: frame 30/ },
+    failure: { args: { scene_id: "NOPE" }, status: "refused", summary: /^Error: unknown scene NOPE/ },
   },
 
   // --- Zenvi 3D (scenes3d.test.ts covers placement, media, cube_cut, re-rendering) ----------

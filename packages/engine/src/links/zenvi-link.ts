@@ -18,6 +18,8 @@ import { readPictureEvents, type PictureEvent } from "../sfx/events.js";
 export const LINK_KEY = "zenvi_link";
 export const LINK_VERSION = 1;
 export const MOTION_LINK_KIND = "zenvi-motion";
+/** A scene an agent wrote (create_scene_tool), rendered in the host's sandbox. */
+export const SCENE_LINK_KIND = "zenvi-scene";
 const PATH_LIKE_KEYS = new Set(["path", "image", "resource", "protobuf_data_path", "lut_path"]);
 const PROPS_ESCAPE_KEY = "$zenvi_json";
 
@@ -119,8 +121,87 @@ export function motionLink(spec: MotionLinkSpec, render: LinkRender): Record<str
  */
 export function readMotionEvents(file: Readonly<Record<string, unknown>>): PictureEvent[] | null {
   const link = file[LINK_KEY];
-  if (!isRecord(link) || link.kind !== MOTION_LINK_KIND || !isRecord(link.motion) || !Array.isArray(link.motion.events)) return null;
-  return readPictureEvents(link.motion.events);
+  if (!isRecord(link)) return null;
+  // A scene's cues are its events: the same frames its picture is timed to.
+  const own = link.kind === MOTION_LINK_KIND ? link.motion : link.kind === SCENE_LINK_KIND ? link.scene : undefined;
+  if (!isRecord(own) || !Array.isArray(own.events)) return null;
+  return readPictureEvents(own.events);
+}
+
+/** How a scene was rendered: what render_scene_tool needs to render it again. */
+export interface SceneLinkSpec {
+  /** The scene's id in the project's scenes (settings `zenvi_scenes`). */
+  sceneId: string;
+  name: string;
+  /** The source rendered (the file can be rendered again without the project's scene). */
+  code: string;
+  params: Record<string, unknown>;
+  /** Media name → Project Files id. */
+  media: Record<string, string>;
+  /** Seconds of the scene. */
+  seconds: number;
+  alpha: boolean;
+  motionBlurSamples: number;
+  draft: boolean;
+  allowStrobe: boolean;
+}
+
+/** The `zenvi_link` record of a rendered scene. */
+export function sceneLink(spec: SceneLinkSpec, render: LinkRender): Record<string, unknown> {
+  return {
+    kind: SCENE_LINK_KIND,
+    version: LINK_VERSION,
+    source: { project_dir: null, entry: null, composition: spec.name, composition_key: spec.sceneId, file: null, line: null, aep: null },
+    props: encodeLinkProps(spec.params),
+    render: {
+      codec: render.codec,
+      width: render.width,
+      height: render.height,
+      fps: { num: render.fps.num, den: render.fps.den },
+      duration_frames: render.frames,
+      output: render.output,
+      rendered_at: render.renderedAt,
+      fingerprint: render.fingerprint,
+    },
+    state: "fresh",
+    error: null,
+    scene: {
+      id: spec.sceneId,
+      name: spec.name,
+      code: spec.code,
+      media: encodeLinkProps(spec.media),
+      seconds: spec.seconds,
+      alpha: spec.alpha,
+      motion_blur_samples: spec.motionBlurSamples,
+      draft: spec.draft,
+      allow_strobe: spec.allowStrobe,
+      ...(render.events ? { events: render.events.map((e) => ({ ...e })) } : {}),
+    },
+  };
+}
+
+/** The scene spec of a file rendered from a scene, or null for any other file. */
+export function readSceneLink(file: Readonly<Record<string, unknown>>): (SceneLinkSpec & { fingerprint: string | null }) | null {
+  const link = file[LINK_KEY];
+  if (!isRecord(link) || link.kind !== SCENE_LINK_KIND || !isRecord(link.scene)) return null;
+  const scene = link.scene;
+  const render = isRecord(link.render) ? link.render : {};
+  if (typeof scene.id !== "string" || typeof scene.code !== "string") return null;
+  const seconds = Number(scene.seconds);
+  const media = Object.fromEntries(Object.entries(decodeLinkProps(scene.media)).map(([k, v]) => [k, String(v)]));
+  return {
+    sceneId: scene.id,
+    name: typeof scene.name === "string" ? scene.name : scene.id,
+    code: scene.code,
+    params: decodeLinkProps(link.props),
+    media,
+    seconds: Number.isFinite(seconds) && seconds > 0 ? seconds : 0,
+    alpha: scene.alpha === true,
+    motionBlurSamples: Math.max(1, Math.trunc(Number(scene.motion_blur_samples) || 1)),
+    draft: scene.draft === true,
+    allowStrobe: scene.allow_strobe === true,
+    fingerprint: typeof render.fingerprint === "string" ? render.fingerprint : null,
+  };
 }
 
 /** The motion spec of a file rendered from a block, or null for any other file. */
