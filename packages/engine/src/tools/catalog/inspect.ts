@@ -75,6 +75,11 @@ export function formatTimecode(seconds: number): string {
 export function totalFrames(project: Project, fps: Fps): number {
   const duration = Number(project.duration);
   if (project.duration !== undefined && project.duration !== null && Number.isFinite(duration)) return Math.max(0, toFrame(duration, fps));
+  return contentFrames(project, fps);
+}
+
+/** The frame the last clip ends on; the project's duration (300 s by default) usually runs far past it. */
+function contentFrames(project: Project, fps: Fps): number {
   let end = 0;
   for (const c of project.clips ?? []) end = Math.max(end, (Number(c.position) || 0) + Math.max(0, (Number(c.end) || 0) - (Number(c.start) || 0)));
   return Math.max(0, toFrame(end, fps));
@@ -180,10 +185,12 @@ export const inspectTools: CatalogTool[] = [
         if (endFrame <= startFrame) endFrame = startFrame + 1;
       }
       if (total <= 0 && (project.clips ?? []).length === 0) return refused(tool, "Error: Timeline is empty — nothing to render.");
-      // No range at all is the Assistant's "look at the timeline": frames spread over all of it (the desktop refuses it).
+      // No range at all is the Assistant's "look at the timeline": frames spread over its clips (the desktop refuses it).
       if (startFrame === undefined && !overview) {
+        const content = contentFrames(project, fps);
+        if (content <= 0) return refused(tool, "Error: Timeline is empty — nothing to render.");
         startFrame = 0;
-        endFrame = Math.max(1, total);
+        endFrame = content;
         warnings.push("No range given: frames spread over the whole timeline.");
       }
       const [maxN, clampWarnings] = clampMaxFrames(input.maxFrames);
