@@ -422,14 +422,17 @@ async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: 
     throw new SceneStop(pageFailure(b, error));
   }
   const differs = twice.filter((p) => !p.error && p.hash !== probes[p.frame]?.hash).map((p) => sceneFrame(p.frame));
-  if (differs.length > 0 || twice.some((p) => p.error)) {
+  if (differs.length > 0) {
     problems.push({
       code: "nondeterministic",
       severity: "error",
       message: `frame${differs.length === 1 ? "" : "s"} ${differs.sort((x, y) => x - y).join(", ")} drew differently the second time: draw must depend only on t, api and the params (no state kept between frames, no counters, no caches that change the picture)`,
-      ...(differs.length > 0 ? { frames: { from: Math.min(...differs), to: Math.max(...differs) } } : {}),
+      frames: { from: Math.min(...differs), to: Math.max(...differs) },
     });
   }
+  // A frame that drew the first time and failed the second: the failure is the problem.
+  const broke = twice.find((p) => p.error);
+  if (broke) problems.push({ code: "nondeterministic", severity: "error", message: `frame ${sceneFrame(broke.frame)} drew the first time and failed the second (${broke.error}): draw must depend only on t, api and the params`, frames: { from: sceneFrame(broke.frame), to: sceneFrame(broke.frame) } });
 
   const luma = probes.map((p) => new Uint8Array(Buffer.from(p.luma, "base64")));
   const flashes = flashingOf({ fps: rate, width: PROBE_W, height: PROBE_H, startSeconds: 0, frames: luma });
