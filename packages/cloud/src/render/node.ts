@@ -173,14 +173,19 @@ export async function nodeMotionHosts(env: NodeJS.ProcessEnv = process.env): Pro
   if (env.ZENVI_MOTION?.trim() === "0") return { reason: "turned off (ZENVI_MOTION=0)" };
   const chrome = await findChrome(env);
   if (!chrome) return { reason: "no headless Chrome (ZENVI_CHROME)" };
+  // Scenes run agent-written code in Chrome, which the container runs unsandboxed: off on a shared
+  // worker until that has had a security review (ZENVI_CLOUD_SCENES=1 turns them on).
+  const scenes = env.ZENVI_CLOUD_SCENES?.trim() === "1";
   return {
-    factory: ({ workDir, resolveMedia }) =>
-      createMotionHost({
+    factory: ({ workDir, resolveMedia }) => {
+      const { scenes: sceneHost, ...blocks } = createMotionHost({
         projectFile: () => path.join(workDir, "cloud.zvn"),
         resolveMedia,
         env: { ...env, ZENVI_CHROME: chrome, ZENVI_CACHE_DIR: workDir },
         workers: MOTION_WORKERS,
-      }),
+      });
+      return scenes && sceneHost ? { ...blocks, scenes: sceneHost } : blocks;
+    },
   };
 }
 

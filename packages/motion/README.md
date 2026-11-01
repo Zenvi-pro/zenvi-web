@@ -122,4 +122,4 @@ order (frame t twice must be identical), measures flashes against WCAG
 2.3.1 and audits the text (safe zone, overlap, 22/32 px minimum, 8 words to
 read at once). A render is decoded again and compared with what the check
 drew, frame by frame, and its flashes measured on the file. Errors refuse the render; warnings come back to the agent
-with the contact sheet. Zenvi Cloud runs the same code in its render worker. Known: a scene's own `new Error().stack` shows the loopback port and the bundle's path (nothing it can reach); text drawn with `ctx.fillText` directly skips the layout audit (use `api.text`).
+with the contact sheet. Zenvi Cloud runs the same code in its render worker only when `ZENVI_CLOUD_SCENES=1` (off by default: the container runs Chrome unsandboxed, so agent code there wants a security review first). Known: a scene's own `new Error().stack` shows the loopback port and the bundle's path (nothing it can reach); text drawn with `ctx.fillText` directly skips the layout audit (use `api.text`).

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { nodeAssetResolver } from "./node.js";
+import { nodeAssetResolver, nodeMotionHosts } from "./node.js";
 
 describe("nodeAssetResolver", () => {
   const previous = process.env.ZENVI_ASSETS_DIR;
@@ -30,5 +30,21 @@ describe("nodeAssetResolver", () => {
     expect(resolve?.("@transitions/common/missing.svg")).toBeUndefined();
     expect(resolve?.("@assets/logo.png")).toBeUndefined();
     expect(resolve?.("/Users/me/Videos/clip.mp4")).toBeUndefined();
+  });
+});
+
+describe("nodeMotionHosts", () => {
+  it("leaves agent-written scenes out unless ZENVI_CLOUD_SCENES=1", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zenvi-motion-hosts-"));
+    try {
+      // Any existing file stands in for Chrome: nothing is launched.
+      const chrome = join(dir, "chrome");
+      await writeFile(chrome, "");
+      const host = (env: NodeJS.ProcessEnv) => nodeMotionHosts(env).then((m) => m.factory!({ workDir: dir, resolveMedia: (p) => p }));
+      expect((await host({ ZENVI_CHROME: chrome })).scenes).toBeUndefined();
+      expect((await host({ ZENVI_CHROME: chrome, ZENVI_CLOUD_SCENES: "1" })).scenes).toBeDefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

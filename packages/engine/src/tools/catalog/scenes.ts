@@ -67,6 +67,7 @@ function parseObject(raw: Record<string, unknown> | string | undefined, name: st
   if (!value || typeof value !== "object" || Array.isArray(value)) return `Error: ${name} must be a JSON object.`;
   const unsafe = Object.keys(value).find((k) => UNSAFE_KEYS.has(k));
   if (unsafe) return `Error: ${name} cannot have a key named ${unsafe}.`;
+  if (typeof raw !== "string" && JSON.stringify(value).length > OBJECT_MAX) return `Error: ${name} is too large (over ${OBJECT_MAX} characters as JSON).`;
   return value as Record<string, unknown>;
 }
 
