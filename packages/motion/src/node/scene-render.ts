@@ -24,7 +24,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Browser, CDPSession, Page } from "puppeteer-core";
 import { flashingOf, readPictureEvents, type PictureEvent, type SceneProblem } from "@zenvi/engine";
-import { resolveBinary, spawnManaged } from "@zenvi/render-node";
+import { decodeLuma, resolveBinary, spawnManaged } from "@zenvi/render-node";
 import { safeArea } from "../runtime/safe.js";
 import { auditLayout } from "../scene/audit.js";
 import { PROBE_H, PROBE_W, SCENE_LIMITS, type FrameProbe, type RawSceneExports, type SceneInfo, type SceneMediaRef, type ScenePageApi, type ScenePageConfig } from "../scene/contract.js";
@@ -606,6 +606,14 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
       } catch (error) {
         if (error instanceof CaptureError || job.signal?.aborted) throw error;
         return { ok: false, problems: [pageFailure(tabs.find((t) => t.crashed()) ?? tabs[0]!, error)], info };
+      }
+      // The flash limit once more, on the file itself: what the page measured came from the scene's own page.
+      if (!job.allowStrobe) {
+        const flashes = flashingOf(await decodeLuma(partial, { width: PROBE_W, height: PROBE_H, fps: rate, signal: job.signal }));
+        if (flashes.length > 0) {
+          const w = flashes[0]!;
+          return { ok: false, problems: [{ code: "flashing", severity: "error", message: `the render flashes ${w.flashes} times in one second from ${round(w.start)} s to ${round(w.end)} s (measured on the file): more than 3 a second can trigger seizures (WCAG 2.3.1)`, frames: { from: Math.round(w.start * info.fps), to: Math.round(w.end * info.fps) } }], info };
+        }
       }
       const result: CachedCheck = { info, problems: checked.problems, events: sceneEvents(info), frames };
       await writeFile(path.join(work, "check.json"), JSON.stringify(result));

@@ -71,6 +71,11 @@ describe("scenes in the sandbox", () => {
     expect(escape.problems[0]!.message).toMatch(/not available in a scene/);
     const canvas = await draftScene(job(scene("  const c = (ctx as any)[['can', 'vas'].join('')];\n  api.rect(0, 0, c.width, 10);")));
     expect(codes(canvas)).toEqual(["error draw-error"]);
+    // The built-ins the runtime measures with are frozen, and so is the scene's context.
+    const tamper = await draftScene(job(scene("  (Math as any).round = () => 0;")));
+    expect(codes(tamper)).toEqual(["error draw-error"]);
+    const shadow = await draftScene(job(scene("  (ctx as any).getImageData = () => ({ data: new Uint8ClampedArray(4) });")));
+    expect(codes(shadow)).toEqual(["error draw-error"]);
     const thrown = await draftScene(job(scene("  if (t >= 12) throw new Error('nope');")));
     expect(thrown.problems[0]).toMatchObject({ code: "draw-error", frames: { from: 12, to: 12 } });
     expect(thrown.problems[0]!.message).toMatch(/nope/);

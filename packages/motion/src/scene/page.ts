@@ -59,6 +59,12 @@ function harden(): void {
   for (const proto of fnProtos) lock(proto, "constructor", refuse);
   // The only page object a scene holds is its 2D context: no way back to the canvas, its document and window.
   Object.defineProperty(CanvasRenderingContext2D.prototype, "canvas", { get: () => undefined, configurable: false });
+  // The shared built-ins frozen, so a scene cannot change what the runtime measures it with (a Math.round that
+  // returns 0 would blind the flash check; the render is measured again from the file all the same).
+  const typed = Object.getPrototypeOf(Uint8Array.prototype) as object;
+  for (const v of [Object, Object.prototype, Array, Array.prototype, Function.prototype, String.prototype, Number.prototype, Boolean.prototype, Symbol, Symbol.prototype, Math, JSON, Map.prototype, Set.prototype, WeakMap.prototype, WeakSet.prototype, Promise, Promise.prototype, Error, Error.prototype, RegExp.prototype, typed, Uint8Array.prototype, Uint8ClampedArray.prototype, Uint32Array.prototype, Float32Array.prototype, Float64Array.prototype, CanvasRenderingContext2D.prototype, Path2D.prototype, DOMMatrix.prototype]) {
+    Object.freeze(v);
+  }
 }
 
 function readConfig(): ScenePageConfig {
@@ -92,6 +98,9 @@ function boot(): void {
   Object.assign(canvas.style, { position: "absolute", left: "0", top: "0", width: `${config.width}px`, height: `${config.height}px` });
   doc.body.append(canvas);
   const ctx = canvas.getContext("2d", { alpha: true, willReadFrequently: true })!;
+  // The scene gets this context: frozen, so it cannot shadow a method the runtime reads pixels with.
+  const readPixels = CanvasRenderingContext2D.prototype.getImageData;
+  Object.freeze(ctx);
   const thumb = Object.assign(doc.createElement("canvas"), { width: PROBE_W, height: PROBE_H });
   const tg = thumb.getContext("2d", { willReadFrequently: true })!;
 
@@ -199,7 +208,7 @@ function boot(): void {
           break;
         }
         const { width, height } = canvas;
-        const hash = pixelHash(ctx.getImageData(0, 0, width, height).data);
+        const hash = pixelHash(readPixels.call(ctx, 0, 0, width, height).data);
         tg.clearRect(0, 0, PROBE_W, PROBE_H);
         tg.drawImage(canvas, 0, 0, PROBE_W, PROBE_H);
         const px = tg.getImageData(0, 0, PROBE_W, PROBE_H).data;
