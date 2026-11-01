@@ -4,7 +4,7 @@
  *   npx tsx packages/motion/scripts/scene.ts packages/motion/src/scene/examples/launch.ts --out /tmp/scene \
  *     [--size 1920x1080] [--fps 30] [--render] [--draft] [--blur 4] [--params '{"headline":"…"}'] [--media hero=photo.jpg]
  *
- * Writes <out>/contact.png and <out>/problems.json; with --render also <out>/scene.mp4 (.mov with alpha).
+ * Writes <out>/contact.jpg and <out>/problems.json; with --render also <out>/scene.mp4 (.mov with alpha).
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -39,7 +39,7 @@ const job = {
   allowStrobe: values.strobe === true,
 };
 await mkdir(values.out, { recursive: true });
-const draft = await draftScene({ ...job, sheetPath: path.join(values.out, "contact.png") });
+const draft = await draftScene({ ...job, sheetPath: path.join(values.out, "contact.jpg") });
 await writeFile(path.join(values.out, "problems.json"), JSON.stringify({ info: draft.info, problems: draft.problems, cells: draft.cells }, null, 2));
 console.log(`checked in ${draft.checkSeconds}s: ${draft.problems.length} problem(s)`);
 for (const p of draft.problems) console.log(`  ${p.severity} ${p.code}${p.frames ? ` [${p.frames.from}-${p.frames.to}]` : ""}${p.line ? ` line ${p.line}` : ""}: ${p.message}`);

@@ -22,7 +22,6 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Browser, CDPSession, Page } from "puppeteer-core";
 import { flashingOf, readPictureEvents, type PictureEvent, type SceneProblem } from "@zenvi/engine";
 import { resolveBinary, spawnManaged } from "@zenvi/render-node";
@@ -32,7 +31,7 @@ import { PROBE_H, PROBE_W, SCENE_LIMITS, type FrameProbe, type RawSceneExports, 
 import { FONT_FACES } from "../tokens.js";
 import { launchChrome } from "./chrome.js";
 import { prepareMedia } from "./media.js";
-import { motionDir, pageHash } from "./page.js";
+import { motionDir, scenePage, type ScenePage } from "./page.js";
 import { designSize, encodeArgs, motionCacheDir, type Fps } from "./render.js";
 import { lintScene, type SceneExport } from "./scene-lint.js";
 import { sceneEvents, sceneInfo, sceneSampleFrames } from "./scene-info.js";
@@ -89,14 +88,14 @@ export interface SceneJob {
 }
 
 export interface DraftOptions extends SceneJob {
-  /** Write the contact sheet here (PNG). */
+  /** Write the contact sheet here (JPEG). */
   sheetPath?: string;
 }
 
 export interface DraftResult {
   info?: SceneInfo;
   problems: SceneProblem[];
-  /** The contact sheet, PNG. */
+  /** The contact sheet, JPEG. */
   sheet?: Buffer;
   cells: { frame: number; label: string }[];
   checkSeconds: number;
@@ -141,36 +140,6 @@ function checkJob(job: SceneJob): { fps: Fps; rate: number } {
 // ---------------------------------------------------------------------------
 // The page
 // ---------------------------------------------------------------------------
-
-interface Runtime {
-  script: string;
-  hash: string;
-}
-
-const runtimes = new Map<string, Promise<Runtime>>();
-
-/** The scene runtime (scene/page.ts and the kit), bundled once per process; prebuilt beside the CLI bundle. */
-export function sceneRuntime(env: NodeJS.ProcessEnv = process.env): Promise<Runtime> {
-  const root = motionDir(env);
-  let runtime = runtimes.get(root);
-  if (!runtime) {
-    runtime = (async () => {
-      const prebuilt = path.join(root, "pages", "__scene.js");
-      let script: string;
-      if (existsSync(prebuilt)) script = await readFile(prebuilt, "utf8");
-      else {
-        const { build } = await import("esbuild");
-        const entry = existsSync(path.join(root, "src", "scene", "page.ts")) ? path.join(root, "src", "scene", "page.ts") : path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "scene", "page.ts");
-        const result = await build({ entryPoints: [entry], bundle: true, format: "iife", platform: "browser", target: "chrome120", write: false, legalComments: "none", logLevel: "silent" });
-        script = result.outputFiles[0]!.text;
-      }
-      return { script, hash: await pageHash(root, script, "") };
-    })();
-    runtime.catch(() => runtimes.delete(root));
-    runtimes.set(root, runtime);
-  }
-  return runtime;
-}
 
 /**
  * The scene's script: its module body inside a strict function whose
@@ -323,7 +292,7 @@ interface Served {
 interface Prepared {
   body: string;
   exports: SceneExport[];
-  runtime: Runtime;
+  runtime: ScenePage;
   fps: Fps;
   rate: number;
   /** Fingerprint of everything that shapes the pixels except the capture's own settings. */
@@ -334,7 +303,7 @@ async function prepare(job: SceneJob): Promise<{ ok: true; prepared: Prepared } 
   const { fps, rate } = checkJob(job);
   const lint = await lintScene(job.code);
   if (!lint.ok) return { ok: false, problems: lint.problems.map((p) => ({ code: p.code === "banned" ? "lint" : p.code, severity: "error", message: p.message, ...(p.line !== undefined ? { line: p.line } : {}) })) };
-  const runtime = await sceneRuntime(job.env);
+  const runtime = await scenePage(job.env);
   const media: Record<string, string> = {};
   for (const [name, file] of Object.entries(job.media ?? {})) {
     const s = await stat(file).catch(() => null);

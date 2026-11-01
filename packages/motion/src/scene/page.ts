@@ -239,7 +239,7 @@ function boot(): void {
         g.textBaseline = "middle";
         g.fillText(cell.label, x + 10, y + cellHeight + label / 2, cellWidth - 20);
       }
-      return sheet.toDataURL("image/png");
+      return sheet.toDataURL("image/jpeg", 0.86);
     },
   };
   Object.defineProperty(window, "__zenviScene", { value: Object.freeze(api), writable: false, configurable: false });

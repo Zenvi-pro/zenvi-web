@@ -41,13 +41,13 @@ describe("scenes in the sandbox", () => {
   it("checks the demo scene: every frame drawn, no problems, a contact sheet", async (t) => {
     if (!chrome) t.skip();
     const code = await readFile(new URL("../scene/examples/launch.ts", import.meta.url), "utf8");
-    const r = await draftScene(job(code, { width: 640, height: 360, sheetPath: path.join(dir, "sheet.png") }));
+    const r = await draftScene(job(code, { width: 640, height: 360, sheetPath: path.join(dir, "sheet.jpg") }));
     expect(codes(r)).toEqual([]);
     expect(r.info).toMatchObject({ fps: 60, duration: 360, alpha: false });
     expect(r.info!.cues.find((c) => c.name === "click")).toMatchObject({ kind: "click", frame: 135 });
     expect(r.cells.length).toBeGreaterThan(6);
-    expect(r.sheet!.subarray(1, 4).toString()).toBe("PNG");
-    expect(existsSync(path.join(dir, "sheet.png"))).toBe(true);
+    expect([...r.sheet!.subarray(0, 2)]).toEqual([0xff, 0xd8]);
+    expect(existsSync(path.join(dir, "sheet.jpg"))).toBe(true);
   });
 
   it("finds a scene that keeps state between frames", async (t) => {

@@ -8,15 +8,17 @@
  */
 
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { copyFile, link, mkdir, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { projectAssetsDir, type MotionBlockInfo, type MotionBlockParam, type MotionHost, type MotionRenderRequest, type MotionRuntimeStatus } from "@zenvi/engine";
+import { projectAssetsDir, type MotionBlockInfo, type MotionBlockParam, type MotionHost, type MotionRenderRequest, type MotionRuntimeStatus, type SceneHost, type SceneRequest } from "@zenvi/engine";
 import { fingerprint as fileFingerprint, probe } from "@zenvi/render-node";
 import { BLOCKS, getBlock } from "../catalog.js";
 import { allParams, checkParams, type BlockManifest } from "../params.js";
 import { CHROME_DOWNLOAD_MB, findChrome, installChrome } from "./chrome.js";
 import { blockEvents, renderBlock, type BlockEventsOptions, type RenderBlockOptions } from "./render.js";
+import { draftScene, renderScene } from "./scene-render.js";
 
 export interface MotionHostOptions {
   /** The open project file, if saved. */
@@ -72,11 +74,56 @@ export function createMotionHost(options: MotionHostOptions): MotionHost {
     env: options.env,
     signal,
   });
-  const linksDir = async (): Promise<string> => {
+  const linksDir = async (kind = "zenvi-motion"): Promise<string> => {
     const project = options.projectFile();
-    const dir = project ? path.join(projectAssetsDir(project), "links", "zenvi-motion") : path.join(tmpdir(), "zenvi-media", "links", "zenvi-motion");
+    const dir = project ? path.join(projectAssetsDir(project), "links", kind) : path.join(tmpdir(), "zenvi-media", "links", kind);
     await mkdir(dir, { recursive: true });
     return dir;
+  };
+  // A hard link to the cached render where the filesystem allows (ProRes 4444 is large), else a
+  // copy renamed into place, so an interrupted copy is never mistaken for a finished render.
+  const place = async (cached: string, dest: string): Promise<void> => {
+    if (existsSync(dest)) return;
+    await link(cached, dest).catch(async () => {
+      const partial = `${dest}.${process.pid}.partial`;
+      await copyFile(cached, partial);
+      await rename(partial, dest);
+    });
+  };
+  const sceneJob = (request: SceneRequest, signal: AbortSignal | undefined) => ({
+    code: request.code,
+    params: request.params,
+    media: Object.fromEntries(Object.entries(request.media).map(([name, p]) => [name, options.resolveMedia(p)])),
+    width: request.width,
+    height: request.height,
+    fps: request.fps,
+    allowStrobe: request.allowStrobe,
+    env: options.env,
+    signal,
+  });
+  const scenes: SceneHost = {
+    async draft(request, signal) {
+      // The sheet is named by what it shows, next to the scene's renders.
+      const key = createHash("sha256").update(JSON.stringify([request.code, request.params, request.media, request.width, request.height])).digest("hex").slice(0, 16);
+      const sheetPath = path.join(await linksDir("zenvi-scene"), "sheets", `sheet-${key}.jpg`);
+      const made = await draftScene({ ...sceneJob(request, signal), sheetPath });
+      return {
+        ...(made.info ? { info: made.info } : {}),
+        problems: made.problems,
+        ...(made.sheet ? { sheet: { mimeType: "image/jpeg" as const, data: made.sheet.toString("base64") }, sheetPath } : {}),
+        cells: made.cells,
+        checkSeconds: made.checkSeconds,
+      };
+    },
+    async render(request, signal) {
+      const made = await renderScene({ ...sceneJob(request, signal), alpha: request.alpha, motionBlurSamples: request.motionBlurSamples, draft: request.draft, onProgress: options.onProgress });
+      if (!made.ok) return made;
+      const dest = path.join(await linksDir("zenvi-scene"), `scene-${made.fingerprint.slice(0, 16)}${path.extname(made.path)}`);
+      await place(made.path, dest);
+      const fp = await fileFingerprint(dest);
+      const { path: _cached, ...rest } = made;
+      return { ...rest, media: { path: dest, info: await probe(dest), name: path.basename(dest), ...(fp ? { fingerprint: fp } : {}) } };
+    },
   };
   return {
     blocks: () => infos,
@@ -102,15 +149,7 @@ export function createMotionHost(options: MotionHostOptions): MotionHost {
     async render(request, signal) {
       const rendered = await renderBlock(request.block, request.params, { ...requestOptions(request, signal), workers: options.workers, onProgress: options.onProgress });
       const dest = path.join(await linksDir(), `${request.block}-${rendered.fingerprint.slice(0, 16)}${path.extname(rendered.path)}`);
-      // A hard link to the cached render where the filesystem allows (ProRes 4444 is large), else a
-      // copy renamed into place, so an interrupted copy is never mistaken for a finished render.
-      if (!existsSync(dest)) {
-        await link(rendered.path, dest).catch(async () => {
-          const partial = `${dest}.${process.pid}.partial`;
-          await copyFile(rendered.path, partial);
-          await rename(partial, dest);
-        });
-      }
+      await place(rendered.path, dest);
       const info = await probe(dest);
       const fp = await fileFingerprint(dest);
       return {
@@ -126,5 +165,6 @@ export function createMotionHost(options: MotionHostOptions): MotionHost {
         events: rendered.events,
       };
     },
+    scenes,
   };
 }

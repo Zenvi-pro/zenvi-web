@@ -129,7 +129,7 @@ export interface ScenePageApi {
   seek(frame: number): Promise<void>;
   /** Draw each output frame and measure it; stops at the first frame that throws. */
   probe(frames: readonly number[]): Promise<FrameProbe[]>;
-  /** Draw the frames into one labelled contact sheet; a PNG data URL. */
+  /** Draw the frames into one labelled contact sheet; a JPEG data URL. */
   sheet(cells: readonly { frame: number; label: string }[], columns: number, cellWidth: number): Promise<string>;
 }
 
