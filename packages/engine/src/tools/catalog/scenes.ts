@@ -40,11 +40,14 @@ const PATH_LIKE = new Set(["path", "image", "resource", "protobuf_data_path", "l
 
 const round = (t: number, places = 3): number => Math.round(t * 10 ** places) / 10 ** places;
 
-const NO_SANDBOX = "this surface cannot run scene code: scenes run only inside a sandboxed headless Chrome (the zenvi CLI, zenvi mcp and Zenvi Cloud). Use motion blocks (add_motion_block_tool) here";
+const NO_SANDBOX = "this surface cannot run scene code: scenes run only inside a sandboxed headless Chrome (the zenvi CLI and zenvi mcp; Zenvi Cloud only where its operator turned them on). Use motion blocks (add_motion_block_tool) here";
+
+/** JSON characters a params or media argument may take, as a string or an object. */
+const OBJECT_MAX = 20_000;
 
 const objectArg = (what: string) =>
   z
-    .union([z.record(z.string(), z.unknown()), z.string().max(20_000)])
+    .union([z.record(z.string(), z.unknown()), z.string().max(OBJECT_MAX)])
     .optional()
     .describe(what);
 

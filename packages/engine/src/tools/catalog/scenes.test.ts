@@ -80,6 +80,8 @@ describe("scene tools", () => {
     expect(said(named)).toMatch(/media name "image"/);
     const proto = await runTool({ doc, host: host() }, "create_scene_tool", { code: CODE, params: '{"__proto__": {"x": 1}}' });
     expect(said(proto)).toMatch(/cannot have a key named __proto__/);
+    const huge = await runTool({ doc, host: host() }, "create_scene_tool", { code: CODE, params: { words: "x".repeat(20_001) } });
+    expect(said(huge)).toMatch(/params is too large/);
     expect(doc.undoLabels).toEqual([]);
   });
 

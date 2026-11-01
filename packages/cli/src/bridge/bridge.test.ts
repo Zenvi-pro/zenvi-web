@@ -141,6 +141,26 @@ describe("trackMotionRenders", () => {
     await motion.render({} as never);
     expect(written).toEqual([path.join(dir, "counter-4567.mp4")]);
   });
+
+  it("counts a new scene contact sheet as written by the call, not one already in the sheets folder", async () => {
+    const dir = path.join(work, "tracked_sheets", "links", "zenvi-motion");
+    const sheets = path.join(work, "tracked_sheets", "links", "zenvi-scene", "sheets");
+    await mkdir(sheets, { recursive: true });
+    await writeFile(path.join(sheets, "sheet-0123.jpg"), "earlier sheet");
+    const written: string[] = [];
+    let next = "sheet-0123.jpg";
+    const draft = async () => {
+      await writeFile(path.join(sheets, next), "sheet");
+      return { problems: [], cells: [], checkSeconds: 0, sheetPath: path.join(sheets, next) };
+    };
+    const inner = { blocks: () => [], check: () => ({ ok: true as const, params: {} }), render: async () => ({}) as never, scenes: { draft, render: async () => ({}) as never } };
+    const motion = trackMotionRenders(inner, dir, (p) => written.push(p));
+    await motion.scenes!.draft({} as never);
+    expect(written).toEqual([]);
+    next = "sheet-4567.jpg";
+    await motion.scenes!.draft({} as never);
+    expect(written).toEqual([path.join(sheets, "sheet-4567.jpg")]);
+  });
 });
 
 describe("zenvi bridge (stdio)", () => {
