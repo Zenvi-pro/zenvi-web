@@ -176,7 +176,8 @@ export function createKit(host: KitHost) {
   const state: FrameState = { t: 0, boxes: [], camera: { zoom: 1, x: 0, y: 0, rotate: 0 }, hitFx: null, grain: null };
   const pathLengths = new Map<string, number>();
   const paths = new Map<string, Path2D>();
-  let finish: FinishBuffers | undefined;
+  // By vignette: a buffer made for one frame's look must not shape another's (frames are drawn in any order).
+  const finishes = new Map<number, FinishBuffers>();
   let copy: HTMLCanvasElement | undefined;
   let noiseTile: HTMLCanvasElement | undefined;
 
@@ -218,7 +219,8 @@ export function createKit(host: KitHost) {
     state.boxes.push({ id, text, x: left, y: top, w: Math.max(...xs) - left, h: Math.max(...ys) - top, px: px * zoom, opacity, ui });
   };
 
-  const wrap = (text: string, maxWidth: number | undefined, tracking: number): string[] => {
+  // measureText counts ctx.letterSpacing already.
+  const wrap = (text: string, maxWidth: number | undefined): string[] => {
     const out: string[] = [];
     for (const para of text.split("\n")) {
       if (!maxWidth) {
@@ -228,7 +230,7 @@ export function createKit(host: KitHost) {
       let line = "";
       for (const word of para.split(/\s+/).filter(Boolean)) {
         const next = line ? `${line} ${word}` : word;
-        if (line && ctx.measureText(next).width + tracking * next.length > maxWidth) {
+        if (line && ctx.measureText(next).width > maxWidth) {
           out.push(line);
           line = word;
         } else line = next;
@@ -256,7 +258,7 @@ export function createKit(host: KitHost) {
     const trackPx = (o.tracking ?? (size >= 72 ? -0.025 : 0)) * size;
     ctx.letterSpacing = `${trackPx}px`;
     ctx.textBaseline = "alphabetic";
-    const lines = wrap(str, o.maxWidth, trackPx);
+    const lines = wrap(str, o.maxWidth);
     const leading = (o.leading ?? 1.12) * size;
     const widths = lines.map((l) => ctx.measureText(l).width);
     const blockW = Math.max(0, ...widths);
@@ -762,7 +764,9 @@ export function createKit(host: KitHost) {
         if (f.chroma > 0 || f.flash > 0.004 || f.bloom > 0.01) {
           const { width, height } = host.canvas;
           copy ??= Object.assign(doc.createElement("canvas"), { width, height });
-          finish ??= finishBuffers(doc, width, height, host.alpha ? 0 : look.vignette);
+          const vignette = host.alpha ? 0 : look.vignette;
+          let finish = finishes.get(vignette);
+          if (!finish) finishes.set(vignette, (finish = finishBuffers(doc, width, height, vignette)));
           const cg = copy.getContext("2d")!;
           cg.globalCompositeOperation = "copy";
           cg.drawImage(host.canvas, 0, 0);

@@ -43,9 +43,13 @@ const draft = await draftScene({ ...job, sheetPath: path.join(values.out, "conta
 await writeFile(path.join(values.out, "problems.json"), JSON.stringify({ info: draft.info, problems: draft.problems, cells: draft.cells }, null, 2));
 console.log(`checked in ${draft.checkSeconds}s: ${draft.problems.length} problem(s)`);
 for (const p of draft.problems) console.log(`  ${p.severity} ${p.code}${p.frames ? ` [${p.frames.from}-${p.frames.to}]` : ""}${p.line ? ` line ${p.line}` : ""}: ${p.message}`);
+if (!draft.info || draft.problems.some((p) => p.severity === "error")) process.exitCode = 1;
 if (values.render) {
-  const out = path.join(values.out, "scene.mp4");
+  const out = path.join(values.out, draft.info?.alpha ? "scene.mov" : "scene.mp4");
   const result = await renderScene({ ...job, draft: values.draft, motionBlurSamples: values.blur ? Number(values.blur) : 1, output: out, onProgress: (d, t) => d % 60 === 0 && process.stdout.write(`\r${d}/${t}`) });
-  if (!result.ok) console.log("render refused:", result.problems.map((p) => p.message).join("; "));
+  if (!result.ok) {
+    console.log("render refused:", result.problems.map((p) => p.message).join("; "));
+    process.exitCode = 1;
+  }
   else console.log(`\nrendered ${result.path} (${result.frames} frames, ${result.renderSeconds}s${result.cached ? ", cached" : ""}); ${result.events.length} picture events`);
 }

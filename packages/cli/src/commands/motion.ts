@@ -160,8 +160,12 @@ export function registerMotionCommands(program: Command, ctx: CommandContext): v
           if (!draft.info || draft.problems.some((p) => p.severity === "error")) throw new CliError("The scene has errors.", 1);
           return;
         }
+        // The extension picks the file: ProRes 4444 with alpha in .mov, opaque H.264 in .mp4.
+        const ext = path.extname(flags.output).toLowerCase();
+        if (ext !== ".mov" && ext !== ".mp4") throw new CliError(`-o must end in .mov (with alpha) or .mp4 (opaque); got ${flags.output}.`, 2);
         const result = await renderScene({
           ...job,
+          alpha: ext === ".mov",
           motionBlurSamples: flags.motionBlur ? Number(flags.motionBlur) : 1,
           draft: flags.draft,
           output: path.resolve(ctx.cwd, flags.output),
