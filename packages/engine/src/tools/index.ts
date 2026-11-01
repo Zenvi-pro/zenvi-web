@@ -41,6 +41,7 @@ export {
 } from "./define.js";
 export {
   allTools,
+  assistantEngineTools,
   getTool,
   listTools,
   runTool,
