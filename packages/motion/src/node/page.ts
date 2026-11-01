@@ -111,7 +111,8 @@ export function scenePage(env: NodeJS.ProcessEnv = process.env): Promise<ScenePa
       if (existsSync(prebuilt)) script = await readFile(prebuilt, "utf8");
       else {
         const { build } = await import("esbuild");
-        const result = await build({ entryPoints: [path.join(root, "src", "scene", "page.ts")], bundle: true, format: "iife", platform: "browser", target: "chrome120", write: false, legalComments: "none", logLevel: "silent" });
+        // Strict all through: no runtime frame lends a scene the global object as its `this` (a stack trace's call sites).
+        const result = await build({ entryPoints: [path.join(root, "src", "scene", "page.ts")], bundle: true, format: "iife", platform: "browser", target: "chrome120", banner: { js: '"use strict";' }, write: false, legalComments: "none", logLevel: "silent" });
         script = result.outputFiles[0]!.text;
       }
       return { script, hash: await pageHash(root, script, "") };

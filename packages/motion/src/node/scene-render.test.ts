@@ -74,6 +74,9 @@ describe("scenes in the sandbox", () => {
     // The built-ins the runtime measures with are frozen, and so is the scene's context.
     const tamper = await draftScene(job(scene("  (Math as any).round = () => 0;")));
     expect(codes(tamper)).toEqual(["error draw-error"]);
+    // V8's stack-trace hook would hand out call sites (and their receivers): Error is frozen.
+    const stack = await draftScene(job(scene("  (Error as any).prepareStackTrace = (_e: unknown, sites: unknown[]) => sites;")));
+    expect(codes(stack)).toEqual(["error draw-error"]);
     const shadow = await draftScene(job(scene("  (ctx as any).getImageData = () => ({ data: new Uint8ClampedArray(4) });")));
     expect(codes(shadow)).toEqual(["error draw-error"]);
     const thrown = await draftScene(job(scene("  if (t >= 12) throw new Error('nope');")));
