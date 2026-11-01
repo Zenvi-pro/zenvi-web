@@ -369,6 +369,30 @@ export function createCloudHost(ctx: McpCallContext, projectId: string, project:
         return { ...made, media: await keepRendered(made.media, "links/zenvi-motion") };
       },
     };
+    // Agent-written scenes run in the same sandbox as on a computer (its own Chrome, network refused, limits), one job at a time.
+    if (catalog.scenes) {
+      const sceneRenderer = async () => {
+        const made = motion({ workDir: await scratchDir(), resolveMedia: resolveFetched }).scenes;
+        if (!made) throw new Error("this Zenvi Cloud worker cannot run scenes");
+        return made;
+      };
+      const fetchMedia = async (paths: Record<string, string>): Promise<void> => {
+        for (const path of Object.values(paths)) fetched.set(path, await localCopy(path));
+      };
+      host.motion.scenes = {
+        draft: async (request, signal) => {
+          await fetchMedia(request.media);
+          const scenes = await sceneRenderer();
+          return oneAtATime(() => scenes.draft(request, signal ?? ctx.signal));
+        },
+        render: async (request, signal) => {
+          await fetchMedia(request.media);
+          const scenes = await sceneRenderer();
+          const made = await oneAtATime(() => scenes.render(request, signal ?? ctx.signal));
+          return made.ok ? { ...made, media: await keepRendered(made.media, "links/zenvi-scene") } : made;
+        },
+      };
+    }
   }
 
   const mattes = services.mattes;

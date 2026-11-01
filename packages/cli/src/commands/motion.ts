@@ -2,13 +2,16 @@
  * `zenvi motion`: Zenvi Motion blocks without a project. `setup` downloads
  * the headless Chrome renders use, `list` shows the blocks, `render` renders
  * one block to a file (placing one on the timeline is
- * `zenvi call add_motion_block_tool block=… params='{…}'`).
+ * `zenvi call add_motion_block_tool block=… params='{…}'`), and `scene`
+ * checks an agent-written scene file in the sandbox (contact sheet and
+ * problems) and renders it (create_scene_tool keeps one in a project).
  */
 
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
 import { allParams, BLOCKS, getBlock } from "@zenvi/motion";
-import { ChromeLaunchError, ChromeMissingError, findChrome, installChrome, MotionBlockError, renderBlock } from "@zenvi/motion/node";
+import { ChromeLaunchError, ChromeMissingError, draftScene, findChrome, installChrome, MotionBlockError, renderBlock, renderScene, SceneJobError } from "@zenvi/motion/node";
 import { CliError } from "../output.js";
 import type { CommandContext } from "./context.js";
 import { parseFps } from "./render.js";
@@ -121,6 +124,57 @@ export function registerMotionCommands(program: Command, ctx: CommandContext): v
         else ctx.out.info(`${result.cached ? "Reused" : "Rendered"} ${id}: ${result.path} (${result.width}x${result.height}, ${result.frames} frames, ${result.codec}${result.cached ? "" : `, ${result.renderSeconds.toFixed(1)} s`})`);
       } catch (error) {
         if (error instanceof MotionBlockError) throw new CliError(error.message, 2);
+        if (error instanceof ChromeMissingError || error instanceof ChromeLaunchError) throw new CliError(error.message, 1);
+        throw error;
+      }
+    });
+
+  motion
+    .command("scene")
+    .description("check a scene file in the sandbox (contact sheet, problems) and render it: zenvi motion scene film.ts --sheet sheet.jpg -o film.mp4")
+    .argument("<file>", "the scene module (.ts or .js)")
+    .option("-o, --output <file>", "render the scene to this file (.mov with alpha, .mp4 opaque); without it only the check runs")
+    .option("--sheet <file>", "write the contact sheet (JPEG) here")
+    .option("--size <WxH>", "frame size", "1920x1080")
+    .option("--fps <rate>", "output frame rate", "30")
+    .option("--motion-blur <n>", "sub-frames averaged per frame (they stop at cuts)")
+    .option("--draft", "half size, quicker")
+    .option("--strobe", "keep flashes past WCAG 2.3.1 (a warning instead of a refusal)")
+    .option("--params <json>", "params as a JSON object")
+    .option("--media <name=file>", "a media file the scene draws (repeatable)", (v: string, all: string[]) => [...all, v], [] as string[])
+    .action(async (file: string, flags: { output?: string; sheet?: string; size: string; fps: string; motionBlur?: string; draft?: boolean; strobe?: boolean; params?: string; media: string[] }) => {
+      const media: Record<string, string> = {};
+      for (const entry of flags.media) {
+        const [name, mediaFile] = entry.split(/=(.*)/s, 2) as [string, string | undefined];
+        if (!mediaFile) throw new CliError(`--media needs name=file (got ${entry}).`, 2);
+        media[name] = path.resolve(ctx.cwd, mediaFile);
+      }
+      const [width, height] = parseSize(flags.size);
+      const job = { code: await readFile(path.resolve(ctx.cwd, file), "utf8"), params: parseCallArgs(flags.params, []), media, width, height, fps: parseFps(flags.fps)!, allowStrobe: flags.strobe === true, env: ctx.env };
+      try {
+        const draft = await draftScene({ ...job, ...(flags.sheet ? { sheetPath: path.resolve(ctx.cwd, flags.sheet) } : {}) });
+        const lines = draft.problems.map((p) => `${p.severity} ${p.code}${p.line !== undefined ? ` line ${p.line}` : p.frames ? ` frames ${p.frames.from}-${p.frames.to}` : ""}: ${p.message}`);
+        if (!ctx.out.json) ctx.out.info(`${draft.info ? `Checked ${draft.info.title ?? path.basename(file)}: ${draft.info.duration} frames at ${draft.info.fps} fps, ${draft.info.cues.length} cue(s)` : "The scene did not run"} in ${draft.checkSeconds} s; ${draft.problems.length} problem(s).${lines.length > 0 ? `\n${lines.join("\n")}` : ""}${flags.sheet && draft.sheet ? `\nContact sheet: ${path.resolve(ctx.cwd, flags.sheet)}` : ""}`);
+        if (!flags.output) {
+          if (ctx.out.json) ctx.out.data({ info: draft.info, problems: draft.problems, cells: draft.cells });
+          if (!draft.info || draft.problems.some((p) => p.severity === "error")) throw new CliError("The scene has errors.", 1);
+          return;
+        }
+        const result = await renderScene({
+          ...job,
+          motionBlurSamples: flags.motionBlur ? Number(flags.motionBlur) : 1,
+          draft: flags.draft,
+          output: path.resolve(ctx.cwd, flags.output),
+          onProgress: (done, total) => {
+            if (!ctx.out.json && (done === total || done % 30 === 0)) process.stderr.write(`\r${done}/${total} frames`);
+          },
+        });
+        if (!ctx.out.json) process.stderr.write("\n");
+        if (!result.ok) throw new CliError(`The scene was not rendered: ${result.problems.filter((p) => p.severity === "error").map((p) => p.message).join("; ")}`, 1);
+        if (ctx.out.json) ctx.out.data(result);
+        else ctx.out.info(`${result.cached ? "Reused" : "Rendered"} ${result.path} (${result.width}x${result.height}, ${result.frames} frames, ${result.codec}, ${result.events.length} picture events${result.cached ? "" : `, ${result.renderSeconds.toFixed(1)} s`})`);
+      } catch (error) {
+        if (error instanceof SceneJobError) throw new CliError(error.message, 2);
         if (error instanceof ChromeMissingError || error instanceof ChromeLaunchError) throw new CliError(error.message, 1);
         throw error;
       }
