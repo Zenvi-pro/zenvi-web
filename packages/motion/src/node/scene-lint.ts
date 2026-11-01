@@ -1,8 +1,8 @@
 /**
  * The scene lint: what an agent's scene code may use, checked before any
- * of it runs. TypeScript is stripped (esbuild), then the module is parsed
- * (acorn) and walked with real scopes: a name that is not declared in the
- * scene must be one of a few pure globals (Math, Number, JSON, Path2D…),
+ * of it runs. TypeScript is stripped (Node's own type stripping), then the
+ * module is parsed (acorn) and walked with real scopes: a name that is not
+ * declared in the scene must be one of a few pure globals (Math, Number, JSON, Path2D…),
  * so the wall clock, randomness, timers, the network, the DOM and dynamic
  * code are refused by construction rather than by a list of bans. Members
  * that lead out of the sandbox (`constructor`, `__proto__`, `ownerDocument`,
@@ -413,20 +413,45 @@ function unexport(js: string, program: N): { body: string; exports: SceneExport[
   return { body, exports, problems };
 }
 
+type Strip = (code: string, options?: { mode?: "strip" | "transform" }) => string;
+
+/**
+ * The scene as JavaScript, and each line's line in the scene's source.
+ * Node's own type stripping (22.13+) blanks the types in place, so lines do
+ * not move and nothing needs bundling (the CLI bundle has no esbuild); on an
+ * older Node, esbuild with a source map.
+ */
+async function stripTypes(source: string): Promise<{ js: string; lines: (number | undefined)[] }> {
+  const { stripTypeScriptTypes } = (await import("node:module")) as { stripTypeScriptTypes?: Strip };
+  if (stripTypeScriptTypes) {
+    // It is experimental and says so on stderr: not news for a person reading the CLI's output.
+    const emit = process.emitWarning;
+    process.emitWarning = (() => undefined) as typeof process.emitWarning;
+    try {
+      const js = stripTypeScriptTypes(source, { mode: "strip" });
+      return { js, lines: js.split("\n").map((_, i) => i + 1) };
+    } finally {
+      process.emitWarning = emit;
+    }
+  }
+  const { transform } = await import("esbuild");
+  const out = await transform(source, { loader: "ts", format: "esm", target: "es2022", sourcefile: "scene.ts", sourcemap: true, logLevel: "silent" });
+  return { js: out.code, lines: sourceLines(out.map) };
+}
+
 /** Strip the scene's TypeScript and lint it; on success, the module body the page runs. */
 export async function lintScene(source: string): Promise<LintResult> {
   const bytes = Buffer.byteLength(source, "utf8");
   if (bytes > SCENE_LIMITS.codeBytes) return { ok: false, problems: [{ code: "size", message: `the scene is ${bytes} bytes; a scene is at most ${SCENE_LIMITS.codeBytes}` }] };
-  const { transform } = await import("esbuild");
   let js: string;
   let lines: (number | undefined)[];
   try {
-    const out = await transform(source, { loader: "ts", format: "esm", target: "es2022", sourcefile: "scene.ts", sourcemap: true, logLevel: "silent" });
-    js = out.code;
-    lines = sourceLines(out.map);
+    const stripped = await stripTypes(source);
+    js = stripped.js;
+    lines = stripped.lines;
   } catch (error) {
     const errors = (error as { errors?: { text: string; location?: { line: number } | null }[] }).errors ?? [];
-    return { ok: false, problems: errors.length > 0 ? errors.slice(0, 10).map((e) => ({ code: "compile", message: e.text, ...(e.location ? { line: e.location.line } : {}) })) : [{ code: "compile", message: error instanceof Error ? error.message : String(error) }] };
+    return { ok: false, problems: errors.length > 0 ? errors.slice(0, 10).map((e) => ({ code: "compile", message: e.text, ...(e.location ? { line: e.location.line } : {}) })) : [{ code: "compile", message: (error instanceof Error ? error.message : String(error)).split("\n")[0]! }] };
   }
   let program: N;
   try {

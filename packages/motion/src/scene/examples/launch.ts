@@ -25,7 +25,7 @@ export const params = {
 export const cues = {
   type: { at: b(1, 1), kind: "type", until: b(1, 3, 2), rate: 30, weight: 0.2, x: 0.45, y: 0.42 },
   click: { at: b(2, 0, 2), kind: "click", weight: 0.35, x: 0.71, y: 0.42 },
-  land: { at: b(2, 1), kind: "land", weight: 0.6, hit: 0.6, x: 0.5, y: 0.62 },
+  land: { at: b(2, 1), kind: "land", weight: 0.6, hit: 0.6, flash: 0, x: 0.5, y: 0.62 },
   count: { at: b(2, 2), kind: "tick", until: b(2, 3, 2), rate: 12, weight: 0.25, x: 0.62, y: 0.62 },
   cut: { at: b(3), kind: "impact", weight: 0.9, hit: 1, shake: 10, flash: 0.3, cut: true },
   line: { at: b(3, 0, 2), kind: "reveal", weight: 0.7 },
@@ -33,7 +33,9 @@ export const cues = {
 };
 
 export function draw(ctx: CanvasRenderingContext2D, t: number, api: SceneApi): void {
-  const { W, H, p, palette } = api;
+  const { W, H, p, palette, safe } = api;
+  // The window fills the title-safe width up to its design size, so 9:16 and 16:9 both fit.
+  const winW = Math.min(1120, W - safe.left - safe.right);
   api.hitFx({ look: "clean", bloom: 0.15 });
   api.grain(0.05);
   if (t < api.cue("cut")) {
@@ -47,7 +49,7 @@ export function draw(ctx: CanvasRenderingContext2D, t: number, api: SceneApi): v
     api.layer(1, () => {
       const enter = api.prog(0, 24, "out");
       ctx.globalAlpha = enter;
-      const win = api.ui.window({ x: W / 2 - 560, y: H * 0.2 + (1 - enter) * 60, w: 1120, h: 660, title: "Zenvi" });
+      const win = api.ui.window({ x: (W - winW) / 2, y: Math.max(safe.top, H * 0.5 - 330) + (1 - enter) * 60, w: winW, h: 660, title: "Zenvi" });
       const field = { x: win.x + 48, y: win.y + 48, w: win.w - 96 - 180, h: 96 };
       api.ui.field({ ...field, text: api.typed(String(p.prompt), "type", { until: cues.type.until }), placeholder: "Describe the edit", caret: t < api.cue("click") });
       api.ui.button({ x: field.x + field.w + 20, y: field.y + 8, w: 160, h: 80, label: "Make", click: "click", fill: palette.accent });
@@ -56,9 +58,9 @@ export function draw(ctx: CanvasRenderingContext2D, t: number, api: SceneApi): v
       if (land > 0) {
         const card = api.ui.card({ x: win.x + 48, y: win.y + 200 + (1 - land) * 80, w: win.w - 96, h: 330, opacity: Math.min(1, land * 2) });
         api.text(String(p.result), { x: card.x + 40, y: card.y + 58, size: 40, weight: 650, id: "result", ui: true });
-        api.ui.chart({ x: card.x + 40, y: card.y + 110, w: 520, h: 180, values: [0.35, 0.5, 0.42, 0.66, 0.58, 0.82, 0.95], grow: api.prog("land", 40) });
-        api.ui.counter({ x: card.x + card.w - 48, y: card.y + 190, size: 120, weight: 700, align: "right", from: 0, to: 38, prefix: "+", suffix: "%", progress: api.prog("count", api.cue("cut") - api.cue("count") - 30, "smooth"), color: palette.accent });
-        api.text("watch time", { x: card.x + card.w - 48, y: card.y + 270, size: 30, weight: 500, align: "right", color: palette.muted, id: "watch", ui: true });
+        api.ui.chart({ x: card.x + 40, y: card.y + 110, w: card.w * 0.5, h: 180, values: [0.35, 0.5, 0.42, 0.66, 0.58, 0.82, 0.95], grow: api.prog("land", 40) });
+        api.ui.counter({ x: card.x + card.w - 48, y: card.y + 190, size: Math.min(120, card.w * 0.11), weight: 700, align: "right", from: 0, to: 38, prefix: "+", suffix: "%", progress: api.prog("count", api.cue("cut") - api.cue("count") - 30, "smooth"), color: palette.accent });
+        api.text("watch time", { x: card.x + card.w - 48, y: card.y + 270, size: 32, weight: 500, align: "right", color: palette.muted, id: "watch", ui: true });
       }
       // The pointer travels to the button and clicks on the cue.
       const travel = api.prog(api.cue("click") - 40, 36, "in-out");
@@ -71,7 +73,7 @@ export function draw(ctx: CanvasRenderingContext2D, t: number, api: SceneApi): v
   ctx.fillRect(0, 0, W, H);
   api.layer(1, () => {
     api.gradient({ stops: [[0, "rgba(255,90,54,0.22)"], [1, "rgba(255,90,54,0)"]], radial: { cy: 0.55, r: 0.6 } });
-    api.text(String(p.headline), { x: W / 2, y: H * 0.46, size: 150, weight: 700, align: "center", color: "#F7F7F5", reveal: { at: "line", per: "word", stagger: 8, dur: 18 } });
+    api.text(String(p.headline), { x: W / 2, y: H * 0.46, size: Math.min(150, W * 0.1), maxWidth: W - safe.left - safe.right, weight: 700, align: "center", color: "#F7F7F5", reveal: { at: "line", per: "word", stagger: 8, dur: 18 } });
     api.text(String(p.brand), { x: W / 2, y: H * 0.66, size: 48, weight: 600, align: "center", color: palette.accent, reveal: { at: "brand", dur: 16 } });
   });
 }

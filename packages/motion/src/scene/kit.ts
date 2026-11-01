@@ -71,6 +71,8 @@ export interface TextOptions {
   /** A product string (a typed command, a URL, an app label): read apart from the copy. */
   ui?: boolean;
   outline?: { width: number; color: string };
+  /** Draw only inside this rect (a field's box); the audit sees the part inside. */
+  clip?: Rect;
 }
 
 export interface ShapeStyle {
@@ -158,6 +160,8 @@ export function createKit(host: KitHost) {
     const base = withAccent(PALETTES[(p.palette as PaletteName) ?? "light"] ?? PALETTES.light, typeof p.accent === "string" ? p.accent : undefined);
     return { ...base, ...(typeof p.paper === "string" ? { paper: p.paper } : {}), ...(typeof p.ink === "string" ? { ink: p.ink } : {}) };
   })();
+  // The smallest readable text (scene/audit.ts): kit UI labels never go under it.
+  const minText = H > W * 1.5 ? 32 : 22;
   const cueFrames = new Map(host.cues.map((c) => [c.name, c.frame]));
   const hits: Hit[] = host.cues.filter((c) => c.hit !== undefined && c.hit > 0).map((c) => ({ t: c.frame / host.fps, strength: c.hit!, ...(c.shake !== undefined ? { shake: c.shake } : {}), ...(c.flash !== undefined ? { flash: c.flash } : {}) }));
   const state: FrameState = { t: 0, boxes: [], camera: { zoom: 1, x: 0, y: 0, rotate: 0 }, hitFx: null, grain: null };
@@ -234,6 +238,11 @@ export function createKit(host: KitHost) {
     const font = o.font ?? "sans";
     const weight = o.weight ?? (font === "display" ? 400 : 600);
     ctx.save();
+    if (o.clip) {
+      ctx.beginPath();
+      ctx.rect(o.clip.x, o.clip.y, o.clip.w, o.clip.h);
+      ctx.clip();
+    }
     ctx.font = fontString({ size, font, weight, italic: o.italic === true });
     const trackPx = (o.tracking ?? (size >= 72 ? -0.025 : 0)) * size;
     ctx.letterSpacing = `${trackPx}px`;
@@ -304,8 +313,17 @@ export function createKit(host: KitHost) {
       if (alpha >= 0.5) readable.push(u.text);
     });
     if (per === "char" && rv) readable = readable.length > 0 ? [readable.join("")] : [];
-    const left = o.align === "center" ? o.x - blockW / 2 : o.align === "right" ? o.x - blockW : o.x;
-    if (maxAlpha > 0) recordBox(o.id ?? str.slice(0, 40), readable.join(" "), left, top, blockW, blockH, size, maxAlpha, o.ui === true);
+    let left = o.align === "center" ? o.x - blockW / 2 : o.align === "right" ? o.x - blockW : o.x;
+    let right = left + blockW;
+    let boxTop = top;
+    let bottom = top + blockH;
+    if (o.clip) {
+      left = Math.max(left, o.clip.x);
+      right = Math.min(right, o.clip.x + o.clip.w);
+      boxTop = Math.max(boxTop, o.clip.y);
+      bottom = Math.min(bottom, o.clip.y + o.clip.h);
+    }
+    if (maxAlpha > 0 && right > left && bottom > boxTop) recordBox(o.id ?? str.slice(0, 40), readable.join(" "), left, boxTop, right - left, bottom - boxTop, size, maxAlpha, o.ui === true);
     ctx.restore();
     return { w: blockW, h: blockH };
   }
@@ -558,7 +576,7 @@ export function createKit(host: KitHost) {
       if (o.bar === false) return { x: o.x, y: o.y, w: o.w, h: o.h };
       const barH = 56;
       ["#FF5F57", "#FEBC2E", "#28C840"].forEach((c, i) => circle(o.x + 30 + i * 22, o.y + barH / 2, 7, { fill: c, opacity: o.opacity }));
-      if (o.title) text(o.title, { x: o.x + o.w / 2, y: o.y + barH / 2, size: 22, weight: 600, align: "center", color: palette.muted, ui: true, id: `window:${o.title}`, opacity: o.opacity });
+      if (o.title) text(o.title, { x: o.x + o.w / 2, y: o.y + barH / 2, size: minText, weight: 600, align: "center", color: palette.muted, ui: true, id: `window:${o.title}`, opacity: o.opacity });
       line(o.x, o.y + barH, o.x + o.w, o.y + barH, { stroke: palette.line, lineWidth: 1.5, opacity: o.opacity });
       return { x: o.x, y: o.y + barH, w: o.w, h: o.h - barH };
     },
@@ -594,10 +612,15 @@ export function createKit(host: KitHost) {
     field(o: Rect & { text: string; placeholder?: string; caret?: boolean; size?: number; radius?: number; font?: FontRole; opacity?: number }): void {
       rect(o.x, o.y, o.w, o.h, { radius: o.radius ?? o.h / 2, fill: palette.surface, shadow: { blur: 24, y: 8, color: "rgba(10,10,20,0.12)" }, opacity: o.opacity });
       rect(o.x, o.y, o.w, o.h, { radius: o.radius ?? o.h / 2, stroke: palette.line, lineWidth: 1.5, opacity: o.opacity });
-      const size = o.size ?? Math.round(o.h * 0.36);
-      const tx = o.x + Math.max(28, o.h * 0.4);
+      const size = o.size ?? Math.max(minText, Math.round(o.h * 0.36));
+      const pad = Math.max(28, o.h * 0.4);
       const shown = o.text || o.placeholder || "";
-      const w = shown ? text(shown, { x: tx, y: o.y + o.h / 2, size, font: o.font ?? "sans", weight: 500, color: o.text ? palette.ink : palette.muted, ui: true, id: "field", opacity: o.opacity }).w : 0;
+      const font = o.font ?? "sans";
+      // A line longer than the field scrolls, as a real input does: its end stays in view.
+      const room = o.w - 2 * pad - 8;
+      const full = shown ? measure(shown, { size, font, weight: 500 }) : 0;
+      const tx = o.x + pad - Math.max(0, full - room);
+      const w = shown ? text(shown, { x: tx, y: o.y + o.h / 2, size, font, weight: 500, color: o.text ? palette.ink : palette.muted, ui: true, id: "field", opacity: o.opacity, clip: { x: o.x + pad / 2, y: o.y, w: o.w - pad, h: o.h } }).w : 0;
       if (o.caret !== false && Math.floor(state.t / (host.fps * 0.5)) % 2 === 0) rect(tx + (o.text ? w + 4 : 0), o.y + o.h / 2 - size * 0.6, 3, size * 1.2, { fill: palette.accent, opacity: o.opacity });
     },
     /** Rows that arrive one after another from `from`, `gap` frames apart; `selected` highlights one. */
@@ -608,7 +631,7 @@ export function createKit(host: KitHost) {
         if (p <= 0) return;
         const y = o.y + i * rowH + (1 - p) * 24;
         rect(o.x, y, o.w, rowH - 14, { radius: 20, fill: i === o.selected ? palette.accent : palette.surface, opacity: p, shadow: { blur: 18, y: 6, color: "rgba(10,10,20,0.10)" } });
-        text(item, { x: o.x + 32, y: y + (rowH - 14) / 2, size: o.size ?? 34, weight: 600, color: i === o.selected ? palette.paper : palette.ink, opacity: p, ui: true, id: `list:${i}` });
+        text(item, { x: o.x + 32, y: y + (rowH - 14) / 2, size: o.size ?? Math.max(minText, 34), weight: 600, color: i === o.selected ? palette.paper : palette.ink, opacity: p, ui: true, id: `list:${i}` });
       });
     },
     /** Bars or a line growing to `values` (0..1 of the height) as `grow` goes 0 → 1. */
@@ -642,7 +665,7 @@ export function createKit(host: KitHost) {
       ctx.translate(o.x + o.w / 2, o.y + o.h / 2);
       ctx.scale(s, s);
       rect(-o.w / 2, -o.h / 2, o.w, o.h, { radius: o.h / 2, fill: o.fill ?? palette.ink, shadow: { blur: 20, y: 8 } });
-      text(o.label, { x: 0, y: 0, size: o.size ?? Math.round(o.h * 0.38), weight: 600, align: "center", color: o.color ?? palette.paper, ui: true, id: `button:${o.label}` });
+      text(o.label, { x: 0, y: 0, size: o.size ?? Math.max(minText, Math.round(o.h * 0.38)), weight: 600, align: "center", color: o.color ?? palette.paper, ui: true, id: `button:${o.label}` });
       ctx.restore();
     },
   };
