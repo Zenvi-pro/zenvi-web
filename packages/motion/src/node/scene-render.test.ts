@@ -32,6 +32,8 @@ describe("scene page", () => {
     expect(wrapped).toContain("return { fps: fps }");
     // A factory: the runtime makes the module again for every draw.
     expect(wrapped).toMatch(/start\(function \(\) \{\n {4}return \(function \(window/);
+    // A scene may declare a hidden name of its own: no clash with the parameter that hides it.
+    expect(() => new Function(wrapScene("const top = 1;\nlet Date = 2;\nclass location {}\nconst fps = 30;", [{ name: "fps", local: "fps" }]))).not.toThrow();
     expect(SCENE_CSP).toContain("connect-src 'none'");
     expect(SCENE_CSP).not.toContain("unsafe-eval");
     // A param cannot close the config's script element.
@@ -125,6 +127,26 @@ describe("scenes in the sandbox", () => {
     const allowed = await draftScene(job(strobe, { allowStrobe: true }));
     expect(codes(allowed)).toContain("warning flashing");
     expect(codes(allowed)).not.toContain("error flashing");
+  });
+
+  it("draws hit looks that change over time the same in any order", async (t) => {
+    if (!chrome) t.skip();
+    // Each look has its own vignette: a buffer kept from the first frame drawn must not shape the others.
+    const r = await draftScene(job(scene("  api.hitFx({ look: t < 12 ? 'clean' : 'wild', bloom: 0.2 });\n  api.rect(api.tween(0, 20, 0, 1600), 400, 200, 200, { fill: api.palette.accent });", "", "export const fps = 30;\nexport const duration = 24;\nexport const cues = { a: { at: 4, kind: 'impact', hit: 1, flash: 0.1 }, b: { at: 18, kind: 'impact', hit: 1, flash: 0.1 } };")));
+    expect(codes(r).filter((c) => c.startsWith("error"))).toEqual([]);
+  });
+
+  it("renders over the video or full frame whatever the scene's own alpha", async (t) => {
+    if (!chrome) t.skip();
+    const draw = "  api.rect(api.tween(0, 20, 0, 1600), 400, 200, 200, { fill: api.palette.accent, radius: 30 });";
+    const cues = "export const cues = { land: { at: 20, kind: 'land' } };";
+    // The check draws what the render will: an opaque scene placed over the video is not refused as drawing something else.
+    const over = await renderScene({ ...job(scene(draw, "", `export const fps = 30;\nexport const duration = 24;\n${cues}`)), alpha: true });
+    expect(over.ok, over.ok ? "" : over.problems.map((p) => p.message).join("; ")).toBe(true);
+    expect(over).toMatchObject({ codec: "prores4444" });
+    const full = await renderScene({ ...job(scene(draw, "", `export const fps = 30;\nexport const duration = 24;\nexport const alpha = true;\n${cues}`)), alpha: false });
+    expect(full.ok, full.ok ? "" : full.problems.map((p) => p.message).join("; ")).toBe(true);
+    expect(full).toMatchObject({ codec: "h264" });
   });
 
   it("audits the layout of the text it draws", async (t) => {

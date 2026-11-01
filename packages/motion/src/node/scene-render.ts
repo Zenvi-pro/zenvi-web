@@ -153,8 +153,11 @@ export function wrapScene(body: string, exports: readonly SceneExport[]): string
   start(function () {
     return (function (${hidden.join(", ")}) {
       "use strict";
+      // A block of its own: a scene may declare a hidden name (\`const top = …\`) without clashing with the parameter.
+      {
 ${body}
       ;return { ${exports.map((e) => `${e.name}: ${e.local}`).join(", ")} };
+      }
     }).call(undefined);
   }, null);
 })(window.__zenviSceneStart);
@@ -357,7 +360,8 @@ function sampleSceneFrames(info: SceneInfo, count: number): number[] {
   return Array.from({ length: count }, (_, i) => all[Math.round((i * (all.length - 1)) / (count - 1))]!).filter((v, i, a) => a.indexOf(v) === i);
 }
 
-async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: string, servers: Served[], tabs: Tab[], mediaSize: { width: number; height: number }): Promise<Checked> {
+/** `alpha` overrides the scene's own (a render placed the other way): the check draws what the render will. */
+async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: string, servers: Served[], tabs: Tab[], mediaSize: { width: number; height: number }, alpha?: boolean): Promise<Checked> {
   const { rate } = prepared;
   const frameMs = job.frameMs ?? SCENE_LIMITS.frameMs;
   const probeSize = Math.min(job.width, job.height) > 720 ? { width: even(job.width / 2), height: even(job.height / 2) } : { width: even(job.width), height: even(job.height) };
@@ -369,6 +373,7 @@ async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: 
   const read = sceneInfo(first.raw);
   if (!read.ok) throw new SceneStop(read.problems.find(isError)!);
   const info = read.info;
+  const drawn = alpha === undefined ? info : { ...info, alpha };
   const problems: SceneProblem[] = [...read.problems];
   await first.tab.page.close().catch(() => undefined);
 
@@ -380,15 +385,15 @@ async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: 
     media[name] = made.ref;
     mediaDirs.set(name, made.dir);
   }
-  const server = await serve(prepared, pageConfig(probeSize.width, probeSize.height, rate, job.params ?? {}, media, info.alpha), mediaDirs, job.env);
+  const server = await serve(prepared, pageConfig(probeSize.width, probeSize.height, rate, job.params ?? {}, media, drawn.alpha), mediaDirs, job.env);
   servers.push(server);
-  const a = (await openTab(browser, server.url, probeSize, info.alpha)).tab;
+  const a = (await openTab(browser, server.url, probeSize, drawn.alpha)).tab;
   tabs.push(a);
-  const b = (await openTab(browser, server.url, probeSize, info.alpha)).tab;
+  const b = (await openTab(browser, server.url, probeSize, drawn.alpha)).tab;
   tabs.push(b);
   for (const tab of [a, b]) {
     try {
-      await startTab(tab, info);
+      await startTab(tab, drawn);
     } catch (error) {
       throw new SceneStop(pageFailure(tab, error));
     }
@@ -441,7 +446,7 @@ async function check(browser: Browser, job: SceneJob, prepared: Prepared, work: 
   problems.push(...auditLayout(probes.map((p) => ({ frame: sceneFrame(p.frame), boxes: p.boxes })), { width: design.width, height: design.height, safe: safeArea(design.width, design.height) }));
 
   if (probes.every((p) => p.hash === probes[0]!.hash)) problems.push({ code: "blank", severity: "warning", message: frames > 1 ? "every frame is the same picture: nothing moves" : "the scene is one frame" });
-  if (info.alpha && probes.every((p) => p.coverage < 0.001)) problems.push({ code: "blank", severity: "warning", message: "the scene is transparent and draws nothing" });
+  if (drawn.alpha && probes.every((p) => p.coverage < 0.001)) problems.push({ code: "blank", severity: "warning", message: "the scene is transparent and draws nothing" });
   const slowest = probes.reduce((m, p) => (p.ms > m.ms ? p : m), probes[0]!);
   if (slowest.ms > frameMs) problems.push({ code: "timeout", severity: "error", message: `frame ${sceneFrame(slowest.frame)} took ${Math.round(slowest.ms)} ms to draw; a frame has ${frameMs} ms` });
   else if (slowest.ms > SCENE_LIMITS.slowFrameMs) problems.push({ code: "slow", severity: "warning", message: `frame ${sceneFrame(slowest.frame)} took ${Math.round(slowest.ms)} ms to draw at half size; the render will be slow (cache paths, draw fewer particles)` });
@@ -601,7 +606,7 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
   const samples = Math.max(1, Math.min(16, Math.round(job.motionBlurSamples ?? 1)));
   const width = even(job.draft ? job.width / 2 : job.width);
   const height = even(job.draft ? job.height / 2 : job.height);
-  const fingerprint = createHash("sha256").update(JSON.stringify(canonical({ source: prepared.sourceKey, width, height, samples, alpha: job.alpha ?? null, strobe: job.allowStrobe === true }))).digest("hex");
+  const fingerprint = createHash("sha256").update(JSON.stringify(canonical({ source: prepared.sourceKey, width, height, samples, alpha: job.alpha ?? null, strobe: job.allowStrobe === true, draft: job.draft === true }))).digest("hex");
   const dir = path.join(motionCacheDir(job.env), "scenes");
   await mkdir(dir, { recursive: true });
   const base = path.join(dir, `scene-${fingerprint.slice(0, 16)}`);
@@ -633,7 +638,7 @@ export async function renderScene(job: RenderSceneOptions): Promise<RenderSceneR
     return await withSandbox(job.env, job.signal, SCENE_LIMITS.renderSeconds * 1000, async (browser) => {
       let checked: Checked;
       try {
-        checked = await check(browser, job, prepared, work, servers, tabs, { width, height });
+        checked = await check(browser, job, prepared, work, servers, tabs, { width, height }, job.alpha);
       } catch (error) {
         if (error instanceof SceneStop) return { ok: false, problems: [error.problem] };
         throw error;
