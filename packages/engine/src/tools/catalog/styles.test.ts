@@ -4,6 +4,7 @@ import { ProjectDocument } from "../../history/document.js";
 import { createProject } from "../../model/defaults.js";
 import { addClip } from "../../ops/clips.js";
 import { addFile } from "../../ops/files.js";
+import { SCENE_STARTERS, starterModule } from "../../director/scenes.js";
 import { STYLE_FILES } from "../../styles/library.gen.js";
 import { STYLE_TEXT_MAX, TECHNIQUE_TEXT_MAX, compactStyle, compactTechnique, rankStyles, styleChecklist, styleFinishCalls } from "../../styles/recipe.js";
 import { normalizeArgs } from "../coerce.js";
@@ -61,9 +62,20 @@ describe("the styles library as text", () => {
     expect(compactStyle(STYLE_FILES.find((f) => f.id === "science-curiosity")!, 20)).toMatch(/equal steps \d+(\.\d)?-\d+(\.\d)? s \(3 x 3 s\)/);
   });
 
+  it("serves a worked scene's whole module, the one produce_video_tool drafts from", () => {
+    for (const id of SCENE_STARTERS) {
+      const file = STYLE_FILES.find((f) => f.id === id)!;
+      const served = /## The scene \(the whole module[^\n]*\n```ts\n([\s\S]*?)\n```/.exec(compactTechnique(file));
+      expect(served?.[1], id).toBe(/```ts\n([\s\S]*?)\n```/.exec(file.markdown)?.[1]);
+      expect(served![1], id).toMatch(/export function draw\(ctx/);
+      expect(starterModule(file.markdown, 20)?.code, id).toMatch(/export const cues/);
+    }
+  });
+
   it("cuts every technique, family and method to ~1.2 k tokens", () => {
     for (const file of STYLE_FILES.filter((f) => f.kind !== "style")) {
-      const text = compactTechnique(file);
+      // A worked scene's module is served whole after the cut text.
+      const text = compactTechnique(file).split("\n## The scene (the whole module")[0]!;
       expect(text.length, file.id).toBeLessThanOrEqual(TECHNIQUE_TEXT_MAX + 2);
       if (file.kind === "technique") expect(text, file.id).toMatch(/## Build it in Zenvi/);
     }

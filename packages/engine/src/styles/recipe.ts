@@ -250,7 +250,11 @@ export function compactTechnique(file: StyleFile): string {
     const all = [doc.intro, ...doc.sections.map((s) => `## ${s.heading}\n${s.text}`)].filter(Boolean).join("\n");
     return clip(`${head}\n${reflow(all)}`, TECHNIQUE_TEXT_MAX);
   }
-  return clip([head, file.summary, ...parts].filter(Boolean).join("\n"), TECHNIQUE_TEXT_MAX);
+  // A worked scene (zenvi-scenes) is served whole after the cut text: a module cut short cannot run.
+  const scene = findSection(doc.sections, /^The scene$/);
+  const code = scene && /```ts\n[\s\S]*?\n```/.exec(scene.text);
+  const text = clip([head, file.summary, ...parts].filter(Boolean).join("\n"), TECHNIQUE_TEXT_MAX);
+  return code ? `${text}\n## The scene (the whole module, for create_scene_tool / update_scene_tool)\n${code[0]}` : text;
 }
 
 /** The finish tools whose arguments a style sets (its look, its sound, its loudness). */

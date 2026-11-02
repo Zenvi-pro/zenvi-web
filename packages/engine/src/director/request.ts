@@ -18,7 +18,9 @@ export interface RequestFacts {
   fps: number | null;
   /** The request rules out stock footage ("use this footage only", "no stock"). */
   noStock: boolean;
-  /** The name after "called" / "named" / "titled", else null. */
+  /** The request plays without sound ("muted", "without sound"): no music, no sound design. */
+  muted: boolean;
+  /** The name in quotes after "called" / "named" / "titled", else a capitalised name the product is introduced by ("launching Halden", "Ledgerly, a ... app"), else null. */
   name: string | null;
   /** A headline, hook or title line in quotes. */
   headline: string | null;
@@ -82,6 +84,17 @@ function secondsOf(request: string): number | null {
   return null;
 }
 
+// Capitalised words after "app" or "launching" that are platforms, not the product.
+const NOT_NAMES = new Set(["Instagram", "TikTok", "YouTube", "Reels", "Shorts", "LinkedIn", "Twitter", "Facebook", "Pinterest", "Snapchat", "Threads", "Mac", "Windows", "iOS", "Android", "Zenvi"]);
+const INTRODUCED = /\b(?:launching|launch of|brand for|app|called|named)\s+([A-Z][A-Za-z0-9]{2,})\b/g;
+const APPOSITIVE = /\b([A-Z][A-Za-z0-9]{2,})(?:,| \() an? (?:[\w-]+ ){0,3}(?:app|tool|product|platform|service|startup|company|cache|library|api)\b/g;
+
+/** The product's name as an unquoted request introduces it, or null. */
+function introducedName(request: string): string | null {
+  for (const re of [INTRODUCED, APPOSITIVE]) for (const m of request.matchAll(re)) if (!NOT_NAMES.has(m[1]!)) return m[1]!;
+  return null;
+}
+
 /** Facts stated in `request`. */
 export function readRequest(request: string): RequestFacts {
   const quoted = [...request.matchAll(QUOTED)].map((m) => ({ text: m.slice(1).find((g) => g !== undefined)!.trim(), at: m.index ?? 0 }));
@@ -112,7 +125,8 @@ export function readRequest(request: string): RequestFacts {
     bpm: bpm ? Number(bpm[1]) : null,
     fps: fps ? Number(fps[1]) : null,
     noStock: /\bno stock\b|\b(this|the given|my|our) (footage|shots|media) only\b|\buse only (the|this|my)\b|\bonly (the|this) (footage|shots|media)\b/i.test(request),
-    name: named?.text ?? null,
+    muted: /\b(muted|without (?:sound|audio)|no (?:sound|audio)|silent)\b/i.test(request),
+    name: named?.text ?? introducedName(request),
     headline: headline?.text ?? null,
     url: url ? url[1]! : null,
     searches: [...new Set(searches)].slice(0, 6),

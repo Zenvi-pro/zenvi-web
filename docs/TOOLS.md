@@ -3931,7 +3931,7 @@ Availability: editor yes; cli yes; cloud yes; desktop — (web-only direct tool)
 
 | Argument | Type | Required | Description |
 | --- | --- | --- | --- |
-| `technique` | string | yes | Technique id (a style's Borrow line, the brief's techniques), or a family (cinematic, kinetic) or method-motif. |
+| `technique` | string | yes | Technique id (a style's Borrow line, the brief's techniques), or a family (cinematic, kinetic, zenvi-scenes) or method-motif. |
 
 ### review_edit_tool
 
