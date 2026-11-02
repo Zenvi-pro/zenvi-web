@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { SURFACE_PROFILES, availabilityMatrix, type Availability } from "../src/tools/availability.js";
 import type { CatalogTool } from "../src/tools/define.js";
 import type { JsonSchema } from "../src/tools/json-schema.js";
-import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_ARGS, PENDING_DESKTOP_TOOLS } from "../src/tools/pending.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_ARGS, PENDING_DESKTOP_TOOLS, PENDING_DESKTOP_TOOLS_AFTER_CONTRACT } from "../src/tools/pending.js";
 import { allTools } from "../src/tools/registry.js";
 import { CONTRACT_REF, CONTRACT_TOOL_NAMES, contractMeta, type ContractToolName } from "../src/tools/schemas.gen.js";
 
@@ -375,6 +375,12 @@ function notPorted(): string[] {
   for (const [area, names] of [...byArea].sort(([a], [b]) => a.localeCompare(b))) {
     out.push(`- **${area}** (${names.length}): ${names.map((n) => `\`${n}\``).join(", ")}`);
   }
+  // Not in the contract, so no desktop area to group them by.
+  out.push(
+    "",
+    `Desktop tools newer than the contract that the Zenvi Assistant offers (${PENDING_DESKTOP_TOOLS_AFTER_CONTRACT.size}; the web editor sends them as \`unavailable_tools\`): ` +
+      [...PENDING_DESKTOP_TOOLS_AFTER_CONTRACT].map((n) => `\`${n}\``).join(", ") + ".",
+  );
   if (DESKTOP_NAMES_ON_DIRECT_TOOLS.size > 0) {
     out.push(
       "",
