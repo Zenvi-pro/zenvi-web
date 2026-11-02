@@ -80,6 +80,7 @@ describe("runChatTurn", () => {
         session_id: "s1",
         auth_token: "jwt",
         client: "web",
+        editor_generation: "media-index-v2",
         agent_mode: "planning",
         images: [{ name: "a.png", mime_type: "image/png", image_base64: "AAAA" }],
         unavailable_tools: ["create_media_with_comfyui_tool"],

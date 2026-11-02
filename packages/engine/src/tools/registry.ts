@@ -102,9 +102,9 @@ import { transitionTools } from "./catalog/transitions.js";
 import { webVideoTools } from "./catalog/web-video.js";
 import { toolAvailability, type AvailabilitySurface } from "./availability.js";
 import { missingCapabilities, resultFor, type CatalogTool } from "./define.js";
-import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS } from "./pending.js";
+import { DESKTOP_NAMES_ON_DIRECT_TOOLS, PENDING_DESKTOP_TOOLS, PENDING_DESKTOP_TOOLS_AFTER_CONTRACT } from "./pending.js";
 import { failed, refused, type ToolReceipt } from "./receipt.js";
-import { CONTRACT_TOOL_NAMES, type ContractToolName } from "./schemas.gen.js";
+import { CONTRACT_TOOL_NAMES } from "./schemas.gen.js";
 import type { ToolContext, ToolHost, ToolResult, ToolSurface } from "./types.js";
 
 /** The refusal for a tool this surface does not have (zenvi-backend #40: "Error: … not available"). */
@@ -176,6 +176,10 @@ function buildCatalog(): readonly CatalogTool[] {
       contract.push(tool);
     }
   }
+  for (const name of PENDING_DESKTOP_TOOLS_AFTER_CONTRACT) {
+    if ((CONTRACT_TOOL_NAMES as readonly string[]).includes(name)) problems.push(`${name} is in the contract now: move it to PENDING_DESKTOP_TOOLS`);
+    else if (byName.has(name)) problems.push(`${name} is implemented: remove it from PENDING_DESKTOP_TOOLS_AFTER_CONTRACT`);
+  }
   if (problems.length > 0) throw new Error(`tool catalog: ${problems.join("; ")}`);
   // produce_video_tool first: the one call a whole video starts with is the first tool a client lists.
   return [...produceTools, ...contract, ...directTools, ...masteringTools, ...analyzeMixTools, ...mixTools, ...panTools, ...reelTools, ...categoryBuilderTools, ...matchCutTools, ...sequenceTools, ...trackingTools, ...colorUnifyTools, ...briefTools, ...styleTools, ...reviewTools, ...reviewRenderTools, ...watchRenderTools, ...variantTools, ...swapShotTools, ...motionTemplateTools, ...kineticCaptionTools, ...alignLyricsTools, ...placeOnWordTools, ...brollOnWordsTools, ...kineticTitleTools, ...typeBlockTools, ...soundDesignTools, ...motionTransitionTools, ...plateWipeTools, ...transitionMaskTools, ...speedRampTools, ...onsetSnapTools, ...beatSnapTools, ...fillLengthTools, ...shotRampTools, ...musicStructureTools, ...actionFoleyTools, ...motionBlockTools, ...sceneTools, ...scenes3dTools, ...fxTools, ...soundLibraryTools, ...soundKitTools, ...stockTools, ...stockGatherTools, ...brollSetTools, ...matteTools, ...shotTools, ...lookMaskTools];
@@ -193,17 +197,19 @@ export function getTool(name: string): CatalogTool | undefined {
 /**
  * The Assistant's editor tools (the backend's names, zenvi-core's contract)
  * a web surface cannot run: not ported, not exposed there, desktop-only
- * (ComfyUI, recording) or needing what its host lacks. The web editor sends
+ * (ComfyUI, recording) or needing what its host lacks, and the desktop
+ * tools newer than the contract (PENDING_DESKTOP_TOOLS_AFTER_CONTRACT). The web editor sends
  * these with every chat turn, so the backend leaves them out of the agent's
  * tools instead of letting it call them for a refusal.
  */
-export function unavailableAssistantTools(surface: Exclude<AvailabilitySurface, "desktop">, host?: ToolHost): ContractToolName[] {
-  return CONTRACT_TOOL_NAMES.filter((name) => {
+export function unavailableAssistantTools(surface: Exclude<AvailabilitySurface, "desktop">, host?: ToolHost): string[] {
+  const contract = CONTRACT_TOOL_NAMES.filter((name) => {
     const tool = getTool(name);
     if (!tool?.contract) return true;
     if (toolAvailability(tool)[surface] === "no") return true;
     return host !== undefined && missingCapabilities(tool.requires, host).length > 0;
   });
+  return [...contract, ...PENDING_DESKTOP_TOOLS_AFTER_CONTRACT];
 }
 
 /**

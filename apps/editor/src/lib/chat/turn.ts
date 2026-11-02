@@ -196,6 +196,7 @@ export function runChatTurn(options: ChatTurnOptions): Promise<ChatTurnResult> {
           session_id: options.sessionId ?? null,
           auth_token: options.authToken,
           client: "web",
+          editor_generation: "media-index-v2",
         },
       };
       if (options.agentMode) data.data.agent_mode = options.agentMode;
