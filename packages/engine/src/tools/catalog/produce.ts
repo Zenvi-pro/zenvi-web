@@ -402,13 +402,15 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
       const created = await director.run("build", "create_scene_tool", { code: module.code, params: starterParams(starter, { name, hook, features }), name: clipText(`${name ?? rule.id} film`, 60) });
       const sceneId = record(created?.data).scene_id;
       if (typeof sceneId !== "string") return null;
-      scene = { scene_id: sceneId, starter };
       if (replace && project().clips.length > 0) {
         call.doc.transaction("Clear the timeline", (tx) => clearTimeline(tx));
         director.stages.push({ stage: "build", tool: TOOL, outcome: "applied", summary: "cleared the timeline for the scene", undo_steps: 1 });
       }
       const placed = await director.run("build", "render_scene_tool", { scene_id: sceneId, position_seconds: 0, placement: "full_frame", motion_blur: 4 });
-      const placedSeconds = record(placed?.data).duration;
+      if (!placed) return null;
+      // Only a placed scene is the film; one that did not render leaves the reel fallback to cut it, and the receipt to name that.
+      scene = { scene_id: sceneId, starter };
+      const placedSeconds = record(placed.data).duration;
       if (typeof placedSeconds === "number") cutSeconds = placedSeconds;
       return placed;
     };
@@ -519,7 +521,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   }
   const failedStages = director.stages.filter((s) => s.outcome === "failed");
   const undoSteps = director.stages.reduce((n, s) => n + s.undo_steps, 0);
-  const builder = director.stages.filter((s) => s.stage === "build" && s.outcome !== "failed").pop();
+  // The stage that cut the edit: a created scene or a cleared timeline is not one when nothing was placed after it.
+  const builder = director.wants("build") && !built ? undefined : director.stages.filter((s) => s.stage === "build" && s.outcome !== "failed").pop();
   const made = builder
     ? `Produced a ${rule.id} edit (${aspect}, ~${cutSeconds}s${cutSeconds !== seconds ? `, ${seconds}s asked: ${builder.tool} cuts no ${cutSeconds > seconds ? "shorter" : "longer"}` : ""}) with ${builder.tool}: ${builder.summary}`
     : `Did not cut the edit (${rule.id}): ${director.stages.filter((s) => s.stage === "build").map((s) => s.summary.replace(/\.$/, "")).join("; ") || "build skipped"}.`;

@@ -121,6 +121,22 @@ describe("produce_video_tool", () => {
     expect(result.data?.summary).toMatch(/is a draft from the scenes-launch-teaser starter/);
   });
 
+  it("falls back to the motion reel when the scene does not render, and does not report the unplaced scene as the film", async () => {
+    const doc = fixtureDoc(createProject({ id: "PRODUCEFAL" }));
+    const scenes = fakeSceneHost();
+    scenes.render = async () => ({ ok: false, problems: [{ code: "lint", severity: "error", message: "the sandbox stopped" }] });
+    const request = "A 20-second launch teaser for Kiln, a build cache. Style: cinetic.";
+    const result = await runTool({ doc, host: { ...fakeHost(), motion: { ...fakeMotionHost(), scenes } } }, "produce_video_tool", { request, style: "cinetic-teaser", skip: ["footage", "music", "watch"] });
+    const data = result.data?.data as { builder: string | null; scene?: unknown; stages: Stage[]; next_calls: { tool: string }[] };
+    // The fixture bin has no pictures, so the reel refuses too: nothing was cut, and the receipt says so.
+    expect(data.stages.filter((s) => s.stage === "build").map((s) => `${s.tool} ${s.outcome}`)).toEqual(["create_scene_tool applied", "render_scene_tool failed", "build_reel_tool failed"]);
+    expect(data.builder, result.text).toBeNull();
+    expect(result.data?.summary).toMatch(/^Did not cut the edit \(cinetic-teaser\)/);
+    expect(data.scene).toBeUndefined();
+    expect(data.next_calls.map((n) => n.tool)).not.toContain("update_scene_tool");
+    expect(result.data?.summary).not.toMatch(/is a draft from the/);
+  });
+
   it("leaves a muted loop without music, sound design or a mix, and falls back to the motion reel without a scene sandbox", async () => {
     const request = "A 10-second looping feature animation for Ledgerly, a shared-expenses app; it autoplays muted. Style: cinetic.";
     const doc = fixtureDoc(createProject({ id: "PRODUCELOP" }));
