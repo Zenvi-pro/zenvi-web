@@ -82,7 +82,7 @@ review_render_tool {"path": "film.mp4"}
 watch_render_tool {"path": "film.mp4"}
 ```
 
-Muted on a page ("autoplays muted", "without sound"): `produce_video_tool` adds no music, sound or mix.
+Muted on a page ("autoplays muted", "without sound"): `produce_video_tool` adds no music, sound or mix; skip `auto_sound_design_tool` and `master_audio_tool` above too.
 
 ## Finish checklist
 

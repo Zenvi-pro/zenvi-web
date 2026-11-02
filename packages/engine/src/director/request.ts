@@ -94,7 +94,15 @@ const INTRODUCED = /\b(?:launching|launch of|brand for|app|called|named)\s+([A-Z
 const APPOSITIVE = /\b([A-Z][A-Za-z0-9]{2,})(?:,| \() an? (?:[\w-]+ ){0,3}(?:app|tool|product|platform|service|startup|company|cache|library|api)\b/g;
 
 /** The film plays without sound; "muted colours", "no sound effects" and "a silent intro" are not that. */
-const MUTED = /\b(?:(?:auto)?plays? muted|muted (?:autoplay|by default|playback)|(?:is|be|stays?|runs?) muted|without (?:any )?(?:sound|audio)(?! (?:effects|fx|design))|no (?:sound|audio)(?! (?:effects|fx|design))|(?:sound|audio) off|silent (?:film|video|loop|autoplay))\b/i;
+const MUTED = /\b(?:(?:auto)?plays? muted|muted (?:autoplay|by default|playback)|(?:is|be|stays?|runs?) muted|without (?:any )?(?:sound|audio)(?! (?:effects|fx|design))|no (?:sound|audio)(?! (?:effects|fx|design))|(?:sound|audio) off|silent (?:film|video|loop|autoplay))\b/gi;
+
+/** "Not muted", "should never be muted", "don't play it muted" ask for sound. */
+const NEGATED = /(?:\bnot|\bnever|n't)(?:\s+\w+)?\s*$/i;
+
+/** The request asks for a film without sound, a negated ask aside. */
+function mutedOf(request: string): boolean {
+  return [...request.matchAll(MUTED)].some((m) => !NEGATED.test(request.slice(Math.max(0, (m.index ?? 0) - 24), m.index)));
+}
 
 /** The product's name as an unquoted request introduces it, or null. */
 function introducedName(request: string): string | null {
@@ -132,7 +140,7 @@ export function readRequest(request: string): RequestFacts {
     bpm: bpm ? Number(bpm[1]) : null,
     fps: fps ? Number(fps[1]) : null,
     noStock: /\bno stock\b|\b(this|the given|my|our) (footage|shots|media) only\b|\buse only (the|this|my)\b|\bonly (the|this) (footage|shots|media)\b/i.test(request),
-    muted: MUTED.test(request),
+    muted: mutedOf(request),
     name: named?.text ?? introducedName(request),
     headline: headline?.text ?? null,
     url: url ? url[1]! : null,

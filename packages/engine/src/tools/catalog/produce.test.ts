@@ -137,6 +137,26 @@ describe("produce_video_tool", () => {
     expect(result.data?.summary).not.toMatch(/is a draft from the/);
   });
 
+  it("clears the old edit only once the scene is placed, keeping the scene", async () => {
+    const request = "A 20-second launch teaser for Kiln, a build cache. Style: cinetic.";
+    const doc = fixtureDoc();
+    const before = doc.project.clips.map((c) => String(c.id));
+    const failing = fakeSceneHost();
+    failing.render = async () => ({ ok: false, problems: [{ code: "lint", severity: "error", message: "the sandbox stopped" }] });
+    const failed = await runTool({ doc, host: { ...fakeHost(), motion: { ...fakeMotionHost(), scenes: failing } } }, "produce_video_tool", { request, style: "cinetic-teaser", replace: true, skip: ["footage", "music", "watch"] });
+    const failedStages = (failed.data?.data as { stages: Stage[] }).stages;
+    expect(failedStages.find((s) => s.tool === "produce_video_tool" && s.stage === "build")).toBeUndefined();
+
+    const fresh = fixtureDoc();
+    const result = await runTool({ doc: fresh, host: { ...fakeHost(), motion: { ...fakeMotionHost(), scenes: fakeSceneHost() } } }, "produce_video_tool", { request, style: "cinetic-teaser", replace: true, skip: ["footage", "music", "watch"] });
+    const data = result.data?.data as { builder: string; stages: Stage[] };
+    expect(data.builder).toBe("render_scene_tool");
+    expect(data.stages.filter((s) => s.stage === "build").map((s) => s.tool)).toEqual(["create_scene_tool", "render_scene_tool", "produce_video_tool"]);
+    expect(fresh.project.clips.map((c) => String(c.id)).filter((id) => before.includes(id))).toEqual([]);
+    const sceneFiles = fresh.project.files.filter((f) => String(f.name).endsWith("(Zenvi scene)")).map((f) => f.id);
+    expect(fresh.project.clips.filter((c) => sceneFiles.includes(c.file_id))).toHaveLength(1);
+  });
+
   it("leaves a muted loop without music, sound design or a mix, and falls back to the motion reel without a scene sandbox", async () => {
     const request = "A 10-second looping feature animation for Ledgerly, a shared-expenses app; it autoplays muted. Style: cinetic.";
     const doc = fixtureDoc(createProject({ id: "PRODUCELOP" }));
@@ -156,7 +176,7 @@ describe("produce_video_tool", () => {
     const result = await runTool({ doc, host: fakeHost() }, "produce_video_tool", args);
     expect(result.data?.status, result.text).toBe("applied");
     const stages = (result.data?.data as { stages: Stage[] }).stages;
-    // One builder; a scene film is created, then placed (the timeline cleared between them, as replace asks).
+    // One builder; a scene film is created, then placed (the old edit cleared after, as replace asks).
     const placed = stages.filter((s) => s.stage === "build" && s.outcome === "applied" && s.tool !== "create_scene_tool" && s.tool !== "produce_video_tool");
     expect(placed.length, JSON.stringify(stages)).toBe(1);
     // master_audio_tool needs a host that renders the mix; the fake host has none.

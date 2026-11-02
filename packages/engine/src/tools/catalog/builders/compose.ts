@@ -196,10 +196,11 @@ function collapse(warnings: readonly string[]): string[] {
   return [...groups].map(([key, g]) => (g.n > 1 ? `${key} (${g.n} clips)` : g.first));
 }
 
-/** Clear the timeline (clips and transitions) on the scratch project: `replace=true`. */
-export function clearTimeline(tx: Transaction): void {
+/** Clear the timeline (clips and transitions) on the scratch project: `replace=true`. `keep` names clips that stay (a film already placed). */
+export function clearTimeline(tx: Transaction, keep: ReadonlySet<string> = new Set()): void {
   for (const t of [...tx.project.effects]) removeTransition(tx, String(t.id));
-  if (tx.project.clips.length > 0) deleteClips(tx, tx.project.clips.map((c) => String(c.id)), { ripple: false });
+  const ids = tx.project.clips.map((c) => String(c.id)).filter((id) => !keep.has(id));
+  if (ids.length > 0) deleteClips(tx, ids, { ripple: false });
 }
 
 /** The lowest `count` tracks, bottom to top, adding tracks when the project has fewer. */

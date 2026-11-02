@@ -122,6 +122,7 @@ describe("readRequest", () => {
     // A look or a part of the mix is not a silent film; a time is not a product.
     for (const loud of ["a teaser in a muted palette", "muted colours, punchy music", "no sound effects, just the track", "a silent intro, then the drop"]) expect(readRequest(loud).muted, loud).toBe(false);
     for (const quiet of ["it plays muted in the feed", "a loop without any sound", "no audio", "a silent loop for the hero"]) expect(readRequest(quiet).muted, quiet).toBe(true);
+    for (const loud of ["a teaser that is not muted", "it should never be muted", "don't play muted", "it must not run muted"]) expect(readRequest(loud).muted, loud).toBe(false);
     expect(readRequest("We're launching Monday: a 20 s teaser").name).toBeNull();
     expect(readRequest("launching May 5: a 20 s teaser").name).toBeNull();
     expect(readRequest("launching Next week, the app Orbit").name).toBe("Orbit");
