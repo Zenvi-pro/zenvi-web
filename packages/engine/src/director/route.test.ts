@@ -119,6 +119,11 @@ describe("readRequest", () => {
     expect(readRequest("A reel for Instagram Reels, 15 s").name).toBeNull();
     expect(readRequest("A launching app Instagram clone").name).toBeNull();
     expect(readRequest("a 20 s launch teaser with sound").muted).toBe(false);
+    // A look or a part of the mix is not a silent film; a time is not a product.
+    for (const loud of ["a teaser in a muted palette", "muted colours, punchy music", "no sound effects, just the track", "a silent intro, then the drop"]) expect(readRequest(loud).muted, loud).toBe(false);
+    for (const quiet of ["it plays muted in the feed", "a loop without any sound", "no audio", "a silent loop for the hero"]) expect(readRequest(quiet).muted, quiet).toBe(true);
+    expect(readRequest("We're launching Monday: a 20 s teaser").name).toBeNull();
+    expect(readRequest("launching Next week, the app Orbit").name).toBe("Orbit");
   });
 
   it("reads minutes, vertical frames and sizes", () => {

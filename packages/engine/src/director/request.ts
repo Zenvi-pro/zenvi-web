@@ -84,10 +84,17 @@ function secondsOf(request: string): number | null {
   return null;
 }
 
-// Capitalised words after "app" or "launching" that are platforms, not the product.
-const NOT_NAMES = new Set(["Instagram", "TikTok", "YouTube", "Reels", "Shorts", "LinkedIn", "Twitter", "Facebook", "Pinterest", "Snapchat", "Threads", "Mac", "Windows", "iOS", "Android", "Zenvi"]);
+// Capitalised words after "app" or "launching" that are platforms or a time ("launching Monday"), not the product.
+const NOT_NAMES = new Set([
+  ...["Instagram", "TikTok", "YouTube", "Reels", "Shorts", "LinkedIn", "Twitter", "Facebook", "Pinterest", "Snapchat", "Threads", "Mac", "Windows", "iOS", "Android", "Zenvi"],
+  ...["The", "This", "That", "Our", "Its", "Their", "Your", "Next", "Today", "Tomorrow", "Soon", "Now", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+  ...["January", "February", "March", "April", "June", "July", "August", "September", "October", "November", "December", "Spring", "Summer", "Fall", "Autumn", "Winter"],
+]);
 const INTRODUCED = /\b(?:launching|launch of|brand for|app|called|named)\s+([A-Z][A-Za-z0-9]{2,})\b/g;
 const APPOSITIVE = /\b([A-Z][A-Za-z0-9]{2,})(?:,| \() an? (?:[\w-]+ ){0,3}(?:app|tool|product|platform|service|startup|company|cache|library|api)\b/g;
+
+/** The film plays without sound; "muted colours", "no sound effects" and "a silent intro" are not that. */
+const MUTED = /\b(?:(?:auto)?plays? muted|muted (?:autoplay|by default|playback)|(?:is|be|stays?|runs?) muted|without (?:any )?(?:sound|audio)(?! (?:effects|fx|design))|no (?:sound|audio)(?! (?:effects|fx|design))|(?:sound|audio) off|silent (?:film|video|loop|autoplay))\b/i;
 
 /** The product's name as an unquoted request introduces it, or null. */
 function introducedName(request: string): string | null {
@@ -125,7 +132,7 @@ export function readRequest(request: string): RequestFacts {
     bpm: bpm ? Number(bpm[1]) : null,
     fps: fps ? Number(fps[1]) : null,
     noStock: /\bno stock\b|\b(this|the given|my|our) (footage|shots|media) only\b|\buse only (the|this|my)\b|\bonly (the|this) (footage|shots|media)\b/i.test(request),
-    muted: /\b(muted|without (?:sound|audio)|no (?:sound|audio)|silent)\b/i.test(request),
+    muted: MUTED.test(request),
     name: named?.text ?? introducedName(request),
     headline: headline?.text ?? null,
     url: url ? url[1]! : null,
