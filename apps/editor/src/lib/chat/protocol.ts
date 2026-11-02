@@ -36,6 +36,12 @@ export interface UserMessageData {
    * lacks. The backend leaves them out of the agent's tools.
    */
   unavailable_tools?: string[];
+  /**
+   * The engine tools this editor runs (engine `assistantEngineTools`): the
+   * styles, brief, sound design and motion tools. The backend offers no
+   * engine tool a client did not list.
+   */
+  engine_tools?: string[];
 }
 
 const CONTEXT_BLOCK_RE = /\[(?:Editor snapshot|Selected timeline clip context)\][\s\S]*?\[\/(?:Editor snapshot|Selected timeline clip context)\]\s*/g;

@@ -206,6 +206,27 @@ export function unavailableAssistantTools(surface: Exclude<AvailabilitySurface, 
   });
 }
 
+/**
+ * The engine tools (the direct tools, not the desktop's contract) a web
+ * surface's Assistant runs: exposed there, not deprecated, and runnable on
+ * its host. The web editor sends these as `engine_tools` with every chat
+ * turn; the backend offers a client no engine tool it did not list
+ * (zenvi-backend core/chat/client_tools.py `withheld_engine_tools`).
+ */
+export function assistantEngineTools(surface: Exclude<AvailabilitySurface, "desktop">, host?: ToolHost): string[] {
+  const contract: ReadonlySet<string> = new Set(CONTRACT_TOOL_NAMES);
+  return allTools
+    .filter(
+      (tool) =>
+        !tool.contract &&
+        !contract.has(tool.name) &&
+        !tool.deprecated &&
+        toolAvailability(tool)[surface] !== "no" &&
+        (host === undefined || missingCapabilities(tool.requires, host).length === 0),
+    )
+    .map((tool) => tool.name);
+}
+
 export interface ListToolsOptions {
   /** Only tools exposed on this surface. */
   surface?: ToolSurface;
