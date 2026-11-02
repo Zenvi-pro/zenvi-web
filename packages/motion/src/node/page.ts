@@ -83,14 +83,47 @@ async function buildPage(root: string, id: string): Promise<BlockPage> {
   return { script, css, codeHash: await pageHash(root, script, css) };
 }
 
-async function pageHash(root: string, script: string, css: string): Promise<string> {
+/** Hash of a page's script, CSS and the bundled fonts. */
+export async function pageHash(root: string, script: string, css: string): Promise<string> {
   const hash = createHash("sha256").update(script).update("\0").update(css);
   const fonts = path.join(root, "fonts");
   for (const name of (await readdir(fonts)).sort()) hash.update(name).update(await readFile(path.join(fonts, name)));
   return hash.digest("hex");
 }
 
-/** Prebuild every block's page and copy the fonts into `outDir` (the CLI bundle's `motion/` folder). */
+export interface ScenePage {
+  /** The scene runtime (scene/page.ts and the kit), one IIFE. */
+  script: string;
+  /** Hash of the runtime and the fonts: part of every scene fingerprint. */
+  hash: string;
+}
+
+const scenePages = new Map<string, Promise<ScenePage>>();
+
+/** The scene runtime, bundled once per process; prebuilt beside the CLI bundle (`pages/__scene.js`). */
+export function scenePage(env: NodeJS.ProcessEnv = process.env): Promise<ScenePage> {
+  const root = motionDir(env);
+  let page = scenePages.get(root);
+  if (!page) {
+    page = (async () => {
+      const prebuilt = path.join(root, "pages", "__scene.js");
+      let script: string;
+      if (existsSync(prebuilt)) script = await readFile(prebuilt, "utf8");
+      else {
+        const { build } = await import("esbuild");
+        // Strict all through: no runtime frame lends a scene the global object as its `this` (a stack trace's call sites).
+        const result = await build({ entryPoints: [path.join(root, "src", "scene", "page.ts")], bundle: true, format: "iife", platform: "browser", target: "chrome120", banner: { js: '"use strict";' }, write: false, legalComments: "none", logLevel: "silent" });
+        script = result.outputFiles[0]!.text;
+      }
+      return { script, hash: await pageHash(root, script, "") };
+    })();
+    page.catch(() => scenePages.delete(root));
+    scenePages.set(root, page);
+  }
+  return page;
+}
+
+/** Prebuild every block's page and the scene runtime, and copy the fonts into `outDir` (the CLI bundle's `motion/` folder). */
 export async function writeBlockPages(outDir: string, env: NodeJS.ProcessEnv = process.env): Promise<string[]> {
   await mkdir(path.join(outDir, "pages"), { recursive: true });
   for (const block of BLOCKS) {
@@ -98,6 +131,7 @@ export async function writeBlockPages(outDir: string, env: NodeJS.ProcessEnv = p
     await writeFile(path.join(outDir, "pages", `${block.id}.js`), page.script);
     await writeFile(path.join(outDir, "pages", `${block.id}.css`), page.css);
   }
+  await writeFile(path.join(outDir, "pages", "__scene.js"), (await scenePage(env)).script);
   await cp(path.join(motionDir(env), "fonts"), path.join(outDir, "fonts"), { recursive: true });
   return BLOCKS.map((b) => b.id);
 }

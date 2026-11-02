@@ -12,6 +12,7 @@ export * from "./decode/video.js";
 export * from "./decode/still.js";
 export * from "./decode/sample-frames.js";
 export * from "./decode/sources.js";
+export { decodeLuma, NoVideoError } from "./decode/luma.js";
 export * from "./probe/exif.js";
 export * from "./probe/starts.js";
 export * from "./render/audio-graph.js";

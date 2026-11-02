@@ -111,10 +111,13 @@ export function bridgeHost(projectFile: string, written: string[], options: Omit
 }
 
 /**
- * Zenvi Motion renders land in `<assets>/links/zenvi-motion` (`dir`). A render that reused a file
- * already there (an earlier call's, maybe in the bin) wrote nothing: only new files belong to the call.
+ * Zenvi Motion renders land in `<assets>/links/zenvi-motion` (`dir`), scenes in its sibling
+ * `zenvi-scene` (their contact sheets in its `sheets`). A render or sheet that reused a file already
+ * there (an earlier call's, maybe in the bin) wrote nothing: only new files belong to the call.
  */
 export function trackMotionRenders(motion: MotionHost, dir: string, note: (p: string) => unknown): MotionHost {
+  const scenes = motion.scenes;
+  const sceneDir = path.join(path.dirname(dir), "zenvi-scene");
   return {
     ...motion,
     render: async (request, signal) => {
@@ -123,6 +126,26 @@ export function trackMotionRenders(motion: MotionHost, dir: string, note: (p: st
       if (!before.has(path.basename(render.media.path))) note(render.media.path);
       return render;
     },
+    ...(scenes
+      ? {
+          scenes: {
+            ...scenes,
+            draft: async (request, signal) => {
+              const sheets = path.join(sceneDir, "sheets");
+              const before = new Set(await readdir(sheets).catch(() => [] as string[]));
+              const draft = await scenes.draft(request, signal);
+              if (draft.sheetPath && !before.has(path.basename(draft.sheetPath))) note(draft.sheetPath);
+              return draft;
+            },
+            render: async (request, signal) => {
+              const before = new Set(await readdir(sceneDir).catch(() => [] as string[]));
+              const render = await scenes.render(request, signal);
+              if (render.ok && !before.has(path.basename(render.media.path))) note(render.media.path);
+              return render;
+            },
+          },
+        }
+      : {}),
   };
 }
 

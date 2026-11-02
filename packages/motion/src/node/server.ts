@@ -30,7 +30,12 @@ export interface PageServer {
 
 export interface PageServerFiles {
   html: string;
-  script: string;
+  /** Served at /block.js. */
+  script?: string;
+  /** More scripts by path (`/scene.js`). */
+  scripts?: Readonly<Record<string, string>>;
+  /** Content-Security-Policy of every response (a scene page's walls). */
+  csp?: string;
   fontsDir: string;
   /** URL prefix (`/media/<name>/`) to the folder it serves. */
   mediaDirs: ReadonlyMap<string, string>;
@@ -42,12 +47,15 @@ export async function startPageServer(files: PageServerFiles): Promise<PageServe
   const server: Server = createServer((req, res) => {
     void (async () => {
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
+      const policy = files.csp ? { "content-security-policy": files.csp } : {};
       const send = (status: number, type: string, body: string): void => {
-        res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
+        res.writeHead(status, { "content-type": type, "cache-control": "no-store", ...policy });
         res.end(body);
       };
       if (url.pathname === "/") return send(200, "text/html; charset=utf-8", files.html);
-      if (url.pathname === "/block.js") return send(200, "text/javascript; charset=utf-8", files.script);
+      if (url.pathname === "/block.js" && files.script !== undefined) return send(200, "text/javascript; charset=utf-8", files.script);
+      const extra = files.scripts && Object.hasOwn(files.scripts, url.pathname) ? files.scripts[url.pathname] : undefined;
+      if (extra !== undefined) return send(200, "text/javascript; charset=utf-8", extra);
       let file: string | undefined;
       const font = /^\/fonts\/([^/]+)$/.exec(url.pathname);
       if (font && FONT_FILES.has(font[1]!)) file = path.join(files.fontsDir, font[1]!);
@@ -58,7 +66,7 @@ export async function startPageServer(files: PageServerFiles): Promise<PageServe
       }
       const type = file ? TYPES[path.extname(file).toLowerCase()] : undefined;
       if (!file || !type || !(await stat(file).then((s) => s.isFile(), () => false))) return send(404, "text/plain", "not found");
-      res.writeHead(200, { "content-type": type, "cache-control": "max-age=3600" });
+      res.writeHead(200, { "content-type": type, "cache-control": "max-age=3600", ...policy });
       createReadStream(file).pipe(res);
     })().catch(() => {
       if (!res.headersSent) res.writeHead(500);

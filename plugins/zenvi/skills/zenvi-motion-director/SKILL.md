@@ -261,6 +261,47 @@ shots already carry their lengths and the music already fits them.
    order, as the recipe says. Move a shot only for a reason you can see on
    `preview_frame` at the cut.
 
+## Bespoke scenes: when the film is code
+
+Blocks are fixed shapes with their own timing. When the brief needs a
+sequence timed to its own beats (a product walkthrough where the click, the
+card landing and the counter all sit on the music's grid; a type sequence
+whose words cut with the picture), write it as a scene: one module whose
+frame grid drives the picture, its cues and the sound. It runs only in the
+sandbox (no imports, `Math.random`, `Date`, timers or DOM; frame t must draw
+the same picture every time).
+
+```ts
+export const fps = 60;                              // the grid: 120 BPM = a beat every 30 frames
+export const duration = 360;                        // frames
+export const params = { headline: "Edits with taste." };
+export const cues = {                               // the beats; a kind makes a sound there
+  click: { at: 135, kind: "click", weight: 0.35, x: 0.71, y: 0.42 },
+  land: { at: 150, kind: "land", weight: 0.6, hit: 0.6 },
+  cut: { at: 240, kind: "impact", weight: 0.9, hit: 1, shake: 10, cut: true },
+};
+export function draw(ctx, t, api) {
+  api.hitFx({ look: "clean" });                      // punch, shake, flash on cues with hit
+  api.layer(1, () => {
+    const card = api.ui.card({ x: 400, y: 300 + (1 - api.prog("land", 22, api.spring({ mass: 1 }))) * 80, w: 1120, h: 330 });
+    api.text(String(api.p.headline), { x: card.x + 40, y: card.y + 60, size: 64, reveal: { at: "land", per: "word" } });
+  });
+}
+```
+
+1. `create_scene_tool {"name": "Opener", "code": "<the module source>"}` checks
+   it (every frame drawn, a sample drawn twice, flashes, text layout) and
+   keeps it; look at the contact sheet it returns, at the cue frames.
+2. Fix what it lists with exact edits, not a rewrite:
+   `update_scene_tool {"scene_id": "<id>", "edits": [{"find": "size: 64", "replace": "size: 72"}]}`.
+   Errors (draw throws, nondeterministic, flashing) refuse the render;
+   warnings (safe-area, overlap, small-text, words) are taste to fix.
+3. `render_scene_tool {"scene_id": "<id>", "position_seconds": 0, "motion_blur": 4}`
+   places it; calling it again after an update re-renders it in place.
+4. The cues are the file's picture events: `auto_sound_design_tool` and
+   `spot_sound_tool` hit them, and `scene_cues_tool {"scene_id": "<id>"}` gives
+   their timeline seconds for cuts or music.
+
 ## Non-negotiables
 
 - **Sound on every cut.** In the references a cut lands on an audio

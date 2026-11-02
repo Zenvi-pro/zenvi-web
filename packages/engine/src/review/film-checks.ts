@@ -23,7 +23,7 @@ import type { ReviewProblem, TextBox } from "./types.js";
 const KINETIC_TITLE_KEY = "zenvi_kinetic_title";
 const KINETIC_CAPTIONS_KEY = "zenvi_kinetic_captions";
 /** Boxes overlapping by more than this share of the smaller one collide. */
-const OVERLAP_SHARE = 0.25;
+export const OVERLAP_SHARE = 0.25;
 /** A keystroke's title starting this soon after the last one ends continues its line. */
 const TYPED_GAP_SECONDS = 0.05;
 

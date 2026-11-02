@@ -1,6 +1,7 @@
 /** A Zenvi Motion host for tests: one block, renders recorded and "written" as files named after the request. */
 
 import type { MotionBlockInfo, MotionHost, MotionRenderRequest, MotionRuntimeStatus } from "../types.js";
+import { fakeSceneHost } from "./fake-scenes.js";
 import { videoInfo } from "./fixture.js";
 
 export const FAKE_MOTION_BLOCK: MotionBlockInfo = {
@@ -27,6 +28,8 @@ export interface FakeMotionOptions {
   setupError?: string;
   /** Warnings `check` returns with every accepted set of params. */
   warnings?: string[];
+  /** The host sandboxes scenes (default true: fake-scenes.ts). */
+  scenes?: boolean;
 }
 
 export interface FakeMotionHost extends MotionHost {
@@ -57,6 +60,7 @@ export function fakeMotionHost(options: FakeMotionOptions = {}): FakeMotionHost 
     requests,
     setups: 0,
     ...local,
+    ...(options.scenes === false ? {} : { scenes: fakeSceneHost() }),
     blocks: () => [block],
     check(id, params) {
       if (id !== block.id) return { ok: false, error: `unknown motion block ${id}` };
