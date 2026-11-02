@@ -26,7 +26,7 @@ export const FINISH_HINT =
  * the ids again and get_style_tool is one call.
  */
 const STYLE =
-  'Before the first edit, read its style\'s recipe (timed beats, look, sound, calls): get_style_tool {"style": "<id>", "length_seconds": <s>}. ' +
+  'Before the first edit, read its style\'s recipe: get_style_tool {"style": "<id>", "length_seconds": <s>}. ' +
   "Styles: match-cut-montage, flash-montage, hype-reel, documentary, kinetic-captions, saas-ui-promo, 3d-product-ad, editorial-type, grid-montage, data-explainer, tutorial; " +
   'find_style_tool {"request"} ranks all 42; get_technique_tool: one technique.';
 
@@ -40,10 +40,17 @@ const BRIEF = "A brief lets review check the edit: save_brief_tool, get_brief_to
  */
 const PRODUCE = "produce_video_tool {request: the person's words, output} does it in one call, then fix its findings.";
 
+/**
+ * Motion design with no footage (SC2 bench: agents built cinetic briefs from
+ * blocks and 3D titles and never opened the style): one scene, its method and
+ * worked examples behind one call.
+ */
+const SCENES = "Cinetic or no-footage motion design: one scene (get_technique_tool zenvi-scenes).";
+
 /** The finish every recipe ends with, in order. */
 const FINISH =
-  "Finish, in order: unify_grade_tool; apply_motion_transitions_tool (no track: every scene change; match cuts stay hard); spot_sound_tool, auto_sound_design_tool (genre, beats); " +
-  "master_audio_tool iterate=true, last; render_video; review_render_tool; watch_render_tool once, fix its HIGH issues. Make the calls receipts say are missing.";
+  "Finish, in order: unify_grade_tool; apply_motion_transitions_tool (no track; match cuts stay hard); spot_sound_tool, auto_sound_design_tool; " +
+  "master_audio_tool iterate=true, last; render_video; review_render_tool; watch_render_tool once, fix its HIGH issues. Make the calls receipts ask for.";
 
 /**
  * Re-edit bench (2026-10-28): agents given a bin of finished shots cut them in
@@ -53,10 +60,15 @@ const ORDER = "Shots to re-edit: sequence_shots_tool first.";
 
 export const DIRECTOR_CARD: string = [
   `Whole videos (reel, ad, promo, montage, a remake): ${PRODUCE} By hand: ${STYLE}`,
+  SCENES,
   ORDER,
   FINISH,
   "TTS captions: kinetic_captions_tool timeline_clip_ids=[the TTS clip].",
 ].join("\n");
+
+/** The scene films, in full where the start note has room: what produce_video_tool does with a cinetic style and what the agent does next. */
+const SCENES_START =
+  'Cinetic styles (launch teaser, feature loop, logo sting, UI walkthrough) and motion design with no footage are ONE scene, never blocks, titles or 3D: produce_video_tool {"request", "style": "cinetic-teaser"} drafts it from a worked example; get_technique_tool zenvi-scenes (the method) and scenes-launch-teaser / scenes-feature-loop / scenes-logo-sting (whole code), then update_scene_tool with this product\'s story.';
 
 /** The one-call builders: a whole first cut in one undo step, then the recipe's fixes and the finish. */
 const BUILDERS =
@@ -68,4 +80,4 @@ const BEST_OF =
   "60 s or shorter and watching works: make the base and two variants that differ on one axis of the brief (pacing, type, grade or music) with fork_project_tool, render 540 px proxies, pick_best_variant_tool from the base, then fix the winner's 3 fixes.";
 
 /** open_project_file's note on an empty project: the plan, where every agent reads (its first receipt). */
-export const DIRECTOR_START: string = `A new edit: ${PRODUCE} By hand instead: ${STYLE} ${BRIEF} ${BUILDERS} ${ORDER} ${FINISH} ${BEST_OF}`;
+export const DIRECTOR_START: string = `A new edit: ${PRODUCE} By hand instead: ${STYLE} ${BRIEF} ${BUILDERS} ${SCENES_START} ${ORDER} ${FINISH} ${BEST_OF}`;

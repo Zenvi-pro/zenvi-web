@@ -17,7 +17,10 @@ describe("director card", () => {
   });
 
   it("sends whole videos to produce_video_tool, by hand to the style tools, and names only tools this server lists", () => {
-    expect(DIRECTOR_CARD).toMatch(/produce_video_tool \{request: the person.s words, output\} does it in one call.*By hand: Before the first edit, read its style's recipe .*get_style_tool \{"style": "<id>".*Styles: match-cut-montage.*find_style_tool .*get_technique_tool/);
+    expect(DIRECTOR_CARD).toMatch(/produce_video_tool \{request: the person.s words, output\} does it in one call.*By hand: Before the first edit, read its style's recipe: get_style_tool \{"style": "<id>".*Styles: match-cut-montage.*find_style_tool .*get_technique_tool/);
+    // Motion design with no footage goes to the scene family, which the styles library serves.
+    expect(DIRECTOR_CARD).toContain("get_technique_tool zenvi-scenes");
+    expect(STYLE_FILES.some((f) => f.id === "zenvi-scenes" && f.kind === "family")).toBe(true);
     // Every style the card names is one get_style_tool knows.
     const named = DIRECTOR_CARD.slice(DIRECTOR_CARD.indexOf("Styles: ") + 8, DIRECTOR_CARD.indexOf(";", DIRECTOR_CARD.indexOf("Styles: "))).split(", ");
     const styles = new Set(STYLE_FILES.filter((f) => f.kind === "style").map((f) => f.id));
