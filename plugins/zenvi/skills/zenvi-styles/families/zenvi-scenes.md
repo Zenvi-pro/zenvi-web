@@ -40,6 +40,13 @@ example's grid, act structure and finish.
    every dimension 3+/5, sound and finish 5, mean 4.2+.
 8. Deliver the asked file; a transparent sting: params `{"background": false}`, `placement: "over_video"`.
 
+## What the judge marked down
+
+Fake product logic (the feature reduced to its simplest version: a plain divide, a counter that only counts); a loop that snaps or reverses
+back (the device travels home); a payoff that goes dead (hold it 1.5 s with one live move); two labels in
+one place; full-frame ground flips every beat; a hard cut to a black end card (grow it out of the device);
+serif for a sans brand; scramble or glitch on the lockup.
+
 ## Tool sequence
 
 ```json
