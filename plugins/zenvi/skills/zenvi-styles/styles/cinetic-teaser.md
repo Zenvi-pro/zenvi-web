@@ -3,7 +3,7 @@ id: cinetic-teaser
 kind: style
 summary: "For a 15-20 s teaser or drop: the problem, the turn and the name, crisp at 120 BPM, one glimpse of proof, no logo first."
 categories: [cinetic-teaser]
-tools: [produce_video_tool, save_brief_tool, get_brief_tool, get_technique_tool, set_project_setting_tool, detect_beats_tool, add_clip_to_timeline_tool, set_keyframes_tool, add_kinetic_title_tool, add_motion_block_tool, apply_motion_transition_tool, apply_fx_tool, add_sfx_tool, master_audio_tool, review_edit_tool, export_video_tool, review_render_tool, watch_render_tool]
+tools: [produce_video_tool, get_technique_tool, create_scene_tool, update_scene_tool, render_scene_tool, scene_cues_tool, auto_sound_design_tool, master_audio_tool, export_video_tool, review_render_tool, watch_render_tool]
 pace: fast
 mood: [crisp, confident, tense, premium]
 aspect: ["16:9", "9:16", "1:1"]
@@ -75,23 +75,20 @@ None.
 
 ## Tool sequence
 
+The film is one scene (family `zenvi-scenes`, `get_technique_tool {"technique": "zenvi-scenes"}`):
+`produce_video_tool` drafts it from `scenes-launch-teaser` with the request's name; rewrite it for this product.
+No `build_product_launch_tool`, titles, blocks or 3D on top of it.
+
 ```json
-produce_video_tool {"request": "<the brief, verbatim>", "style": "cinetic-teaser", "length_seconds": 20}
-get_brief_tool {}
-get_technique_tool {"technique": "<each drawn pick>"}
-set_project_setting_tool {"fps": 60}
-detect_beats_tool {"file_id": "<music>"}
-add_kinetic_title_tool {"text": "<problem, 2-3 words>", "position_seconds": 0.25, "duration_seconds": 1.2, "style": "documentary", "animation": "rise", "stagger_seconds": 0.1}
-add_clip_to_timeline_tool {"file_id": "<product>", "position_seconds": 8, "start_seconds": 0, "end_seconds": 3, "track": "1"}
-set_keyframes_tool {"timeline_clip_id": "<it>", "property": "scale_x", "points": [{"seconds": 0, "value": 1.0}, {"seconds": 0.9, "value": 3.0, "ease": "ease_in_out_sine"}]}
-apply_motion_transition_tool {"track": "1", "time": 14, "preset": "whip", "direction": "left"}
-add_motion_block_tool {"block": "logo_reveal_end", "position_seconds": 18, "duration_seconds": 2, "params": {"brand": "<Name>", "cta": "", "url": "<date or URL>", "glow": false, "display_font": "sans"}}
-add_sfx_tool {"recipe": "hit_transient", "at_seconds": 18.6, "gain_db": -6}
-master_audio_tool {"target_lufs": -14}
-review_edit_tool {}
-export_video_tool {}
-review_render_tool {"path": "<render>"}
-watch_render_tool {"path": "<render>"}
+produce_video_tool {"request": "<the brief, verbatim>", "style": "cinetic-teaser", "length_seconds": 20, "output": "film.mp4"}
+get_technique_tool {"technique": "scenes-launch-teaser"}
+update_scene_tool {"scene_id": "<data.scene.scene_id>", "code": "<the module rewritten: this product's device, copy and brand>"}
+render_scene_tool {"scene_id": "<id>", "motion_blur": 4}
+auto_sound_design_tool {"genre": "saas_ui", "intensity": "subtle"}
+master_audio_tool {"preset": "social", "iterate": true}
+export_video_tool {"output_path": "film.mp4"}
+review_render_tool {"path": "film.mp4"}
+watch_render_tool {"path": "film.mp4"}
 ```
 
 ## Finish checklist

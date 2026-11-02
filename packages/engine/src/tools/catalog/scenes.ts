@@ -238,7 +238,8 @@ export const sceneTools: CatalogTool[] = [
     description:
       "Write a film (or one shot of it) as code: a deterministic scene whose one frame grid drives the picture, its cues and the sound, drawn with Zenvi's motion kit (kinetic type, app UI with a clicking cursor and typing, charts and counters, shapes that draw on, the project's photos and videos, eases and springs, camera push and parallax, hit FX, grain). " +
       "The code runs in a sandbox; every frame is drawn and measured: errors (code that cannot run, frames that differ when drawn twice, flashing past WCAG 2.3.1) and layout warnings (text outside the safe zone, overlapping, too small, too much to read) come back with a contact sheet of the cue frames. " +
-      "The scene is kept in the project (one undo step); render_scene_tool puts it on the timeline. Use it when blocks cannot do what the brief needs: a bespoke sequence timed to its own beats.",
+      "The scene is kept in the project (one undo step); render_scene_tool puts it on the timeline. Use it when blocks cannot do what the brief needs: a bespoke sequence timed to its own beats. " +
+        "A cinetic style's film or any motion-design film with no footage (launch teaser, feature loop, logo sting, UI walkthrough) is one scene: get_technique_tool zenvi-scenes has the method and scenes-launch-teaser, scenes-feature-loop, scenes-logo-sting whole modules to start from.",
     input: createInput,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     requires: ["motion"],

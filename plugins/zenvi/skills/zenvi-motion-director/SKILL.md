@@ -269,7 +269,10 @@ card landing and the counter all sit on the music's grid; a type sequence
 whose words cut with the picture), write it as a scene: one module whose
 frame grid drives the picture, its cues and the sound. It runs only in the
 sandbox (no imports, `Math.random`, `Date`, timers or DOM; frame t must draw
-the same picture every time).
+the same picture every time). The `cinetic-*` styles are always scene films:
+the method is the zenvi-styles family `zenvi-scenes`, and its worked examples
+(`scenes-launch-teaser`, `scenes-feature-loop`, `scenes-logo-sting`) are whole
+modules to start from (`get_technique_tool`).
 
 ```ts
 export const fps = 60;                              // the grid: 120 BPM = a beat every 30 frames

@@ -18,7 +18,9 @@ export interface RequestFacts {
   fps: number | null;
   /** The request rules out stock footage ("use this footage only", "no stock"). */
   noStock: boolean;
-  /** The name after "called" / "named" / "titled", else null. */
+  /** The request plays without sound ("muted", "without sound"): no music, no sound design. */
+  muted: boolean;
+  /** The name in quotes after "called" / "named" / "titled", else a capitalised name the product is introduced by ("launching Halden", "Ledgerly, a ... app"), else null. */
   name: string | null;
   /** A headline, hook or title line in quotes. */
   headline: string | null;
@@ -82,6 +84,32 @@ function secondsOf(request: string): number | null {
   return null;
 }
 
+// Capitalised words after "app" or "launching" that are platforms or a time ("launching Monday"), not the product.
+const NOT_NAMES = new Set([
+  ...["Instagram", "TikTok", "YouTube", "Reels", "Shorts", "LinkedIn", "Twitter", "Facebook", "Pinterest", "Snapchat", "Threads", "Mac", "Windows", "iOS", "Android", "Zenvi"],
+  ...["The", "This", "That", "Our", "Its", "Their", "Your", "Next", "Today", "Tomorrow", "Soon", "Now", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+  ...["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Spring", "Summer", "Fall", "Autumn", "Winter"],
+]);
+const INTRODUCED = /\b(?:launching|launch of|brand for|app|called|named)\s+([A-Z][A-Za-z0-9]{2,})\b/g;
+const APPOSITIVE = /\b([A-Z][A-Za-z0-9]{2,})(?:,| \() an? (?:[\w-]+ ){0,3}(?:app|tool|product|platform|service|startup|company|cache|library|api)\b/g;
+
+/** The film plays without sound; "muted colours", "no sound effects" and "a silent intro" are not that. */
+const MUTED = /\b(?:(?:auto)?plays? muted|muted (?:autoplay|by default|playback)|(?:is|be|stays?|runs?) muted|without (?:any )?(?:sound|audio)(?! (?:effects|fx|design))|no (?:sound|audio)(?! (?:effects|fx|design))|(?:sound|audio) off|silent (?:film|video|loop|autoplay))\b/gi;
+
+/** "Not muted", "should never be muted", "don't play it muted" ask for sound. */
+const NEGATED = /(?:\bnot|\bnever|n't)(?:\s+\w+)?\s*$/i;
+
+/** The request asks for a film without sound, a negated ask aside. */
+function mutedOf(request: string): boolean {
+  return [...request.matchAll(MUTED)].some((m) => !NEGATED.test(request.slice(Math.max(0, (m.index ?? 0) - 24), m.index)));
+}
+
+/** The product's name as an unquoted request introduces it, or null. */
+function introducedName(request: string): string | null {
+  for (const re of [INTRODUCED, APPOSITIVE]) for (const m of request.matchAll(re)) if (!NOT_NAMES.has(m[1]!)) return m[1]!;
+  return null;
+}
+
 /** Facts stated in `request`. */
 export function readRequest(request: string): RequestFacts {
   const quoted = [...request.matchAll(QUOTED)].map((m) => ({ text: m.slice(1).find((g) => g !== undefined)!.trim(), at: m.index ?? 0 }));
@@ -112,7 +140,8 @@ export function readRequest(request: string): RequestFacts {
     bpm: bpm ? Number(bpm[1]) : null,
     fps: fps ? Number(fps[1]) : null,
     noStock: /\bno stock\b|\b(this|the given|my|our) (footage|shots|media) only\b|\buse only (the|this|my)\b|\bonly (the|this) (footage|shots|media)\b/i.test(request),
-    name: named?.text ?? null,
+    muted: mutedOf(request),
+    name: named?.text ?? introducedName(request),
     headline: headline?.text ?? null,
     url: url ? url[1]! : null,
     searches: [...new Set(searches)].slice(0, 6),

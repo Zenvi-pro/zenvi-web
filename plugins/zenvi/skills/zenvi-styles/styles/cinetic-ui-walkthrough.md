@@ -3,7 +3,7 @@ id: cinetic-ui-walkthrough
 kind: style
 summary: "For a 20-90 s UI walkthrough that teaches a flow: chapters on downbeats, one camera, cursor physics, one caption each."
 categories: [cinetic-ui-walkthrough]
-tools: [produce_video_tool, save_brief_tool, get_brief_tool, get_technique_tool, set_project_setting_tool, add_clip_to_timeline_tool, set_keyframes_tool, add_motion_block_tool, add_kinetic_title_tool, add_captions_tool, apply_motion_transition_tool, add_sfx_tool, master_audio_tool, review_edit_tool, export_video_tool, review_render_tool, watch_render_tool]
+tools: [produce_video_tool, get_technique_tool, create_scene_tool, update_scene_tool, render_scene_tool, scene_cues_tool, auto_sound_design_tool, master_audio_tool, export_video_tool, review_render_tool, watch_render_tool]
 pace: calm
 mood: [clear, helpful, calm, precise]
 aspect: ["16:9", "9:16", "1:1"]
@@ -74,26 +74,24 @@ With a voice-over: `add_captions_tool` from it, the music ducked under the voice
 
 ## Tool sequence
 
+The film is one scene (family `zenvi-scenes`, `get_technique_tool {"technique": "zenvi-scenes"}`):
+`produce_video_tool` drafts it from `scenes-feature-loop` with the request's name; rewrite it for this product.
+No `build_product_launch_tool`, titles, blocks or 3D on top of it.
+
 ```json
-produce_video_tool {"request": "<the brief>", "style": "cinetic-ui-walkthrough", "length_seconds": 45}
-get_brief_tool {}
-get_technique_tool {"technique": "<each drawn pick>"}
-set_project_setting_tool {"fps": 60}
-add_clip_to_timeline_tool {"file_id": "<screen recording, chapter 1>", "position_seconds": 2.4, "start_seconds": 0, "end_seconds": 12, "track": "1"}
-set_keyframes_tool {"timeline_clip_id": "<it>", "property": "scale_x", "points": [{"seconds": 1.2, "value": 1.0}, {"seconds": 2.4, "value": 2.2, "ease": "ease_in_out_sine"}]}
-set_keyframes_tool {"timeline_clip_id": "<it>", "property": "location_x", "points": [{"seconds": 1.2, "value": 0}, {"seconds": 2.4, "value": -0.18, "ease": "ease_in_out_sine"}]}
-add_motion_block_tool {"block": "cursor_path", "position_seconds": 5.4, "duration_seconds": 4, "params": {"background": "<still of the screen>", "points": [[0.3, 0.6], [0.62, 0.41]], "labels": ["<control>"], "clicks": true}}
-add_kinetic_title_tool {"text": "<caption, 5 words or fewer>", "position_seconds": 2.6, "duration_seconds": 2.2, "style": "documentary", "animation": "rise", "y": 0.86}
-add_sfx_tool {"recipe": "mouse_click", "at_seconds": 7.1, "gain_db": -18}
-apply_motion_transition_tool {"track": "1", "time": 14.4, "preset": "whip", "direction": "left"}
-master_audio_tool {"target_lufs": -14}
-review_edit_tool {}
-export_video_tool {}
-review_render_tool {"path": "<render>"}
-watch_render_tool {"path": "<render>"}
+produce_video_tool {"request": "<the brief, verbatim>", "style": "cinetic-ui-walkthrough", "length_seconds": 45, "output": "film.mp4"}
+get_technique_tool {"technique": "scenes-feature-loop"}
+update_scene_tool {"scene_id": "<data.scene.scene_id>", "code": "<the module rewritten: this product's device, copy and brand>"}
+render_scene_tool {"scene_id": "<id>", "motion_blur": 4}
+auto_sound_design_tool {"genre": "saas_ui", "intensity": "subtle"}
+master_audio_tool {"preset": "social", "iterate": true}
+export_video_tool {"output_path": "film.mp4"}
+review_render_tool {"path": "film.mp4"}
+watch_render_tool {"path": "film.mp4"}
 ```
 
-(`scale_y` takes the same points as `scale_x`.)
+A walkthrough is chapters: one scene per chapter (the loop's click -> act -> land arc, without the
+reset), placed back to back with `render_scene_tool` `position_seconds`, one camera language across them.
 
 ## Finish checklist
 

@@ -3,7 +3,7 @@ id: cinetic-launch-film
 kind: style
 summary: "For a software launch film watched twice: one idea told in pictures, copy in fragments, a device that becomes the mark."
 categories: [cinetic-launch-film]
-tools: [produce_video_tool, save_brief_tool, get_brief_tool, get_technique_tool, set_project_setting_tool, add_clip_to_timeline_tool, set_keyframes_tool, add_kinetic_title_tool, add_motion_block_tool, add_shape_mask_tool, apply_motion_transition_tool, add_sfx_tool, spot_sound_tool, master_audio_tool, review_edit_tool, export_video_tool, review_render_tool, watch_render_tool, save_frame_image_tool]
+tools: [produce_video_tool, get_technique_tool, create_scene_tool, update_scene_tool, render_scene_tool, scene_cues_tool, auto_sound_design_tool, master_audio_tool, export_video_tool, review_render_tool, watch_render_tool]
 pace: medium
 mood: [considered, precise, premium, calm]
 aspect: ["16:9", "9:16", "1:1"]
@@ -93,35 +93,21 @@ under the voice and keeps the same fragment grammar on screen.
 
 ## Tool sequence
 
-```json
-produce_video_tool {"request": "<the person's brief, verbatim>", "style": "cinetic-launch-film", "length_seconds": 30}
-get_brief_tool {}
-get_technique_tool {"technique": "method-cinetic"}
-get_technique_tool {"technique": "<each drawn pick>"}
-save_brief_tool {"goal": "<logline, 15 words or fewer>", "style": "cinetic-launch-film", "aspect": "16:9", "length_seconds": 30, "platform": "web", "hook": "<frame 0: the problem already moving>", "beats": [{"start": 0, "end": 6, "name": "hook-problem"}, {"start": 6, "end": 10, "name": "turn"}, {"start": 10, "end": 18, "name": "proof 1"}, {"start": 18, "end": 24, "name": "proof 2"}, {"start": 24, "end": 30, "name": "promise"}, {"start": 30, "end": 33, "name": "lockup"}], "motifs": ["<the device>", "..."], "through_line": "<the device>", "palette": "<ink, paper, the accent and its meaning>", "type": "<the sans, two weights>", "critique": "<deletion, specificity and feature-word tests>"}
-set_project_setting_tool {"fps": 60}
-```
-
-Then per act, on the grid (100 BPM: beats every 0.6 s, 16ths every 0.15 s):
+The film is one scene (family `zenvi-scenes`, `get_technique_tool {"technique": "zenvi-scenes"}`):
+`produce_video_tool` drafts it from `scenes-launch-teaser` with the request's name; rewrite it for this product.
+No `build_product_launch_tool`, titles, blocks or 3D on top of it.
 
 ```json
-add_clip_to_timeline_tool {"file_id": "<product recording>", "position_seconds": 2.4, "start_seconds": 0, "end_seconds": 3.6, "track": "1"}
-set_keyframes_tool {"timeline_clip_id": "<it>", "property": "scale_x", "points": [{"seconds": 0, "value": 1.0}, {"seconds": 1.2, "value": 2.6, "ease": "ease_in_out_sine"}]}
-add_kinetic_title_tool {"text": "<2-3 words>", "position_seconds": 0.6, "duration_seconds": 1.6, "style": "documentary", "animation": "rise", "accent": "<accent>", "ink": "<ink>"}
-add_kinetic_title_tool {"text": "<the next fragment>", "position_seconds": 3.0, "duration_seconds": 1.4, "style": "documentary", "animation": "rise"}
-add_shape_mask_tool {"clip_ids": ["<incoming shot>"], "shape": "ellipse", "x": 0.5, "y": 0.5, "width": 1.6, "height": 1.6, "feather": 0.002, "keyframes": [{"seconds": 0, "grow": -0.8}, {"seconds": 0.4, "grow": 0}]}
-add_motion_block_tool {"block": "logo_build", "position_seconds": 30, "duration_seconds": 4.4, "params": {"name": "<Name>", "mark": "<from the mark sheet>", "colors": ["<ink>", "<accent>"], "palette": "dark", "display_font": "sans"}}
-add_sfx_tool {"recipe": "hit_transient", "at_seconds": 31.2, "gain_db": -8}
-spot_sound_tool {}
-master_audio_tool {"target_lufs": -18}
-review_edit_tool {}
-export_video_tool {}
-review_render_tool {"path": "<render>", "loudness_target_lufs": -18}
-watch_render_tool {"path": "<render>"}
+produce_video_tool {"request": "<the brief, verbatim>", "style": "cinetic-launch-film", "length_seconds": 30, "output": "film.mp4"}
+get_technique_tool {"technique": "scenes-launch-teaser"}
+update_scene_tool {"scene_id": "<data.scene.scene_id>", "code": "<the module rewritten: this product's device, copy and brand>"}
+render_scene_tool {"scene_id": "<id>", "motion_blur": 4}
+auto_sound_design_tool {"genre": "saas_ui", "intensity": "subtle"}
+master_audio_tool {"preset": "social", "iterate": true}
+export_video_tool {"output_path": "film.mp4"}
+review_render_tool {"path": "film.mp4"}
+watch_render_tool {"path": "film.mp4"}
 ```
-
-(`scale_y` takes the same points as `scale_x`; the ellipse mask is an iris opening from the device's spot:
-put `x`/`y` on the device.) Build the drawn techniques in their beats with the calls their files give.
 
 ## Finish checklist
 
