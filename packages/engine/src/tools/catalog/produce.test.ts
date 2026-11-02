@@ -8,6 +8,8 @@ import { readBrief } from "../../brief/brief.js";
 import { projectFps } from "../frame-time.js";
 import { runTool } from "../registry.js";
 import { fakeHost } from "../test-support/fake-host.js";
+import { fakeMotionHost } from "../test-support/fake-motion.js";
+import { fakeSceneHost } from "../test-support/fake-scenes.js";
 import { audioInfo, fixtureDoc, media } from "../test-support/fixture.js";
 
 type Stage = { stage: string; tool: string; outcome: string; summary: string; undo_steps: number };
@@ -103,6 +105,34 @@ describe("produce_video_tool", () => {
     expect([doc.project.width, doc.project.height]).toEqual([1280, 720]);
   });
 
+  it("films a cinetic style as a scene drafted from its worked example, and says to make it the product's", async () => {
+    const doc = fixtureDoc(createProject({ id: "PRODUCESCN" }));
+    const scenes = fakeSceneHost();
+    const host = { ...fakeHost(), motion: { ...fakeMotionHost(), scenes } };
+    const request = "Invent the brand for Kiln (a build cache that makes CI runs finish in seconds) and make a 25-second launch teaser with sound. Style: cinetic.";
+    const result = await runTool({ doc, host }, "produce_video_tool", { request, style: "cinetic-teaser", skip: ["footage", "music", "watch"] });
+    expect(result.data?.status, result.text).toBe("applied");
+    expect(scenes.drafts[0]!.code).toMatch(/^const SECONDS = 25;$/m);
+    expect(scenes.drafts[0]!.params).toMatchObject({ name: "Kiln", app: "Kiln", items: [] });
+    expect(scenes.renders[0]).toMatchObject({ motionBlurSamples: 4 });
+    const data = result.data?.data as { builder: string; scene: { scene_id: string; starter: string }; next_calls: { tool: string }[] };
+    expect(data).toMatchObject({ builder: "render_scene_tool", scene: { starter: "scenes-launch-teaser" } });
+    expect(data.next_calls.slice(0, 3).map((n) => n.tool)).toEqual(["get_technique_tool", "update_scene_tool", "render_scene_tool"]);
+    expect(result.data?.summary).toMatch(/is a draft from the scenes-launch-teaser starter/);
+  });
+
+  it("leaves a muted loop without music, sound design or a mix, and falls back to the motion reel without a scene sandbox", async () => {
+    const request = "A 10-second looping feature animation for Ledgerly, a shared-expenses app; it autoplays muted. Style: cinetic.";
+    const doc = fixtureDoc(createProject({ id: "PRODUCELOP" }));
+    const muted = await runTool({ doc, host: fakeHost() }, "produce_video_tool", { request, style: "cinetic-feature-loop", skip: ["footage", "watch"] });
+    const stages = (muted.data?.data as { stages: Stage[] }).stages;
+    for (const stage of ["music", "sound", "master"]) expect(stages.find((s) => s.stage === stage)?.summary, stage).toBe("the request plays muted");
+    expect(muted.data?.summary).not.toMatch(/auto_sound_design_tool/);
+    const bare = fixtureDoc();
+    const fallback = await runTool({ doc: bare, host: { ...fakeHost(), motion: fakeMotionHost({ scenes: false }) } }, "produce_video_tool", { request, style: "cinetic-feature-loop", replace: true, skip: ["footage", "music", "watch"] });
+    expect((fallback.data?.data as { builder: string }).builder, fallback.text).toBe("build_reel_tool");
+  });
+
   // Each stage is a call to another tool with arguments built here: a renamed argument shows up as a failed stage, not a thrown error.
   it.each(STYLE_RULES.map((r) => r.id))("cuts and finishes %s with arguments its tools accept", async (style) => {
     const doc = fixtureDoc();
@@ -110,7 +140,9 @@ describe("produce_video_tool", () => {
     const result = await runTool({ doc, host: fakeHost() }, "produce_video_tool", args);
     expect(result.data?.status, result.text).toBe("applied");
     const stages = (result.data?.data as { stages: Stage[] }).stages;
-    expect(stages.filter((s) => s.stage === "build" && s.outcome === "applied").length, JSON.stringify(stages)).toBe(1);
+    // One builder; a scene film is created, then placed (the timeline cleared between them, as replace asks).
+    const placed = stages.filter((s) => s.stage === "build" && s.outcome === "applied" && s.tool !== "create_scene_tool" && s.tool !== "produce_video_tool");
+    expect(placed.length, JSON.stringify(stages)).toBe(1);
     // master_audio_tool needs a host that renders the mix; the fake host has none.
     const failed = stages.filter((s) => s.outcome === "failed" && s.stage !== "master");
     expect(failed, JSON.stringify(failed)).toEqual([]);

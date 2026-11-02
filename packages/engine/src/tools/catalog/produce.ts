@@ -29,6 +29,7 @@ import { briefSummary, readBrief, type Brief, type BriefAspect } from "../../bri
 import { inventoryEntry, inventoryFiles } from "../../brief/inventory.js";
 import { readRequest } from "../../director/request.js";
 import { binFacts, fallbackFor, routeRequest, STYLE_RULES, type BuilderPlan, type Route, type SoundGenre } from "../../director/route.js";
+import { starterModule, starterParams, type SceneStarter } from "../../director/scenes.js";
 import { finishGaps } from "../../review/finish.js";
 import { loadStyleFiles } from "../../styles/load.js";
 import type { Problem } from "../../review/render.js";
@@ -36,6 +37,7 @@ import type { ShotSwap } from "../../review/swaps.js";
 import { directTool, type CatalogTool, type ToolCall } from "../define.js";
 import { projectFps } from "../frame-time.js";
 import { applied, refused, type ToolReceipt } from "../receipt.js";
+import { clearTimeline } from "./builders/compose.js";
 // A cycle (the registry lists this tool), safe because runTool is only called while a tool runs (master-loop.ts does the same).
 import { runTool } from "../registry.js";
 import type { ToolImage } from "../types.js";
@@ -223,6 +225,8 @@ function builderArgs(plan: BuilderPlan, ctx: { args: Request; route: Route; seco
       };
     case "build_talking_head_tool":
       return { speaker_file_ids: ctx.speakers, ...(ctx.hook && ctx.hook.split(/\s+/).length <= 3 ? { hook: ctx.hook } : {}), ...common };
+    case "create_scene_tool":
+      throw new Error("a scene is drafted by draftScene, not from builder arguments");
     case "build_product_launch_tool":
       return {
         product: ctx.name,
@@ -288,7 +292,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const aspect: BriefAspect = facts.aspect ?? (facts.size ? nearestAspect(facts.size) : null) ?? saved?.aspect ?? projectAspect;
   const missingFor = (route: Route): string[] => [
     ...(route.fallback ? [`${route.fallback.wanted}: ${route.fallback.why}`] : []),
-    ...(!name && (rule.builder.tool === "build_product_launch_tool" || rule.builder.tool === "build_trailer_tool") ? ["the product or film name"] : []),
+    ...(!name && (rule.builder.tool === "build_product_launch_tool" || rule.builder.tool === "build_trailer_tool" || rule.builder.tool === "create_scene_tool") ? ["the product or film name"] : []),
   ];
   let missing = missingFor(plan);
 
@@ -359,6 +363,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const bpm = args.bpm ?? facts.bpm ?? null;
   if (director.wants("music")) {
     if (music) director.pass("music", `the bin has music (${music})`);
+    else if (facts.muted) director.pass("music", "the request plays muted");
     else {
       const query = args.music_query ?? facts.musicQuery ?? rule.music.query;
       const found = await director.run("music", "search_freesound_music_tool", { query, bpm: bpm ?? rule.music.bpm, energy: rule.music.energy, min_seconds: Math.ceil(seconds), count: 4 });
@@ -376,6 +381,8 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   plan = { ...route(rule.id), why: plan.why, runnersUp: plan.runnersUp };
   missing = missingFor(plan);
   let built: ToolReceipt | null = null;
+  // Set inside draftScene (a closure: typed by assertion so the checker does not narrow it to null).
+  let scene = null as { scene_id: string; starter: SceneStarter } | null;
   // What the report states: the length the builder cut for (a trailer and a launch film have a floor, a match-cut montage a ceiling).
   let cutSeconds = seconds;
   if (director.wants("build")) {
@@ -383,7 +390,30 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     const pictureIds = entries().filter((e) => e.kind === "video" || e.kind === "image").map((e) => e.id);
     const replace = args.replace ?? false;
     const builderInput = { args, route: plan, seconds, name, hook, endCard, url: facts.url, music, bpm, pictures: pictureIds, voices: bin.voices, speakers: bin.speakers, replace };
+    // A scene film (the cinetic styles): the starter's module with the request's copy, checked, then placed full frame.
+    const draftScene = async (starter: SceneStarter): Promise<ToolReceipt | null> => {
+      const file = (await loadStyleFiles()).find((f) => f.id === starter);
+      const module = file ? starterModule(file.markdown, seconds) : null;
+      if (!module) {
+        director.stages.push({ stage: "build", tool: "create_scene_tool", outcome: "failed", summary: `the styles library has no ${starter} scene`, undo_steps: 0 });
+        return null;
+      }
+      const features = (args.features ?? []).map((f) => (typeof f === "string" ? f : f.title));
+      const created = await director.run("build", "create_scene_tool", { code: module.code, params: starterParams(starter, { name, hook, features }), name: clipText(`${name ?? rule.id} film`, 60) });
+      const sceneId = record(created?.data).scene_id;
+      if (typeof sceneId !== "string") return null;
+      scene = { scene_id: sceneId, starter };
+      if (replace && project().clips.length > 0) {
+        call.doc.transaction("Clear the timeline", (tx) => clearTimeline(tx));
+        director.stages.push({ stage: "build", tool: TOOL, outcome: "applied", summary: "cleared the timeline for the scene", undo_steps: 1 });
+      }
+      const placed = await director.run("build", "render_scene_tool", { scene_id: sceneId, position_seconds: 0, placement: "full_frame", motion_blur: 4 });
+      const placedSeconds = record(placed?.data).duration;
+      if (typeof placedSeconds === "number") cutSeconds = placedSeconds;
+      return placed;
+    };
     const build = async (builder: BuilderPlan): Promise<ToolReceipt | null> => {
+      if (builder.tool === "create_scene_tool") return draftScene(builder.starter);
       const input = builderArgs(builder, builderInput);
       const receipt = await director.run("build", builder.tool, input);
       if (receipt && typeof input.duration_seconds === "number") cutSeconds = input.duration_seconds;
@@ -415,6 +445,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   }
   if (director.wants("sound")) {
     if (!hasEdit) director.pass("sound", noEdit);
+    else if (facts.muted) director.pass("sound", "the request plays muted");
     else if (!owed().has("sound")) director.pass("sound", "the cuts already have sound design");
     else {
       const beats = beatsOf(built);
@@ -423,6 +454,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   }
   if (director.wants("master")) {
     if (!hasEdit) director.pass("master", noEdit);
+    else if (facts.muted) director.pass("master", "the request plays muted");
     else if (!owed().has("master")) director.pass("master", "the mix is mastered");
     else await director.run("master", "master_audio_tool", { preset: "social", iterate: true, genre: MASTER_GENRE[rule.sound] });
   }
@@ -468,9 +500,19 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     director.next.push({ tool: TOOL, args: { replace: true, skip: ["brief", "format", "footage", "music"] }, why: "then cut again with the new footage, finish, render and review" });
   }
   // What the finish still owes is the new edit's; with none cut, the old timeline's gaps are not this call's to report.
-  for (const gap of hasEdit ? finishGaps(project()) : []) {
+  // A muted film owes no sound and no mix.
+  const gaps = hasEdit ? finishGaps(project()).filter((g) => !(facts.muted && (g.kind === "sound" || g.kind === "master"))) : [];
+  for (const gap of gaps) {
     findings.push({ from: "finish", severity: "problem", message: gap.message });
     for (const next of gap.next) director.next.push({ ...next, why: gap.kind });
+  }
+  if (scene) {
+    // The draft is the starter's story, not this product's: rewriting it comes before any polish.
+    director.next.unshift(
+      { tool: "get_technique_tool", args: { technique: "zenvi-scenes" }, why: "the method: one story device of this product, its brand, the grid, the acts" },
+      { tool: "update_scene_tool", args: { scene_id: scene.scene_id, code: "<the module rewritten for this product>" }, why: `the draft keeps ${scene.starter}'s own story objects` },
+      { tool: "render_scene_tool", args: { scene_id: scene.scene_id, motion_blur: 4 }, why: "re-render it in place" },
+    );
   }
   if (findings.length > 0 && rendered) {
     director.next.push({ tool: TOOL, args: { skip: ["brief", "format", "footage", "music", "build"], output: rendered.path }, why: "after the fixes: finish what is still owed, render, review and watch again" });
@@ -487,6 +529,11 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
     brief ? briefSummary(brief).split("\n")[0]! : "No brief.",
     ...(brief?.draw ? [`Drawn techniques (${brief.draw.format}, ${brief.draw.energy}): ${brief.draw.picks.map((p) => p.technique).join(", ")}. get_technique_tool each; build the ones the concept carries in the film's own objects, drop the rest with a reason.`] : []),
     `Stages (${undoSteps} undo step${undoSteps === 1 ? "" : "s"}, one per stage): ${director.stages.map((s) => `${s.stage} ${s.outcome === "applied" ? "ok" : s.outcome}${s.tool !== "-" && s.outcome !== "applied" ? ` (${s.tool}: ${s.summary})` : ""}`).join(" · ")}`,
+    ...(scene
+      ? [
+          `Scene ${scene.scene_id} is a draft from the ${scene.starter} starter with this request's name and copy; its story objects are the example's, not this product's. Make it this film: get_technique_tool {"technique": "zenvi-scenes"} (the method) and {"technique": "${scene.starter}"} (the code), then update_scene_tool {"scene_id": "${scene.scene_id}", "code": "<the whole module>"}, render_scene_tool${facts.muted ? "" : ", auto_sound_design_tool (a rerun replaces the cues' sounds)"} and render again. Do not add titles, blocks or 3D on top of it.`,
+        ]
+      : []),
     ...(rendered ? [`Render: ${rendered.path}${rendered.seconds ? ` (${rendered.seconds.toFixed(1)} s)` : ""}.`] : []),
     ...(findings.length > 0
       ? ["Findings, worst first (fix these, then render again and review_render_tool):", ...findings.slice(0, 10).map((f, i) => `${i + 1}. ${f.severity.toUpperCase()}${f.at !== undefined ? ` ${f.at.toFixed(1)}s` : ""} (${f.from}): ${f.message}${f.tools && f.tools.length > 0 ? ` Tools: ${f.tools.join(", ")}` : ""}`)]
@@ -499,6 +546,7 @@ async function produce(call: ToolCall, args: Request, requested: boolean): Promi
   const data = {
     style: rule.id,
     builder: builder?.tool ?? null,
+    ...(scene ? { scene } : {}),
     why: plan.why,
     ...(plan.fallback ? { fallback: plan.fallback } : {}),
     brief,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { matchStyle } from "../brief/auto.js";
 import { readRequest } from "./request.js";
-import { routeRequest, type BinFacts } from "./route.js";
+import { fallbackFor, routeRequest, styleRule, type BinFacts } from "./route.js";
 
 const FOOTAGE: BinFacts = { pictures: 8, speakers: [], voices: [], music: [] };
 
@@ -60,6 +60,22 @@ describe("routeRequest", () => {
   });
 });
 
+describe("cinetic styles", () => {
+  it("are bespoke scenes drafted from the nearest worked example, with the motion reel where scenes cannot run", () => {
+    const starters = ["cinetic-launch-film", "cinetic-teaser", "cinetic-feature-loop", "cinetic-logo-sting", "cinetic-ui-walkthrough"].map((style) => routeRequest({ request: "Style: cinetic.", style, bin: FOOTAGE }).builder);
+    expect(starters).toEqual([
+      { tool: "create_scene_tool", starter: "scenes-launch-teaser" },
+      { tool: "create_scene_tool", starter: "scenes-launch-teaser" },
+      { tool: "create_scene_tool", starter: "scenes-feature-loop" },
+      { tool: "create_scene_tool", starter: "scenes-logo-sting" },
+      { tool: "create_scene_tool", starter: "scenes-feature-loop" },
+    ]);
+    // Nothing the person must give first: no product name or features gate a scene.
+    expect(routeRequest({ request: "A logo sting. Style: cinetic.", bin: FOOTAGE }).fallback).toBeUndefined();
+    expect(fallbackFor(styleRule("cinetic-teaser")!)).toEqual({ tool: "build_reel_tool", style: "ui_promo" });
+  });
+});
+
 describe("readRequest", () => {
   it("reads the bench's brief format", () => {
     const facts = readRequest(
@@ -91,6 +107,18 @@ describe("readRequest", () => {
     expect(readRequest("a 30 second reel from my 5 minutes of drone footage").seconds).toBe(30);
     expect(readRequest("my 5 minutes of drone footage as a 30s reel").seconds).toBe(30);
     expect(readRequest("a 20 minute film").seconds).toBe(1200);
+  });
+
+  it("reads a product named without quotes, and a film that plays muted", () => {
+    // cinetic's four gallery briefs (bench refs cin-*).
+    expect(readRequest("Invent the brand for Kiln (a build cache that makes CI runs finish in seconds) and make a 25-second launch teaser").name).toBe("Kiln");
+    expect(readRequest("We're launching Halden, a calm note-taking app. Design the logo").name).toBe("Halden");
+    expect(readRequest("Our reading-tracker app Quire is shipping Streaks next week.").name).toBe("Quire");
+    const ledgerly = readRequest("A looping feature animation for the landing page of Ledgerly, a shared-expenses app. It has to work without sound (it autoplays muted).");
+    expect(ledgerly).toMatchObject({ name: "Ledgerly", muted: true });
+    expect(readRequest("A reel for Instagram Reels, 15 s").name).toBeNull();
+    expect(readRequest("A launching app Instagram clone").name).toBeNull();
+    expect(readRequest("a 20 s launch teaser with sound").muted).toBe(false);
   });
 
   it("reads minutes, vertical frames and sizes", () => {

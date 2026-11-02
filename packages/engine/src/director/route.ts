@@ -13,6 +13,7 @@
 
 import { AUTO_DEFAULT_STYLE, styleMatch } from "../brief/auto.js";
 import type { InventoryEntry } from "../brief/inventory.js";
+import type { SceneStarter } from "./scenes.js";
 
 /** The builders the router picks from, with the arguments that make them this style. */
 export type BuilderPlan =
@@ -21,7 +22,9 @@ export type BuilderPlan =
   | { tool: "build_trailer_tool" }
   | { tool: "build_explainer_tool"; pace: "documentary" | "essay" }
   | { tool: "build_talking_head_tool" }
-  | { tool: "build_product_launch_tool" };
+  | { tool: "build_product_launch_tool" }
+  /** A film written as a scene, drafted from a starter of the styles library (director/scenes.ts). */
+  | { tool: "create_scene_tool"; starter: SceneStarter };
 
 export type SoundGenre = "hype" | "flash_montage" | "saas_ui" | "talking_head" | "match_cut" | "product_3d" | "video_essay" | "documentary" | "editorial" | "multiplicity";
 
@@ -165,19 +168,20 @@ export const STYLE_RULES: readonly StyleRule[] = [
     coherent: true,
     beats: LAUNCH_BEATS,
   },
-  // The cinetic styles (zenvi-styles styles/cinetic-*.md): hard cuts on the grid, the drawn techniques do the transitions.
+  // The cinetic styles (zenvi-styles styles/cinetic-*.md) are bespoke scenes (families/zenvi-scenes.md): the
+  // builders' own looks (build_product_launch_tool's chrome 3D titles) broke the house style. Cuts are the scene's.
   ...(
     [
-      ["cinetic-launch-film", 30, 100, "medium", "subtle"],
-      ["cinetic-teaser", 20, 120, "high", "normal"],
-      ["cinetic-feature-loop", 10, 100, "medium", "subtle"],
-      ["cinetic-logo-sting", 6, 120, "medium", "subtle"],
-      ["cinetic-ui-walkthrough", 45, 90, "low", "subtle"],
+      ["cinetic-launch-film", 30, 100, "medium", "subtle", "scenes-launch-teaser"],
+      ["cinetic-teaser", 20, 120, "high", "normal", "scenes-launch-teaser"],
+      ["cinetic-feature-loop", 10, 100, "medium", "subtle", "scenes-feature-loop"],
+      ["cinetic-logo-sting", 6, 120, "medium", "subtle", "scenes-logo-sting"],
+      ["cinetic-ui-walkthrough", 45, 90, "low", "subtle", "scenes-feature-loop"],
     ] as const
   ).map(
-    ([id, seconds, bpm, energy, intensity]): StyleRule => ({
+    ([id, seconds, bpm, energy, intensity, starter]): StyleRule => ({
       id,
-      builder: { tool: "build_product_launch_tool" },
+      builder: { tool: "create_scene_tool", starter },
       sound: "saas_ui",
       intensity,
       transitions: "none",
@@ -344,6 +348,9 @@ export function fallbackFor(rule: StyleRule): BuilderPlan {
   switch (rule.builder.tool) {
     case "build_product_launch_tool":
       return { tool: "build_reel_tool", style: rule.id === "3d-product-ad" ? "product_callout" : "ui_promo" };
+    case "create_scene_tool":
+      // Where scenes cannot run (no sandboxed Chrome): the UI promo reel, the nearest look without chrome titles.
+      return { tool: "build_reel_tool", style: "ui_promo" };
     case "build_explainer_tool":
     case "build_trailer_tool":
       return { tool: "build_reel_tool", style: "cinematic" };

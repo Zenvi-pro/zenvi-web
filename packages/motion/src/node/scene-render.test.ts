@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { SCENE_STARTERS, starterModule } from "@zenvi/engine";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { findChrome } from "./chrome.js";
 import { draftScene, renderDrift, renderScene, sceneHtml, SCENE_CSP, wrapScene } from "./scene-render.js";
@@ -52,6 +53,19 @@ describe("scenes in the sandbox", () => {
     expect(r.cells.length).toBeGreaterThan(6);
     expect([...r.sheet!.subarray(0, 2)]).toEqual([0xff, 0xd8]);
     expect(existsSync(path.join(dir, "sheet.jpg"))).toBe(true);
+  });
+
+  // The zenvi-scenes worked examples (zenvi-styles techniques/scenes-*.md): produce_video_tool drafts every cinetic film from one.
+  it.each(SCENE_STARTERS)("checks the worked scene %s at 16:9 and 9:16 with no problems", async (id) => {
+    if (!chrome) return;
+    const markdown = await readFile(new URL(`../../../../plugins/zenvi/skills/zenvi-styles/techniques/${id}.md`, import.meta.url), "utf8");
+    for (const seconds of [12, 30]) {
+      const { code } = starterModule(markdown, seconds)!;
+      for (const [width, height] of [[640, 360], [360, 640]] as const) {
+        const r = await draftScene(job(code, { width, height, fps: 30, frameMs: 2000 }));
+        expect(codes(r), `${id} ${seconds}s ${width}x${height}: ${r.problems.map((p) => p.message).join("; ")}`).toEqual([]);
+      }
+    }
   });
 
   it("makes the module again for every draw, so state a scene keeps never outlives a frame", async (t) => {

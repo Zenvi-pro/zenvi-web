@@ -70,7 +70,7 @@ const getInput = z.strictObject({
 });
 
 const techniqueInput = z.strictObject({
-  technique: z.string().min(1).max(80).describe("Technique id (a style's Borrow line, the brief's techniques), or a family (cinematic, kinetic) or method-motif."),
+  technique: z.string().min(1).max(80).describe("Technique id (a style's Borrow line, the brief's techniques), or a family (cinematic, kinetic, zenvi-scenes) or method-motif."),
 });
 
 export const styleTools: CatalogTool[] = [
