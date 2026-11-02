@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assistantEngineTools, unavailableAssistantTools } from "./registry.js";
+import { assistantEngineTools, getTool, unavailableAssistantTools } from "./registry.js";
 import { CONTRACT_TOOL_NAMES } from "./schemas.gen.js";
 import { fakeHost } from "./test-support/fake-host.js";
 
@@ -11,7 +11,13 @@ describe("unavailableAssistantTools", () => {
     for (const name of [...COMFYUI, "prepare_recording_tool", "open_project_tool"]) expect(names).toContain(name);
     // What the web editor runs stays offered.
     for (const name of ["split_clip_tool", "import_stock_media_tool", "export_video_tool", "add_clip_to_timeline_tool"]) expect(names).not.toContain(name);
-    expect(names.every((n) => (CONTRACT_TOOL_NAMES as readonly string[]).includes(n))).toBe(true);
+  });
+
+  it("names the desktop tools newer than the contract, which the engine runs none of", () => {
+    const names = unavailableAssistantTools("editor");
+    // media-index-v2 tools the backend offers an editor that says so.
+    for (const name of ["get_project_overview_tool", "search_footage_tool", "storyboard_tool", "view_frames_tool"]) expect(names).toContain(name);
+    expect(names.filter((n) => !(CONTRACT_TOOL_NAMES as readonly string[]).includes(n)).every((n) => getTool(n) === undefined)).toBe(true);
   });
 
   it("adds the tools this host cannot run (a browser without video export)", () => {
