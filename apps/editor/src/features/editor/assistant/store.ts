@@ -2,7 +2,7 @@
  * Assistant conversation state per open project, and the send/stop actions.
  * Lives outside React so a turn keeps running when the panel is hidden.
  */
-import { unavailableAssistantTools } from "@zenvi/engine/tools";
+import { assistantEngineTools, unavailableAssistantTools } from "@zenvi/engine/tools";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { getAccessToken } from "@/lib/auth";
 import { fetchModelCatalog, type ModelInfo } from "@/lib/backend";
@@ -199,6 +199,7 @@ export async function send(session: EditorSession, text: string): Promise<void> 
     authToken: token,
     agentMode: state.mode,
     unavailableTools: unavailableAssistantTools("editor", host),
+    engineTools: assistantEngineTools("editor", host),
     executeTool: (name, args, _callId, signal) => runAssistantTool(session, host, name, args, signal),
     onEvent,
     signal: abort.signal,

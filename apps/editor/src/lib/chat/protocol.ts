@@ -31,11 +31,23 @@ export interface UserMessageData {
   /** Which editor is talking (the backend ignores unknown fields today). */
   client?: "web";
   /**
+   * The editor build's tool generation, as the desktop sends it. Without it
+   * the backend takes the turn for a shipped desktop and gives the legacy
+   * prompt and tools: no tool search, no engine tools.
+   */
+  editor_generation?: "media-index-v2";
+  /**
    * Editor tools this editor cannot run (engine `unavailableAssistantTools`):
    * desktop-only ones such as ComfyUI, unported ones, and ones the browser
    * lacks. The backend leaves them out of the agent's tools.
    */
   unavailable_tools?: string[];
+  /**
+   * The engine tools this editor runs (engine `assistantEngineTools`): the
+   * styles, brief, sound design and motion tools. The backend offers no
+   * engine tool a client did not list.
+   */
+  engine_tools?: string[];
 }
 
 const CONTEXT_BLOCK_RE = /\[(?:Editor snapshot|Selected timeline clip context)\][\s\S]*?\[\/(?:Editor snapshot|Selected timeline clip context)\]\s*/g;
