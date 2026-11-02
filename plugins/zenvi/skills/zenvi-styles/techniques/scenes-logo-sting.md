@@ -23,7 +23,7 @@ name follows out of it; the lockup holds 3.5 s, drifting. `produce_video_tool` d
 
 ## Build it in Zenvi
 
-1. A designed mark beats the monogram: draw the product's own primitive (a letter's stem and a dot, a
+1. A designed mark beats the monogram (this monogram as drafted judged 5.6/10 against cinetic's designed mark): draw the product's own primitive (a letter's stem and a dot, a
    fold, a flame) with `api.path(..., {draw})` and keep the three beats.
 2. Params `name`, `accent`, `ink`, `paper`, `tagline`.
 3. Transparent version for editors: `update_scene_tool` params `{"background": false}`, then
@@ -37,7 +37,8 @@ name follows out of it; the lockup holds 3.5 s, drifting. `produce_video_tool` d
 ## Sound
 
 A soft whoosh under the drawing line, one tuned impact on the fill, a reveal under the name; nothing on
-top of the hold.
+top of the hold: `auto_sound_design_tool {"genre": "saas_ui", "intensity": "subtle"}` (a calm brand never
+gets the editorial palette's clicks).
 
 ## Common mistakes
 
@@ -93,7 +94,7 @@ export function draw(ctx: CanvasRenderingContext2D, t: number, api) {
   api.camera({ zoom: api.tween(0, duration, 1.04, 1, "smooth") });
   api.layer(1, () => {
     // 1. A line draws itself into the square, already under way on frame 0.
-    const trace = api.prog(-8, api.cue("hit") + 8, "in-out");
+    const trace = api.prog(-8, api.cue("hit") + 8, api.ease("snap"));
     // The hit gives the mark one firm pop (scale about its centre), the only bounce of the film.
     const pop = 1 + 0.07 * Math.sin(Math.PI * api.prog("hit", 16, "linear"));
     ctx.save();
@@ -110,9 +111,9 @@ export function draw(ctx: CanvasRenderingContext2D, t: number, api) {
     }
     ctx.restore();
     // 3. The name comes out from behind the mark, then holds and drifts with the camera.
-    if (slide > 0) {
-      // It travels a gap's width into its place, never past where the lockup ends.
-      api.text(name, { x: home + s / 2 + gap - (1 - slide) * gap, y: cy, size: nameSize, weight: 700, color: ink, opacity: slide, clip: { x: cx + s / 2 + 4, y: 0, w: W, h: H }, id: "name" });
+    if (t >= api.cue("name")) {
+      // Letter by letter out of the mark's edge, each rising into place; never past where the lockup ends.
+      api.text(name, { x: home + s / 2 + gap - (1 - slide) * gap * 0.5, y: cy, size: nameSize, weight: 700, color: ink, clip: { x: cx + s / 2 + 4, y: 0, w: W, h: H }, id: "name", reveal: { at: "name", per: "char", stagger: 3, dur: 22, rise: nameSize * 0.35 } });
     }
     if (String(p.tagline)) api.text(String(p.tagline), { x: W / 2, y: cy + s * 0.95, size: Math.max(32, s * 0.2), weight: 500, align: "center", color: ink, opacity: 0.65, reveal: { at: "tag", per: "word", stagger: 5, dur: 20 } });
   });
