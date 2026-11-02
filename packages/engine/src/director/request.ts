@@ -88,7 +88,7 @@ function secondsOf(request: string): number | null {
 const NOT_NAMES = new Set([
   ...["Instagram", "TikTok", "YouTube", "Reels", "Shorts", "LinkedIn", "Twitter", "Facebook", "Pinterest", "Snapchat", "Threads", "Mac", "Windows", "iOS", "Android", "Zenvi"],
   ...["The", "This", "That", "Our", "Its", "Their", "Your", "Next", "Today", "Tomorrow", "Soon", "Now", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-  ...["January", "February", "March", "April", "June", "July", "August", "September", "October", "November", "December", "Spring", "Summer", "Fall", "Autumn", "Winter"],
+  ...["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December", "Spring", "Summer", "Fall", "Autumn", "Winter"],
 ]);
 const INTRODUCED = /\b(?:launching|launch of|brand for|app|called|named)\s+([A-Z][A-Za-z0-9]{2,})\b/g;
 const APPOSITIVE = /\b([A-Z][A-Za-z0-9]{2,})(?:,| \() an? (?:[\w-]+ ){0,3}(?:app|tool|product|platform|service|startup|company|cache|library|api)\b/g;

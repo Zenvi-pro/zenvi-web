@@ -56,8 +56,8 @@ describe("scenes in the sandbox", () => {
   });
 
   // The zenvi-scenes worked examples (zenvi-styles techniques/scenes-*.md): produce_video_tool drafts every cinetic film from one.
-  it.each(SCENE_STARTERS)("checks the worked scene %s at 16:9 and 9:16 with no problems", async (id) => {
-    if (!chrome) return;
+  it.for(SCENE_STARTERS)("checks the worked scene %s at 16:9 and 9:16 with no problems", async (id, t) => {
+    if (!chrome) t.skip();
     const markdown = await readFile(new URL(`../../../../plugins/zenvi/skills/zenvi-styles/techniques/${id}.md`, import.meta.url), "utf8");
     for (const seconds of [12, 30]) {
       const { code } = starterModule(markdown, seconds)!;
