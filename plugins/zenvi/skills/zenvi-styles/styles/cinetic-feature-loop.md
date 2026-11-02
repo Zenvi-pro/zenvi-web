@@ -3,7 +3,7 @@ id: cinetic-feature-loop
 kind: style
 summary: "For a landing-page hero or muted social loop: the product acting from frame 0, a cycle with no visible restart."
 categories: [cinetic-feature-loop]
-tools: [produce_video_tool, save_brief_tool, get_brief_tool, get_technique_tool, set_project_setting_tool, add_clip_to_timeline_tool, set_keyframes_tool, add_motion_block_tool, add_kinetic_title_tool, review_edit_tool, export_video_tool, review_render_tool, save_frame_image_tool]
+tools: [produce_video_tool, get_technique_tool, create_scene_tool, update_scene_tool, render_scene_tool, scene_cues_tool, auto_sound_design_tool, master_audio_tool, export_video_tool, review_render_tool, watch_render_tool]
 pace: calm
 mood: [calm, alive, precise, quiet]
 aspect: ["16:9", "1:1", "4:5", "9:16"]
@@ -66,22 +66,23 @@ None.
 
 ## Tool sequence
 
+The film is one scene (family `zenvi-scenes`, `get_technique_tool {"technique": "zenvi-scenes"}`):
+`produce_video_tool` drafts it from `scenes-feature-loop` with the request's name; rewrite it for this product.
+No `build_product_launch_tool`, titles, blocks or 3D on top of it.
+
 ```json
-produce_video_tool {"request": "<the brief>", "style": "cinetic-feature-loop", "length_seconds": 9.6, "skip": ["music", "sound"]}
-get_brief_tool {}
-get_technique_tool {"technique": "<each drawn pick>"}
-set_project_setting_tool {"fps": 60}
-add_clip_to_timeline_tool {"file_id": "<product recording, the cycle>", "position_seconds": 0, "start_seconds": 0, "end_seconds": 9.6, "track": "1"}
-set_keyframes_tool {"timeline_clip_id": "<it>", "property": "location_y", "points": [{"seconds": 0, "value": 0}, {"seconds": 4.8, "value": -0.006, "ease": "ease_in_out_sine"}, {"seconds": 9.6, "value": 0, "ease": "ease_in_out_sine"}]}
-add_motion_block_tool {"block": "notification_stack", "position_seconds": 0, "duration_seconds": 9.6, "params": {"display_font": "sans", "exit": false}}
-review_edit_tool {}
-export_video_tool {}
-review_render_tool {"path": "<render>"}
-save_frame_image_tool {"time": 0}
+produce_video_tool {"request": "<the brief, verbatim>", "style": "cinetic-feature-loop", "length_seconds": 10, "output": "film.mp4"}
+get_technique_tool {"technique": "scenes-feature-loop"}
+update_scene_tool {"scene_id": "<data.scene.scene_id>", "code": "<the module rewritten: this product's device, copy and brand>"}
+render_scene_tool {"scene_id": "<id>", "motion_blur": 4}
+auto_sound_design_tool {"genre": "saas_ui", "intensity": "subtle"}
+master_audio_tool {"preset": "social", "iterate": true}
+export_video_tool {"output_path": "film.mp4"}
+review_render_tool {"path": "film.mp4"}
+watch_render_tool {"path": "film.mp4"}
 ```
 
-Check the seam: the last frame and frame 0 side by side in `review_edit_tool {"start": 9.4, "end": 9.6}` and
-`{"start": 0, "end": 0.2}`; the step across the seam is no bigger than the median step at the ends.
+Muted on a page ("autoplays muted", "without sound"): `produce_video_tool` adds no music, sound or mix.
 
 ## Finish checklist
 

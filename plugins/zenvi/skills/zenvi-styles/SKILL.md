@@ -90,7 +90,7 @@ review can see the technique on the timeline.
 | [video-essay-explainer](styles/video-essay-explainer.md) | fast | 9:16 16:9 | For an argued explainer or micro-documentary over B-roll: claim, proof run cut on the words, one slam card at the turn. |
 | [wedding-event-film](styles/wedding-event-film.md) | calm | 16:9 2.39:1 9:16 4:5 | For a wedding, party or event highlight: phrase-cut to one song, real sound at the moments, soft grade, a held payoff. |
 
-### Techniques (284)
+### Techniques (287)
 
 | technique | pace | tools | use when |
 | --- | --- | --- | --- |
@@ -191,6 +191,9 @@ review can see the technique on the timeline.
 | [prompt-bar-typing-hero](techniques/prompt-bar-typing-hero.md) | medium | add_motion_block_tool list_motion_blocks_tool add_sfx_tool automate_volume_tool apply_motion_transition_tool detect_beats_tool | For an AI or app hook: a prompt bar types the request with keyboard foley, the cursor clicks send, cut on the click. |
 | [reset-inside-the-vocal-rest](techniques/reset-inside-the-vocal-rest.md) | calm | add_marker_tool add_clip_to_timeline_tool set_clip_properties_tool fade_clip_tool split_clip_tool kinetic_captions_tool analyze_timeline_audio_tool automate_volume_tool set_audio_gain_tool master_audio_tool | For lyric videos and sung edits: change the picture or clear the text in the breath between lines, not on the beat. |
 | [scale-jump-cut-on-sub-bass-hit](techniques/scale-jump-cut-on-sub-bass-hit.md) | fast | add_sfx_tool automate_volume_tool set_keyframes_tool color_grade_clip_tool search_clip_scenes_tool add_clip_to_timeline_tool | For a story beat in a trailer or montage: a quiet wide, a riser, then a hard cut to an extreme close-up on a sub hit. |
+| [scenes-feature-loop](techniques/scenes-feature-loop.md) | calm | produce_video_tool create_scene_tool update_scene_tool render_scene_tool scene_cues_tool auto_sound_design_tool master_audio_tool review_render_tool watch_render_tool | A worked feature loop as one scene: the feature acts on the product's own UI and returns to frame 0, muted-first. |
+| [scenes-launch-teaser](techniques/scenes-launch-teaser.md) | fast | produce_video_tool create_scene_tool update_scene_tool render_scene_tool scene_cues_tool auto_sound_design_tool master_audio_tool review_render_tool watch_render_tool | A worked launch teaser as one scene: the problem piles up, one row becomes the mark, proof in the product, lockup. |
+| [scenes-logo-sting](techniques/scenes-logo-sting.md) | medium | produce_video_tool create_scene_tool update_scene_tool render_scene_tool scene_cues_tool auto_sound_design_tool master_audio_tool review_render_tool watch_render_tool | A logo sting as one scene: a line draws itself into the mark, one tuned hit fills it, the name slides out and holds. |
 | [screen-capture-zoom-onto-the-number](techniques/screen-capture-zoom-onto-the-number.md) | fast | set_keyframes_tool add_clip_to_timeline_tool add_motion_block_tool add_sfx_tool | When proof is a metric on a screen: push in onto the number in 0.3-0.4 s with a swoosh, hold it 1 s. (needs screen-recording-zoom-follow) |
 | [sentence-split-rapid-hook](techniques/sentence-split-rapid-hook.md) | frantic | add_clip_to_timeline_tool trim_clip_tool kinetic_captions_tool add_sfx_tool unify_grade_tool get_transcript_tool | When the first 2 s must grab: one hook sentence split over 5-6 takes, a word or phrase per 10-15 frame shot. |
 | [shot-assemble-flyin](techniques/shot-assemble-flyin.md) | medium | add_clip_to_timeline_tool apply_clip_preset_tool set_keyframes_tool add_kinetic_title_tool apply_fx_tool add_motion_block_tool add_sfx_tool | When a page should build itself: blank skeleton pieces fly in and snap, then every text letter tumbles in. (needs component-assemble-flyin) |
@@ -387,6 +390,7 @@ review can see the technique on the timeline.
 
 - [cinematic](families/cinematic.md)
 - [kinetic](families/kinetic.md)
+- [zenvi-scenes](families/zenvi-scenes.md)
 
 ### Methods
 

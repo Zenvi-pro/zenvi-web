@@ -3,7 +3,7 @@ id: cinetic-logo-sting
 kind: style
 summary: "For a 3-8 s logo sting: the mark builds from its own primitives, one tuned hit on contact, a lockup held and building."
 categories: [cinetic-logo-sting]
-tools: [produce_video_tool, save_brief_tool, get_brief_tool, get_technique_tool, set_project_setting_tool, add_motion_block_tool, add_kinetic_title_tool, set_keyframes_tool, add_sfx_tool, master_audio_tool, review_edit_tool, export_video_tool, review_render_tool, save_frame_image_tool]
+tools: [produce_video_tool, get_technique_tool, create_scene_tool, update_scene_tool, render_scene_tool, scene_cues_tool, auto_sound_design_tool, master_audio_tool, export_video_tool, review_render_tool, watch_render_tool]
 pace: medium
 mood: [confident, crafted, clean, resolved]
 aspect: ["16:9", "1:1", "9:16"]
@@ -68,24 +68,24 @@ None.
 
 ## Tool sequence
 
+The film is one scene (family `zenvi-scenes`, `get_technique_tool {"technique": "zenvi-scenes"}`):
+`produce_video_tool` drafts it from `scenes-logo-sting` with the request's name; rewrite it for this product.
+No `build_product_launch_tool`, titles, blocks or 3D on top of it.
+
 ```json
-produce_video_tool {"request": "<the brief>", "style": "cinetic-logo-sting", "length_seconds": 6, "skip": ["music"]}
-get_brief_tool {}
-get_technique_tool {"technique": "<each drawn pick>"}
-set_project_setting_tool {"fps": 60}
-add_motion_block_tool {"block": "logo_build", "position_seconds": 0, "duration_seconds": 6, "params": {"name": "<Name>", "tagline": "", "mark": "<petals|pinwheel|stack|kit, from the mark sheet>", "colors": ["<ink>", "<accent>"], "display_font": "sans", "exit": false}}
-set_keyframes_tool {"timeline_clip_id": "<the block>", "property": "scale_x", "points": [{"seconds": 3.5, "value": 1.0}, {"seconds": 6, "value": 1.12}]}
-add_sfx_tool {"recipe": "hit_transient", "at_seconds": 2.0, "gain_db": -6}
-add_sfx_tool {"recipe": "tail_bloom", "at_seconds": 2.0, "gain_db": -16}
-master_audio_tool {"target_lufs": -16}
-review_edit_tool {}
-export_video_tool {}
-review_render_tool {"path": "<render>", "loudness_target_lufs": -16}
-save_frame_image_tool {"time": 5.9}
+produce_video_tool {"request": "<the brief, verbatim>", "style": "cinetic-logo-sting", "length_seconds": 6, "output": "film.mp4"}
+get_technique_tool {"technique": "scenes-logo-sting"}
+update_scene_tool {"scene_id": "<data.scene.scene_id>", "code": "<the module rewritten: this product's device, copy and brand>"}
+render_scene_tool {"scene_id": "<id>", "motion_blur": 4}
+auto_sound_design_tool {"genre": "saas_ui", "intensity": "subtle"}
+master_audio_tool {"preset": "social", "iterate": true}
+export_video_tool {"output_path": "film.mp4"}
+review_render_tool {"path": "film.mp4"}
+watch_render_tool {"path": "film.mp4"}
 ```
 
-With the person's own logo: `logo_reveal_end` with `params.logo` = their file, `glow: false`. An alpha
-version for editors: `export_video_tool` with a ProRes 4444 preset over no background.
+The transparent version: `update_scene_tool` params `{"background": false}`, then `render_scene_tool`
+`placement: "over_video"` (ProRes 4444 with alpha).
 
 ## Finish checklist
 
