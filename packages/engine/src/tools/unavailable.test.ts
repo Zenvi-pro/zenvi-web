@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assistantEngineTools, getTool, unavailableAssistantTools } from "./registry.js";
+import { assistantEngineTools, getTool, listTools, unavailableAssistantTools } from "./registry.js";
 import { CONTRACT_TOOL_NAMES } from "./schemas.gen.js";
 import { fakeHost } from "./test-support/fake-host.js";
 
@@ -33,6 +33,17 @@ describe("assistantEngineTools", () => {
     // Not the desktop's contract tools (those are the backend's frontend tools), nor what the editor refuses.
     expect(names.some((n) => (CONTRACT_TOOL_NAMES as readonly string[]).includes(n))).toBe(false);
     expect(names).not.toContain("review_render_tool");
+  });
+
+  it("names only tools the editor's executor runs, none of them also withheld", () => {
+    const host = fakeHost({ without: ["frames"] });
+    const names = assistantEngineTools("editor", host);
+    // runTool's surface check (runAssistantTool passes surface "editor"): an advertised tool must not answer "not available".
+    const runnable = new Set(listTools({ surface: "editor", host }).map((tool) => tool.name));
+    expect(names.filter((n) => !runnable.has(n))).toEqual([]);
+    const withheld = new Set(unavailableAssistantTools("editor", host));
+    expect(names.filter((n) => withheld.has(n))).toEqual([]);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it("leaves out the tools this host cannot run (a browser without frame rendering)", () => {
