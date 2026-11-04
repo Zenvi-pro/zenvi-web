@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assistantArguments } from "./assistant-arguments.js";
 import { runTool } from "./registry.js";
 import { fakeHost } from "./test-support/fake-host.js";
-import { fixtureDoc, IDS } from "./test-support/fixture.js";
+import { fixtureDoc, fixtureProject, IDS } from "./test-support/fixture.js";
 
 describe("assistantArguments", () => {
   it("reads inspect_timeline_tool's snake_case names as the contract's, silently", () => {
@@ -58,6 +58,26 @@ describe("the Assistant's calls through runTool (live zenvi.pro, 2026-10-31)", (
     expect(r.ok, r.text).toBe(true);
     expect(r.images).toHaveLength(4);
     expect(r.text).toContain("No range given: frames spread over the whole timeline.");
+    // Over the clips (0–19 s, frames 0–570), not the project's 300 s duration, where every frame is empty.
+    const frames = (r.data as { data: { renderedFrames: number[] } }).data.renderedFrames;
+    for (const f of frames) expect(f < 570, `frame ${f}`).toBe(true);
+  });
+
+  it("inspect_timeline_tool with a clip alone looks only inside that clip", async () => {
+    // clipB sits at 10–15 s; at 30 fps that is frames 300–450.
+    const r = await runTool({ doc: fixtureDoc(), host: fakeHost() }, "inspect_timeline_tool", { timeline_clip_id: IDS.clipB, max_frames: 3 });
+    expect(r.ok, r.text).toBe(true);
+    const frames = (r.data as { data: { renderedFrames: number[] } }).data.renderedFrames;
+    expect(frames).toHaveLength(3);
+    for (const f of frames) expect(f >= 300 && f < 450, `frame ${f}`).toBe(true);
+  });
+
+  it("inspect_timeline_tool with no range refuses a timeline with no clips (its 300 s duration is all black)", async () => {
+    const doc = fixtureDoc({ ...fixtureProject(), clips: [] });
+    const r = await runTool({ doc, host: fakeHost() }, "inspect_timeline_tool", {});
+    expect(r.ok, r.text).toBe(false);
+    expect(r.text).toContain("Error: Timeline is empty");
+    expect(doc.undoLabels).toHaveLength(0);
   });
 
   it("add_captions_tool takes the desktop's default look and whole_project", async () => {
