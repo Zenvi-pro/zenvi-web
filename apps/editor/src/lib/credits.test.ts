@@ -20,12 +20,20 @@ describe("credit top-ups (zenvi-core#272)", () => {
     expect(await buyCredits(10)).toMatchObject({ mode: "card" });
     await buyCredits(15, true);
     expect(invoke.mock.calls[0]).toEqual(["buy-credits", { body: { pack: 10 } }]);
+    await buyCredits(15, true, "a1b2c3d4e5");
     expect(invoke.mock.calls[1]).toEqual(["buy-credits", { body: { pack: 15, confirm: true } }]);
+    expect(invoke.mock.calls[2]).toEqual(["buy-credits", { body: { pack: 15, confirm: true, attempt: "a1b2c3d4e5" } }]);
   });
 
   it("returns the error instead of throwing", async () => {
     invoke.mockResolvedValue({ data: null, error: new Error("Edge Function returned a non-2xx status code") });
     expect((await buyCredits(5)).error).toBeTruthy();
+  });
+
+  it("reads the function's own words from a non-2xx reply", async () => {
+    const error = Object.assign(new Error("Edge Function returned a non-2xx status code"), { context: new Response(JSON.stringify({ error: "Your card was declined." }), { status: 500 }) });
+    invoke.mockResolvedValue({ data: null, error });
+    expect((await buyCredits(5, true)).error).toBe("Your card was declined.");
   });
 
   it("opens only a Stripe Checkout URL", () => {

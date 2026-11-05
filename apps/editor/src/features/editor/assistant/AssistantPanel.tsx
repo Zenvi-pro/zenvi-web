@@ -41,7 +41,7 @@ function outOfCredits(message: ChatMessage): boolean {
   return OUT_OF_CREDITS.test(message.error ?? "") || message.tools.some((t) => t.status === "error" && OUT_OF_CREDITS.test(t.detail ?? ""));
 }
 
-function Message({ message, last }: { message: ChatMessage; last?: boolean }) {
+function Message({ message, topUp }: { message: ChatMessage; topUp?: boolean }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
@@ -72,7 +72,7 @@ function Message({ message, last }: { message: ChatMessage; last?: boolean }) {
           </span>
         ) : null}
         {message.error ? <p className="rounded-md bg-danger-soft px-2.5 py-1.5 text-xs text-danger">{message.error}</p> : null}
-        {last && !message.streaming && outOfCredits(message) ? <TopUpCard /> : null}
+        {topUp ? <TopUpCard /> : null}
       </div>
     </div>
   );
@@ -84,6 +84,9 @@ export default function AssistantPanel() {
   const status = useAuth((s) => s.status);
   const store = assistantStore(session);
   const messages = useStore(store, (s) => s.messages);
+  // The card sits under the latest assistant reply, if it was refused for credits (a note after it does not move it).
+  const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
+  const topUpId = lastReply && !lastReply.streaming && outOfCredits(lastReply) ? lastReply.id : null;
   const running = useStore(store, (s) => s.running);
   const models = useStore(store, (s) => s.models);
   const modelId = useStore(store, (s) => s.modelId);
@@ -192,7 +195,7 @@ export default function AssistantPanel() {
             </div>
           </div>
         ) : (
-          messages.map((m, i) => <Message key={m.id} message={m} last={i === messages.length - 1} />)
+          messages.map((m) => <Message key={m.id} message={m} topUp={m.id === topUpId} />)
         )}
       </div>
 

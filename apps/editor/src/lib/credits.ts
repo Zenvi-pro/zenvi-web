@@ -62,12 +62,16 @@ export interface TopUp {
 }
 
 /** A $5/$10/$15 top-up (zenvi-pro buy-credits, zenvi-core#272): a quote, or with confirm the charge / Checkout URL. */
-export async function buyCredits(pack: number, confirm = false): Promise<TopUp> {
+export async function buyCredits(pack: number, confirm = false, attempt?: string): Promise<TopUp> {
   const supabase = getSupabase();
   if (!supabase) return { error: "Sign in to buy credits." };
-  const { data, error } = await supabase.functions.invoke("buy-credits", { body: confirm ? { pack, confirm: true } : { pack } });
-  if (error || !data || data.error) return { error: data?.error ?? "Could not start the top-up. Try again, or buy at https://zenvi.pro/topup." };
-  return data as TopUp;
+  const body = confirm ? { pack, confirm: true, ...(attempt ? { attempt } : {}) } : { pack };
+  const { data, error } = await supabase.functions.invoke("buy-credits", { body });
+  // A non-2xx reply puts the function's JSON on error.context, not data.
+  const context = (error as { context?: unknown } | null)?.context;
+  const reply = data ?? (context instanceof Response ? await context.json().catch(() => null) : null);
+  if (error || !reply || reply.error) return { error: reply?.error ?? "Could not start the top-up. Try again, or buy at https://zenvi.pro/topup." };
+  return reply as TopUp;
 }
 
 /** The Checkout URL to open, only when it is Stripe's. */
