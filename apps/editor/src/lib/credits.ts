@@ -58,6 +58,8 @@ export interface TopUp {
   status?: "paid" | "checkout";
   url?: string;
   balance?: number;
+  /** This pack was charged moments ago; no second charge was made. */
+  already?: boolean;
   error?: string;
 }
 

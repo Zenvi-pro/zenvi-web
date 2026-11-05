@@ -1,49 +1,73 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buyCredits, stripeCheckoutUrl, type TopUp } from "@/lib/credits";
 import { Button } from "@/ui/Button";
 import { cn } from "@/ui/cn";
 
-// One payment at a time across remounts: a card that unmounts mid-charge must not let a new one charge again.
-// The attempt id is the charge's idempotency key, so a retry after an unknown outcome replays it.
-const pending: { attempt: string; run: Promise<TopUp> | null } = { attempt: crypto.randomUUID(), run: null };
+type View = { busy?: boolean; done?: string; error?: string; url?: string };
+
+// Kept outside the card so a card that unmounts mid-charge hands its charge to the next one:
+// the attempt id (the charge's idempotency key) and its pack survive until the charge settles,
+// and a result nobody saw is shown by the next card instead of offering Pay again.
+const pending: { attempt: string; pack: number | null; run: Promise<TopUp> | null; unseen: View | null } = {
+  attempt: crypto.randomUUID(),
+  pack: null,
+  run: null,
+  unseen: null,
+};
+
+function view(result: TopUp, pack: number, tab: Window | null): View {
+  const url = stripeCheckoutUrl(result);
+  if (result.error) {
+    tab?.close();
+    return { error: result.error };
+  }
+  if (result.status === "paid") {
+    tab?.close();
+    return { done: result.already ? "Already added a moment ago; you were not charged again." : `${(result.credits ?? pack * 100).toLocaleString("en-US")} credits added.` };
+  }
+  if (url) {
+    if (tab && !tab.closed) {
+      try {
+        tab.location.href = url;
+        return { done: "Finish paying in the Stripe tab; your credits appear once it confirms.", url };
+      } catch {
+        /* the tab went away: fall through to the link */
+      }
+    }
+    return { done: "Open Stripe to finish paying.", url };
+  }
+  tab?.close();
+  return { done: "Your bank is processing the payment; the credits arrive when it clears." };
+}
 
 /** Top-up card (zenvi-core#272) under an out-of-credits refusal. Pay is the only thing that charges. */
 export function TopUpCard() {
-  const [pack, setPack] = useState(10);
+  const [pack, setPack] = useState(pending.pack ?? 10);
   const [quote, setQuote] = useState<TopUp | null>(null);
-  const [state, setState] = useState<{ busy?: boolean; done?: string; error?: string; url?: string }>({});
+  const [state, setState] = useState<View>(pending.unseen ?? {});
+  const live = useRef(true);
 
-  function settle(result: TopUp, tab: Window | null) {
-    const url = stripeCheckoutUrl(result);
-    if (result.error) {
-      tab?.close();
-      setState({ error: result.error });
-      return;
+  function show(result: TopUp, chargedPack: number, tab: Window | null) {
+    const next = view(result, chargedPack, tab);
+    if (!next.error) {
+      pending.attempt = crypto.randomUUID(); // settled: the next Pay is a new purchase
+      pending.pack = null;
     }
-    pending.attempt = crypto.randomUUID();
-    if (result.status === "paid") {
-      tab?.close();
-      setState({ done: `${(result.credits ?? pack * 100).toLocaleString("en-US")} credits added.` });
-    } else if (url && tab) {
-      tab.location.href = url;
-      setState({ done: "Finish paying in the Stripe tab; your credits appear once it confirms." });
-    } else if (url) {
-      setState({ url, done: "Open Stripe to finish paying." });
-    } else {
-      tab?.close();
-      setState({ done: "Your bank is processing the payment; the credits appear once it confirms." });
-    }
+    if (live.current) setState(next);
+    else pending.unseen = next;
   }
 
   useEffect(() => {
-    let live = true;
+    live.current = true;
+    pending.unseen = null;
     if (pending.run) {
       setState({ busy: true });
-      void pending.run.then((r) => live && settle(r, null));
+      const run = pending.run;
+      void run.then((r) => show(r, pending.pack ?? 10, null));
     }
-    void buyCredits(10).then((q) => live && (q.error ? setState((s) => ({ ...s, error: q.error })) : setQuote(q)));
+    void buyCredits(10).then((q) => live.current && (q.error ? setState((s) => ({ ...s, error: q.error })) : setQuote(q)));
     return () => {
-      live = false;
+      live.current = false;
     };
   }, []);
 
@@ -52,16 +76,19 @@ export function TopUpCard() {
     // Opened inside the click, before any await: a tab opened after the network round trip is blocked as a popup.
     const tab = quote?.mode === "card" ? null : window.open("about:blank", "_blank");
     if (tab) tab.opener = null;
+    const charged = (pending.pack ??= pack); // a retry pays for the same pack
     setState({ busy: true });
-    pending.run = buyCredits(pack, true, pending.attempt);
+    pending.run = buyCredits(charged, true, pending.attempt);
     try {
-      settle(await pending.run, tab);
+      show(await pending.run, charged, tab);
     } finally {
       pending.run = null;
     }
   }
 
-  const price = `${quote?.currency === "cad" ? "CA$" : "$"}${pack}`;
+  const locked = pending.pack !== null;
+  const shown = pending.pack ?? pack;
+  const price = `${quote?.currency === "cad" ? "CA$" : "$"}${shown}`;
   return (
     <div className="space-y-2 rounded-lg border border-line bg-white/[0.02] p-3 text-xs">
       <p className="font-medium text-fg">Add credits</p>
@@ -70,10 +97,10 @@ export function TopUpCard() {
           <button
             key={p}
             type="button"
-            aria-pressed={p === pack}
-            disabled={Boolean(state.done || state.busy)}
+            aria-pressed={p === shown}
+            disabled={Boolean(state.done || state.busy || locked)}
             onClick={() => setPack(p)}
-            className={cn("flex-1 rounded-md border px-2 py-1.5", p === pack ? "border-accent text-fg" : "border-line text-fg-muted")}
+            className={cn("flex-1 rounded-md border px-2 py-1.5", p === shown ? "border-accent text-fg" : "border-line text-fg-muted")}
           >
             ${p} · {(p * 100).toLocaleString("en-US")} credits
           </button>
@@ -93,7 +120,7 @@ export function TopUpCard() {
           {quote.mode === "card" && quote.card ? `Pay ${price} with ${quote.card}` : `Pay ${price} on Stripe`}
         </Button>
       ) : (
-        <a href={`https://zenvi.pro/topup?pack=${pack}`} target="_blank" rel="noopener noreferrer" className="block text-center underline">
+        <a href={`https://zenvi.pro/topup?pack=${shown}`} target="_blank" rel="noopener noreferrer" className="block text-center underline">
           Buy on zenvi.pro
         </a>
       )}
