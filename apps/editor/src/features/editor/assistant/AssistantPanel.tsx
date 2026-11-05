@@ -10,7 +10,9 @@ import { ZenviMark } from "@/ui/Logo";
 import { Select } from "@/ui/Select";
 import { Spinner } from "@/ui/Spinner";
 import { useSession } from "../session/context";
+import { OUT_OF_CREDITS } from "@/lib/credits";
 import { Markdown } from "./Markdown";
+import { TopUpCard } from "./TopUpCard";
 import { assistantStore, loadModels, newChat, send, setModel, stop, type ChatMessage, type ToolActivity } from "./store";
 
 const SUGGESTIONS = [
@@ -34,7 +36,12 @@ function ToolRow({ tool }: { tool: ToolActivity }) {
   );
 }
 
-function Message({ message }: { message: ChatMessage }) {
+/** A turn refused for lack of credits: offer the top-up card under it. */
+function outOfCredits(message: ChatMessage): boolean {
+  return OUT_OF_CREDITS.test(message.error ?? "") || message.tools.some((t) => t.status === "error" && OUT_OF_CREDITS.test(t.detail ?? ""));
+}
+
+function Message({ message, last }: { message: ChatMessage; last?: boolean }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
@@ -65,6 +72,7 @@ function Message({ message }: { message: ChatMessage }) {
           </span>
         ) : null}
         {message.error ? <p className="rounded-md bg-danger-soft px-2.5 py-1.5 text-xs text-danger">{message.error}</p> : null}
+        {last && !message.streaming && outOfCredits(message) ? <TopUpCard /> : null}
       </div>
     </div>
   );
@@ -184,7 +192,7 @@ export default function AssistantPanel() {
             </div>
           </div>
         ) : (
-          messages.map((m) => <Message key={m.id} message={m} />)
+          messages.map((m, i) => <Message key={m.id} message={m} last={i === messages.length - 1} />)
         )}
       </div>
 

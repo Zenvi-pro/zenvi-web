@@ -487,3 +487,18 @@ describe("engine tools on the cloud", () => {
     await client.close();
   });
 });
+
+describe("buy_credits (zenvi-core#272)", () => {
+  it("lists the packs as links to the top-up page, where the person confirms the payment", async () => {
+    const h = await harness();
+    const client = await connect(h, await pat(h));
+    const byName = Object.fromEntries((await client.listTools()).tools.map((t) => [t.name, t]));
+    expect(byName.buy_credits?.annotations?.readOnlyHint).toBe(true);
+
+    const result = await call(client, "buy_credits", { pack: 10 });
+    expect(result.isError).toBeFalsy();
+    const text = result.content[0]?.text ?? "";
+    for (const words of ["$5", "$10", "$15", "1,000 credits", "https://zenvi.test/topup?pack=10"]) expect(text).toContain(words);
+    expect(result.structuredContent).toMatchObject({ url: "https://zenvi.test/topup?pack=10", pack: 10, credits: 1000 });
+  });
+});

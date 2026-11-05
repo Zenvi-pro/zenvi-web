@@ -79,6 +79,8 @@ export const PENDING_DESKTOP_TOOLS_AFTER_CONTRACT: ReadonlySet<string> = new Set
   "audition_music_tool",
   "balance_mix_tool",
   "build_recreation_tool",
+  // The web editor shows its own top-up card on an out-of-credits refusal (zenvi-core#272).
+  "buy_credits_tool",
   "call_link_host_tool",
   "check_media_health_tool",
   "check_recreation_tool",

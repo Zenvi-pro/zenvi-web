@@ -6,6 +6,10 @@ import { fakeHost } from "./test-support/fake-host.js";
 const COMFYUI = ["list_comfyui_templates_tool", "list_comfyui_jobs_tool", "create_media_with_comfyui_tool", "enhance_file_with_comfyui_tool", "cancel_comfyui_job_tool"];
 
 describe("unavailableAssistantTools", () => {
+  it("withholds buy_credits_tool: the editor shows its own top-up card (zenvi-core#272)", () => {
+    expect(unavailableAssistantTools("editor")).toContain("buy_credits_tool");
+  });
+
   it("names the desktop-only tools a web editor's Assistant must not be offered", () => {
     const names = unavailableAssistantTools("editor");
     for (const name of [...COMFYUI, "prepare_recording_tool", "open_project_tool"]) expect(names).toContain(name);

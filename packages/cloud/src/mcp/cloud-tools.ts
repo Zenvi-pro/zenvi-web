@@ -480,6 +480,34 @@ const renderProject = defineTool({
   },
 });
 
+const TOPUP_PACKS = [5, 10, 15] as const;
+
+/** Credit top-ups (zenvi-core#272). The person pays on zenvi.pro/topup, so nothing here can charge them. */
+const buyCredits = defineTool({
+  name: "buy_credits",
+  title: "Buy Zenvi credits",
+  description:
+    "Give the person links to top up their Zenvi credits ($5 = 500, $10 = 1,000, $15 = 1,500). Use this when they ask to add credits, " +
+    "or a Zenvi tool was refused for lack of credits. The link opens zenvi.pro, where they confirm the payment (the card on their " +
+    "subscription, or Stripe Checkout); nothing is charged here, so never say the credits were added.",
+  input: z.object({ pack: z.union([z.literal(5), z.literal(10), z.literal(15)]).optional().describe("Pack to suggest, in dollars (default 10).") }),
+  output: z.object({ url: z.string(), pack: z.number(), credits: z.number(), packs: z.array(z.object({ dollars: z.number(), credits: z.number(), url: z.string() })) }),
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  scope: SCOPE_READ,
+  invoking: "Finding top-up options…",
+  invoked: "Top-up options",
+  async run(ctx, input) {
+    const site = new URL(ctx.services.config.editorUrl).origin;
+    const pack = input.pack ?? 10;
+    const packs = TOPUP_PACKS.map((dollars) => ({ dollars, credits: dollars * 100, url: `${site}/topup?pack=${dollars}` }));
+    const text =
+      "Top up Zenvi credits (one-time; top-up credits never expire). Open a link and confirm there:\n" +
+      packs.map((p) => `- [$${p.dollars} — ${p.credits.toLocaleString("en-US")} credits](${p.url})${p.dollars === pack ? " (suggested)" : ""}`).join("\n") +
+      "\nNothing is charged until the person confirms on zenvi.pro.";
+    return { text, data: { url: `${site}/topup?pack=${pack}`, pack, credits: pack * 100, packs } };
+  },
+});
+
 const getRenderStatus = defineTool({
   name: "get_render_status",
   title: "Get render status",
@@ -635,7 +663,7 @@ const getGenerationStatus = defineTool({
 });
 
 export function cloudTools(options: { backend?: boolean } = {}): McpTool[] {
-  const tools = [listProjects, createProject, openProject, importMediaFromUrl, importAttachedFile, getUploadLink, openInEditor, renderProject, getRenderStatus, previewFrame];
+  const tools = [listProjects, createProject, openProject, importMediaFromUrl, importAttachedFile, getUploadLink, openInEditor, renderProject, getRenderStatus, previewFrame, buyCredits];
   if (options.backend) tools.push(generateVideo, getGenerationStatus);
   return tools;
 }
