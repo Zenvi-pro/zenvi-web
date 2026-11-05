@@ -1,10 +1,10 @@
 import { createRequire as __zenviCreateRequire } from 'node:module';
 const require = __zenviCreateRequire(import.meta.url);
 
-// packages/render-node/src/render/composite-worker.ts
+// ../render-node/src/render/composite-worker.ts
 import { parentPort } from "node:worker_threads";
 
-// packages/engine/src/render/pixels.ts
+// ../engine/src/render/pixels.ts
 function createPremul(width, height) {
   const w = Math.max(0, Math.trunc(width));
   const h = Math.max(0, Math.trunc(height));
@@ -159,7 +159,7 @@ function unpremultiply(src, out) {
   return target;
 }
 
-// packages/engine/src/model/fma.ts
+// ../engine/src/model/fma.ts
 var SPLITTER = 134217729;
 function productError(a, b, p) {
   let t = SPLITTER * a;
@@ -202,7 +202,7 @@ function fma(a, b, c) {
   return th + roundToOdd(s, err);
 }
 
-// packages/engine/src/render/qt/fma.ts
+// ../engine/src/render/qt/fma.ts
 var f64 = new Float64Array(1);
 var u32 = new Uint32Array(f64.buffer);
 var LO = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? 0 : 1;
@@ -311,7 +311,7 @@ function fmaExact(a, b, c) {
   return roundToDouble(pm + cm, pe);
 }
 
-// packages/engine/src/render/kernels/params.ts
+// ../engine/src/render/kernels/params.ts
 function isRecord(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -380,7 +380,7 @@ function readerPath(params, key) {
   return typeof path3 === "string" && path3.length > 0 ? path3 : void 0;
 }
 
-// packages/engine/src/render/kernels/analog-tape.ts
+// ../engine/src/render/kernels/analog-tape.ts
 var f32 = Math.fround;
 var FNV_PRIME = 16777619;
 function utf8(text2) {
@@ -736,7 +736,7 @@ function hash01Tail(h, c) {
   return f32(fnv1aWord(h, c)) / 4294967296;
 }
 
-// packages/engine/src/render/qt/smooth-scale.ts
+// ../engine/src/render/qt/smooth-scale.ts
 function calcPoints(s, d) {
   const p = new Int32Array(d);
   const up = d >= s;
@@ -922,7 +922,7 @@ function smoothScale(src, dw, dh) {
   return out;
 }
 
-// packages/engine/src/render/kernels/audio-visualization-analysis.ts
+// ../engine/src/render/kernels/audio-visualization-analysis.ts
 var f322 = Math.fround;
 function clampf(v, lo, hi) {
   const m = v < hi ? v : hi;
@@ -1085,7 +1085,7 @@ function mt19937Floats(seed, count) {
   return out;
 }
 
-// packages/engine/src/render/kernels/audio-visualization-color.ts
+// ../engine/src/render/kernels/audio-visualization-color.ts
 function rgb8(r, g, b, a = 255) {
   return { r: r * 257, g: g * 257, b: b * 257, a: a * 257 };
 }
@@ -1270,7 +1270,7 @@ function verticalStyleFill(x0, y0, x1, y1, palette, style, alphaScale = 1) {
   return { kind: "linear", x1: x0, y1: y0, x2: x1, y2: y1, stops };
 }
 
-// packages/engine/src/render/qt/compose.ts
+// ../engine/src/render/qt/compose.ts
 var CompositionMode = {
   SourceOver: 0,
   DestinationOver: 1,
@@ -1548,7 +1548,7 @@ function composerFor(mode) {
   return COMPOSERS[mode] ?? sourceOver;
 }
 
-// packages/engine/src/render/qt/gray-raster.ts
+// ../engine/src/render/qt/gray-raster.ts
 function grayRasterize(contours, oddEven, width, height) {
   const outline = contours.filter((c) => c.length >= 4).map((c) => c.map((v) => Math.floor(v * 64 + 0.5)));
   if (outline.length === 0) return null;
@@ -1803,7 +1803,7 @@ function grayRasterize(contours, oddEven, width, height) {
   return { x: minEx, y: minEy, width: countEx, height: countEy, data };
 }
 
-// packages/engine/src/render/qt/rasterizer.ts
+// ../engine/src/render/qt/rasterizer.ts
 function clipBoxFor(width, height) {
   return { left: 0, top: 0, right: width - 1, bottom: height - 1 };
 }
@@ -2350,7 +2350,7 @@ function maskSpans(mask2, sink) {
   }
 }
 
-// packages/engine/src/render/kernels/audio-visualization-stroke.ts
+// ../engine/src/render/kernels/audio-visualization-stroke.ts
 var MOVE_TO = 0;
 var LINE_TO = 1;
 var CURVE_TO = 2;
@@ -3140,7 +3140,7 @@ function flattenPath(path3, device) {
   return contours;
 }
 
-// packages/engine/src/render/kernels/audio-visualization-cosmetic.ts
+// ../engine/src/render/kernels/audio-visualization-cosmetic.ts
 var CAP_BEGIN = 1;
 var CAP_END = 2;
 var NO_DIRECTION = 0;
@@ -3705,7 +3705,7 @@ function splitCubic(pts, base) {
   }
 }
 
-// packages/engine/src/render/kernels/audio-visualization-paint.ts
+// ../engine/src/render/kernels/audio-visualization-paint.ts
 function premultipliedBytes(c) {
   const a = c.a;
   if (a === 65535) return [div257(c.r), div257(c.g), div257(c.b), 255];
@@ -4307,7 +4307,7 @@ var Painter = class {
   }
 };
 
-// packages/engine/src/render/kernels/audio-visualization.ts
+// ../engine/src/render/kernels/audio-visualization.ts
 var WAVEFORM = 0;
 var FILLED_WAVEFORM = 1;
 var BARS = 2;
@@ -4841,7 +4841,7 @@ var audioVisualization = {
   }
 };
 
-// packages/engine/src/model/types.ts
+// ../engine/src/model/types.ts
 var Interpolation = {
   BEZIER: 0,
   LINEAR: 1,
@@ -4852,7 +4852,7 @@ var HandleType = {
   MANUAL: 1
 };
 
-// packages/engine/src/model/rounding.ts
+// ../engine/src/model/rounding.ts
 function roundHalfAway(x) {
   if (!Number.isFinite(x)) return x;
   const a = Math.abs(x);
@@ -4865,7 +4865,7 @@ function truncInt(x) {
   return t === 0 ? 0 : t;
 }
 
-// packages/engine/src/keyframe/points.ts
+// ../engine/src/keyframe/points.ts
 var DEFAULT_HANDLE_LEFT = Object.freeze({ X: 0.5, Y: 1 });
 var DEFAULT_HANDLE_RIGHT = Object.freeze({ X: 0.5, Y: 0 });
 function num2(value) {
@@ -4938,7 +4938,7 @@ function resolvePoints(kf) {
   return out;
 }
 
-// packages/engine/src/keyframe/evaluate.ts
+// ../engine/src/keyframe/evaluate.ts
 var BEZIER_ALLOWED_ERROR = 0.01;
 var BEZIER_MAX_ITERATIONS = 100;
 function linear(left, right, target) {
@@ -5005,7 +5005,7 @@ function evaluate(kf, frame, fallback) {
   return valueAtResolved(resolvePoints(kf), truncInt(frame));
 }
 
-// packages/engine/src/render/plan/effect-params.ts
+// ../engine/src/render/plan/effect-params.ts
 function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -5078,7 +5078,7 @@ var DENOISE_RESPONSE_NODES = Object.freeze([
   { id: 2, x: 1, y: 0.2, interpolation: 1 }
 ]);
 
-// packages/engine/src/render/kernels/beat-sync.ts
+// ../engine/src/render/kernels/beat-sync.ts
 var f323 = Math.fround;
 var TWO_PI_F2 = f323(2 * f323(Math.PI));
 var ONE_24TH = f323(1 / 24);
@@ -5194,7 +5194,7 @@ var beatSync = {
   }
 };
 
-// packages/engine/src/render/qt/blit.ts
+// ../engine/src/render/qt/blit.ts
 function blendPixel(d, di, s, si, constAlpha255) {
   if (constAlpha255 === 255) {
     const sa = s[si + 3];
@@ -5376,7 +5376,7 @@ function fastScaled(src, w, h) {
   return out;
 }
 
-// packages/engine/src/render/qt/rect.ts
+// ../engine/src/render/qt/rect.ts
 function qrect(x, y, w, h) {
   return { x1: x, y1: y, x2: x + w - 1, y2: y + h - 1 };
 }
@@ -5415,7 +5415,7 @@ function intersected(a, b) {
   return { x1: Math.max(l1, l2), x2: Math.min(r1, r2), y1: Math.max(t1, t2), y2: Math.min(b1, b2) };
 }
 
-// packages/engine/src/render/kernels/blur.ts
+// ../engine/src/render/kernels/blur.ts
 var f324 = Math.fround;
 function clampMargin(v) {
   return v < 0 ? 0 : v > 1 ? 1 : v;
@@ -5558,7 +5558,7 @@ var pixelate = {
   }
 };
 
-// packages/engine/src/render/kernels/text-layout.ts
+// ../engine/src/render/kernels/text-layout.ts
 var F64 = new Float64Array(1);
 var U64 = new BigUint64Array(F64.buffer);
 function decompose2(x) {
@@ -5938,7 +5938,7 @@ var approximateMetrics = {
   }
 };
 
-// packages/engine/src/render/kernels/caption.ts
+// ../engine/src/render/kernels/caption.ts
 var CAPTION_DEFAULT_TEXT = "00:00:00:000 --> 00:10:00:000\nEdit this caption with our caption editor";
 var CUE_PATTERN = /(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})[\t\n\v\f\r ]*-->[\t\n\v\f\r ]*(\d{2})?:*(\d{2}):(\d{2})[^\n](\d{2,3})([\s\S]*?)([^\n]*?)(?=\d{2}:\d{2,3}|\n?$)/gu;
 function groupValue(g) {
@@ -6115,7 +6115,7 @@ var caption = {
   }
 };
 
-// packages/engine/src/render/kernels/chroma-key.ts
+// ../engine/src/render/kernels/chroma-key.ts
 var f325 = Math.fround;
 var INV_ALPHA = (() => {
   const t = new Float32Array(256);
@@ -6211,7 +6211,7 @@ var chromaKey = {
   }
 };
 
-// packages/engine/src/render/kernels/color-basic.ts
+// ../engine/src/render/kernels/color-basic.ts
 var f326 = Math.fround;
 var INV_255 = f326(1 / 255);
 var INV_ALPHA2 = (() => {
@@ -6376,7 +6376,7 @@ var negate = {
   }
 };
 
-// packages/engine/src/render/kernels/cube-lut.ts
+// ../engine/src/render/kernels/cube-lut.ts
 function isQtSpace(code) {
   if (code === 32 || code >= 9 && code <= 13) return true;
   if (code < 133) return false;
@@ -6503,7 +6503,7 @@ function cachedCubeLut(text2) {
   return lut;
 }
 
-// packages/engine/src/render/kernels/color-map.ts
+// ../engine/src/render/kernels/color-map.ts
 var f327 = Math.fround;
 var INV_2552 = f327(1 / 255);
 var MEMO_BITS = 16;
@@ -6660,7 +6660,7 @@ var colorMap = {
   }
 };
 
-// packages/engine/src/render/kernels/color-grade.ts
+// ../engine/src/render/kernels/color-grade.ts
 var f328 = Math.fround;
 var INV_2553 = f328(1 / 255);
 var EPSILON = f328(1e-5);
@@ -7119,7 +7119,7 @@ var colorGrade = {
   }
 };
 
-// packages/engine/src/render/kernels/denoise.ts
+// ../engine/src/render/kernels/denoise.ts
 var f329 = Math.fround;
 var INV_2554 = f329(1 / 255);
 var INV_255_THIRD = f329(INV_2554 / 3);
@@ -7403,7 +7403,7 @@ var denoiseImage = {
   }
 };
 
-// packages/engine/src/render/kernels/image-cache.ts
+// ../engine/src/render/kernels/image-cache.ts
 var cache = /* @__PURE__ */ new WeakMap();
 function cached(source2, key, make) {
   let bySize = cache.get(source2);
@@ -7433,7 +7433,7 @@ function scaledPremul(source2, width, height, delivered) {
   });
 }
 
-// packages/engine/src/render/kernels/displace.ts
+// ../engine/src/render/kernels/displace.ts
 var f3210 = Math.fround;
 var MIN_CONTRAST_DIVISOR = f3210(1e-5);
 function displaceMapPath(params) {
@@ -7513,7 +7513,7 @@ function displaceKernel(image, params, ctx) {
 }
 var displace = { type: "Displace", supported: true, run: displaceKernel };
 
-// packages/engine/src/render/kernels/effect-mask.ts
+// ../engine/src/render/kernels/effect-mask.ts
 var f3211 = Math.fround;
 function blendWithMask(original, effected, mask2, invert) {
   const o = original.data;
@@ -7546,7 +7546,7 @@ function blendVaryStrength(original, effected, mask2, invert) {
   }
 }
 
-// packages/engine/src/render/kernels/film-grain.ts
+// ../engine/src/render/kernels/film-grain.ts
 var f3212 = Math.fround;
 var INV_2555 = f3212(1 / 255);
 var EPSILON2 = f3212(1e-5);
@@ -7851,7 +7851,7 @@ var filmGrain = {
   }
 };
 
-// packages/engine/src/render/kernels/geometry.ts
+// ../engine/src/render/kernels/geometry.ts
 var f3213 = Math.fround;
 function cropRects(params, W, H) {
   const left = num(params, "left", 0);
@@ -8077,7 +8077,7 @@ var bars = {
   }
 };
 
-// packages/engine/src/render/qt/transform.ts
+// ../engine/src/render/qt/transform.ts
 var TxNone = 0;
 var TxTranslate = 1;
 var TxScale = 2;
@@ -8409,7 +8409,7 @@ function scaleIsUniform(t) {
   return type === TxRotate && fuzzyCompare3(xScale2, yScale2);
 }
 
-// packages/engine/src/render/kernels/lens-flare.ts
+// ../engine/src/render/kernels/lens-flare.ts
 var f3214 = Math.fround;
 var USHRT_MAX = 65535;
 function fromRgbF(r, g, b, a) {
@@ -8671,7 +8671,7 @@ function lensFlareKernel(image, params) {
 }
 var lensFlare = { type: "LensFlare", supported: true, run: lensFlareKernel };
 
-// packages/engine/src/render/kernels/mask.ts
+// ../engine/src/render/kernels/mask.ts
 var f3215 = Math.fround;
 var MUL_LUT = (() => {
   const t = new Uint8Array(256 * 256);
@@ -8730,7 +8730,7 @@ var mask = {
   }
 };
 
-// packages/engine/src/render/kernels/shadow-glow.ts
+// ../engine/src/render/kernels/shadow-glow.ts
 var f3216 = Math.fround;
 var DEG_TO_RAD_F = f3216(Math.PI / 180);
 function clampf3(v, lo, hi) {
@@ -8883,7 +8883,7 @@ function glowKernel(image, params) {
 var shadow = { type: "Shadow", supported: true, run: shadowKernel };
 var glow = { type: "Glow", supported: true, run: glowKernel };
 
-// packages/engine/src/render/qt/convert.ts
+// ../engine/src/render/qt/convert.ts
 var f3217 = Math.fround;
 var F322 = new Float32Array(1);
 var U322 = new Uint32Array(F322.buffer);
@@ -8946,7 +8946,7 @@ function unpremultiplyNeon(image) {
   return out;
 }
 
-// packages/engine/src/render/kernels/sharpen.ts
+// ../engine/src/render/kernels/sharpen.ts
 var f3218 = Math.fround;
 function boxesForGauss(sigma) {
   const n = 3;
@@ -9111,7 +9111,7 @@ var sharpen = {
   }
 };
 
-// packages/engine/src/render/kernels/spherical.ts
+// ../engine/src/render/kernels/spherical.ts
 var DEG = Math.PI / 180;
 var HALF_PI = Math.PI / 2;
 var TWO_PI3 = 2 * Math.PI;
@@ -9442,7 +9442,7 @@ function sphericalKernel(image, params, ctx) {
 }
 var sphericalProjection = { type: "SphericalProjection", supported: true, sequential: true, run: sphericalKernel };
 
-// packages/engine/src/render/kernels/timer.ts
+// ../engine/src/render/kernels/timer.ts
 var TimerMode = { CountUp: 0, CountDown: 1, Clock: 2, Timecode: 3, FrameNumber: 4 };
 var TimerTimeSource = { Clip: 0, Source: 1 };
 var TimerFormat = { MmSs: 0, HhMmSs: 1, HhMmSsMs: 2, Timecode: 3, Frames: 4 };
@@ -9670,7 +9670,7 @@ var timer = {
   }
 };
 
-// packages/engine/src/render/kernels/registry.ts
+// ../engine/src/render/kernels/registry.ts
 function unsupported(type) {
   return { type, supported: false, run: () => void 0 };
 }
@@ -9733,7 +9733,7 @@ function processEffect(image, effect, ctx) {
   return out;
 }
 
-// packages/engine/src/render/qt/path.ts
+// ../engine/src/render/qt/path.ts
 var MoveTo = 0;
 var LineTo = 1;
 var CurveTo = 2;
@@ -9962,7 +9962,7 @@ function outlineContours(path3, transform) {
   });
 }
 
-// packages/engine/src/render/qt/spans.ts
+// ../engine/src/render/qt/spans.ts
 var SPAN_BATCH = 256;
 var CLIPPED_BATCH = 256;
 function div2552(x) {
@@ -10107,7 +10107,7 @@ function handleSpans(spans, constAlpha, fetch2, process2) {
   }
 }
 
-// packages/engine/src/render/qt/draw-image.ts
+// ../engine/src/render/qt/draw-image.ts
 var FIXED = 65536;
 var HALF = 32768;
 function setupMatrix(t) {
@@ -10372,7 +10372,7 @@ function roundedRectClip(w, h, radius, transform, width, height) {
   return ClipData.fromMask(grayRasterize(outlineContours(path3, transform), true, width, height));
 }
 
-// packages/engine/src/render/cpu/compositor.ts
+// ../engine/src/render/cpu/compositor.ts
 function createCompositorState() {
   return { effects: /* @__PURE__ */ new Map() };
 }
@@ -10484,10 +10484,10 @@ function compositeFrame(plan, sources, out) {
   return unpremultiply(canvas, out);
 }
 
-// packages/render-node/src/svg/text.ts
+// ../render-node/src/svg/text.ts
 import { readFileSync } from "node:fs";
 
-// node_modules/@resvg/resvg-wasm/index.mjs
+// ../../node_modules/@resvg/resvg-wasm/index.mjs
 var wasm;
 var heap = new Array(128).fill(void 0);
 heap.push(void 0, null, true, false);
@@ -11066,13 +11066,13 @@ function isCustomFontsOptions(value) {
   return Object.prototype.hasOwnProperty.call(value, "fontBuffers");
 }
 
-// packages/render-node/src/svg/fonts.ts
+// ../render-node/src/svg/fonts.ts
 import { existsSync as existsSync2 } from "node:fs";
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path2 from "node:path";
 
-// packages/render-node/src/resources.ts
+// ../render-node/src/resources.ts
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -11103,7 +11103,7 @@ function bundledFontsDir() {
   return path.join(packageRoot(), "fonts");
 }
 
-// packages/render-node/src/svg/fonts.ts
+// ../render-node/src/svg/fonts.ts
 function cacheDir(env = process.env) {
   const override = env.ZENVI_CACHE_DIR?.trim();
   if (override) return override;
@@ -11413,7 +11413,7 @@ function resolveFonts(index, familyLists) {
   return { files: [...files], fallbackFor, sansSerif, serif, monospace };
 }
 
-// packages/render-node/src/svg/opentype.ts
+// ../render-node/src/svg/opentype.ts
 function tableDirectory(view, faceOffset) {
   const numTables = view.getUint16(faceOffset + 4);
   const tables = {};
@@ -11580,7 +11580,7 @@ function parseOpenType(bytes, faceOffset = 0) {
   };
 }
 
-// packages/render-node/src/svg/rasterize.ts
+// ../render-node/src/svg/rasterize.ts
 import { readFile as readFile2, stat as stat2 } from "node:fs/promises";
 var ready;
 function initResvg() {
@@ -11592,7 +11592,7 @@ function initResvg() {
 }
 var MAX_IMAGE_BYTES = 64 * 1024 * 1024;
 
-// packages/render-node/src/svg/text.ts
+// ../render-node/src/svg/text.ts
 var STYLE_WORDS = /(bold|italic|oblique|light|thin|black|heavy|medium|semibold|demibold|condensed|narrow|extra|ultra)/i;
 function esc(text2) {
   return text2.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -11801,7 +11801,7 @@ function nodeTextRasterizer() {
   return shared2;
 }
 
-// packages/render-node/src/render/composite-worker.ts
+// ../render-node/src/render/composite-worker.ts
 var cache2 = /* @__PURE__ */ new Map();
 var state = createCompositorState();
 var text;
