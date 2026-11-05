@@ -20,9 +20,7 @@ describe("credit top-ups (zenvi-core#272)", () => {
     expect(await buyCredits(10)).toMatchObject({ mode: "card" });
     await buyCredits(15, true);
     expect(invoke.mock.calls[0]).toEqual(["buy-credits", { body: { pack: 10 } }]);
-    await buyCredits(15, true, "a1b2c3d4e5");
     expect(invoke.mock.calls[1]).toEqual(["buy-credits", { body: { pack: 15, confirm: true } }]);
-    expect(invoke.mock.calls[2]).toEqual(["buy-credits", { body: { pack: 15, confirm: true, attempt: "a1b2c3d4e5" } }]);
   });
 
   it("returns the error instead of throwing", async () => {

@@ -64,10 +64,10 @@ export interface TopUp {
 }
 
 /** A $5/$10/$15 top-up (zenvi-pro buy-credits, zenvi-core#272): a quote, or with confirm the charge / Checkout URL. */
-export async function buyCredits(pack: number, confirm = false, attempt?: string): Promise<TopUp> {
+export async function buyCredits(pack: number, confirm = false): Promise<TopUp> {
   const supabase = getSupabase();
   if (!supabase) return { error: "Sign in to buy credits." };
-  const body = confirm ? { pack, confirm: true, ...(attempt ? { attempt } : {}) } : { pack };
+  const body = confirm ? { pack, confirm: true } : { pack };
   const { data, error } = await supabase.functions.invoke("buy-credits", { body });
   // A non-2xx reply puts the function's JSON on error.context, not data.
   const context = (error as { context?: unknown } | null)?.context;
