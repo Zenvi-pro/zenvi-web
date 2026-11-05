@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -632,7 +632,7 @@ ${error.stack ?? ""}` : String(error);
 
   // packages/motion/src/blocks/data_clock/block.ts
   var START = 0.3;
-  var clamp013 = (v) => Math.min(1, Math.max(0, v));
+  var clamp012 = (v) => Math.min(1, Math.max(0, v));
   function build(ctx) {
     const { tl, params: p, width: W, height: H, safe } = ctx;
     const plan = planClock(p, ctx.seconds);
@@ -642,29 +642,29 @@ ${error.stack ?? ""}` : String(error);
     const reverse = p.reverse === true;
     const stampOf = (i) => formatDate(addSteps(plan.start, plan.step, i), format2, plan.step);
     const at = (t) => {
-      const f = clamp013((t - START) * plan.rate / plan.count);
+      const f = clamp012((t - START) * plan.rate / plan.count);
       const done = Math.min(plan.count, Math.floor(Math.max(0, t - START) * plan.rate + 1e-9));
       return reverse ? { i: plan.count - done, f: 1 - f } : { i: done, f };
     };
     const widest = [stampOf(0), stampOf(plan.count)].sort((a, b) => b.length - a.length)[0];
     const contentW = W - safe.left - safe.right;
-    const stamp2 = ctx.el("div", style === "band" ? "dc-stamp" : `dc-stamp dc-${style}`, ctx.root, widest);
+    const stamp = ctx.el("div", style === "band" ? "dc-stamp" : `dc-stamp dc-${style}`, ctx.root, widest);
     const label = p.label ? ctx.el("div", "dc-label", ctx.root, String(p.label)) : null;
     let slider = null;
     if (style === "ghost") {
-      fitWidth(stamp2, [stamp2], contentW, H * 0.35 * (ctx.portrait ? 0.5 : 1), 60);
-      Object.assign(stamp2.style, { left: `${safe.left}px`, bottom: `${safe.bottom}px` });
-      tl.fromTo(stamp2, { opacity: 0, y: 30 }, { opacity: 0.24, y: 0 }, { at: 0, duration: 0.6, ease: "out" });
+      fitWidth(stamp, [stamp], contentW, H * 0.35 * (ctx.portrait ? 0.5 : 1), 60);
+      Object.assign(stamp.style, { left: `${safe.left}px`, bottom: `${safe.bottom}px` });
+      tl.fromTo(stamp, { opacity: 0, y: 30 }, { opacity: 0.24, y: 0 }, { at: 0, duration: 0.6, ease: "out" });
       if (label) {
-        Object.assign(label.style, { left: `${safe.left + 6}px`, bottom: `${safe.bottom + stamp2.getBoundingClientRect().height + 16}px` });
+        Object.assign(label.style, { left: `${safe.left + 6}px`, bottom: `${safe.bottom + stamp.getBoundingClientRect().height + 16}px` });
         tl.fromTo(label, { opacity: 0 }, { opacity: 1 }, { at: 0.2, duration: 0.5, ease: "smooth" });
       }
     } else if (style === "badge") {
-      Object.assign(stamp2.style, { right: `${safe.right}px`, top: `${safe.top}px` });
-      tl.fromTo(stamp2, { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1 }, { at: 0, duration: 0.45, ease: "back-out" });
-      ctx.cue(0, "pop", { weight: 0.3, at: stamp2 });
+      Object.assign(stamp.style, { right: `${safe.right}px`, top: `${safe.top}px` });
+      tl.fromTo(stamp, { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1 }, { at: 0, duration: 0.45, ease: "back-out" });
+      ctx.cue(0, "pop", { weight: 0.3, at: stamp });
       if (label) {
-        Object.assign(label.style, { right: `${safe.right + 8}px`, top: `${safe.top + stamp2.getBoundingClientRect().height + 12}px` });
+        Object.assign(label.style, { right: `${safe.right + 8}px`, top: `${safe.top + stamp.getBoundingClientRect().height + 12}px` });
         tl.fromTo(label, { opacity: 0 }, { opacity: 1 }, { at: 0.2, duration: 0.5, ease: "smooth" });
       }
     } else {
@@ -672,10 +672,10 @@ ${error.stack ?? ""}` : String(error);
       const lift = ctx.portrait ? safe.bottom * 0.7 : 0;
       const band = ctx.el("div", "dc-band");
       Object.assign(band.style, { height: `${bandH}px`, bottom: `${lift}px` });
-      ctx.root.insertBefore(band, stamp2);
+      ctx.root.insertBefore(band, stamp);
       const mid = H - lift - bandH / 2;
       const size = Math.round(bandH * 0.34);
-      Object.assign(stamp2.style, { fontSize: `${size}px`, fontWeight: "600", lineHeight: "1", right: `${safe.right}px`, top: `${mid - size / 2 + 8}px` });
+      Object.assign(stamp.style, { fontSize: `${size}px`, fontWeight: "600", lineHeight: "1", right: `${safe.right}px`, top: `${mid - size / 2 + 8}px` });
       if (label) Object.assign(label.style, { right: `${safe.right}px`, top: `${mid - bandH * 0.38}px`, fontSize: "20px" });
       const legendW = Math.min(300, contentW * 0.6 / Math.max(1, plan.legends.length));
       plan.legends.forEach((lg, j) => {
@@ -693,20 +693,20 @@ ${error.stack ?? ""}` : String(error);
       Object.assign(track.style, { left: `${safe.left}px`, width: `${w}px`, top: "-2px" });
       slider = { fill: ctx.el("div", "dc-fill", track), knob: ctx.el("div", "dc-knob", track), w };
       tl.fromTo(band, { yPercent: 100, opacity: 0 }, { yPercent: 0, opacity: 1 }, { at: 0, duration: 0.55, ease: "out" });
-      tl.fromTo(stamp2, { opacity: 0 }, { opacity: 1 }, { at: 0.15, duration: 0.4, ease: "smooth" });
+      tl.fromTo(stamp, { opacity: 0 }, { opacity: 1 }, { at: 0.15, duration: 0.4, ease: "smooth" });
       if (label) tl.fromTo(label, { opacity: 0 }, { opacity: 1 }, { at: 0.2, duration: 0.4, ease: "smooth" });
       ctx.cue(0, "whoosh", { weight: 0.25 });
     }
     tl.track((t) => {
       const { i, f } = at(t);
-      stamp2.textContent = stampOf(i);
+      stamp.textContent = stampOf(i);
       if (slider) {
         slider.fill.style.width = `${(f * slider.w).toFixed(1)}px`;
         slider.knob.style.left = `${(f * slider.w).toFixed(1)}px`;
       }
     });
     const until = START + plan.count / plan.rate;
-    ctx.cue(START, "tick", { weight: 0.15, at: stamp2, until, rate: Math.min(20, plan.rate) });
+    ctx.cue(START, "tick", { weight: 0.15, at: stamp, until, rate: Math.min(20, plan.rate) });
   }
 
   // packages/motion/src/blocks/data_clock/data_clock-entry.ts

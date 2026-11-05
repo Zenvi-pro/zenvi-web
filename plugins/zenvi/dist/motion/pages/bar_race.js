@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -694,7 +694,7 @@ ${error.stack ?? ""}` : String(error);
   }
 
   // packages/motion/src/blocks/bar_race/block.ts
-  var clamp013 = (v) => Math.min(1, Math.max(0, v));
+  var clamp012 = (v) => Math.min(1, Math.max(0, v));
   var r1 = (v) => (Math.round(v * 10) / 10).toString();
   function build(ctx) {
     const { tl, params: p, width: W, height: H, safe, palette } = ctx;
@@ -738,7 +738,7 @@ ${error.stack ?? ""}` : String(error);
     const raceAt = 0.8;
     const raceEnd = ctx.seconds - 1.4;
     const last = plan.periods.length - 1;
-    const posAt = (t) => clamp013((t - raceAt) / (raceEnd - raceAt)) * last;
+    const posAt = (t) => clamp012((t - raceAt) / (raceEnd - raceAt)) * last;
     const grow = resolveEase("out");
     const window2 = last / (raceEnd - raceAt) * 0.35;
     tl.track((t) => {
@@ -746,15 +746,15 @@ ${error.stack ?? ""}` : String(error);
       const values = valuesAt(plan, pos);
       const ranks = smoothRanks(plan, pos, window2);
       const scale = Math.max(1e-9, ...values);
-      const intro = grow(clamp013((t - 0.3) / 0.8));
+      const intro = grow(clamp012((t - 0.3) / 0.8));
       rows.forEach(({ row, bar, value }, i) => {
         const rank = ranks[i];
         const y = plotTop + rank * pitch + (pitch - barH) / 2;
         row.style.transform = `translateY(${r1(y)}px)`;
-        row.style.opacity = r1(clamp013(top - rank) * intro);
+        row.style.opacity = r1(clamp012(top - rank) * intro);
         const w = Math.max(4, values[i] / scale * barMax * intro);
         bar.style.width = `${r1(w)}px`;
-        const lead = pinned >= 0 ? i === pinned ? 1 : 0 : clamp013(1 - rank);
+        const lead = pinned >= 0 ? i === pinned ? 1 : 0 : clamp012(1 - rank);
         bar.style.background = mixHex(tones[i], palette.accent, lead);
         value.style.left = `${r1(w + 18)}px`;
         value.textContent = formatNumber(values[i] * intro, fmt);

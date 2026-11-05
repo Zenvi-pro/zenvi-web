@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -746,7 +746,7 @@ ${error.stack ?? ""}` : String(error);
   var SVG = "http://www.w3.org/2000/svg";
   var TONES = [0.62, 0.44, 0.32, 0.24, 0.18];
   var r1 = (v) => (Math.round(v * 10) / 10).toString();
-  var clamp013 = (v) => Math.min(1, Math.max(0, v));
+  var clamp012 = (v) => Math.min(1, Math.max(0, v));
   function build(ctx) {
     const { tl, params: p, width: W, height: H, safe, palette } = ctx;
     const plan = planPictogram(p);
@@ -768,7 +768,7 @@ ${error.stack ?? ""}` : String(error);
     const span = (ctx.seconds - 0.6 - enterAt) / layouts.length;
     const T = layouts.map((_, j) => enterAt + j * span);
     const morphFor = Math.min(0.9, span * 0.55);
-    const stagger2 = Math.min(0.5, span * 0.3);
+    const stagger = Math.min(0.5, span * 0.3);
     const out = resolveEase("out");
     const pop = resolveEase("back-out");
     const svg = ctx.doc.createElementNS(SVG, "svg");
@@ -803,10 +803,10 @@ ${error.stack ?? ""}` : String(error);
     tl.track((t) => {
       icons.forEach(({ use, kept }, i) => {
         let j = 0;
-        while (j + 1 < layouts.length && t >= T[j + 1] + delay(i, stagger2)) j += 1;
-        const f = j === 0 ? 1 : out(clamp013((t - T[j] - delay(i, stagger2)) / morphFor));
+        while (j + 1 < layouts.length && t >= T[j + 1] + delay(i, stagger)) j += 1;
+        const f = j === 0 ? 1 : out(clamp012((t - T[j] - delay(i, stagger)) / morphFor));
         const slot = j === 0 ? steps[0].slots[i] : mix(steps[j - 1].slots[i], steps[j].slots[i], f);
-        const enter = pop(clamp013((t - enterAt - delay(i, enterFor)) / 0.4));
+        const enter = pop(clamp012((t - enterAt - delay(i, enterFor)) / 0.4));
         let alpha = 1;
         let grow = 1;
         if (holds[j]) {
@@ -823,8 +823,8 @@ ${error.stack ?? ""}` : String(error);
         let alpha = 1;
         layouts.forEach((kind, j) => {
           if (kind !== "hold") return;
-          const q = resolveEase("smooth")(clamp013((t - T[j]) / (morphFor + stagger2)));
-          const back = j + 1 < layouts.length ? resolveEase("smooth")(clamp013((t - T[j + 1]) / (morphFor + stagger2))) : 0;
+          const q = resolveEase("smooth")(clamp012((t - T[j]) / (morphFor + stagger)));
+          const back = j + 1 < layouts.length ? resolveEase("smooth")(clamp012((t - T[j + 1]) / (morphFor + stagger))) : 0;
           alpha = Math.min(alpha, 1 - q + back);
         });
         backdrop.style.opacity = r1(alpha);

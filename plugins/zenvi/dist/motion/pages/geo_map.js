@@ -218,9 +218,9 @@
     }
     return [targets];
   }
-  function staggerOffsets(count, stagger2) {
-    if (!stagger2 || count <= 1) return new Array(count).fill(0);
-    const s = typeof stagger2 === "number" ? { each: stagger2 } : stagger2;
+  function staggerOffsets(count, stagger) {
+    if (!stagger || count <= 1) return new Array(count).fill(0);
+    const s = typeof stagger === "number" ? { each: stagger } : stagger;
     const from = s.from ?? "start";
     const order = [...Array(count).keys()];
     if (from === "random") {
@@ -1077,8 +1077,8 @@ ${error.stack ?? ""}` : String(error);
     if (order.length > 0) ctx.cue(fillAt, "reveal", { weight: 0.4 });
     const markAt = pushAt + pushFor * 0.55;
     const n = plan.markers.length;
-    const stagger2 = n > 1 ? Math.min(0.2, ctx.seconds * 0.3 / (n - 1)) : 0;
-    const popAt = plan.markers.map((_, i) => markAt + i * stagger2);
+    const stagger = n > 1 ? Math.min(0.2, ctx.seconds * 0.3 / (n - 1)) : 0;
+    const popAt = plan.markers.map((_, i) => markAt + i * stagger);
     const routeG = node(ctx, svg, "g", { class: "gm-routes" });
     const pairs = p.route === "path" ? plan.markers.slice(1).map((_, i) => [i, i + 1]) : p.route === "hub" ? plan.markers.slice(1).map((_, i) => [0, i + 1]) : [];
     const arcs = pairs.map(([from, to]) => {
