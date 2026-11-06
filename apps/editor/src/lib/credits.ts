@@ -68,7 +68,9 @@ export async function buyCredits(pack: number, confirm = false): Promise<TopUp> 
   const supabase = getSupabase();
   if (!supabase) return { error: "Sign in to buy credits." };
   const body = confirm ? { pack, confirm: true } : { pack };
-  const { data, error } = await supabase.functions.invoke("buy-credits", { body });
+  // VITE_STRIPE_TEST=1 (local testing): Stripe test keys, if the project allows request test mode.
+  const test = import.meta.env.VITE_STRIPE_TEST === "1" ? { headers: { "x-stripe-test-mode": "true" } } : {};
+  const { data, error } = await supabase.functions.invoke("buy-credits", { body, ...test });
   // A non-2xx reply puts the function's JSON on error.context, not data.
   const context = (error as { context?: unknown } | null)?.context;
   const reply = data ?? (context instanceof Response ? await context.json().catch(() => null) : null);

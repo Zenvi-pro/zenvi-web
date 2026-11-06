@@ -40,3 +40,13 @@ describe("credit top-ups (zenvi-core#272)", () => {
     expect(stripeCheckoutUrl({})).toBeNull();
   });
 });
+
+describe("local testing", () => {
+  it("asks for Stripe test keys when VITE_STRIPE_TEST=1", async () => {
+    invoke.mockResolvedValue({ data: { mode: "checkout" }, error: null });
+    vi.stubEnv("VITE_STRIPE_TEST", "1");
+    await buyCredits(5);
+    vi.unstubAllEnvs();
+    expect(invoke.mock.calls[0]).toEqual(["buy-credits", { body: { pack: 5 }, headers: { "x-stripe-test-mode": "true" } }]);
+  });
+});
