@@ -10,7 +10,9 @@ import { ZenviMark } from "@/ui/Logo";
 import { Select } from "@/ui/Select";
 import { Spinner } from "@/ui/Spinner";
 import { useSession } from "../session/context";
+import { OUT_OF_CREDITS } from "@/lib/credits";
 import { Markdown } from "./Markdown";
+import { TopUpCard } from "./TopUpCard";
 import { assistantStore, loadModels, newChat, send, setModel, stop, type ChatMessage, type ToolActivity } from "./store";
 
 const SUGGESTIONS = [
@@ -34,7 +36,12 @@ function ToolRow({ tool }: { tool: ToolActivity }) {
   );
 }
 
-function Message({ message }: { message: ChatMessage }) {
+/** A turn refused for lack of credits: offer the top-up card under it. */
+function outOfCredits(message: ChatMessage): boolean {
+  return OUT_OF_CREDITS.test(message.error ?? "") || message.tools.some((t) => t.status === "error" && OUT_OF_CREDITS.test(t.detail ?? ""));
+}
+
+function Message({ message, topUp }: { message: ChatMessage; topUp?: boolean }) {
   if (message.role === "user") {
     return (
       <div className="flex justify-end">
@@ -65,6 +72,7 @@ function Message({ message }: { message: ChatMessage }) {
           </span>
         ) : null}
         {message.error ? <p className="rounded-md bg-danger-soft px-2.5 py-1.5 text-xs text-danger">{message.error}</p> : null}
+        {topUp ? <TopUpCard /> : null}
       </div>
     </div>
   );
@@ -76,6 +84,9 @@ export default function AssistantPanel() {
   const status = useAuth((s) => s.status);
   const store = assistantStore(session);
   const messages = useStore(store, (s) => s.messages);
+  // The card sits under the latest assistant reply, if it was refused for credits (a note after it does not move it).
+  const lastReply = [...messages].reverse().find((m) => m.role === "assistant");
+  const topUpId = lastReply && !lastReply.streaming && outOfCredits(lastReply) ? lastReply.id : null;
   const running = useStore(store, (s) => s.running);
   const models = useStore(store, (s) => s.models);
   const modelId = useStore(store, (s) => s.modelId);
@@ -184,7 +195,7 @@ export default function AssistantPanel() {
             </div>
           </div>
         ) : (
-          messages.map((m) => <Message key={m.id} message={m} />)
+          messages.map((m) => <Message key={m.id} message={m} topUp={m.id === topUpId} />)
         )}
       </div>
 

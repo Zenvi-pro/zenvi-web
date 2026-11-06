@@ -44,3 +44,41 @@ export async function checkOperation(operation: string, units = 1, durationSecon
     reason: typeof r.block_reason === "string" && r.block_reason ? r.block_reason : null,
   };
 }
+
+/** Zenvi's own credit refusals (backend credit_gate 402, the desktop's tool refusal), not a provider's balance. */
+export const OUT_OF_CREDITS = /out of credits|insufficient credits/i;
+
+export interface TopUp {
+  mode?: "card" | "checkout";
+  card?: string | null;
+  pack?: number;
+  credits?: number;
+  amount?: number;
+  currency?: string;
+  status?: "paid" | "checkout";
+  url?: string;
+  balance?: number;
+  /** This pack was charged moments ago; no second charge was made. */
+  already?: boolean;
+  error?: string;
+}
+
+/** A $5/$10/$15 top-up (zenvi-pro buy-credits, zenvi-core#272): a quote, or with confirm the charge / Checkout URL. */
+export async function buyCredits(pack: number, confirm = false): Promise<TopUp> {
+  const supabase = getSupabase();
+  if (!supabase) return { error: "Sign in to buy credits." };
+  const body = confirm ? { pack, confirm: true } : { pack };
+  // VITE_STRIPE_TEST=1 (local testing): Stripe test keys, if the project allows request test mode.
+  const test = import.meta.env.VITE_STRIPE_TEST === "1" ? { headers: { "x-stripe-test-mode": "true" } } : {};
+  const { data, error } = await supabase.functions.invoke("buy-credits", { body, ...test });
+  // A non-2xx reply puts the function's JSON on error.context, not data.
+  const context = (error as { context?: unknown } | null)?.context;
+  const reply = data ?? (context instanceof Response ? await context.json().catch(() => null) : null);
+  if (error || !reply || reply.error) return { error: reply?.error ?? "Could not start the top-up. Try again, or buy at https://zenvi.pro/topup." };
+  return reply as TopUp;
+}
+
+/** The Checkout URL to open, only when it is Stripe's. */
+export function stripeCheckoutUrl(result: TopUp): string | null {
+  return typeof result.url === "string" && result.url.startsWith("https://checkout.stripe.com/") ? result.url : null;
+}
