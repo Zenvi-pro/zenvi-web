@@ -41,6 +41,15 @@ describe("import_stock_media_tool charges stock_add", () => {
     expect(billing(host).at(-1)).toEqual(["/api/v1/stock/charge", { provider: "freesound", units: 1, note: "sound 55" }]);
   });
 
+  it("does not charge again for a clip already in the project", async () => {
+    const host = fakeHost();
+    const doc = fixtureDoc();
+    await runTool({ doc, host }, "import_stock_media_tool", PEXELS);
+    const again = await runTool({ doc, host }, "import_stock_media_tool", PEXELS);
+    expect(again.text).toContain("File already in project");
+    expect(billing(host).filter(([path]) => path === "/api/v1/stock/charge")).toHaveLength(1);
+  });
+
   it("refuses without downloading when the person cannot pay", async () => {
     const host = refusing();
     const doc = fixtureDoc();

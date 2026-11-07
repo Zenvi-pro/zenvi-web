@@ -303,6 +303,7 @@ export const mediaTools: CatalogTool[] = [
     requires: ["media"],
     run: async (call, input) => {
       let media: ImportedMedia | string;
+      let fee: ["pexels" | "freesound", string] | null = null;
       const localPath = text(input.local_path);
       const source = text(input.source).toLowerCase();
       const filenameHint = text(input.filename);
@@ -324,7 +325,7 @@ export const mediaTools: CatalogTool[] = [
         if (refusal) return refusal;
         media = await importUrlWithFallbacks(call, [link], `${(filenameHint || `pexels_${vid}`).replace(/[^\w-]/g, "_")}.mp4`);
         if (typeof media === "string") return `Pexels download error: ${media}`;
-        await chargeStockFee(call, "pexels", 1, `video ${vid}`);
+        fee = ["pexels", `video ${vid}`];
       } else if (source === "freesound") {
         const preview = text(input.preview_url);
         if (!preview) return "Error: preview_url is required (from search_freesound_music_tool).";
@@ -335,7 +336,7 @@ export const mediaTools: CatalogTool[] = [
         if (refusal) return refusal;
         media = await importUrlWithFallbacks(call, freesoundCandidates(preview), `${(filenameHint || `freesound_${sid}`).replace(/[^\w-]/g, "_")}${ext}`);
         if (typeof media === "string") return `Freesound download error: ${media}`;
-        await chargeStockFee(call, "freesound", 1, `sound ${sid}`);
+        fee = ["freesound", `sound ${sid}`];
       } else {
         return "Error: source must be 'pexels' or 'freesound' (or pass local_path).";
       }
@@ -350,6 +351,8 @@ export const mediaTools: CatalogTool[] = [
           "(or empty file_id to use this just-imported file) to place it on the timeline."
         );
       }
+      // Charged once it is new to the project: a clip imported again adds nothing.
+      if (fee) await chargeStockFee(call, fee[0], 1, fee[1]);
       // Web extra (the editor's stock panel): place the import right away.
       if (text(input.position_seconds) || text(input.track)) {
         const placed = await importAndPlace(call, media, {
