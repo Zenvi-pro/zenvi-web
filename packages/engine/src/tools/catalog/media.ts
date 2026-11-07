@@ -24,7 +24,7 @@ import { pyFixed } from "../pyfmt.js";
 import { applied, unchanged } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
 import { importAndPlace, placeExistingFile } from "./clips.js";
-import { fileById, record, rememberFile, text } from "./common.js";
+import { chargeStockFee, fileById, record, rememberFile, stockFeeRefusal, text } from "./common.js";
 
 /** Extensions collected from folders (tool_handlers._IMPORT_VIDEO/AUDIO/IMAGE_EXTS). */
 export const IMPORT_VIDEO_EXTS = [".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv"];
@@ -303,6 +303,7 @@ export const mediaTools: CatalogTool[] = [
     requires: ["media"],
     run: async (call, input) => {
       let media: ImportedMedia | string;
+      let fee: ["pexels" | "freesound", string] | null = null;
       const localPath = text(input.local_path);
       const source = text(input.source).toLowerCase();
       const filenameHint = text(input.filename);
@@ -320,16 +321,22 @@ export const mediaTools: CatalogTool[] = [
         const link = text(input.link);
         if (!link) return "Error: link is required (use the MP4 URL from search_pexels_videos_tool).";
         const vid = /^\d+$/.test(text(input.video_id)) ? text(input.video_id) : "0";
+        const refusal = await stockFeeRefusal(call, 1);
+        if (refusal) return refusal;
         media = await importUrlWithFallbacks(call, [link], `${(filenameHint || `pexels_${vid}`).replace(/[^\w-]/g, "_")}.mp4`);
         if (typeof media === "string") return `Pexels download error: ${media}`;
+        fee = ["pexels", `video ${vid}`];
       } else if (source === "freesound") {
         const preview = text(input.preview_url);
         if (!preview) return "Error: preview_url is required (from search_freesound_music_tool).";
         const sid = text(input.sound_id);
         if (!/^-?\d+$/.test(sid)) return `Error: sound_id must be numeric Freesound ID, not '${sid}'.`;
         const ext = preview.endsWith(".ogg") ? ".ogg" : ".mp3";
+        const refusal = await stockFeeRefusal(call, 1);
+        if (refusal) return refusal;
         media = await importUrlWithFallbacks(call, freesoundCandidates(preview), `${(filenameHint || `freesound_${sid}`).replace(/[^\w-]/g, "_")}${ext}`);
         if (typeof media === "string") return `Freesound download error: ${media}`;
+        fee = ["freesound", `sound ${sid}`];
       } else {
         return "Error: source must be 'pexels' or 'freesound' (or pass local_path).";
       }
@@ -344,6 +351,10 @@ export const mediaTools: CatalogTool[] = [
           "(or empty file_id to use this just-imported file) to place it on the timeline."
         );
       }
+      // Charged once it lands in the project: a clip imported again, or a refused placement, adds nothing.
+      const charge = async () => {
+        if (fee) await chargeStockFee(call, fee[0], 1, fee[1]);
+      };
       // Web extra (the editor's stock panel): place the import right away.
       if (text(input.position_seconds) || text(input.track)) {
         const placed = await importAndPlace(call, media, {
@@ -352,11 +363,13 @@ export const mediaTools: CatalogTool[] = [
           duration_seconds: input.duration_seconds,
           start_seconds: input.start_seconds,
         });
+        if (placed.file) await charge();
         if (!placed.clip) return placed.text;
         return `Added to project: ${media.path} (file_id=${String(placed.file?.id)}). ${placed.text}`;
       }
       const file = call.commit((tx) => addFile(tx, media));
       rememberFile(call, String(file.id));
+      await charge();
       return (
         `Added to project: ${media.path} (file_id=${file.id}). ` +
         `IMPORTANT: Call add_clip_to_timeline_tool with file_id='${file.id}' ` +

@@ -252,6 +252,13 @@ export function backendStock(backend: BackendHost): StockHost {
       const sounds = Array.isArray(data.sounds) ? (data.sounds.filter(isRecord) as unknown as FreesoundSound[]) : [];
       return { sounds, total: Number(data.count ?? sounds.length) || sounds.length };
     },
+    // zenvi-backend api/routes/stock.py: the same stock_add RPCs the desktop calls.
+    async checkImports(units, options) {
+      await backend.request("/api/v1/stock/check", { method: "POST", body: { units }, signal: options?.signal });
+    },
+    async chargeImports(provider, units, note) {
+      await backend.request("/api/v1/stock/charge", { method: "POST", body: { provider, units, note } });
+    },
   };
 }
 

@@ -215,3 +215,25 @@ export function forgetFile(call: ToolCall): void {
 export function record(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
 }
+
+/**
+ * Zenvi's stock fee before a download (zenvi-core tool_handlers.py
+ * check_operation("stock_add")): the refusal in words, or null to go ahead.
+ */
+export async function stockFeeRefusal(call: ToolCall, units: number): Promise<string | null> {
+  try {
+    await call.host.stock?.checkImports?.(units, { signal: call.signal });
+    return null;
+  } catch (error) {
+    return `Error: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/** Charge stock imports that landed. A failed charge keeps the import, like the desktop's fire-and-forget charge. */
+export async function chargeStockFee(call: ToolCall, provider: "pexels" | "freesound", units: number, note: string): Promise<void> {
+  try {
+    await call.host.stock?.chargeImports?.(provider, units, note);
+  } catch (error) {
+    call.host.log?.(`stock charge failed (${provider}, ${note}): ${error instanceof Error ? error.message : String(error)}`);
+  }
+}

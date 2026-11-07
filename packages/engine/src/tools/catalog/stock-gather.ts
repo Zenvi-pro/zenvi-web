@@ -32,7 +32,7 @@ import { directTool, unavailable, type CatalogTool, type ToolCall } from "../def
 import { applied, refused } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
 import { provisionalFile } from "./clips.js";
-import { record, rememberFile } from "./common.js";
+import { chargeStockFee, record, rememberFile, stockFeeRefusal } from "./common.js";
 import type { ProjectFile } from "../../model/types.js";
 
 const TOOL = "gather_stock_footage_tool";
@@ -156,6 +156,8 @@ export const stockGatherTools: CatalogTool[] = [
       if (args.match_file_id && !coherent) return refused(TOOL, "Error: match_file_id needs coherence='shoot'.");
       const matchFile = args.match_file_id ? project.files.find((f) => String(f.id) === args.match_file_id) : undefined;
       if (args.match_file_id && !matchFile) return refused(TOOL, `Error: media-bin file ${args.match_file_id} not found.`);
+      const refusal = await stockFeeRefusal(call, count);
+      if (refusal) return refused(TOOL, refusal);
 
       const warnings: string[] = [];
       const found = await Promise.all(
@@ -316,6 +318,7 @@ export const stockGatherTools: CatalogTool[] = [
         `Gather stock footage (${taken.length})`,
       );
       rememberFile(call, String(files[files.length - 1]!.id));
+      await chargeStockFee(call, "pexels", taken.length, `gather ${taken.map((t) => t.video.id).join(",")}`);
       const rows = taken.map((t, i) => ({
         file_id: String(files[i]!.id),
         query: t.query,
