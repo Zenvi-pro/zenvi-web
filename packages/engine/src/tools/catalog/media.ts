@@ -351,8 +351,10 @@ export const mediaTools: CatalogTool[] = [
           "(or empty file_id to use this just-imported file) to place it on the timeline."
         );
       }
-      // Charged once it is new to the project: a clip imported again adds nothing.
-      if (fee) await chargeStockFee(call, fee[0], 1, fee[1]);
+      // Charged once it lands in the project: a clip imported again, or a refused placement, adds nothing.
+      const charge = async () => {
+        if (fee) await chargeStockFee(call, fee[0], 1, fee[1]);
+      };
       // Web extra (the editor's stock panel): place the import right away.
       if (text(input.position_seconds) || text(input.track)) {
         const placed = await importAndPlace(call, media, {
@@ -361,11 +363,13 @@ export const mediaTools: CatalogTool[] = [
           duration_seconds: input.duration_seconds,
           start_seconds: input.start_seconds,
         });
+        if (placed.file) await charge();
         if (!placed.clip) return placed.text;
         return `Added to project: ${media.path} (file_id=${String(placed.file?.id)}). ${placed.text}`;
       }
       const file = call.commit((tx) => addFile(tx, media));
       rememberFile(call, String(file.id));
+      await charge();
       return (
         `Added to project: ${media.path} (file_id=${file.id}). ` +
         `IMPORTANT: Call add_clip_to_timeline_tool with file_id='${file.id}' ` +

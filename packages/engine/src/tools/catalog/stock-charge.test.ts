@@ -72,6 +72,16 @@ describe("import_stock_media_tool charges stock_add", () => {
     expect(billing(host).map(([path]) => path)).toEqual(["/api/v1/stock/check"]);
   });
 
+  it("does not charge an import whose placement was refused", async () => {
+    const host = fakeHost();
+    const doc = fixtureDoc();
+    const before = doc.project.files.length;
+    const result = await runTool({ doc, host }, "import_stock_media_tool", { ...PEXELS, position_seconds: "5", track: "no such track" });
+    expect(result.ok, result.text).toBe(false);
+    expect(doc.project.files.length).toBe(before);
+    expect(billing(host).map(([path]) => path)).toEqual(["/api/v1/stock/check"]);
+  });
+
   it("does not charge for a local file", async () => {
     const host = fakeHost();
     await runTool({ doc: fixtureDoc(), host }, "import_stock_media_tool", { local_path: "/clips/new.mp4" });
