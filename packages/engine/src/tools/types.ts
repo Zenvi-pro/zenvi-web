@@ -677,6 +677,14 @@ export interface StockHost {
   searchPexelsVideos(query: string, options: { perPage: number; signal?: AbortSignal }): Promise<{ videos: PexelsVideo[]; total: number }>;
   /** Sounds at least `minSeconds` long (0: any length). */
   searchFreesound(query: string, options: { pageSize: number; minSeconds: number; signal?: AbortSignal }): Promise<{ sounds: FreesoundSound[]; total: number }>;
+  /**
+   * Zenvi's stock fee (stock_add): rejects with an error in words when the
+   * person cannot pay for `units` imports. Absent where imports are free
+   * (a deployment's own provider keys).
+   */
+  checkImports?(units: number, options?: { signal?: AbortSignal }): Promise<void>;
+  /** Charge `units` imports that landed in the project. */
+  chargeImports?(provider: "pexels" | "freesound", units: number, note: string): Promise<void>;
 }
 
 /**

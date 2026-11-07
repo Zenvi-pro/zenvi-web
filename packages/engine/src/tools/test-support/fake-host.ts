@@ -261,6 +261,8 @@ export const TITLE_TEMPLATE_SVG =
 function defaultRoutes(): Record<string, (body: unknown, path: string) => unknown> {
   return {
     "/api/v1/indexing/status": () => ({ configured: true }),
+    "/api/v1/stock/check": () => ({ allowed: true }),
+    "/api/v1/stock/charge": () => ({ ok: true }),
     "/api/v1/search": () => ({
       results: [
         { video_id: "VID0001", start: 2.5, end: 4.5, rank: 2, score: 0.7, transcription: "today we talk about cameras" },

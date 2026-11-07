@@ -24,7 +24,7 @@ import { pyFixed } from "../pyfmt.js";
 import { applied, unchanged } from "../receipt.js";
 import type { ImportedMedia } from "../types.js";
 import { importAndPlace, placeExistingFile } from "./clips.js";
-import { fileById, record, rememberFile, text } from "./common.js";
+import { chargeStockFee, fileById, record, rememberFile, stockFeeRefusal, text } from "./common.js";
 
 /** Extensions collected from folders (tool_handlers._IMPORT_VIDEO/AUDIO/IMAGE_EXTS). */
 export const IMPORT_VIDEO_EXTS = [".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v", ".mpg", ".mpeg", ".wmv"];
@@ -320,16 +320,22 @@ export const mediaTools: CatalogTool[] = [
         const link = text(input.link);
         if (!link) return "Error: link is required (use the MP4 URL from search_pexels_videos_tool).";
         const vid = /^\d+$/.test(text(input.video_id)) ? text(input.video_id) : "0";
+        const refusal = await stockFeeRefusal(call, 1);
+        if (refusal) return refusal;
         media = await importUrlWithFallbacks(call, [link], `${(filenameHint || `pexels_${vid}`).replace(/[^\w-]/g, "_")}.mp4`);
         if (typeof media === "string") return `Pexels download error: ${media}`;
+        await chargeStockFee(call, "pexels", 1, `video ${vid}`);
       } else if (source === "freesound") {
         const preview = text(input.preview_url);
         if (!preview) return "Error: preview_url is required (from search_freesound_music_tool).";
         const sid = text(input.sound_id);
         if (!/^-?\d+$/.test(sid)) return `Error: sound_id must be numeric Freesound ID, not '${sid}'.`;
         const ext = preview.endsWith(".ogg") ? ".ogg" : ".mp3";
+        const refusal = await stockFeeRefusal(call, 1);
+        if (refusal) return refusal;
         media = await importUrlWithFallbacks(call, freesoundCandidates(preview), `${(filenameHint || `freesound_${sid}`).replace(/[^\w-]/g, "_")}${ext}`);
         if (typeof media === "string") return `Freesound download error: ${media}`;
+        await chargeStockFee(call, "freesound", 1, `sound ${sid}`);
       } else {
         return "Error: source must be 'pexels' or 'freesound' (or pass local_path).";
       }
