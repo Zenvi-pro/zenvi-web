@@ -66,7 +66,7 @@ import { TITLE_STYLE_IDS, TITLE_STYLES, sameTitleSpec, titleFieldsOf, titleShown
 import type { ContractInput } from "../schemas.gen.js";
 import type { ToolOutcome } from "../define.js";
 import { NATIVE_TITLE_KEY, blockFileFields, nativePlan, placeNativeTitle, renderTitleBlock, rendersTitleBlock, specOf, type NativeTitleTag } from "./titles.js";
-import { commitDrawn, writeDrawings } from "./motion-templates.js";
+import { commitDrawn, planOverlayStack, writeDrawings } from "./motion-templates.js";
 import { animatedCatalog } from "./animated-titles.js";
 
 function basename(path: string): string {
@@ -372,7 +372,8 @@ async function resolveTitle(call: ToolCall, clipId: string, fileId: string, titl
   }
   const selected = (call.host.ui?.selectedIds?.() ?? [])
     .map((id) => project.clips.find((c) => c.id === id))
-    .filter((c): c is Clip => Boolean(c) && titles.some((f) => f.id === c!.file_id));
+    // Any layer of a native title selects it (each layer is its own file).
+    .filter((c): c is Clip => Boolean(c) && (titles.some((f) => f.id === c!.file_id) || Boolean(fileById(String(c!.file_id ?? ""))?.[NATIVE_TITLE_KEY])));
   if (selected.length === 1) {
     const file = fileById(String(selected[0]!.file_id ?? ""));
     if (file) return [svgTitle(file), selected[0]!.id];
@@ -455,12 +456,18 @@ async function editMadeTitle(call: ToolCall, input: ContractInput<"edit_title_to
     const files = nativeGroups(project).get(tag.group) ?? [file];
     const ids = new Set(files.map((f) => String(f.id)));
     const clips = project.clips.filter((c) => ids.has(String(c.file_id)));
+    if (clips.length === 0) toolError("this title has no clips on the timeline any more; add a new one with add_title_tool");
     refuseLocked(project, clips);
-    const position = clips.length > 0 ? Math.max(0, Math.min(...clips.map((c) => Number(c.position) || 0)) - (Number(tag.lead) || 0)) : 0;
-    const plan = await nativePlan(call, project, next, tag.seconds, warnings);
-    const layers = [...new Set(clips.map((c) => Number(c.layer)))].sort((a, b) => a - b).slice(0, plan.tracks);
-    let top = Math.max(0, ...project.layers.map((l) => Number(l.number) || 0));
-    while (layers.length < plan.tracks) layers.push((top += TRACK_STEP));
+    const lead = Number(tag.lead) || 0;
+    const first = Math.min(...clips.map((c) => Number(c.position) || 0));
+    const position = Math.max(0, first - lead);
+    // Its length as it is now (a trimmed title stays trimmed), never longer than it was made.
+    const shownEnd = Math.max(...clips.map((c) => (Number(c.position) || 0) + (Number(c.end) || 0) - (Number(c.start) || 0)));
+    const seconds = Math.min(tag.seconds, Math.max(1 / fpsOfProject(project), shownEnd - position));
+    const plan = await nativePlan(call, project, next, seconds, warnings);
+    const own = [...new Set(clips.map((c) => Number(c.layer)))].sort((a, b) => a - b);
+    // Its own tracks when they are enough; else a fresh stack above whatever now sits over it (never around it).
+    const layers = own.length >= plan.tracks ? own.slice(0, plan.tracks) : planOverlayStack(project, position, position + seconds, plan.tracks, undefined, new Set(clips.map((c) => c.id))).layers;
     const written = await writeDrawings(call, plan, `title-${next.style}`);
     if (typeof written === "string") return toolError(written.replace(/^Error: /, ""));
     const placed = await commitDrawn(
@@ -468,7 +475,7 @@ async function editMadeTitle(call: ToolCall, input: ContractInput<"edit_title_to
       written,
       (tx) => {
         for (const f of files) removeFile(tx, String(f.id), { removeClips: true });
-        return placeNativeTitle(tx, plan, written, position, fpsOfProject(project), layers, next, tag.seconds);
+        return placeNativeTitle(tx, plan, written, position, fpsOfProject(project), layers, next, seconds);
       },
       "Edit title",
     );

@@ -9,7 +9,7 @@
 import { backdrop, drawing, enter, key, pose, textBox, textElement, type TextBlock } from "../motion/elements.js";
 import { planOf } from "../motion/keyframes.js";
 import { centredWidth, fitType, layoutOf, opticalCentre, typeSize, type Layout } from "../motion/layout.js";
-import { textWidth } from "../motion/text.js";
+import { clampText, fitSize, textWidth } from "../motion/text.js";
 import type { Element, Key, MotionFrame, MotionPlan, Pose } from "../motion/types.js";
 import { ROLL_LINES, titleBackground, type TitleSpec } from "./styles.js";
 
@@ -58,10 +58,13 @@ function groupTop(c: Ctx, zone: TitleSpec["zone"], height: number): number {
 export function buildNativeTitle(s: TitleSpec, frame: MotionFrame, seconds: number): MotionPlan {
   const L = layoutOf(frame);
   const frames = Math.max(2, Math.round(seconds * frame.fps));
-  const f = (t: number): number => Math.min(frames - 1, Math.round(t * frame.fps));
+  const outSeconds = Math.min(0.5, seconds * 0.2);
+  // Entrances take up to ~1.2 s; a shorter title plays them faster so they end before its exit.
+  const pace = Math.min(1, Math.max(0.05, seconds - outSeconds) / 1.2);
+  const f = (t: number): number => Math.min(frames - 1, Math.round(t * pace * frame.fps));
   const [ink, inkAlpha] = split(s.text_color || (s.style === "bold_box" ? "#111111" : "#ffffff"));
   const [accent, accentAlpha] = split(s.accent_color || (s.style === "bold_box" ? "#ffffff" : "#ffd166"));
-  const c: Ctx = { L, frames, out: frames - Math.max(1, f(Math.min(0.5, seconds * 0.2))), ink, inkAlpha, accent, accentAlpha, scale: s.font_scale, elements: [] };
+  const c: Ctx = { L, frames, out: frames - Math.max(1, Math.round(outSeconds * frame.fps)), ink, inkAlpha, accent, accentAlpha, scale: s.font_scale, elements: [] };
   const { W, H, u } = L;
   const k = s.font_scale;
   const bg = titleBackground(s);
@@ -97,11 +100,19 @@ export function buildNativeTitle(s: TitleSpec, frame: MotionFrame, seconds: numb
       textAt(c, "title-subtitle", block(S.lines, S.size, { bold: big, tracking: big ? 0.24 : 0, leading: 1.3, opacity: inkAlpha * (big ? 0.8 : 0.9) }), W / 2, y + 0.9 * S.size, f(big ? 0.45 : 0.5), { dy: 24 * u, frames: f(0.6) });
     }
   } else if (s.style === "lower_third") {
-    const nameSize = typeSize(L, "body", 56 * u * k);
-    const roleSize = typeSize(L, "label", 32 * u * k);
-    const nameW = s.title ? textWidth(s.title, { size: nameSize, font: "sans", bold: true }) : 0;
-    const roleW = s.subtitle ? textWidth(s.subtitle, { size: roleSize, font: "sans" }) : 0;
     const padX = 34 * u;
+    const barW0 = 10 * u;
+    const textRoom = W * 0.78 / 1.08 - 2 * padX - barW0;
+    const fitLine = (text: string, size: number, bold: boolean, role: "body" | "label"): [string, number] => {
+      if (!text) return ["", size];
+      const style = { font: "sans" as const, bold };
+      const shrunk = Math.max(L.type[role], Math.min(size, fitSize([text], style, textRoom, size)));
+      return [clampText(text, { ...style, size: shrunk }, textRoom), shrunk];
+    };
+    const [name, nameSize] = fitLine(s.title, typeSize(L, "body", 56 * u * k), true, "body");
+    const [role, roleSize] = fitLine(s.subtitle, typeSize(L, "label", 32 * u * k), false, "label");
+    const nameW = name ? textWidth(name, { size: nameSize, font: "sans", bold: true }) : 0;
+    const roleW = role ? textWidth(role, { size: roleSize, font: "sans" }) : 0;
     const plateW = Math.min(W * 0.78, Math.max(nameW, roleW) * 1.08 + 2 * padX);
     const plateH = 44 * u + (s.title ? 1.1 * nameSize : 0) + (s.subtitle ? 1.2 * roleSize + 6 * u : 0);
     const barW = 10 * u;
@@ -112,10 +123,10 @@ export function buildNativeTitle(s: TitleSpec, frame: MotionFrame, seconds: numb
     c.elements.push(drawing("title-plate", c.elements.length, f(0.15), frames, { width: plateW, height: plateH, cx: 0, cy: plateH / 2 }, (d) => d.rect(0, 0, plateW, plateH, { fill: "#0c0c10", fillOpacity: 0.82 }), life(c, pose(left + barW, top + plateH / 2), f(0.15), { sx: 0, alpha: 1, frames: f(0.7), ease: "in_out" })));
     let y = top + 22 * u;
     if (s.title) {
-      textAt(c, "title-name", block([s.title], nameSize, { anchor: "start", tracking: -0.01 }), left + barW + padX, y + 0.88 * nameSize, f(0.45), { dx: -30 * u, frames: f(0.6), ease: "out_strong" });
+      textAt(c, "title-name", block([name], nameSize, { anchor: "start", tracking: -0.01 }), left + barW + padX, y + 0.88 * nameSize, f(0.45), { dx: -30 * u, frames: f(0.6), ease: "out_strong" });
       y += 1.1 * nameSize + 6 * u;
     }
-    if (s.subtitle) textAt(c, "title-role", block([s.subtitle], roleSize, { anchor: "start", bold: false, opacity: inkAlpha * 0.78 }), left + barW + padX, y + 0.9 * roleSize, f(0.58), { dx: -30 * u, frames: f(0.6), ease: "out_strong" });
+    if (s.subtitle) textAt(c, "title-role", block([role], roleSize, { anchor: "start", bold: false, opacity: inkAlpha * 0.78 }), left + barW + padX, y + 0.9 * roleSize, f(0.58), { dx: -30 * u, frames: f(0.6), ease: "out_strong" });
   } else if (s.style === "bold_box") {
     const rows = [...s.title.split("\n").map((r) => r.trim()).filter(Boolean), ...(s.subtitle ? [s.subtitle] : [])];
     const longest = Math.max(...rows.map((r) => r.length), 1);

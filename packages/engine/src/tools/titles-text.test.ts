@@ -13,7 +13,8 @@ import { getAttr } from "../titles/xml.js";
 import { toStoredPaths } from "../io/paths.js";
 import { createProject } from "../model/defaults.js";
 import type { Clip, Effect, Keyframe } from "../model/types.js";
-import { addClip } from "../ops/clips.js";
+import { addClip, deleteClips } from "../ops/clips.js";
+import { patchClip } from "../ops/internal.js";
 import { createEffect } from "../effects/registry.js";
 import { addFile, updateFile } from "../ops/files.js";
 import { setTrackLocked } from "../ops/tracks.js";
@@ -772,6 +773,68 @@ describe("edit_title_tool on titles made with add_title_tool", () => {
     for (const id of r.timeline_clip_ids as string[]) expect(clip(doc, id)).toBeUndefined();
     expect(doc.undoLabels.length).toBe(undo + 1);
     await expectRefusal(doc, h, "edit_title_tool", { timeline_clip_id: ids[0], scope: "this_clip", text: "x" }, "edited as a whole");
+  });
+
+  it("redraws a native title with more layers above anything that now sits over it, never around it", async () => {
+    const doc = newDoc();
+    const h = host({ without: ["motion"] });
+    const r = data(await call(doc, h, "add_title_tool", { text: "Day 1" }));
+    const ids = r.timeline_clip_ids as string[];
+    const top = Math.max(...ids.map((id) => Number(clip(doc, id)!.layer)));
+    const sticker = addVideo(doc, { position: 0, end: 5, layer: top + 1_000_000 });
+    const e = data(await call(doc, h, "edit_title_tool", { timeline_clip_id: ids[0], background_color: "#000000" }));
+    const layers = (e.timeline_clip_ids as string[]).map((id) => Number(clip(doc, id)!.layer));
+    const stickerLayer = Number(clip(doc, sticker)!.layer);
+    // All below the sticker or all above it: it never ends up between the title's own layers.
+    expect(layers.every((l) => l < stickerLayer) || layers.every((l) => l > stickerLayer)).toBe(true);
+  });
+
+  it("keeps a trimmed native title's length, and refuses one whose clips are gone", async () => {
+    const doc = newDoc();
+    const h = host({ without: ["motion"] });
+    const r = data(await call(doc, h, "add_title_tool", { text: "Day 1", duration_seconds: 5 }));
+    const ids = r.timeline_clip_ids as string[];
+    const ends = () => (ids2: string[]) => Math.max(...ids2.map((id) => Number(clip(doc, id)!.position) + Number(clip(doc, id)!.end) - Number(clip(doc, id)!.start)));
+    doc.transaction("trim", (tx) => {
+      for (const id of ids) {
+        const c = clip(doc, id)!;
+        patchClip(tx, id, { end: Math.min(Number(c.end), 2 - Number(c.position) + Number(c.start)) });
+      }
+    });
+    const e = data(await call(doc, h, "edit_title_tool", { timeline_clip_id: ids[0], text: "Day 2" }));
+    expect(ends()(e.timeline_clip_ids as string[])).toBeLessThanOrEqual(2 + 1e-6);
+    const fileId = String(e.file_id);
+    doc.transaction("delete", (tx) => deleteClips(tx, e.timeline_clip_ids as string[]));
+    await expectRefusal(doc, h, "edit_title_tool", { file_id: fileId, text: "Day 3" }, "no clips");
+  });
+
+  it("finds a native title from any of its layers in the selection", async () => {
+    const doc = newDoc();
+    const h = host({ without: ["motion"] });
+    await call(doc, h, "add_title_tool", { text: "First" });
+    const r = data(await call(doc, h, "add_title_tool", { text: "Second", subtitle: "Sub", position_seconds: 10 }));
+    const last = (r.timeline_clip_ids as string[]).find((id) => clip(doc, id)!.file_id !== r.file_id)!;
+    h.editor.selection.clips = [last];
+    const e = await call(doc, h, "edit_title_tool", { text: "Second!" });
+    expect(e.summary).toMatch(/^Updated title 'Second! \/ Sub'/);
+  });
+
+  it("plays a short native title's entrance and fade inside it, and fits a long lower-third name", async () => {
+    const doc = newDoc();
+    const h = host({ without: ["motion"] });
+    const r = data(await call(doc, h, "add_title_tool", { text: "Hi", duration_seconds: 1 }));
+    for (const id of r.timeline_clip_ids as string[]) {
+      const c = clip(doc, id)!;
+      const alpha = (c.alpha as Keyframe).Points;
+      const length = Math.round((Number(c.end) - Number(c.start)) * 30);
+      expect(alpha.at(-1)!.co.Y).toBe(0); // it fades out
+      expect(Math.max(...alpha.map((p) => p.co.X))).toBeLessThanOrEqual(length + 1);
+    }
+    const long = data(await call(doc, h, "add_title_tool", { text: "A very long name that would never fit on any plate at all", subtitle: "Role", style: "lower_third", position_seconds: 5 }));
+    for (const id of long.timeline_clip_ids as string[]) {
+      const svg = svgOf(h, String(clip(doc, id)!.reader.path));
+      expect(Number(/<svg[^>]*\swidth="([\d.]+)"/.exec(svg)![1])).toBeLessThanOrEqual(1920 * 0.78 + 1);
+    }
   });
 
   it("refuses style changes on a Title Editor SVG, and a rendered title where nothing can render", async () => {
