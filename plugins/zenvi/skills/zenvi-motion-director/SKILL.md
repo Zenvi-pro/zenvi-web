@@ -150,8 +150,8 @@ unmastered edits arrive 9-17 dB too quiet and nobody has looked at the file.
    lockup, wheel for a word flipper, paper for stop-motion paper type);
    put a hit on each of its `data.hits`.
    `text_behind_subject_tool` for one full-width hero word; `add_title_tool`
-   with a bundled family (`font: "Anton"`, `"Instrument Serif"`, `"Space
-   Mono"`...) only for static labels and logo bugs.
+   (animated styles: `headline`, `lower_third`, `kicker`, `end_card`...; a
+   family such as `font: "Anton"`) for titles, labels and logo bugs.
 9. **Colour: match first, then the look.** `unify_grade_tool` (no
    arguments: every footage clip toward the cut's median look; or
    `reference_clip_id` = the hero shot) so daylight and night shots stop
