@@ -81,7 +81,7 @@ documentary captions or none on 16:9; captions on 9:16.
    1.07 per shot (`ease_in_out`).
 4. Scale steps: `apply_motion_transition_tool` `{"preset": "zoom_through", "time": <join>}` + `add_sfx_tool`
    `whoosh_short` (-16).
-5. Readout per step: `add_title_tool` `{"template": "Header_3", "text": "10⁻⁴ m", "font": "Menlo",
+5. Readout per step: `add_title_tool` `{"style": "kicker", "text": "10⁻⁴ m", "font": "Menlo",
    "text_color": "#ffffff", "position_seconds": <step>, "duration_seconds": <step length>}`.
 6. The claim: `add_kinetic_title_tool` `{"text": "Plants move.", "style": "editorial", "animation": "rise",
    "emphasis": ["move."]}`; captions after it: `kinetic_captions_tool` `{"style": "documentary"}`.
