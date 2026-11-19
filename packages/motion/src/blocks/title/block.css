@@ -1,0 +1,18 @@
+.tt-stack { width: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.tt-t { margin: 0; font-weight: 800; line-height: 1.02; letter-spacing: -0.03em; text-wrap: balance; max-width: 100%; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.35); }
+.tt-m { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: 0.06em; }
+.tt-w { display: inline-block; }
+.tt-rule { background: var(--title-accent); border-radius: 999px; }
+.tt-s { margin: 0; font-weight: 500; line-height: 1.3; opacity: 0.9; text-wrap: balance; max-width: 90%; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.35); }
+.tt-caps { text-transform: uppercase; letter-spacing: 0.24em; font-weight: 600; }
+.tt-lt { flex-direction: row; align-items: stretch; align-self: flex-start; width: auto; max-width: 78%; text-align: left; }
+.tt-bar { background: var(--title-accent); transform-origin: 50% 100%; }
+.tt-plate { background: rgba(12, 12, 16, 0.82); display: flex; flex-direction: column; justify-content: center; }
+.tt-n { font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; white-space: nowrap; }
+.tt-r { font-weight: 500; line-height: 1.2; opacity: 0.78; white-space: nowrap; }
+.tt-row { line-height: 1; margin: 6px 0; }
+.tt-box { display: inline-block; background: var(--title-accent); color: var(--title-ink); font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; border-radius: 8px; }
+.tt-kick { display: flex; align-items: center; justify-content: center; width: 100%; }
+.tt-line { display: block; width: 90px; height: 2px; background: var(--title-accent); }
+.tt-k { font-weight: 700; text-transform: uppercase; letter-spacing: 0.32em; white-space: nowrap; }
+.tt-c { font-weight: 600; line-height: 1.2; }

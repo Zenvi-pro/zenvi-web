@@ -41,7 +41,8 @@ const editTitle: ToolSpec = {
   tool: "edit_title_tool",
   args: { title_query: "TRUTH" },
   clips: [],
-  setup: [{ tool: "add_title_tool", args: { text: "TRUTH", template: "Standard_1", duration_seconds: 1 } }],
+  setup: [{ tool: "add_title_tool", args: { text: "TRUTH", duration_seconds: 2 } }],
+  probe: { kind: "picture", at: 1 },
   needsChange: true,
 };
 const effectsGone: ToolSpec = { tool: "remove_effect_tool", args: { timeline_clip_id: A }, setup: [{ tool: "add_effect_tool", args: { timeline_clip_id: A, effect: "Negate" } }] };
@@ -166,11 +167,10 @@ export const EDIT_TOOL_CASES: readonly TruthCase[] = [
 
   // Editing a title in place.
   param(editTitle, "text", "CHANGED TITLE"),
-  param(editTitle, "text_color", "#ff0000", { expect: [up("red")] }),
+  param(editTitle, "text_color", "#ff0000", { expect: [down("green")] }),
   param(editTitle, "background_color", "#00ff00", { expect: [up("green")] }),
   param(editTitle, "font_scale", 2, { expect: [up("coverage")] }),
-  param(editTitle, "font_weight", "normal", { expect: [down("coverage")] }),
-  param(editTitle, "font_style", "italic"),
+  param(editTitle, "style", "bold_box", { expect: [up("coverage")] }),
   param(editTitle, "font", "Instrument Serif"),
 
   // Removing what earlier calls added.

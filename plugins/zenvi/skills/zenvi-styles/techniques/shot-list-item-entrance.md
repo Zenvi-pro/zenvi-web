@@ -22,7 +22,7 @@ rotate flat from a 16 degree tilt and "click" into their slot, with a 2 px accen
 
 ## Build it in Zenvi
 - Menu: `add_motion_block_tool {"block": "toggle_panel"}` is a ready panel whose rows enter in turn (its switches then turn on); `glass_cards` is a
-  3-card version over footage. For a 6-row menu with exact control, one `add_title_tool {"text": "Home", "template": "Gray_Box_4", "position_seconds": 0.07, "duration_seconds": 3.8, "screen_position": "center"}`
+  3-card version over footage. For a 6-row menu with exact control, one `add_title_tool {"text": "Home", "style": "lower_third", "position_seconds": 0.07, "duration_seconds": 3.8, "screen_position": "center"}`
   per row (rows at 10 f = 0.33 s apart), then per row `set_keyframes_tool` on `scale_x`/`scale_y` 0.82 to 1 (0.8 s, `ease_out_back`, soft), `alpha` 0 to 1 (0.4 s) and `location_y` +0.04 to 0.
 - Drift: the drift is on the container; with separate row clips, add one `set_keyframes_tool` `location_y` on a parent-like cover: apply the same
   linear `location_y` curve (0.05 to -0.05 of the frame over the shot, `interpolation: linear`) to every row clip.

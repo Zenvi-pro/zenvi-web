@@ -25,7 +25,7 @@ Use when: A tab, filter or toggle switch causes the next state (the chart change
 
 ## Build it in Zenvi
 
-1. Indicator: `add_title_tool {"text": " ", "background_color": "<ink_or_white>", "fit_text": false, "position_seconds": 0.0, "duration_seconds": 4.0, "track": "2"}` behind the labels (a screenshot or per-label title clips); `corner_radius` fully round, fill flat, height fixed.
+1. Indicator: `add_title_tool {"text": " ", "background_color": "<ink_or_white>", "position_seconds": 0.0, "duration_seconds": 4.0, "track": "2"}` behind the labels (a screenshot or per-label title clips); `corner_radius` fully round, fill flat, height fixed.
 2. Two edges, one ease, different lengths: leading edge reaches the target edge in 12 f (0.2 s), trailing edge in 20 f (0.33 s), both `ease_in_out_sine`. Sample both edges every 2 f (0.03 s) and write the indicator's centre and width: `set_keyframes_tool {"timeline_clip_id": "<pill>", "property": "location_x", "interpolation": "linear", "points": [...centre = (L+R)/2...]}` and `scale_x` points = (R - L) / start_width, which swells to about 1.9x near f6 (0.1 s) and relaxes to the target width.
 3. For hops beyond about 250 px keep the 0.6 ratio but lengthen both (a 420 px hop takes 18 f / 30 f = 0.3 s / 0.5 s) so the leading edge stays under about 65 px/f.
 4. Labels: the new label goes from grey to the active colour over the last 8 f (0.13 s), the old one back over the first 8 f (two crossfading title clips each); step the new label's weight 500 to 600 on the landing frame.

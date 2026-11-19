@@ -25,7 +25,7 @@ Use when: Speaking-pace builds, stat rows that widen as words arrive, centred ty
 
 ## Build it in Zenvi
 
-1. Lay the line out as one word per title so each word has its own clip: `add_title_tool {"text": "One", "template": "Standard_1", "position_seconds": 1.0, "duration_seconds": 3.5, "track": "3"}`, then `"prompt"`, `"ships"`, `"the film."` on tracks 4, 5, 6 with `position_seconds` 1.45, 1.9, 2.35 (a new word every 27 f, 0.45 s).
+1. Lay the line out as one word per title so each word has its own clip: `add_title_tool {"text": "One", "position_seconds": 1.0, "duration_seconds": 3.5, "track": "3"}`, then `"prompt"`, `"ships"`, `"the film."` on tracks 4, 5, 6 with `position_seconds` 1.45, 1.9, 2.35 (a new word every 27 f, 0.45 s).
 2. Each word drops in: `set_keyframes_tool {"timeline_clip_id": "<word_k>", "property": "location_y", "ease": "ease_out_expo", "points": [{"seconds": <land_k>, "value": -0.04}, {"seconds": <land_k + 0.3>, "value": 0}]}` (0.35 em, 18 f) and `alpha` 0 to 1 over 0.1 s.
 3. Re-centre: for every word already placed, add `location_x` keyframes that shift it by half the new word's width at each landing, `ease_in_out_sine`, 0.45 s long (never over 280 px, 0.15 of width, per shift).
 4. After the last word add a 0.3 px/f drift: `location_x` +0.003 over 1.5 s.

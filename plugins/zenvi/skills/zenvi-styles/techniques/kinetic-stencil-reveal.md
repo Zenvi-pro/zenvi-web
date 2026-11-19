@@ -22,8 +22,7 @@ then a cut on the beat to the full shot. Chapter opens, recipe titles, game titl
 No one-call tool (`needs: cutout-title-reveal`, no cast shadow on the hole). Fallback that verifies: one white-on-black
 title image multiplied over the footage (white × shot = shot, black × shot = black):
 ```json
-add_title_tool {"template": "Standard_1", "text": "BLOOM", "font": "Arial Black", "font_weight": "bold", "font_scale": 2.5,
-  "text_color": "#ffffff", "background_color": "#000000", "position_seconds": 0, "duration_seconds": 2.6}
+add_title_tool {"text": "BLOOM", "font": "Arial Black", "font_scale": 2.5, "text_color": "#ffffff", "background_color": "#000000", "position_seconds": 0, "duration_seconds": 2.6}
 set_clip_properties_tool {"timeline_clip_ids": ["<title clip>"], "properties": {"composite": "multiply"}}
 set_keyframes_tool {"timeline_clip_id": "<title clip>", "property": "scale_x", "points": [{"seconds": 0, "value": 1}, {"seconds": 2.6, "value": 1.12}]}
 set_keyframes_tool {"timeline_clip_id": "<title clip>", "property": "scale_y", "points": [{"seconds": 0, "value": 1}, {"seconds": 2.6, "value": 1.12}]}

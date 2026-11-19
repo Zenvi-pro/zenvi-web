@@ -32,7 +32,7 @@ Use when: Copy about fixing, undoing, cleaning up or simplifying; a deadpan joke
 
 **Full look** (relies on italic: only when the person's brand supplies that look):
 
-1. Broken state: `add_title_tool {"text": "Messy, tangled, slow.", "template": "Standard_1", "position_seconds": 2.0, "duration_seconds": 0.1, "track": "3"}` and tilt it with `set_keyframes_tool {"timeline_clip_id": "<broken>", "property": "rotation", "points": [{"seconds": 2.0, "value": -20}, {"seconds": 2.1, "value": -22}]}`; a drift of 0.5 px/f is the tiny `location_x` slide over the clip.
+1. Broken state: `add_title_tool {"text": "Messy, tangled, slow.", "position_seconds": 2.0, "duration_seconds": 0.1, "track": "3"}` and tilt it with `set_keyframes_tool {"timeline_clip_id": "<broken>", "property": "rotation", "points": [{"seconds": 2.0, "value": -20}, {"seconds": 2.1, "value": -22}]}`; a drift of 0.5 px/f is the tiny `location_x` slide over the clip.
 2. Fix steps are hard cuts between title clips, no tween: one clip per state, at +6 f, +26 f, +40 f after the cut (0.1 s, 0.43 s, 0.67 s): `add_title_tool {"text": "Clean, tangled, slow.", "position_seconds": 2.1, ...}` and so on, each word upright as it is fixed.
 3. 2 % punch on the newly fixed word's clip: `scale_x/y` 1.0, 1.02 (0.03 s, ease_out_expo), 1.0 at 0.07 s.
 4. Delete variant: successive title clips with the words cut from the end, held 10, 5, 5, 2 f (0.17, 0.08, 0.08, 0.03 s).

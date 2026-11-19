@@ -25,7 +25,7 @@ Use when: Clearing a sentence into a single colour field or a seed for the logo 
 
 ## Build it in Zenvi
 
-1. Flanking words converge: `add_title_tool {"template": "Standard_1", "text": "Ship", "position_seconds": 0, "duration_seconds": 1.2, "track": 3}` and `"text": "faster"` on track 4; the tile (icon) on a higher track. `set_keyframes_tool` on each word `location_x` from -0.3 / +0.3 to 0 over 22 f (0.37 s), `ease_in_cubic`, sliding under the tile (lower track).
+1. Flanking words converge: `add_title_tool {"text": "Ship", "position_seconds": 0, "duration_seconds": 1.2, "track": 3}` and `"text": "faster"` on track 4; the tile (icon) on a higher track. `set_keyframes_tool` on each word `location_x` from -0.3 / +0.3 to 0 over 22 f (0.37 s), `ease_in_cubic`, sliding under the tile (lower track).
 2. The tile and its blank accent face as two clips: `add_clip_to_timeline_tool {"file_id": "<icon_tile>", "position_seconds": 0, "duration_seconds": 1.4, "track": 5}` and `{"file_id": "<accent_face>", "position_seconds": 0.37, "duration_seconds": 1.4, "track": 5}`.
 3. Turn over 12 f (0.2 s) with `ease_in_out_sine`: `set_keyframes_tool {"timeline_clip_id": "<icon_tile>", "property": "scale_x", "mode": "replace", "points": [{"seconds": 0.37, "value": 1.0}, {"seconds": 0.57, "value": 0.02, "ease": "ease_in_out_sine"}]}` with `location_x` 0 to -half the tile width; the accent face `scale_x` 0.02 to 1.0 with `location_x` +half to 0 over the same times. Dim the departing face from brightness 1 to 0.55 with a black card above at 0 to 0.45 alpha.
 4. Hold the blank face 6 f (0.1 s) as a designed freeze on a silence, then it expands, punches or opens into the next element: `scale_x/y` 1.0 to 3.0 on `ease_in_expo`.

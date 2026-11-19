@@ -23,7 +23,7 @@ the viewer settles; then in under 0.4 s the whole ground drops to near-black, th
 ```json
 add_motion_block_tool {"block":"gradient_field","position_seconds":0,"duration_seconds":4.8,"placement":"over_video",
   "params":{"style":"aurora","colors":["#6b4fe0","#d97a4a","#ffffff"],"speed":0.8,"grain":true}}
-add_title_tool {"template":"Solid_Color","text":" ","background_color":"#0a0a12ed","position_seconds":2.9,"duration_seconds":1.9,"fade_in_seconds":0.36}
+add_title_tool {"text": " ", "background_color": "#0a0a12ed", "position_seconds": 2.9, "duration_seconds": 1.9}
 add_kinetic_title_tool {"text":"Once, a week of work","style":"editorial","animation":"fade","emphasis":"none","text_size":0.16,"ink":"#1a1a24","y":0.5,"position_seconds":0.9,"duration_seconds":1.9}
 add_kinetic_title_tool {"text":"now one afternoon","style":"editorial","animation":"rise","emphasis":"afternoon","text_size":0.16,"stagger_seconds":0.08,"accent":"#c9b8ff","ink":"#ffffff","y":0.5,"position_seconds":3.6,"duration_seconds":1.2}
 add_sfx_tool {"recipe":"sub_drop","at_seconds":2.95,"gain_db":-14}

@@ -1,14 +1,15 @@
 /**
- * Title templates and editing titles: list_title_templates_tool, edit_title_tool.
+ * Title styles and editing titles: list_title_templates_tool, edit_title_tool.
  *
- * Ports of zenvi-core develop src/classes/editor_tools/titles_text.py with
- * the title rules of classes/title_svg.py (titles/title-svg.ts). Templates
- * are the 50 bundled SVGs (`ToolHost.assets`); the desktop also lists the
- * user's own template folder, which web surfaces do not have. A project
- * title's SVG is read through the host (`StorageHost.readText`; bundled
- * emoji through the assets).
+ * Ports of zenvi-core src/classes/editor_tools/titles_text.py (#407). The
+ * styles are add_title_tool's six (titles/styles.ts). A title made with
+ * add_title_tool is edited by rendering its title block again (titles.ts) or,
+ * when it was drawn with layers, by drawing its group again where it was. An
+ * SVG title from the Title Editor is rewritten with the rules of
+ * classes/title_svg.py (titles/title-svg.ts); its SVG is read through the host
+ * (`StorageHost.readText`; bundled emoji through the assets).
  *
- * Editing writes a new SVG through `MediaHost.writeGenerated`. The desktop
+ * Editing an SVG title writes a new SVG through `MediaHost.writeGenerated`. The desktop
  * points the title's Project Files entry at the new version (same file id);
  * here the new version is a new entry that takes the old one's place in
  * every clip and in the bin, in the same undo step, because web hosts store
@@ -19,18 +20,14 @@
  */
 
 import type { Clip, Project, ProjectFile } from "../../model/types.js";
-import { addFile, removeFile } from "../../ops/files.js";
+import { addFile, removeFile, updateFile } from "../../ops/files.js";
 import { useFileForClip } from "../../ops/overlays.js";
 import { textSpan } from "../../titles/artboard.js";
-import { TITLE_TEMPLATES } from "../../titles/templates.js";
 import {
   applyFont,
-  artboardSize,
-  backgroundColor,
   duplicatePattern,
   fieldByRole,
   fitField,
-  fontFamily,
   freeName,
   installedFontForTitle,
   parseTitleSvg,
@@ -40,7 +37,6 @@ import {
   setTextColor,
   textColor,
   textNodes,
-  textZone,
   titleFields,
   titleSvgText,
   tspanNodes,
@@ -51,10 +47,12 @@ import {
 import { contractTool, unavailable, type ToolCall } from "../define.js";
 import { pyReprString } from "../pyfmt.js";
 import { applied } from "../receipt.js";
-import type { AssetHost, ImportedMedia } from "../types.js";
+import type { ImportedMedia } from "../types.js";
 import {
   OVERLAY_ROLE,
+  TRACK_STEP,
   colorHexAlpha,
+  fpsOfProject,
   guarded,
   isLocked,
   pyRoundTo,
@@ -64,62 +62,12 @@ import {
   uiTrackNumber,
 } from "../titles-text.js";
 import { outlineTitle, titleFontFamilies, titleFontWarnings } from "../fonts.js";
+import { TITLE_STYLE_IDS, TITLE_STYLES, sameTitleSpec, titleFieldsOf, titleShown, titleSpecOf, type TitleSpec } from "../../titles/styles.js";
+import type { ContractInput } from "../schemas.gen.js";
+import type { ToolOutcome } from "../define.js";
+import { NATIVE_TITLE_KEY, blockFileFields, nativePlan, placeNativeTitle, renderTitleBlock, rendersTitleBlock, specOf, type NativeTitleTag } from "./titles.js";
+import { commitDrawn, writeDrawings } from "./motion-templates.js";
 import { animatedCatalog } from "./animated-titles.js";
-
-/** What each bundled template looks like (titles_text.py TEMPLATE_PURPOSE, from rendering all 50). */
-const TEMPLATE_PURPOSE: Readonly<Record<string, string>> = {
-  Bar_1: "centre title on a glossy blue bar, with a reflection",
-  Bar_2: "centre title + subtitle on a glossy blue bar",
-  Bar_3: "lower third: gold title on a dark bar across the bottom",
-  Box: "full-screen card: purple background, cyan frame, title + subtitle",
-  Bubbles_1: "title + subtitle under floating bubbles",
-  Bubbles_2: "title + subtitle with bubbles around the frame",
-  Camera_Border: "camera viewfinder corners around a small title",
-  Cloud_1: "title + subtitle inside a cartoon cloud",
-  Cloud_2: "three lines in three cartoon clouds",
-  Creative_Commons_1: "music credit card (song, author, CC licence) on black",
-  Creative_Commons_2: "music credit card with a URL line, on black",
-  Film_Rating_1: "green 'approved for all audiences' trailer card",
-  Film_Rating_2: "green trailer rating card: R",
-  Film_Rating_3: "green trailer rating card: G",
-  Film_Rating_4: "green trailer rating card: PG-13",
-  Flames: "title + subtitle over flames along the bottom",
-  Flare: "full-screen card: colourful light flare, big title + subtitle",
-  Footer_1: "small footer text, bottom left",
-  Footer_2: "small footer text, bottom centre",
-  Footer_3: "small footer text, bottom right",
-  Gold_1: "gold title, centre",
-  Gold_2: "gold title + subtitle, centre",
-  Gold_Bottom: "gold title, bottom centre",
-  Gold_Top: "gold title, top centre",
-  Gray_Box_1: "title in a grey box, top left",
-  Gray_Box_2: "title + subtitle in a grey box, top left",
-  Gray_Box_3: "lower third: title in a grey box, bottom right",
-  Gray_Box_4: "lower third: name + role in a grey box, bottom right",
-  Header_1: "small header text, top left",
-  Header_2: "small header text, top centre",
-  Header_3: "small header text, top right",
-  OpenShot: "full-screen card: pink-to-blue gradient, white title + subtitle (end card)",
-  Oval_1: "title + subtitle inside a blue oval vignette",
-  Oval_2: "title + subtitle inside a blue oval frame",
-  Oval_3: "title at the top and subtitle at the bottom of a blue oval",
-  Oval_4: "title with reflection inside a blue oval",
-  Post_it: "yellow sticky note with four lines",
-  Ribbon_1: "subtitle + title on a blue ribbon across the top",
-  Ribbon_2: "title + subtitle on a blue ribbon across the top",
-  Ribbon_3: "title ribbon at the top, subtitle ribbon at the bottom",
-  Smoke_1: "title + subtitle between dark smoke at top and bottom",
-  Smoke_2: "title + subtitle with dark smoke",
-  Smoke_3: "title with reflection between dark smoke",
-  Solid_Color: "solid full-screen colour card with no text (set background_color)",
-  Standard_1: "plain title + subtitle, centre",
-  Standard_2: "plain title with a reflection, centre",
-  Standard_3: "three centred lines",
-  Standard_4: "four centred lines (credits)",
-  Sunset: "glowing gradient title, centre",
-  Text_Card: "solid colour card with one centred line of text (set background_color)",
-  TV_Rating: "small TV rating badge (TV / G), top left",
-};
 
 function basename(path: string): string {
   return String(path ?? "").split(/[\\/]/).pop() ?? "";
@@ -279,51 +227,13 @@ export function assignTexts(slots: readonly TextField[], text: string, subtitle:
 // Reading templates and project titles
 // ---------------------------------------------------------------------------
 
-const templateCache = new WeakMap<AssetHost, Promise<Record<string, unknown>[]>>();
-
-/** `_template_entry` for every bundled template, read once per asset host. */
-function templateEntries(call: ToolCall): Promise<Record<string, unknown>[]> {
-  const assets = call.host.assets!;
-  let pending = templateCache.get(assets);
-  if (!pending) {
-    pending = Promise.all(
-      TITLE_TEMPLATES.map(async (t) => {
-        const entry: Record<string, unknown> = { name: t.id, label: t.name, source: "bundled" };
-        let doc: TitleDoc;
-        try {
-          doc = parseTitleSvg(await assets.readText(t.assetPath));
-        } catch (error) {
-          entry.error = `unreadable: ${errorMessage(error)}`;
-          return entry;
-        }
-        const slots = titleFields(doc);
-        const [, h] = artboardSize(doc);
-        const main = fieldByRole(slots, "title") ?? slots[0];
-        const [color, alpha] = main ? textColor(doc, main.nodes[0]) : ["", 0];
-        const [bg, bgAlpha] = backgroundColor(doc);
-        Object.assign(entry, {
-          purpose: TEMPLATE_PURPOSE[t.id] ?? "",
-          zone: textZone(slots, h),
-          fields: fieldRows(slots),
-          text_color: color,
-          background: { color: bg, opacity: pyRoundTo(bgAlpha, 3) },
-          font: fontFamily(doc),
-        });
-        if (alpha < 0.999) entry.text_opacity = pyRoundTo(alpha, 3);
-        return entry;
-      }),
-    );
-    pending.catch(() => templateCache.delete(assets));
-    templateCache.set(assets, pending);
-  }
-  return pending;
-}
-
 /** `_matches`: every query word in the entry's name, label, purpose, zone and field texts. */
 function matches(entry: Record<string, unknown>, query: string): boolean {
   if (!query) return true;
-  const fields = Array.isArray(entry.fields) ? (entry.fields as { text?: string }[]) : [];
-  const hay = [entry.name, entry.label, entry.purpose, entry.zone, entry.title, ...fields.map((f) => f.text)]
+  const texts = Array.isArray(entry.fields)
+    ? (entry.fields as unknown[]).map((f) => (typeof f === "object" && f ? String((f as { text?: string }).text ?? "") : ""))
+    : Object.values((entry.fields ?? {}) as Record<string, unknown>).map((v) => (Array.isArray(v) ? v.join(" ") : String(v ?? "")));
+  const hay = [entry.name, entry.label, entry.look, entry.style, entry.zone, entry.title, ...texts]
     .map((v) => (typeof v === "string" ? v : ""))
     .join(" ")
     .toLowerCase()
@@ -338,7 +248,7 @@ function matches(entry: Record<string, unknown>, query: string): boolean {
 
 /** SVG files in the bin that can be titles (not the transparent overlay carrier). */
 function titleFiles(project: Project): ProjectFile[] {
-  return project.files.filter((f) => String(f.path ?? "").toLowerCase().endsWith(".svg") && f.zenvi_role !== OVERLAY_ROLE);
+  return project.files.filter((f) => String(f.path ?? "").toLowerCase().endsWith(".svg") && f.zenvi_role !== OVERLAY_ROLE && !f[NATIVE_TITLE_KEY]);
 }
 
 /** A bin SVG's text: bundled emoji from the assets, anything else through the host's storage. */
@@ -358,9 +268,28 @@ function clipsOf(project: Project, fileId: string): Clip[] {
 async function projectTitles(call: ToolCall, query: string): Promise<Record<string, unknown>[]> {
   const project = call.doc.project;
   const out: Record<string, unknown>[] = [];
+  const clipRows = (ids: readonly string[]) =>
+    project.clips
+      .filter((c) => ids.includes(String(c.file_id)))
+      .map((c) => {
+        const position = Number(c.position) || 0;
+        const length = (Number(c.end) || 0) - (Number(c.start) || 0);
+        return { timeline_clip_id: c.id, track: uiTrackNumber(project, c.layer), position: pyRoundTo(position, 3), end: pyRoundTo(position + length, 3) };
+      });
+  for (const f of project.files) {
+    const spec = titleSpecOf(f);
+    if (!spec) continue;
+    const entry: Record<string, unknown> = { file_id: f.id, kind: "rendered", name: f.name || basename(String(f.path)), path: String(f.path), style: spec.style, fields: titleFieldsOf(spec), clips: clipRows([String(f.id)]) };
+    if (matches(entry, query)) out.push(entry);
+  }
+  for (const [group, files] of nativeGroups(project)) {
+    const tag = files[0]![NATIVE_TITLE_KEY] as NativeTitleTag;
+    const entry: Record<string, unknown> = { file_id: files[0]!.id, kind: "native", group, file_ids: files.map((f) => f.id), style: tag.spec.style, fields: titleFieldsOf(tag.spec), clips: clipRows([String(files[0]!.id)]) };
+    if (matches(entry, query)) out.push(entry);
+  }
   for (const f of titleFiles(project)) {
     const path = String(f.path);
-    const entry: Record<string, unknown> = { file_id: f.id, name: f.name || basename(path), path };
+    const entry: Record<string, unknown> = { file_id: f.id, kind: "svg", name: f.name || basename(path), path };
     try {
       const doc = parseTitleSvg(await readProjectSvg(call, f));
       entry.fields = fieldRows(titleFields(doc));
@@ -385,7 +314,8 @@ async function projectTitles(call: ToolCall, query: string): Promise<Record<stri
 /** `_svg_file`: only SVG titles that are not overlay carriers can be edited. */
 function svgTitle(file: ProjectFile): ProjectFile {
   const path = String(file.path ?? "");
-  if (!path.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file.name || basename(path)))} is not a title (only .svg titles can be edited)`);
+  if (titleSpecOf(file) || file[NATIVE_TITLE_KEY]) return file;
+  if (!path.toLowerCase().endsWith(".svg")) toolError(`${pyReprString(String(file.name || basename(path)))} is not a title (only titles made with add_title_tool or the Title Editor can be edited)`);
   if (file.zenvi_role === OVERLAY_ROLE) toolError("that clip is a caption/timer overlay; use edit_captions_tool or add_timer_tool");
   return file;
 }
@@ -405,17 +335,21 @@ async function resolveTitle(call: ToolCall, clipId: string, fileId: string, titl
     if (!file) return toolError(`no project file with id=${pyReprString(fileId)}`);
     return [svgTitle(file), ""];
   }
-  const titles = titleFiles(project);
+  const titles = [...project.files.filter((f) => titleSpecOf(f)), ...[...nativeGroups(project).values()].map((files) => files[0]!), ...titleFiles(project)];
   if (titleQuery) {
     const q = titleQuery.toLowerCase();
     const scored: [number, ProjectFile][] = [];
     for (const f of titles) {
       const name = String(f.name || basename(String(f.path)));
       let texts: string[] = [];
-      try {
-        texts = titleFields(parseTitleSvg(await readProjectSvg(call, f))).map((s) => s.text.trim());
-      } catch {
-        texts = [];
+      const spec = titleSpecOf(f) ?? (f[NATIVE_TITLE_KEY] as NativeTitleTag | undefined)?.spec;
+      if (spec) texts = [spec.title, spec.subtitle, ...spec.lines];
+      else {
+        try {
+          texts = titleFields(parseTitleSvg(await readProjectSvg(call, f))).map((s) => s.text.trim());
+        } catch {
+          texts = [];
+        }
       }
       const hay = [name.toLowerCase(), ...texts.map((t) => t.toLowerCase())];
       if (hay.some((h) => h === q)) scored.push([2, f]);
@@ -438,7 +372,7 @@ async function resolveTitle(call: ToolCall, clipId: string, fileId: string, titl
   }
   const selected = (call.host.ui?.selectedIds?.() ?? [])
     .map((id) => project.clips.find((c) => c.id === id))
-    .filter((c): c is Clip => Boolean(c) && String(c!.reader?.path ?? "").toLowerCase().endsWith(".svg"));
+    .filter((c): c is Clip => Boolean(c) && titles.some((f) => f.id === c!.file_id));
   if (selected.length === 1) {
     const file = fileById(String(selected[0]!.file_id ?? ""));
     if (file) return [svgTitle(file), selected[0]!.id];
@@ -462,20 +396,134 @@ export async function writeTitle(call: ToolCall, name: string, svg: string): Pro
   }
 }
 
+// ---------------------------------------------------------------------------
+// Titles made with add_title_tool (titles/styles.ts): rendered, or drawn with layers
+// ---------------------------------------------------------------------------
+
+/** Native titles by group: every layer file of each one, in bin order. */
+function nativeGroups(project: Project): Map<string, ProjectFile[]> {
+  const groups = new Map<string, ProjectFile[]>();
+  for (const f of project.files) {
+    const tag = f[NATIVE_TITLE_KEY] as NativeTitleTag | undefined;
+    if (!tag || typeof tag !== "object") continue;
+    groups.set(tag.group, [...(groups.get(tag.group) ?? []), f]);
+  }
+  return groups;
+}
+
+/** `_edited_spec`: `old` with only what was passed changed (font_scale multiplies the current size). */
+function editedSpec(old: TitleSpec, input: ContractInput<"edit_title_tool">): TitleSpec {
+  const text = String(input.text ?? "");
+  const subtitle = String(input.subtitle ?? "");
+  const lines = (input.lines ?? []).map(String);
+  const style = String(input.style ?? "").trim() || old.style;
+  const title = lines.length > 0 ? "" : text.trim() ? text : old.title || old.lines.join("\n");
+  const sub = lines.length > 0 ? "" : subtitle.trim() ? subtitle : text.includes("\n") ? "" : old.subtitle;
+  const wanted = input.screen_position && input.screen_position !== "auto" ? input.screen_position : style === old.style ? old.zone : "auto";
+  return specOf({
+    style,
+    title,
+    subtitle: sub,
+    lines,
+    text_color: String(input.text_color ?? "").trim() || old.text_color,
+    accent_color: String(input.accent_color ?? "").trim() || old.accent_color,
+    background_color: String(input.background_color ?? "").trim() || old.background_color,
+    font: String(input.font ?? "").trim() || old.font,
+    font_scale: old.font_scale * (Number(input.font_scale) || 1),
+    screen_position: wanted,
+  });
+}
+
+function refuseLocked(project: Project, clips: readonly Clip[]): void {
+  const locked = clips.filter((c) => isLocked(project, c.layer));
+  if (locked.length > 0) toolError(`title clip(s) on locked track(s): ${locked.map((c) => `${c.id} (track ${uiTrackNumber(project, c.layer)})`).join(", ")}; unlock first`);
+}
+
+async function editMadeTitle(call: ToolCall, input: ContractInput<"edit_title_tool">, file: ProjectFile, clipId: string): Promise<ToolOutcome> {
+  const tool = "edit_title_tool";
+  const project = call.doc.project;
+  const tag = file[NATIVE_TITLE_KEY] as NativeTitleTag | undefined;
+  const old = titleSpecOf(file) ?? tag!.spec;
+  const scope = input.scope ?? "all_clips";
+  const next = editedSpec(old, input);
+  if (scope !== "duplicate" && sameTitleSpec(next, old)) toolError("the title already looks like that; nothing changed");
+  const warnings: string[] = [];
+  const shown = titleShown(next);
+  if (tag && !titleSpecOf(file)) {
+    // Drawn with layers: the whole group is drawn again where it was.
+    if (scope !== "all_clips") toolError("a title drawn with layers is edited as a whole; use scope='all_clips'");
+    const files = nativeGroups(project).get(tag.group) ?? [file];
+    const ids = new Set(files.map((f) => String(f.id)));
+    const clips = project.clips.filter((c) => ids.has(String(c.file_id)));
+    refuseLocked(project, clips);
+    const position = clips.length > 0 ? Math.max(0, Math.min(...clips.map((c) => Number(c.position) || 0)) - (Number(tag.lead) || 0)) : 0;
+    const plan = await nativePlan(call, project, next, tag.seconds, warnings);
+    const layers = [...new Set(clips.map((c) => Number(c.layer)))].sort((a, b) => a - b).slice(0, plan.tracks);
+    let top = Math.max(0, ...project.layers.map((l) => Number(l.number) || 0));
+    while (layers.length < plan.tracks) layers.push((top += TRACK_STEP));
+    const written = await writeDrawings(call, plan, `title-${next.style}`);
+    if (typeof written === "string") return toolError(written.replace(/^Error: /, ""));
+    const placed = await commitDrawn(
+      call,
+      written,
+      (tx) => {
+        for (const f of files) removeFile(tx, String(f.id), { removeClips: true });
+        return placeNativeTitle(tx, plan, written, position, fpsOfProject(project), layers, next, tag.seconds);
+      },
+      "Edit title",
+    );
+    return applied(tool, summaryLine(`Updated title ${pyReprString(shown)}, drawn again on ${placed.clipIds.length} layer(s).`), {
+      warnings,
+      data: { scope: "all_clips", source_file_id: file.id, file_id: placed.fileIds[0], file_ids: placed.fileIds, timeline_clip_ids: placed.clipIds, style: next.style, fields: titleFieldsOf(next), renderer: "native" },
+    });
+  }
+  if (!(await rendersTitleBlock(call))) {
+    toolError("this title is a rendered video and this Zenvi surface cannot render titles (no headless Chrome); edit it in Zenvi desktop or the zenvi CLI, or remove it and add a new one with add_title_tool");
+  }
+  const clips = project.clips.filter((c) => c.file_id === file.id);
+  if (scope === "this_clip" && !clipId) toolError("scope='this_clip' needs timeline_clip_id (the clip that gets its own copy)");
+  const scopeUsed = scope === "this_clip" && clips.length <= 1 ? "all_clips" : scope;
+  if (scopeUsed !== "duplicate") refuseLocked(project, scopeUsed === "all_clips" ? clips : clips.filter((c) => c.id === clipId));
+  const ai = file.ai_metadata as { title_duration?: unknown } | undefined;
+  const seconds = Number(ai?.title_duration) || Number(file.duration) || 5;
+  const rendered = await renderTitleBlock(call, project, next, seconds);
+  const result = call.commit((tx) => {
+    const added = addFile(tx, rendered.render.media, { mediaType: "video", name: String(file.name || shown), dedupe: false });
+    const fresh = updateFile(tx, String(added.id), blockFileFields(rendered, next, seconds));
+    if (scopeUsed === "all_clips") {
+      const ids = clipsOf(tx.project, String(file.id)).map((c) => useFileForClip(tx, c.id, String(fresh.id)).id);
+      removeFile(tx, String(file.id), { removeClips: false });
+      return { fileId: String(fresh.id), clipIds: ids };
+    }
+    if (scopeUsed === "this_clip") {
+      useFileForClip(tx, clipId, String(fresh.id));
+      return { fileId: String(fresh.id), clipIds: [clipId] };
+    }
+    return { fileId: String(fresh.id), clipIds: [] as string[] };
+  }, "Edit title");
+  let summary: string;
+  if (scopeUsed === "all_clips") summary = `Updated title ${pyReprString(shown)} on ${result.clipIds.length} clip(s).`;
+  else if (scopeUsed === "this_clip") summary = `Gave clip ${clipId} its own edited title ${pyReprString(shown)}.`;
+  else summary = `Duplicated the title (${pyReprString(shown)}); it is in Project Files.`;
+  const data: Record<string, unknown> = { scope: scopeUsed, file_id: result.fileId, source_file_id: file.id, path: rendered.render.media.path, timeline_clip_ids: result.clipIds, style: next.style, fields: titleFieldsOf(next), renderer: "motion" };
+  if (scope !== scopeUsed) data.note = "the title is used by only this clip, so it was edited in place";
+  return applied(tool, summaryLine(summary), { data, warnings });
+}
+
 export const titleTemplateTools = [
   contractTool("list_title_templates_tool", {
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     requires: ["assets"],
     run: (call, input) =>
       guarded("list_title_templates_tool", async () => {
-        const kind = input.kind ?? "static";
+        const kind = input.kind ?? "styles";
         const query = String(input.query ?? "").trim();
         const data: Record<string, unknown> = { kind };
         const counts: string[] = [];
-        if (kind === "static" || kind === "all") {
-          const templates = (await templateEntries(call)).filter((e) => matches(e, query));
-          data.templates = templates;
-          counts.push(`${templates.length} title template(s)`);
+        if (kind === "styles" || kind === "all") {
+          const styles = TITLE_STYLE_IDS.map((id) => ({ style: id, label: TITLE_STYLES[id].label, look: TITLE_STYLES[id].description, zone: TITLE_STYLES[id].zone, fields: [...TITLE_STYLES[id].fields] })).filter((e) => matches(e, query));
+          data.styles = styles;
+          counts.push(`${styles.length} title style(s)`);
         }
         if (kind === "animated" || kind === "all") {
           const { rows, renderer } = animatedCatalog(query);
@@ -506,10 +554,13 @@ export const titleTemplateTools = [
         const scope = input.scope ?? "all_clips";
         const style = new TitleStyle(input);
         const hasText = Boolean(text.trim() || subtitle.trim() || lines.length > 0);
-        if (!hasText && !style.changesAnything && scope !== "duplicate") {
-          toolError("nothing to change: pass text, subtitle, lines, font, colours or font_scale (or scope='duplicate' to copy the title)");
+        const looks = Boolean(input.style || String(input.accent_color ?? "").trim() || (input.screen_position && input.screen_position !== "auto"));
+        if (!hasText && !looks && !style.changesAnything && scope !== "duplicate") {
+          toolError("nothing to change: pass text, subtitle, lines, style, font, colours or font_scale (or scope='duplicate' to copy the title)");
         }
         const [file, clipId] = await resolveTitle(call, String(input.timeline_clip_id ?? "").trim(), String(input.file_id ?? "").trim(), String(input.title_query ?? "").trim());
+        if (titleSpecOf(file) || file[NATIVE_TITLE_KEY]) return editMadeTitle(call, input, file, clipId);
+        if (looks) toolError("this is an SVG title from the Title Editor: style, accent_color and screen_position only apply to titles made with add_title_tool; make one with add_title_tool instead");
         const project = call.doc.project;
         const clips = clipsOf(project, String(file.id));
         if (scope === "this_clip" && !clipId) toolError("scope='this_clip' needs timeline_clip_id (the clip that gets its own copy)");

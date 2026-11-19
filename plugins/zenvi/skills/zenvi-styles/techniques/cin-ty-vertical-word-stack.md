@@ -25,7 +25,7 @@ Use when: Vertical cut-downs where a horizontal line would be too small; speakin
 
 ## Build it in Zenvi
 
-1. One title per word on a 9:16 project, each centred in the same column: `add_title_tool {"text": "Shoot", "template": "Standard_1", "font_scale": 2.6, "position_seconds": 1.0, "duration_seconds": 3.5, "track": "3"}`; then "once.", "Publish" and "everywhere." on tracks 4-6 at 1.43, 1.87, 2.3 s (a word every 26 f).
+1. One title per word on a 9:16 project, each centred in the same column: `add_title_tool {"text": "Shoot", "font_scale": 2.6, "position_seconds": 1.0, "duration_seconds": 3.5, "track": "3"}`; then "once.", "Publish" and "everywhere." on tracks 4-6 at 1.43, 1.87, 2.3 s (a word every 26 f).
 2. Drop-in per word: `set_keyframes_tool {"timeline_clip_id": "<w_k>", "property": "location_y", "ease": "ease_out_expo", "points": [{"seconds": <land_k>, "value": 0.05}, {"seconds": <land_k + 0.3>, "value": 0}]}` (0.35 em, 18 f), `alpha` 0 to 1 over 0.1 s.
 3. Stack rise: for all earlier words add `location_y` -0.055 per new landing (one line of pitch 1.05x the font size) over 0.45 s `ease_in_out_sine`.
 4. Fade lines older than two steps: `alpha` 1 to 0 over 0.3 s on each word two landings later, so at most 3 words show.

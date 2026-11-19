@@ -55,7 +55,7 @@ the run fails unless that is the contract ref. To move the contract:
 
 Usage:  python3 packages/engine/scripts/gen-tool-schemas.py [--vendor-manifest PATH]
 Env:    ZENVI_DESKTOP_REPO (default ~/Projects/zenvi),
-        ZENVI_CONTRACT_REF (default 1f80cb3d0, develop with #341).
+        ZENVI_CONTRACT_REF (default 4e60e000e: 1f80cb3d0, develop with #341, plus the #407 title tools).
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ BACKEND_JSON = os.path.join(ROOT, "docs", "specs", "backend-frontend-tools.json"
 MANIFEST_JSON = os.path.join(ROOT, "docs", "specs", "desktop-editor-tools-manifest.json")
 OVERLAY_JSON = os.path.join(HERE, "tool-schema-overlay.json")
 
-DEFAULT_REF = "1f80cb3d0"
+DEFAULT_REF = "4e60e000e"
 REPO = os.environ.get("ZENVI_DESKTOP_REPO", os.path.join(os.path.expanduser("~"), "Projects", "zenvi"))
 REF = os.environ.get("ZENVI_CONTRACT_REF", DEFAULT_REF)
 

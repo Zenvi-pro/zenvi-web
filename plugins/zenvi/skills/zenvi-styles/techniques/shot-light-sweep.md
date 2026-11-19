@@ -23,7 +23,7 @@ reveal: a radial light grows from a corner at constant speed until the whole scr
 Spotlight (A) from a scrim with a hole; the hole travels because the scrim clip travels.
 ```json
 add_kinetic_title_tool {"text":"Make it count","style":"editorial","animation":"fade","emphasis":"none","text_size":0.3,"ink":"#f8efe2","background":"#1a0a0d","y":0.5,"stagger_seconds":0,"position_seconds":0,"duration_seconds":5}
-add_title_tool {"template":"Solid_Color","text":" ","background_color":"#050203f7","position_seconds":0,"duration_seconds":5}   // the scrim, on the top track
+add_title_tool {"text": " ", "background_color": "#050203f7", "position_seconds": 0, "duration_seconds": 5}   // the scrim, on the top track
 add_shape_mask_tool {"clip_ids":["<scrim>"],"shape":"ellipse","x":0.5,"y":0.5,"width":0.22,"height":0.14,"feather":0.06,"outside":true}
 set_keyframes_tool {"timeline_clip_id":"<scrim>","property":"scale_x","points":[{"seconds":0,"value":3}]}   // and scale_y: the scrim is 3x the frame so its edge never shows
 set_keyframes_tool {"timeline_clip_id":"<scrim>","property":"location_x","points":[{"seconds":0,"value":-0.62,"ease":"ease_in_out_sine"},{"seconds":1.2,"value":0.6,"ease":"ease_in_out_sine"},{"seconds":2.4,"value":-0.35,"ease":"ease_in_out_sine"},{"seconds":3.4,"value":0,"ease":"ease_out_sine"}]}

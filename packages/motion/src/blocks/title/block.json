@@ -1,0 +1,22 @@
+{
+  "id": "title",
+  "version": 1,
+  "title": "Title",
+  "description": "add_title_tool's titles, the look Zenvi desktop renders with HyperFrames: headline (words rise out of a mask over an accent rule), lower_third (name and role on a dark plate behind an accent bar), end_card (full-frame card), bold_box (social text on solid boxes), kicker (small tracked label between rules) and credits (lines fading up, or rolling past six). Placed by add_title_tool; edit with edit_title_tool.",
+  "tags": ["text", "title", "lower third", "end card", "credits"],
+  "duration": { "default": 5, "min": 0.1, "max": 600 },
+  "aspects": ["9:16", "16:9", "1:1", "4:5"],
+  "alpha": true,
+  "params": {
+    "style": { "type": "enum", "options": ["headline", "lower_third", "end_card", "bold_box", "kicker", "credits"], "default": "headline", "description": "The look." },
+    "title": { "type": "string", "maxLength": 400, "default": "Tokyo Day 1", "description": "Main text (bold_box: one box per line)." },
+    "subtitle": { "type": "string", "maxLength": 400, "default": "Shibuya at night", "description": "Second line." },
+    "lines": { "type": "strings", "maxItems": 200, "maxLength": 200, "default": [], "description": "Credits entries." },
+    "text_color": { "type": "string", "maxLength": 9, "default": "", "description": "'#rrggbb[aa]', empty = the style's." },
+    "accent_color": { "type": "string", "maxLength": 9, "default": "", "description": "Rule, bar and box colour, empty = the style's." },
+    "background_color": { "type": "string", "maxLength": 9, "default": "", "description": "Full-frame background, alpha allowed; empty = none (end_card: near-black)." },
+    "font": { "type": "string", "maxLength": 64, "default": "", "description": "Font family; empty = Inter." },
+    "font_scale": { "type": "number", "min": 0.2, "max": 5, "default": 1, "description": "Text size vs the style's." },
+    "zone": { "type": "enum", "options": ["top", "center", "bottom"], "default": "center", "description": "Where the text sits." }
+  }
+}

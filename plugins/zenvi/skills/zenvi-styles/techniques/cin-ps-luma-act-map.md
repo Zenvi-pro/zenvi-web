@@ -26,7 +26,7 @@ Use when: Films with distinct problem/solution or prompt/result halves, and 20-6
 ## Build it in Zenvi
 
 1. Plan: alternation (about 50/50 flipping at each ask/answer change) or arc (dark open, mixed middle, light product finish). Mark each flip on a downbeat: `detect_beats_tool {"file_id": "<music>"}` then `add_marker_tool {"name": "Flip to light", "position_seconds": 12.0, "color": "white"}`. Three to five flips per film.
-2. Stage colours: dark at value 0.10-0.30, light at 0.85-0.95, the accent unchanged: `add_title_tool {"template": "Standard_1", "text": "", "background_color": "#14161a", "position_seconds": 0, "duration_seconds": 12, "track": 1}` and a light card (`#f1efe9`) after it.
+2. Stage colours: dark at value 0.10-0.30, light at 0.85-0.95, the accent unchanged: `add_title_tool {"text": "", "background_color": "#14161a", "position_seconds": 0, "duration_seconds": 12, "track": 1}` and a light card (`#f1efe9`) after it.
 3. Flip devices, never the same twice in a row: an inverse hard cut; an inverse match cut on a shared icon; an iris from a glyph, 20 f (0.33 s): `add_shape_mask_tool {"clip_ids": ["<light_card>"], "shape": "ellipse", "x": 0.5, "y": 0.5, "keyframes": [{"seconds": 12.0, "grow": -0.5}, {"seconds": 12.33, "grow": 0}]}`; a bleach to white, 26 f (0.43 s): `apply_motion_transition_tool {"preset": "flash_white", "clip1_id": "<a>", "clip2_id": "<b>", "duration": 0.43}`; a theme flip during a move, 6 f (0.1 s).
 4. Optional brand wash that shows only on brand beats: `add_motion_block_tool {"block": "gradient_field", "position_seconds": 18.0, "duration_seconds": 3.0, "params": {"style": "aurora"}}` rising from the bottom edge, `location_y` +0.4 to 0 over 50 f (0.83 s), `ease_out_expo`, draining in 8 f (0.13 s).
 5. `add_sfx_tool {"recipe": "impact_thud", "at_seconds": 12.0, "gain_db": -10}` on each flip.
@@ -56,7 +56,7 @@ A thud or hit on each flip frame, always on a downbeat; the wash is silent.
 
 Found when rendering it (apply before building):
 
-- Step 2: add_title_tool {"template": "Standard_1", "text": ""} places a visible Standard_1 template title, not a flat card; use {"text": " ", "background_color": "#14161a", "fit_text": false, "track": "1"} (track as a string) for each stage colour. A title that would overlap another on the same track is moved to the next free track with a warning, so put the dark card on track 1 and the light iris card on track 2.
+- Step 2: add_title_tool needs text or a background colour; for a flat card use {"text": " ", "background_color": "#14161a", "track": "1"} (track as a string) for each stage colour. A title that would overlap another on the same track is moved to the next free track with a warning, so put the dark card on track 1 and the light iris card on track 2.
 - Step 3: add_shape_mask_tool ellipse defaults to 0.6 x 0.6 of the frame, so grow -0.5 to 0 ends as a 0.6-wide disc and never flips the screen; set width 1.5 and height 2.0 (an ellipse that covers the corners needs at least 1.42 x 1.42) and use grow -0.9 to 0 (grow is at most 1); the keyframe seconds are timeline seconds here (iris began at the stated 2.0 s).
 - Step 5: delete_from_timeline_tool takes a single-clip argument, not timeline_clip_ids (Additional properties are not allowed); to remove several cards use one call each (or zenvi rm <clip>).
 - Step 1: detect_beats_tool {"file_id"} works; add_marker_tool {name, position_seconds, color: "white"} works as written.

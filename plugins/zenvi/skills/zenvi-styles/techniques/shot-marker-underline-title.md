@@ -24,7 +24,7 @@ A ragged variable-width stroke is not available (`needs: marker-stroke-shape`). 
 thin rectangle with a shape mask, drawn on by a keyframed Crop and tilted with a rotation keyframe.
 ```json
 add_kinetic_title_tool {"text": "Make it free today", "style": "editorial", "animation": "rise", "emphasis": "free", "accent": "#d8402a", "position_seconds": 0, "duration_seconds": 3, "y": 0.45}
-add_title_tool {"template": "Standard_1", "text": " ", "background_color": "#d8402a", "position_seconds": 0.8, "duration_seconds": 2.2}
+add_title_tool {"text": " ", "background_color": "#d8402a", "position_seconds": 0.8, "duration_seconds": 2.2}
 add_shape_mask_tool {"clip_ids": ["<bar>"], "shape": "rectangle", "x": 0.6, "y": 0.575, "width": 0.14, "height": 0.018, "feather": 0.006}
 add_effect_tool {"timeline_clip_id": "<bar>", "effect": "Crop", "properties": {"right": [{"time": 0.8, "value": 0.74}, {"time": 1.13, "value": 0.26}]}}
 set_keyframes_tool {"timeline_clip_id": "<bar>", "property": "rotation", "points": [{"seconds": 0.8, "value": -1.5}, {"seconds": 1.13, "value": -1.5}]}

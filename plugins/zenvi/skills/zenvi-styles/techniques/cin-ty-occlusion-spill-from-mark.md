@@ -25,7 +25,7 @@ Use when: An icon-led claim mid-film, or an opening line pushed out by the mark 
 
 ## Build it in Zenvi
 
-1. Words: `add_title_tool {"text": "Sync across every device", "template": "Standard_1", "position_seconds": 2.0, "duration_seconds": 2.5, "track": "3"}`; mark on top: `add_clip_to_timeline_tool {"file_id": "<logo>", "position_seconds": 2.0, "duration_seconds": 2.5, "track": "4"}`.
+1. Words: `add_title_tool {"text": "Sync across every device", "position_seconds": 2.0, "duration_seconds": 2.5, "track": "3"}`; mark on top: `add_clip_to_timeline_tool {"file_id": "<logo>", "position_seconds": 2.0, "duration_seconds": 2.5, "track": "4"}`.
 2. Mask the words at the mark's moving edge: `add_shape_mask_tool {"clip_ids": ["<words>"], "shape": "rectangle", "x": 0.6, "y": 0.5, "width": 0.7, "height": 0.2, "feather": 0, "keyframes": [{"seconds": 2.0, "grow": -0.7}, {"seconds": 2.33, "grow": 0}]}`, so only what has cleared the mark shows.
 3. Mark: `set_keyframes_tool {"timeline_clip_id": "<mark>", "property": "location_x", "ease": "ease_out_expo", "points": [{"seconds": 2.0, "value": 0}, {"seconds": 2.33, "value": 0.135}]}` (260 px over 20 f).
 4. Words: `location_x` +0.167 to 0 over 24 f (0.4 s), starting 1 f after the mark, `ease_out_expo`, `alpha` 0 to 1 over 0.1 s, then `apply_fx_tool` directional_blur on the first 0.1 s.

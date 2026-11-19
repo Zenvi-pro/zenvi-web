@@ -26,8 +26,8 @@ No variable-weight type (`needs: variable-weight-text`). Fallback: two stacked c
 copy's opacity pulsed by the beat envelope.
 ```json
 detect_beats_tool {"file_id": "<music>"}                                  (beat times; or a grid: 128 bpm = one beat per 0.469 s)
-add_title_tool {"template": "Standard_1", "text": "FRAME MOTION", "font": "Inter", "font_weight": "normal", "font_scale": 2.2, "text_color": "#e8e8ee", "background_color": "#101018", "position_seconds": 0, "duration_seconds": 5}
-add_title_tool {"template": "Standard_1", "text": "FRAME MOTION", "font": "Inter", "font_weight": "bold", "font_scale": 2.2, "text_color": "#ffffff", "position_seconds": 0, "duration_seconds": 5}
+add_title_tool {"text": "FRAME MOTION", "font": "Inter", "font_scale": 2.2, "text_color": "#e8e8ee", "background_color": "#101018", "position_seconds": 0, "duration_seconds": 5}
+add_title_tool {"text": "FRAME MOTION", "font": "Inter", "font_scale": 2.2, "text_color": "#ffffff", "position_seconds": 0, "duration_seconds": 5}
 set_keyframes_tool {"timeline_clip_id": "<bold copy>", "property": "alpha", "interpolation": "linear", "points": [
   {"seconds": 0.469, "value": 1}, {"seconds": 0.69, "value": 0}, {"seconds": 0.938, "value": 1}, {"seconds": 1.16, "value": 0}]}      (one 1-then-0 pair per beat; use mode merge to append)
 set_keyframes_tool {"timeline_clip_id": "<bold copy>", "property": "scale_x", "interpolation": "linear", "points": [{"seconds": 0.469, "value": <s0 * 1.06>}, {"seconds": 0.69, "value": <s0>}]}      (accent beat of each bar only)

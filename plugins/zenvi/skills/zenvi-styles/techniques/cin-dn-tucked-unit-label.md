@@ -33,7 +33,7 @@ Use when: A hero figure needs its unit (views, users, ms) without a second line 
 **Full look** (relies on serif, beige: only when the person's brand supplies that look):
 
 1. `add_motion_block_tool {"block": "counter", "position_seconds": 1.0, "duration_seconds": 4.0, "placement": "full_frame", "params": {"values": ["12.4"], "decimals": 1, "style": "count", "align": "center", "weight": 800}}` (no label here; the unit is its own clip).
-2. Unit word at 0.35x the numeral size, weight 450, muted ink: `add_title_tool {"text": "views", "template": "Standard_1", "text_color": "#8a8f98", "font_scale": 0.5, "position_seconds": 2.2, "duration_seconds": 2.8, "track": "5"}` (starts at least 12 f, 0.2 s, after the number settles; 36 f, 0.6 s, is a good default).
+2. Unit word at 0.35x the numeral size, weight 450, muted ink: `add_title_tool {"text": "views", "text_color": "#8a8f98", "font_scale": 0.5, "position_seconds": 2.2, "duration_seconds": 2.8, "track": "5"}` (starts at least 12 f, 0.2 s, after the number settles; 36 f, 0.6 s, is a good default).
 3. Tuck it: right edge to the numeral's right edge, its top at the numeral baseline minus 0.3x the label's line height, so it overlaps the last two digits: set a constant `set_keyframes_tool {"timeline_clip_id": "<unit>", "property": "location_x", "points": [{"seconds": 2.2, "value": <dx>}, {"seconds": 5.0, "value": <dx>}]}` and `location_y` the same, measured on `inspect_timeline_tool`.
 4. Fade in over 19 f (0.32 s) with a 4 px rise: `alpha` 0 to 1 `ease_in_out_sine` and `location_y` +0.004 to the tucked value.
 

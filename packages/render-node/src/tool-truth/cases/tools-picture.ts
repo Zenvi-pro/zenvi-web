@@ -32,7 +32,8 @@ const vignette: ToolSpec = { tool: "add_vignette_tool", args: { clip_ids: [A] } 
 const mask: ToolSpec = { tool: "add_shape_mask_tool", args: { clip_ids: [A] } };
 const speed: ToolSpec = { tool: "set_clip_speed_tool", args: { timeline_clip_ids: [A], allow_overlap: true }, needsChange: true };
 const fade: ToolSpec = { tool: "fade_clip_tool", args: { clip_id: A }, probe: { kind: "picture", at: 0.1 }, needsChange: true };
-const title: ToolSpec = { tool: "add_title_tool", args: { text: "TRUTH", template: "Standard_1", duration_seconds: 1 }, clips: [] };
+// Probed at rest: the words are in by 0.8 s and leave over the last 0.4 s.
+const title: ToolSpec = { tool: "add_title_tool", args: { text: "TRUTH", duration_seconds: 2 }, clips: [], probe: { kind: "picture", at: 1 } };
 const emoji: ToolSpec = { tool: "add_emoji_tool", args: { emoji: "fire", duration_seconds: 1 }, clips: [] };
 // On black with an opaque blue box (the default box is translucent black, invisible on black).
 const timer: ToolSpec = { tool: "add_timer_tool", args: { duration_seconds: 1, mode: "count_up", background_color: "#3050ff", background_opacity: 1 }, clips: [] };
@@ -142,20 +143,17 @@ export const PICTURE_TOOL_CASES: readonly TruthCase[] = [
 
   // Titles over black.
   param(title, "text", "WIDE TRUTH TEXT", { base: "I" }),
-  param(title, "template", "Gray_Box_4"),
-  param(title, "text_color", "#ff0000", { expect: [up("red")] }),
+  param(title, "style", "bold_box", { expect: [up("coverage")] }),
+  param(title, "text_color", "#ff0000", { expect: [down("green")] }),
+  param(title, "accent_color", "#ff0000", { with: { style: "bold_box" }, expect: [down("green")] }),
   param(title, "background_color", "#00ff00", { expect: [up("green")] }),
   param(title, "font_scale", 2, { expect: [up("coverage")] }),
-  param(title, "font_weight", "normal", { expect: [down("coverage")] }),
-  param(title, "font_style", "italic"),
   param(title, "font", "Instrument Serif"),
-  param(title, "subtitle", "and a second line", { with: { template: "Standard_4" } }),
-  param(title, "lines", ["FIRST", "SECOND LINE"], { with: { template: "Standard_4" } }),
-  param(title, "fade_in_seconds", 1, { expect: [down("luma")] }),
-  param({ ...title, probe: { kind: "picture", at: 0.9 } }, "fade_out_seconds", 1, { expect: [down("luma")] }),
-  param(title, "position_seconds", 0.8, { expect: [down("coverage")] }),
+  param(title, "subtitle", "and a second line", { expect: [up("coverage")] }),
+  param(title, "lines", ["FIRST", "SECOND LINE"]),
+  param(title, "screen_position", "top"),
+  param(title, "position_seconds", 0.95, { expect: [down("coverage")] }),
   param(title, "duration_seconds", 0.3, { expect: [down("coverage")] }),
-  param(title, "fit_text", false, { with: { text: "A VERY VERY LONG TITLE THAT RUNS OFF THE FRAME", font_scale: 3 } }),
 
   // Emoji and timer overlays.
   param(emoji, "emoji", "blue heart", { expect: [up("blue")] }),

@@ -21,7 +21,7 @@ lines up with it, and the world turns with it. The last station pulls back to an
 
 ## Build it in Zenvi
 Today's native camera is 2D (scale, location, rotation), so build the *flat* version and keep real Y/X tilt for later.
-1. One clip per station on its own track: `add_title_tool {"template":"Gray_Box_1","text":"Step one\nOne line of detail","position_seconds":0,"duration_seconds":7.5}`
+1. One clip per station on its own track: `add_title_tool {"style": "kicker", "text": "Step one\nOne line of detail", "position_seconds": 0, "duration_seconds": 7.5}`
    (terminal stations: `add_motion_block_tool {"block":"code_card","params":{...},"position_seconds":3.0,"duration_seconds":2.5,"placement":"over_video"}`
    so the command types in after the camera has arrived).
 2. The camera is the inverse of the station pose, applied to every clip: for camera at station k with zoom z,

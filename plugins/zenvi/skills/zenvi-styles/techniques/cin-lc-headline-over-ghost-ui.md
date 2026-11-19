@@ -27,7 +27,7 @@ Use when: Setting up a demo during a statement, so the move into the product nee
 
 1. UI capture on the video track, dim: `add_clip_to_timeline_tool {"file_id": "<ui_capture>", "position_seconds": 0, "duration_seconds": 5, "track": 1}` then `set_keyframes_tool {"timeline_clip_id": "<ui>", "property": "alpha", "mode": "replace", "points": [{"seconds": 0, "value": 0.15}, {"seconds": 2.2, "value": 0.15}, {"seconds": 3.2, "value": 1.0, "ease": "ease_in_out_sine"}]}`. Put a black or paper title card on the track below so the dimmed UI sits on the stage colour.
 2. Same clip scale: `set_keyframes_tool {"timeline_clip_id": "<ui>", "property": "scale_x", "mode": "replace", "points": [{"seconds": 2.2, "value": 1.03}, {"seconds": 3.2, "value": 1.0, "ease": "ease_in_out_sine"}]}` and `scale_y` the same.
-3. Headline inking from grey to near-black as two stacked titles: `add_title_tool {"template": "Standard_1", "text": "<claim>", "text_color": "#9a9a9a", "position_seconds": 0.2, "duration_seconds": 2.4, "track": 3}` and the same text in `"#161616"` on track 4 with `"fade_in_seconds": 0.67, "fade_out_seconds": 0.27`. The dark copy fading in over 40 f (0.67 s) is the ink.
+3. Headline inking from grey to near-black as two stacked titles: `add_title_tool {"text": "<claim>", "text_color": "#9a9a9a", "position_seconds": 0.2, "duration_seconds": 2.4, "track": 3}` and the same text in `"#161616"` on track 4 with `"fade_in_seconds": 0.67, "fade_out_seconds": 0.27`. The dark copy fading in over 40 f (0.67 s) is the ink.
 4. If the capture is busy, defocus the ghost: `add_effect_tool {"effect": "Blur", "timeline_clip_id": "<ui>"}`, set radius about 10, then `update_effect_tool` with a keyframe to 0 across 2.2-3.2 s.
 
 ## Timing & taste rules

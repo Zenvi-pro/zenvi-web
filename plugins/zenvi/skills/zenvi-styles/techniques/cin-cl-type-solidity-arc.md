@@ -26,9 +26,9 @@ Use when: Brand films and launches on a coloured or living stage, built as quest
 ## Build it in Zenvi
 
 1. Choose one alpha per act: opening 0.65, middle 0.85, end 1.0. Type is `#ffffffA6`, `#ffffffD9`, `#ffffff` (the last two hex digits are the alpha).
-2. Opening line over the coloured stage: `add_title_tool {"text": "What if a film built itself?", "text_color": "#ffffffA6", "font_weight": "bold", "position_seconds": 0.5, "duration_seconds": 3, "fade_in_seconds": 0.27}`.
+2. Opening line over the coloured stage: `add_title_tool {"text": "What if a film built itself?", "text_color": "#ffffffA6", "position_seconds": 0.5, "duration_seconds": 3}`.
 3. Middle act: same call, same font, size and position, `"text_color": "#ffffffD9"`.
-4. Closing line and lockup: solid. `add_title_tool {"text": "Zenvi builds it.", "text_color": "#ffffff", "font_weight": "bold", "position_seconds": 9.0, "duration_seconds": 2, "fade_in_seconds": 0.27}`, then hold the lockup 90-120 f (1.5-2.0 s) at full opacity.
+4. Closing line and lockup: solid. `add_title_tool {"text": "Zenvi builds it.", "text_color": "#ffffff", "position_seconds": 9.0, "duration_seconds": 2}`, then hold the lockup 90-120 f (1.5-2.0 s) at full opacity.
 5. Step the value only on cuts or act changes, never inside a line.
 6. The stage is a living gradient, e.g. `add_motion_block_tool {"block": "gradient_field", "position_seconds": 0, "duration_seconds": 11, "params": {"style": "orbs", "colors": ["#1d4ed8", "#0b1530"], "speed": 0.2}, "track": "1"}`.
 

@@ -25,7 +25,7 @@ Use when: A crescendo near the end that proves breadth (many apps, templates, ou
 
 ## Build it in Zenvi
 
-1. Hero on the bottom track, already at final size, under everything: `add_title_tool {"template": "Standard_1", "text": "<hero stat or lockup>", "position_seconds": 0, "duration_seconds": 4.4, "track": 1}` (or the product shot via `add_clip_to_timeline_tool`).
+1. Hero on the bottom track, already at final size, under everything: `add_title_tool {"text": "<hero stat or lockup>", "position_seconds": 0, "duration_seconds": 4.4, "track": 1}` (or the product shot via `add_clip_to_timeline_tool`).
 2. Place 16-20 card stills (screenshots or outputs, distinct) on tracks 2-5, all starting at the same time, each 4.0 s: `add_clip_to_timeline_tool {"file_id": "<card_i>", "position_seconds": 0.4, "duration_seconds": 4.0, "track": 2}`. Scale each card to 0.25-0.35 with `set_clip_property_tool`, larger cards on higher tracks.
 3. Fly-in, per card i: `set_keyframes_tool {"timeline_clip_id": "<card_i>", "property": "location_x", "mode": "replace", "points": [{"seconds": 0.4 + i*0.02, "value": "<ux_i * 0.57>"}, {"seconds": 1.0 + i*0.02, "value": "<slot_x_i>", "ease": "ease_out_expo"}]}`, same for `location_y`. ux/uy is the unit vector from the centre through the card's slot, 0.57 = about 1090 px at 1080p. Spread starts over 24 f (0.4 s), each card travels 28-40 f (0.47-0.67 s). Slots are a grid jittered by up to 40 px (0.02) and 6 deg (`rotation`).
 4. Swirl and build: `location_x/y` rotate the slots about the centre by 24 deg decaying to 0 over 60 f (1.0 s, `ease_out_expo`), pull to 73 % spread over 32 f (0.53 s), then `scale_x/y` on every card +0.2 %/f (about +12 %/s) for 104 f (1.73 s), `interpolation: "linear"`.

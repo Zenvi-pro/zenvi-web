@@ -25,7 +25,7 @@ Use when: A click that opens something (button to panel, card to detail), a stat
 
 ## Build it in Zenvi
 
-1. The container is one plain rounded block (no content, so stretching it cannot distort anything): `add_title_tool {"text": " ", "background_color": "<card>", "fit_text": false, "position_seconds": 0.0, "duration_seconds": 3.0, "track": "2"}`. Never swap in a second element.
+1. The container is one plain rounded block (no content, so stretching it cannot distort anything): `add_title_tool {"text": " ", "background_color": "<card>", "position_seconds": 0.0, "duration_seconds": 3.0, "track": "2"}`. Never swap in a second element.
 2. Morph over 30-36 f (0.5-0.6 s) on `ease_in_out_expo`, long enough that the fastest edge stays under 70 px/f (frames >= 3.8 x edge travel / 70): `set_keyframes_tool {"timeline_clip_id": "<card>", "property": "scale_x", "points": [{"seconds": 1.0, "value": <old_w>}, {"seconds": 1.55, "value": <new_w>, "ease": "ease_in_out_expo"}]}`, plus `scale_y`, `location_x`, `location_y`, and `corner_radius` (a pill going to a tile keeps its height locked and its radius from full to 22 % of its side; a panel's radius eases 44 to 36 px).
 3. Old content (a clip) fades out in the first 12 f (0.2 s) `ease_in_out_sine`; a surviving title flies to its header spot and 0.6 scale on the same curve, dropping to 55 % opacity while it is faster than 20 px/f so it lands sharp.
 4. New content enters 8 f (0.13 s) after the speed peak with a 2-4 f (0.03-0.07 s) stagger: `set_keyframes_tool {"property": "alpha", "points": [{"seconds": 1.35, "value": 0}, {"seconds": 1.55, "value": 1}]}` per child.

@@ -27,7 +27,7 @@ Use when: The product works through steps on its own (an agent, a sync, an impor
 
 1. Working: a dotted ring that spins one turn per 48 f (0.8 s) = 450 degrees per second: `add_type_block_tool {"block": "text_on_path", "text": "· · · · · · · ·", "shape": "ring", "radius": 0.012, "spin": 450, "ink": "<ink>", "position_seconds": <step_start>, "duration_seconds": <work_time>}`, beside the step label (`add_title_tool`).
 2. Done frame: end the spinner clip and place the check on the same frame: `add_type_block_tool {"block": "write_on", "paths": ["M2 8 L6 12 L14 3"], "view_box": [0, 0, 16, 16], "width": 0.014, "stroke_width": 2.5, "ink": "<accent>", "position_seconds": <done>, "duration_seconds": 0.5, "draw_seconds": 0.13}` (ring scale 0.6 to 1 over 8 f / 0.13 s on `ease_out_expo`; the tick draws over 8 f from +3 f / 0.05 s).
-3. A small Done tag rises 6 px and fades in over 8 f (0.13 s): `add_title_tool {"text": "Done", "position_seconds": <done>, "duration_seconds": 3.0, "fade_in_seconds": 0.13}`; the step label goes from grey to ink (crossfade two title clips).
+3. A small Done tag rises 6 px and fades in over 8 f (0.13 s): `add_title_tool {"text": "Done", "position_seconds": <done>, "duration_seconds": 3.0}`; the step label goes from grey to ink (crossfade two title clips).
 4. The next step's spinner starts on that same frame; one step every 24-36 f (0.4-0.6 s).
 5. Inline variant: open a slot between two words (the words slide apart over 6 f / 0.1 s) with an accent disc spinning in it; on done, swap it for the check.
 6. `add_sfx_tool {"recipe": "pop", "at_seconds": <done + 0.07>, "gain_db": -22, "pitch": <step_n>}` on each check's 50 % frame, climbing one semitone per step.
@@ -58,7 +58,7 @@ A soft pop at -22 dB on each check, pitched up one semitone per step so the run 
 Found when rendering it (apply before building):
 
 - Step 1: add_type_block_tool radius and width have a minimum of 0.05 (0.012 and 0.014 are refused); the smallest ring (0.05-0.06 of the short side) draws its dots as faint specks at 720p, so use radius about 0.1 with a bold ink and text_size, and set x/y (0-1) to put it beside the label (x 0.42 here).
-- Step 1 and 3: add_title_tool with no template renders the Bar_1 title, a large opaque blue bar that covers the spinner; for the label and the Done tag use add_kinetic_title_tool {"text": "Done", "style": "documentary", "animation": "fade", "y": 0.5, "text_size": 0.05} (it has no x, so it centres and overlaps a spinner placed at the centre: place the spinner at x 0.42 and keep the label short, or accept the overlap).
+- Step 1 and 3: add_title_tool's headline is a large centred title that covers the spinner; for the label and the Done tag use add_kinetic_title_tool {"text": "Done", "style": "documentary", "animation": "fade", "y": 0.5, "text_size": 0.05} (it has no x, so it centres and overlaps a spinner placed at the centre: place the spinner at x 0.42 and keep the label short, or accept the overlap).
 - Step 2: write_on with paths works as written once width is >= 0.05 (width 0.06 here, x/y to match the ring); the tick ink was a thin orange line at 2.5 stroke_width, use 4 or more at 720p.
 
 Translated from cinetic's technique library (`mi-spinner-to-check`, MIT, (c) 2026 Leonxlnx; see NOTICE): the intent and the numbers, rebuilt with Zenvi tools; no cinetic code.

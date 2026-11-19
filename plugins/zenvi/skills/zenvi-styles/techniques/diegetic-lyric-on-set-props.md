@@ -31,7 +31,7 @@ turning, (c) squash that render into the label's ellipse and multiply it
 on. Each stage is its own project (one .zvn per folder).
 
 ```json
-add_title_tool {"text": "say my name", "template": "Standard_1", "position_seconds": 0, "duration_seconds": 5, "background_color": "#ffffff", "text_color": "#202020", "font": "Georgia", "font_scale": 1.4}
+add_title_tool {"text": "say my name", "position_seconds": 0, "duration_seconds": 5, "background_color": "#ffffff", "text_color": "#202020", "font": "Georgia", "font_scale": 1.4}
 import_files_tool {"paths": ["<stage a render>"]}
 add_clip_to_timeline_tool {"file_id": "<stage a>", "position_seconds": 0, "start_seconds": 0.6, "end_seconds": 4.6, "track": "2"}
 add_title_tool {"text": " ", "position_seconds": 0, "duration_seconds": 4, "background_color": "#ffffff", "track": "1"}

@@ -1,5 +1,5 @@
 {
- "commit": "1f80cb3d061b85619f4f081d4b9eafeb1a5fd8e9",
+ "commit": "4e60e000e739f3314fc19ae63f841dea5dd4f242",
  "manifest_version": 1,
  "source": "zenvi-core src/classes/editor_tools",
  "tools": [
@@ -496,7 +496,7 @@
    "covers": [
     "emoji.add"
    ],
-   "description": "Put an emoji sticker on the video, e.g. \"put a \ud83d\udd25 emoji top right\", \"add a heart at 5 seconds\".\n\nFinds the emoji by name, character or code among the Emojis dock's OpenMoji\nstickers (search_emojis_tool shows alternatives), adds it to Project Files the\nway the dock does, and places it on the lowest free track above the video at\nposition_seconds, sized and pinned to screen_position. The receipt lists close\nalternatives in case the match was not the intended one. One undo step.\n\nExample: {\"emoji\": \"fire\", \"screen_position\": \"top_right\", \"size\": 0.15, \"position_seconds\": 2,\n\"duration_seconds\": 3}.",
+   "description": "Put an emoji sticker on the video, e.g. \"put a 🔥 emoji top right\", \"add a heart at 5 seconds\".\n\nFinds the emoji by name, character or code among the Emojis dock's OpenMoji\nstickers (search_emojis_tool shows alternatives), adds it to Project Files the\nway the dock does, and places it on the lowest free track above the video at\nposition_seconds, sized and pinned to screen_position. The receipt lists close\nalternatives in case the match was not the intended one. One undo step.\n\nExample: {\"emoji\": \"fire\", \"screen_position\": \"top_right\", \"size\": 0.15, \"position_seconds\": 2,\n\"duration_seconds\": 3}.",
    "input_schema": {
     "additionalProperties": false,
     "properties": {
@@ -509,7 +509,7 @@
      },
      "emoji": {
       "default": "",
-      "description": "Which emoji: a name ('fire', 'red heart', 'party popper'), the character ('\ud83d\udd25') or an OpenMoji code from search_emojis_tool ('1F525').",
+      "description": "Which emoji: a name ('fire', 'red heart', 'party popper'), the character ('🔥') or an OpenMoji code from search_emojis_tool ('1F525').",
       "type": "string"
      },
      "group": {
@@ -786,80 +786,46 @@
    "covers": [
     "title.create"
    ],
-   "description": "Create an on-screen title from a template and place it on the timeline, over the video.\n\nUse for titles, title cards, lower thirds, end cards, credits and any static\ntext over video (\"add a title 'Tokyo Day 1'\", \"lower third with my name\",\n\"end card saying Thanks for watching\"). Not for subtitles or captions of speech\n(add_captions_tool), countdowns (add_timer_tool), emoji (add_emoji_tool) or 3D\nanimated titles (add_animated_title_tool).\n\nWrites a new SVG title from the template with your text, font and colours,\nadds it to Project Files and places it at position_seconds for duration_seconds\non the lowest free track above the video (never under it). Placeholder text the\ntemplate has but you did not fill (e.g. 'Sub-Title') is blanked. Optional fades.\nOne undo step removes the clip and the file entry.\n\nExamples: {\"text\": \"Tokyo Day 1\", \"template\": \"Standard_1\", \"text_color\": \"white\",\n\"fade_in_seconds\": 0.5, \"fade_out_seconds\": 0.5};\nlower third {\"text\": \"Jane Doe\", \"subtitle\": \"Founder, Acme\", \"template\": \"Gray_Box_4\",\n\"position_seconds\": 3, \"duration_seconds\": 4};\nend card {\"text\": \"Thanks for watching\", \"subtitle\": \"Subscribe for more\", \"template\": \"Standard_1\",\n\"background_color\": \"#000000\", \"text_color\": \"white\", \"position_seconds\": 58}.",
+   "description": "Create an animated on-screen title and place it on the timeline, over the video.\n\nFor titles, title cards, lower thirds, end cards, credits and any text over\nvideo. Not for captions of speech (add_captions_tool), countdowns\n(run_tool(name='add_timer_tool')), emoji (run_tool(name='add_emoji_tool')) or 3D\nBlender titles (run_tool(name='add_animated_title_tool')). The title is a\nHyperFrames composition rendered on this computer (from a few seconds to a\nminute) into a transparent video, added to Project Files and placed above the\nvideo (never under it); end_card renders an opaque full-frame card. No text\nwith a background_color makes a blank colour card, e.g. a 0.1 s white flash\nframe. One undo step removes the clip and the file entry.",
    "input_schema": {
     "additionalProperties": false,
     "properties": {
+     "accent_color": {
+      "default": "",
+      "description": "Rule, bar and box colour. Empty = the style's (warm yellow; white boxes on bold_box).",
+      "type": "string"
+     },
      "background_color": {
       "default": "",
-      "description": "Colour of the title's full-frame background (transparent in most templates) with optional alpha, e.g. '#000000' for a solid black end card or '#00000080' for a 50% dark veil over the video. Empty keeps it.",
+      "description": "Full-frame background, alpha allowed: '#00000080' is a 50% dark veil over the video; end_card defaults to near-black. Empty = none.",
       "type": "string"
      },
      "duration_seconds": {
       "default": 5.0,
-      "description": "How long the title stays on screen, in seconds.",
-      "maximum": 86400,
+      "description": "Seconds on screen (the animation in and out fits inside it).",
+      "maximum": 600,
       "minimum": 0.01,
-      "type": "number"
-     },
-     "fade_in_seconds": {
-      "default": 0.0,
-      "description": "Fade the title in over this many seconds (0 = appear at once).",
-      "maximum": 10,
-      "minimum": 0,
-      "type": "number"
-     },
-     "fade_out_seconds": {
-      "default": 0.0,
-      "description": "Fade the title out over this many seconds (0 = disappear at once).",
-      "maximum": 10,
-      "minimum": 0,
       "type": "number"
      },
      "file_name": {
       "default": "",
-      "description": "Name for the new title file in Project Files (without .svg). Empty = from the text. An existing name gets ' (1)', ' (2)'... instead of being overwritten.",
+      "description": "Project Files name (no extension). Empty = from the text. Taken names get ' (1)', ' (2)'... (never overwritten).",
       "type": "string"
-     },
-     "fit_text": {
-      "default": true,
-      "description": "Shrink a line whose text would run off the frame (templates do not wrap text).",
-      "type": "boolean"
      },
      "font": {
       "default": "",
-      "description": "Font family for every line, e.g. 'Arial Black', 'Helvetica Neue', 'Georgia'. Must be installed; empty keeps the template's font.",
+      "description": "Font family, e.g. 'Georgia' or a Google Fonts family such as 'Playfair Display'. Empty = Inter.",
       "type": "string"
      },
      "font_scale": {
       "default": 1.0,
-      "description": "Text size relative to the template: 1 = as designed, 1.5 = half again as big, 0.7 = smaller.",
+      "description": "Text size vs the style's (1 = as designed).",
       "maximum": 5.0,
       "minimum": 0.2,
       "type": "number"
      },
-     "font_style": {
-      "default": "",
-      "description": "Italic or upright text; empty keeps the template's.",
-      "enum": [
-       "",
-       "italic",
-       "normal"
-      ],
-      "type": "string"
-     },
-     "font_weight": {
-      "default": "",
-      "description": "Make the text bold or normal weight; empty keeps the template's.",
-      "enum": [
-       "",
-       "bold",
-       "normal"
-      ],
-      "type": "string"
-     },
      "lines": {
-      "description": "Every field in order (as listed by list_title_templates_tool), for templates with several lines such as Standard_4 or credits. Overrides text/subtitle; fields left out are blanked.",
+      "description": "Entries for credits (one per line); on other styles the first is the title and the rest the subtitle. Overrides text/subtitle.",
       "items": {
        "type": "string"
       },
@@ -873,7 +839,7 @@
      },
      "screen_position": {
       "default": "auto",
-      "description": "Where the 16:9 title artboard sits when the project is not 16:9 (vertical reels, square): auto = by where the template's text is (lower thirds at the bottom, headers at the top). On 9:16 video bottom/top titles are lifted clear of the platform UI bands.",
+      "description": "Where the text sits: auto = the style's own place (lower_third bottom, kicker top, the rest centre). On 9:16 the text stays clear of the platforms' UI bands.",
       "enum": [
        "auto",
        "top",
@@ -882,29 +848,37 @@
       ],
       "type": "string"
      },
-     "subtitle": {
-      "default": "",
-      "description": "Text for the template's subtitle field (second line), e.g. a role under a name.",
+     "style": {
+      "default": "headline",
+      "description": "The look (list_title_templates_tool describes each): headline (big title, words rise in), lower_third (name + role on a plate), end_card (full-frame card), bold_box (social text on solid boxes), kicker (small tracked label), credits (lines).",
+      "enum": [
+       "headline",
+       "lower_third",
+       "end_card",
+       "bold_box",
+       "kicker",
+       "credits"
+      ],
       "type": "string"
      },
-     "template": {
+     "subtitle": {
       "default": "",
-      "description": "Template name from list_title_templates_tool (e.g. 'Standard_1', 'Gray_Box_4', 'Bar_3', 'OpenShot'), or the path of an existing .svg title to start from. Empty = Bar_1 (centre title on a blue bar).",
+      "description": "Second line, e.g. a role under a name.",
       "type": "string"
      },
      "text": {
       "default": "",
-      "description": "Main title text, e.g. 'Tokyo Day 1'. A '\\n' puts the rest on the template's next field(s): 'Jane Doe\\nFounder' fills a lower third's name and role.",
+      "description": "Main title text. A second line ('Jane Doe\\nFounder') becomes the subtitle; on bold_box every line gets its own box; on credits every line is an entry.",
       "type": "string"
      },
      "text_color": {
       "default": "",
-      "description": "Colour of every line: '#RRGGBB', '#RRGGBBAA' (alpha = opacity), 'rgba(r,g,b,a)' or a basic name ('white', 'yellow'). Empty keeps the template's colours.",
+      "description": "Text colour: '#RRGGBB', '#RRGGBBAA' (alpha = opacity), 'rgba(r,g,b,a)' or a name. Empty = the style's (white; dark on bold_box).",
       "type": "string"
      },
      "track": {
       "default": "",
-      "description": "UI track number (1 = bottom), name or layer for the title. Empty = the lowest free track above every clip with video at that time (a new top track when none is free).",
+      "description": "UI track number (1 = bottom), name or layer. Empty = the lowest free track above every clip with video at that time (a new top track when none is free). A busy named track falls back to the first free track above it (with a warning).",
       "type": "string"
      }
     },
@@ -2492,13 +2466,18 @@
    "covers": [
     "title.edit"
    ],
-   "description": "Change an existing title's text, font or colours, or duplicate it.\n\nUse when the user wants to fix or restyle a title that is already there (\"change\nthe title to 'Day 2'\", \"make the lower third yellow\", \"use Georgia for the end\ncard\", \"make a copy of this title\"). Target it by timeline_clip_id (best),\nfile_id or title_query (its text); with no target the selected title clip, or the\nproject's only title, is used. Only what you pass changes; other fields keep their\ntext. scope=all_clips (default) updates every clip showing that title, like the\neditor's Edit Title; this_clip gives just that clip its own edited copy;\nduplicate saves an edited copy as a new title (place it with\nadd_clip_to_timeline_tool). One undo step restores the previous look.\nTo move, trim or re-time a title clip use the timeline tools instead.\n\nExample: {\"timeline_clip_id\": \"C1A2\", \"text\": \"Tokyo Day 2\", \"text_color\": \"#FFD700\"}.",
+   "description": "Change an existing title's text, style, font or colours, or duplicate it.\n\nTitles made with run_tool(name='add_title_tool') are rendered again with the change (HyperFrames, on\nthis computer); SVG titles from the Title Editor are rewritten. With no target,\nthe selected title clip or the project's only title is used. Only what you pass\nchanges. One undo step restores the previous look. To move, trim or re-time a\ntitle clip use the timeline tools.",
    "input_schema": {
     "additionalProperties": false,
     "properties": {
+     "accent_color": {
+      "default": "",
+      "description": "New rule, bar or box colour (HyperFrames titles). Empty keeps it.",
+      "type": "string"
+     },
      "background_color": {
       "default": "",
-      "description": "Colour of the title's full-frame background (transparent in most templates) with optional alpha, e.g. '#000000' for a solid black end card or '#00000080' for a 50% dark veil over the video. Empty keeps it.",
+      "description": "New full-frame background, alpha allowed. Empty keeps it.",
       "type": "string"
      },
      "file_id": {
@@ -2506,45 +2485,20 @@
       "description": "The title's Project Files id instead of a clip.",
       "type": "string"
      },
-     "fit_text": {
-      "default": true,
-      "description": "Shrink a line whose text would run off the frame (templates do not wrap text).",
-      "type": "boolean"
-     },
      "font": {
       "default": "",
-      "description": "Font family for every line, e.g. 'Arial Black', 'Helvetica Neue', 'Georgia'. Must be installed; empty keeps the template's font.",
+      "description": "Font family, e.g. 'Georgia' or a Google Fonts family such as 'Playfair Display'. Empty = Inter.",
       "type": "string"
      },
      "font_scale": {
       "default": 1.0,
-      "description": "Text size relative to the template: 1 = as designed, 1.5 = half again as big, 0.7 = smaller.",
+      "description": "Text size vs now (1 = unchanged).",
       "maximum": 5.0,
       "minimum": 0.2,
       "type": "number"
      },
-     "font_style": {
-      "default": "",
-      "description": "Italic or upright text; empty keeps the template's.",
-      "enum": [
-       "",
-       "italic",
-       "normal"
-      ],
-      "type": "string"
-     },
-     "font_weight": {
-      "default": "",
-      "description": "Make the text bold or normal weight; empty keeps the template's.",
-      "enum": [
-       "",
-       "bold",
-       "normal"
-      ],
-      "type": "string"
-     },
      "lines": {
-      "description": "New text for fields 1..N in order (list_title_templates_tool kind=project shows them); '' blanks a field; fields after N are kept.",
+      "description": "New lines (credits entries, or an SVG title's fields 1..N in order; '' blanks an SVG field).",
       "items": {
        "type": "string"
       },
@@ -2552,7 +2506,7 @@
      },
      "scope": {
       "default": "all_clips",
-      "description": "all_clips = change the title everywhere it is used (Edit Title); this_clip = change only timeline_clip_id, as its own copy; duplicate = save the changed copy as a new title in Project Files without touching any clip (Duplicate).",
+      "description": "all_clips = every clip using the title (Edit Title); this_clip = only timeline_clip_id, as its own copy; duplicate = save the edit as a new Project Files title, no clip changes (place it with add_clip_to_timeline_tool).",
       "enum": [
        "all_clips",
        "this_clip",
@@ -2560,24 +2514,40 @@
       ],
       "type": "string"
      },
+     "screen_position": {
+      "default": "auto",
+      "description": "Where the text sits: auto = the style's own place (lower_third bottom, kicker top, the rest centre). On 9:16 the text stays clear of the platforms' UI bands.",
+      "enum": [
+       "auto",
+       "top",
+       "center",
+       "bottom"
+      ],
+      "type": "string"
+     },
+     "style": {
+      "default": "",
+      "description": "Change a run_tool(name='add_title_tool') title to another style (list_title_templates_tool lists them). Empty keeps it.",
+      "type": "string"
+     },
      "subtitle": {
       "default": "",
-      "description": "New subtitle text. Empty keeps it.",
+      "description": "New subtitle. Empty keeps it.",
       "type": "string"
      },
      "text": {
       "default": "",
-      "description": "New main title text ('\\n' continues into the next fields). Empty keeps it.",
+      "description": "New main text ('\\n' continues into the subtitle). Empty keeps it.",
       "type": "string"
      },
      "text_color": {
       "default": "",
-      "description": "Colour of every line: '#RRGGBB', '#RRGGBBAA' (alpha = opacity), 'rgba(r,g,b,a)' or a basic name ('white', 'yellow'). Empty keeps the template's colours.",
+      "description": "New text colour ('#RRGGBB[AA]', rgba() or a name). Empty keeps it.",
       "type": "string"
      },
      "timeline_clip_id": {
       "default": "",
-      "description": "A title clip on the timeline (from add_title_tool or get_timeline_state_tool).",
+      "description": "A title clip on the timeline. Best target.",
       "type": "string"
      },
      "title_query": {
@@ -3929,15 +3899,15 @@
     "title.templates",
     "title.animated"
    ],
-   "description": "List title templates (and the titles already in the project) with their editable text fields.\n\nUse before add_title_tool when the user wants a particular look (\"lower third\",\n\"end card\", \"gold title\"), before edit_title_tool to see a title's current text,\nand with kind=\"animated\" before add_animated_title_tool. Each static template\nlists its fields in order (index, role title/subtitle/line, placeholder text),\nits text colour, background and where its text sits (zone top/center/bottom).\nGood defaults: Standard_1 (plain centred title + subtitle), Gray_Box_4 (lower\nthird: name + role), Bar_3 / Gold_Bottom (bottom text), OpenShot / Box / Flare\n(full-screen end card), Standard_4 (credits), Solid_Color (colour card).\nExample: {\"kind\": \"static\", \"query\": \"lower third\"}.",
+   "description": "List the title styles (and the titles already in the project) with the fields they show.\n\nUse before run_tool(name='add_title_tool') when the user wants a particular look (\"lower third\",\n\"end card\", \"credits\"), before run_tool(name='edit_title_tool') to see a title's current text,\nand with kind=\"animated\" before run_tool(name='add_animated_title_tool'). Each style lists its\nlook, the fields it draws (title / subtitle, or lines) and where it sits (zone top/center/bottom).\nExample: {\"kind\": \"styles\", \"query\": \"lower third\"}.",
    "input_schema": {
     "additionalProperties": false,
     "properties": {
      "kind": {
-      "default": "static",
-      "description": "static = the 50 SVG title templates + the user's templates (for add_title_tool); animated = the Blender animated titles and their parameters (for add_animated_title_tool); project = titles already in this project with their current text and the clips using them (for edit_title_tool); all = everything.",
+      "default": "styles",
+      "description": "styles = the title styles run_tool(name='add_title_tool') draws (HyperFrames); animated = the Blender animated titles and their parameters (for add_animated_title_tool); project = titles already in this project with their current text and the clips using them (for edit_title_tool); all = everything.",
       "enum": [
-       "static",
+       "styles",
        "animated",
        "project",
        "all"
@@ -3946,7 +3916,7 @@
      },
      "query": {
       "default": "",
-      "description": "Optional filter words matched against name, look and text, e.g. 'lower third', 'gold', 'end card', 'credits', 'Tokyo'.",
+      "description": "Optional filter words matched against name, look and text, e.g. 'lower third', 'end card', 'credits', 'Tokyo'.",
       "type": "string"
      }
     },
@@ -4012,7 +3982,7 @@
      },
      "spherical": {
       "default": false,
-      "description": "360\u00b0 spherical video.",
+      "description": "360° spherical video.",
       "type": "boolean"
      },
      "width": {
@@ -5375,7 +5345,7 @@
      },
      "query": {
       "default": "",
-      "description": "A name or word ('fire', 'heart', 'thumbs up', 'coffee'), an emoji character ('\ud83d\udd25') or an OpenMoji code ('1F525'). Empty lists a group.",
+      "description": "A name or word ('fire', 'heart', 'thumbs up', 'coffee'), an emoji character ('🔥') or an OpenMoji code ('1F525'). Empty lists a group.",
       "type": "string"
      }
     },

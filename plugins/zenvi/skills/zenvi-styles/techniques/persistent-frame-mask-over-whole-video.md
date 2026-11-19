@@ -22,7 +22,7 @@ pages.
 
 ## Build it in Zenvi
 1. The mat on track 1 for the whole length:
-   `add_title_tool {"text": " ", "template": "Standard_1", "background_color": "#efe8dc",
+   `add_title_tool {"text": " ", "background_color": "#efe8dc",
    "position_seconds": 0, "duration_seconds": <length>, "track": "1"}`
    (or a generated paper texture via `generate_image_and_add_to_timeline_tool`).
 2. All footage on track 2, then one call:

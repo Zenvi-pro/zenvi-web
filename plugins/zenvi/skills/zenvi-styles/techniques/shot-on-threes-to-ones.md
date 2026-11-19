@@ -20,7 +20,7 @@ instant switches to fully smooth motion and sprints. The change of frame rate is
 slick burst on one screen. For a card entering, a metric crossing a line.
 
 ## Build it in Zenvi
-1. The element: a title/graphic clip (e.g. `add_title_tool {"text": "NEW", "template": "Bar_1", "position_seconds": 0, "duration_seconds": 5}`)
+1. The element: a title/graphic clip (e.g. `add_title_tool {"text": "NEW", "position_seconds": 0, "duration_seconds": 5}`)
    or a kinetic-headline block.
 2. Stepped phase (0 to 1.6 s): `set_keyframes_tool {"timeline_clip_id": "<C>", "property": "location_x", "interpolation": "constant",
    "points": [{"seconds": 0, "value": -0.35}, {"seconds": 0.1, "value": -0.29}, {"seconds": 0.2, "value": -0.23}, ...]}`

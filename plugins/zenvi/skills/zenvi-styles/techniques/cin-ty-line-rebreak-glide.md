@@ -25,7 +25,7 @@ Use when: An inserted icon or a longer word makes a centred line too wide. A hea
 
 ## Build it in Zenvi
 
-1. One title per word on tracks 3-7, laid out as one centred line (layout A): `add_title_tool {"text": "Ship", "template": "Standard_1", "position_seconds": 1.0, "duration_seconds": 4.0, "track": "3"}`, then the other words.
+1. One title per word on tracks 3-7, laid out as one centred line (layout A): `add_title_tool {"text": "Ship", "position_seconds": 1.0, "duration_seconds": 4.0, "track": "3"}`, then the other words.
 2. Word i glides from slot A to slot B with `set_keyframes_tool {"timeline_clip_id": "<w_i>", "property": "location_x", "ease": "ease_in_out_sine", "points": [{"seconds": <s + 0.033 i>, "value": <xA_i>}, {"seconds": <s + 0.033 i + D_i>, "value": <xB_i>}]}`, with D_i = 0.15 x travel clamped to 0.5-0.8 s (30-48 f), stagger 2 f (0.033 s) in the new reading order.
 3. y leads by 4 f (0.07 s) on its own curve: `location_y` from yA_i to yB_i, `ease_out_expo`, starting 0.067 s earlier, so words that change rows drop first and slide second.
 4. If the layout also shrinks, add `scale_x/y` 1.0 to <s_B/s_A> over the same window.

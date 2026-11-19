@@ -770,19 +770,20 @@ const SPECS: Record<string, Spec> = {
   add_title_tool: {
     happy: {
       args: { text: "Chapter One", position_seconds: "3", duration_seconds: "4" },
-      summary: /^Added title 'Chapter One' \(Bar_1\) on track 4 at 3\.00-7\.00s\.$/,
+      summary: /^Added title 'Chapter One' \(Headline\) on track 4 at 3\.00-7\.00s\.$/,
       check: ({ host, receipt, doc }) => {
-        const path = (receipt.data as { path: string }).path;
-        expect(String(new TextDecoder().decode(host.written.get(path) as Uint8Array))).toContain(">Chapter One</tspan>");
+        // Drawn with keyframed layers here (no headless Chrome): the words are in a drawing, not an OpenShot template.
+        expect([...host.written.values()].some((v) => new TextDecoder().decode(v as Uint8Array).includes("Chapter One"))).toBe(true);
+        expect((receipt.data as { renderer: string }).renderer).toBe("native");
         // Over the picture, not on the video's track: the first free track above the logo on track 3.
-        const title = doc.project.clips.find((c) => c.position === 3 && c.file_id === (receipt.data as { file_id: string }).file_id);
+        const title = doc.project.clips.find((c) => c.id === (receipt.data as { timeline_clip_id: string }).timeline_clip_id);
         expect(title?.layer).toBe(4_000_000);
         expect(doc.project.layers).toHaveLength(5);
       },
     },
     failure: {
-      args: { text: "Chapter One", template: "NoSuchTemplate" },
-      summary: /^Error: unknown title template 'NoSuchTemplate'; close matches: .+ \(list_title_templates_tool lists them all\)$/,
+      args: { text: "Chapter One", text_color: "not-a-colour" },
+      summary: /^Error: text_color: /,
     },
   },
   add_captions_tool: {
@@ -800,7 +801,7 @@ const SPECS: Record<string, Spec> = {
     failure: { args: { srtPath: "/subs/missing.srt" }, summary: /^Error: subtitle file not found: \/subs\/missing\.srt$/ },
   },
   list_title_templates_tool: {
-    happy: { args: { kind: "static", query: "lower third" }, host: { assets: ENGINE_ASSETS }, summary: /^Found 3 title template\(s\) matching 'lower third'\.$/ },
+    happy: { args: { kind: "styles", query: "lower third" }, host: { assets: ENGINE_ASSETS }, summary: /^Found 1 title style\(s\) matching 'lower third'\.$/ },
     failure: { args: { kind: "sideways" }, status: "refused", summary: /^Error: Invalid arguments for list_title_templates_tool: 'sideways' is not one of/ },
   },
   edit_title_tool: {
