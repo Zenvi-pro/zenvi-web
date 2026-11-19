@@ -35,6 +35,26 @@ describe("motion block tools", () => {
     expect(names(fakeHost({ without: ["motion"] }))).not.toContain("add_motion_block_tool");
   });
 
+  it("leave the title block to add_title_tool: not listed, refused by name", async () => {
+    const doc = project();
+    const motion = fakeMotionHost();
+    motion.blocks = () => [FAKE_MOTION_BLOCK, { ...FAKE_MOTION_BLOCK, id: "title", title: "Title" }];
+    const listed = await runTool({ doc, host: host(motion) }, "list_motion_blocks_tool", {});
+    expect((listed.data as { summary: string }).summary).not.toMatch(/^title /m);
+    const added = await runTool({ doc, host: host(motion) }, "add_motion_block_tool", { block: "title" });
+    expect(added.ok).toBe(false);
+    expect(added.text).toContain("add_title_tool");
+    // A title add_title_tool rendered is changed with edit_title_tool, which keeps its spec in step.
+    const motionWithTitle = { ...motion, check: (id: string, params: Record<string, unknown>) => (id === "title" ? { ok: true as const, params } : motion.check(id, params)) };
+    const titled = await runTool({ doc, host: host(motionWithTitle as typeof motion) }, "add_title_tool", { text: "Hi" });
+    expect(titled.ok, titled.text).toBe(true);
+    const fileId = String(dataOf(titled).file_id);
+    const updated = await runTool({ doc, host: host(motion) }, "update_motion_block_tool", { file_id: fileId, params: { title: "Bye" } });
+    expect(updated.ok).toBe(false);
+    expect(updated.text).toContain("edit_title_tool");
+    expect(motion.requests).toHaveLength(1);
+  });
+
   it("lists blocks and one block's params", async () => {
     const doc = project();
     const all = await runTool({ doc, host: host() }, "list_motion_blocks_tool", {});

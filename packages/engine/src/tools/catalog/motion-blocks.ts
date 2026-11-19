@@ -32,6 +32,13 @@ const ADD = "add_motion_block_tool";
 const UPDATE = "update_motion_block_tool";
 const SETUP = "setup_motion_runtime_tool";
 const TRACK_LABEL = "Motion";
+/** The block add_title_tool renders titles with (titles.ts): one tool per job, so these tools leave it alone. */
+const TITLE_BLOCK = "title";
+
+/** The host's blocks these tools offer. */
+function offered(motion: MotionHost): MotionBlockInfo[] {
+  return motion.blocks().filter((b) => b.id !== TITLE_BLOCK);
+}
 
 const round = (t: number): number => Math.round(t * 1000) / 1000;
 
@@ -214,7 +221,7 @@ export const motionBlockTools: CatalogTool[] = [
     requires: ["motion"],
     run: async (call, args: z.infer<typeof listInput>) => {
       const motion = call.host.motion!;
-      const all = motion.blocks();
+      const all = offered(motion);
       // A block that cannot render yet is worse than none: say so before the agent plans around it.
       const runtime = await motion.runtime?.();
       const notReady = runtime && !runtime.ready ? runtime : undefined;
@@ -272,14 +279,15 @@ export const motionBlockTools: CatalogTool[] = [
     run: async (call, args: z.infer<typeof addInput>) => {
       const motion = call.host.motion!;
       const project = call.doc.project;
-      const block = motion.blocks().find((b) => b.id === args.block);
-      if (!block) return refused(ADD, `Error: unknown motion block ${args.block}; blocks: ${motion.blocks().map((b) => b.id).join(", ")}.`);
+      if (args.block === TITLE_BLOCK) return refused(ADD, "Error: titles are add_title_tool's job (its style argument picks the look).");
+      const block = offered(motion).find((b) => b.id === args.block);
+      if (!block) return refused(ADD, `Error: unknown motion block ${args.block}; blocks: ${offered(motion).map((b) => b.id).join(", ")}.`);
       const raw = parseParams(args.params);
       if (typeof raw === "string") return refused(ADD, raw);
       const checked = motion.check(block.id, raw);
       if (!checked.ok) return refused(ADD, errorText(checked.error));
       const asked = args.duration_seconds ?? block.duration.default;
-      const long = durationProblem(block, asked, motion.blocks());
+      const long = durationProblem(block, asked, offered(motion));
       if (long) return refused(ADD, long);
       // Whole frames: the render has round(seconds × fps) frames, and the clip must not outrun them.
       const seconds = snapToFrame(project, asked);
@@ -335,6 +343,7 @@ export const motionBlockTools: CatalogTool[] = [
       if (!file) return refused(UPDATE, `Error: unknown file id ${args.file_id}.`);
       const current = readMotionLink(file);
       if (!current) return refused(UPDATE, `Error: ${file.id} is not a Zenvi Motion block (add one with add_motion_block_tool).`);
+      if (current.block === TITLE_BLOCK) return refused(UPDATE, `Error: ${file.id} is a title; change it with edit_title_tool.`);
       const block = motion.blocks().find((b) => b.id === current.block);
       if (!block) return refused(UPDATE, `Error: this Zenvi has no motion block ${current.block}.`);
       const raw = parseParams(args.params);
