@@ -185,15 +185,15 @@ async function timelineMusicGrid(call: ToolCall, project: Project, warnings: str
  * lowest free unlocked track above every picture there (planOverlayTrack),
  * then the free tracks above it, then new tracks on top.
  */
-export function planOverlayStack(project: Project, start: number, end: number, count: number): { layers: number[]; created: number[] } {
-  const first = planOverlayTrack(project, start, end, undefined);
+export function planOverlayStack(project: Project, start: number, end: number, count: number, track?: string, exclude: ReadonlySet<string> = new Set()): { layers: number[]; created: number[] } {
+  const first = planOverlayTrack(project, start, end, track, exclude);
   const layers = [first.layer];
   const created = first.created ? [first.layer] : [];
   const numbers = project.layers.map((l) => Math.trunc(Number(l.number) || 0)).sort((a, b) => a - b);
   let top = Math.max(first.layer, ...numbers);
   for (let i = 1; i < count; i += 1) {
     const below = layers[i - 1]!;
-    const next = created.length === 0 ? numbers.find((n) => n > below && !isLocked(project, n) && clipsInWindow(project, n, start, end).length === 0) : undefined;
+    const next = created.length === 0 ? numbers.find((n) => n > below && !isLocked(project, n) && clipsInWindow(project, n, start, end, exclude).length === 0) : undefined;
     if (next !== undefined) layers.push(next);
     else {
       top += TRACK_STEP;

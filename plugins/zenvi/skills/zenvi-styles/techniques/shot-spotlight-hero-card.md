@@ -22,7 +22,7 @@ with a floating 3D caption. One hero, one complete motion arc.
 ## Build it in Zenvi
 Dim layer over the page capture, with a hole cut by a feathered shape mask (outside kept): a dark title card as the dim, `alpha` 0.9.
 ```json
-add_title_tool {"text": " ", "background_color": "#0e0c0aE6", "position_seconds": 0, "duration_seconds": 1.0, "template": "Bar_1"}
+add_title_tool {"text": " ", "background_color": "#0e0c0aE6", "position_seconds": 0, "duration_seconds": 1.0}
 add_shape_mask_tool {"clip_ids": ["<dim_1>"], "shape": "ellipse", "x": 0.28, "y": 0.4, "width": 0.4, "height": 0.4, "feather": 0.25, "outside": true}
 ```
 A mask keeps its centre, so a wandering pool = one dim clip per station (3 stations x ~0.4 s, each with its own x,y); the last dim clip is the lock: a card-shaped `rectangle` hole whose

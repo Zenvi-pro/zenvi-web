@@ -26,7 +26,7 @@ Use when: Single-take product walkthroughs and 3D UI slabs where each feature ge
 ## Build it in Zenvi
 
 1. Frame the end pose so the product covers 65-75 % of the frame and leaves a 25-30 % band on the side it turns away from: `set_keyframes_tool {"timeline_clip_id": "<product>", "property": "scale_x", "mode": "replace", "points": [{"seconds": 0, "value": 1.0}, {"seconds": 1.4, "value": 1.35, "ease": "ease_in_out_sine"}]}`, `scale_y` the same, and `location_x` to push the product to one side (for example -0.12).
-2. Caption in the band, at most 24 % of the frame width, 2-3 words per line, left aligned, inset 8-10 % from the frame edge: `add_title_tool {"template": "Standard_1", "text": "One click\nto publish", "position_seconds": 1.05, "duration_seconds": 2.0, "fade_in_seconds": 0.43, "fade_out_seconds": 0.23, "track": 3}`, then `set_keyframes_tool` on `location_x` (+0.28 for a right band) and `scale_x/y` to hold it narrow.
+2. Caption in the band, at most 24 % of the frame width, 2-3 words per line, left aligned, inset 8-10 % from the frame edge: `add_title_tool {"text": "One click\nto publish", "position_seconds": 1.05, "duration_seconds": 2.0, "track": 3}`, then `set_keyframes_tool` on `location_x` (+0.28 for a right band) and `scale_x/y` to hold it narrow.
 3. For a word-by-word build use `add_kinetic_title_tool {"text": "One click to publish", "style": "documentary", "animation": "rise", "stagger_seconds": 0.133, "position_seconds": 1.05, "duration_seconds": 2.0, "y": 0.5}` and move the clips into the band with `set_keyframes_tool` `location_x`.
 4. Start the caption in the last 25 % of the move, or within 6 f (0.1 s) of landing; fade it out as one block (12-16 f, 0.2-0.27 s) before the next camera move starts.
 

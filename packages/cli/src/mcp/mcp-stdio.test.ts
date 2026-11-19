@@ -116,7 +116,10 @@ describe("zenvi mcp over stdio (real catalog)", () => {
 
     // Every edit autosaved to the project file, in the desktop format.
     const saved = JSON.parse(await readFile(path.join(work, "e2e.zvn"), "utf8")) as { clips: unknown[]; files: unknown[] };
-    expect(saved.clips).toHaveLength(3);
-    expect(saved.files).toHaveLength(2);
+    // The title is one rendered clip (headless Chrome) or a few drawn layers, each its own file.
+    const titleClips = title.receipt.clips.length;
+    expect(titleClips).toBeGreaterThan(0);
+    expect(saved.clips).toHaveLength(2 + titleClips);
+    expect(saved.files).toHaveLength(1 + titleClips);
   }, 600_000);
 });

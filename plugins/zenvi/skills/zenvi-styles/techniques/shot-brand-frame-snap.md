@@ -21,7 +21,7 @@ the layout inside changes on the same frame and the badge text swaps. The flip i
 It brands a raw screen recording without a watermark.
 
 ## Build it in Zenvi
-1. Frame colour as a full-frame card under the recording: `add_title_tool {"template":"Solid_Color","text":" ","background_color":"#2F55FF","position_seconds":0,"duration_seconds":2.8}`
+1. Frame colour as a full-frame card under the recording: `add_title_tool {"text": " ", "background_color": "#2F55FF", "position_seconds": 0, "duration_seconds": 2.8}`
    then a second card for the second mode: `{"background_color":"#FF5B1F","position_seconds":2.8,"duration_seconds":2.0}` (hard cut at the flip, no fade).
 2. Recording clip on the track above: `add_clip_to_timeline_tool {"file_id":"<capture>","position_seconds":0}`. Make the frame visible by shrinking it:
    `set_keyframes_tool property=scale_x` and `scale_y`: `[{"seconds":0,"value":1.0},{"seconds":0.63,"value":0.89,"ease":"ease_out_cubic"}]`, with `corner_radius` ~0.02. 89 % scale leaves a ~60 px frame on 1080p, so the frame "grows" as the content shrinks.

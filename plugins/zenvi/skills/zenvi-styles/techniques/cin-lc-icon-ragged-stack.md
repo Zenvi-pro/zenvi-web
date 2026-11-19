@@ -27,14 +27,14 @@ Use when: Listing three or four abstract capabilities, platforms or audiences th
 
 **Ban-safe variant (the cinetic house default; the draw says `ban_safe_variant`):**
 
-1. Drop the muted lead word above the stack. Fold it into row one at full strength and the keywords' size: `add_title_tool {"template": "Standard_1", "text": "Built for teams", "text_color": "#161616", "position_seconds": 0, "duration_seconds": 3.4, "track": 4}`, then `agencies` and `founders` on the rag.
+1. Drop the muted lead word above the stack. Fold it into row one at full strength and the keywords' size: `add_title_tool {"text": "Built for teams", "text_color": "#161616", "position_seconds": 0, "duration_seconds": 3.4, "track": 4}`, then `agencies` and `founders` on the rag.
 2. Icons only where the person supplies the product's own mark for that item (`add_clip_to_timeline_tool`); otherwise words alone on the rag.
 3. Keep the rag table (`location_x` 0, +0.0625, -0.031), the 10 f (0.17 s) row stagger with `ease_out_expo` and the 0.4 px/f drift (`location_y` -0.022 per second).
 
 **Full look** (relies on filler-text: only when the person's brand supplies that look):
 
-1. Lead word: `add_title_tool {"template": "Standard_1", "text": "Built for", "text_color": "#8a8a8a", "position_seconds": 0, "duration_seconds": 3.4, "track": 3, "fade_in_seconds": 0.3}`; park it above the stack with `set_keyframes_tool` on `location_y`.
-2. One title per keyword, rows 10 f (0.17 s) apart: `add_title_tool {"template": "Standard_1", "text": "Teams", "text_color": "#161616", "position_seconds": 0.17, "duration_seconds": 3.2, "track": 4}` and again for rows 2-4 at 0.33, 0.5, 0.67 s on tracks 5-7. Rag: `location_x` offsets from the table [0, +120, -60, +180] px, which is [0, 0.0625, -0.031, 0.094] of the frame width.
+1. Lead word: `add_title_tool {"text": "Built for", "text_color": "#8a8a8a", "position_seconds": 0, "duration_seconds": 3.4, "track": 3}`; park it above the stack with `set_keyframes_tool` on `location_y`.
+2. One title per keyword, rows 10 f (0.17 s) apart: `add_title_tool {"text": "Teams", "text_color": "#161616", "position_seconds": 0.17, "duration_seconds": 3.2, "track": 4}` and again for rows 2-4 at 0.33, 0.5, 0.67 s on tracks 5-7. Rag: `location_x` offsets from the table [0, +120, -60, +180] px, which is [0, 0.0625, -0.031, 0.094] of the frame width.
 3. One icon clip per row (the product's own mark for that item) at one em, left of the word: `add_clip_to_timeline_tool {"file_id": "<icon_i>", "position_seconds": 0.17, "duration_seconds": 3.2, "track": 8}`.
 4. Entry per row (title and icon share keyframes): `set_keyframes_tool {"timeline_clip_id": "<row_i>", "property": "location_y", "mode": "merge", "points": [{"seconds": 0.17, "value": "<y_i + 0.011>"}, {"seconds": 0.54, "value": "<y_i>", "ease": "ease_out_expo"}]}` and `alpha` 0 to 1 over the same 22 f (0.37 s).
 5. Hold: drift the whole stack up at 0.4 px/f, which is `location_y` -0.022 over 1 s, from 0.54 s to 2.4 s; exit in reading order 4 f (0.07 s) apart with `alpha` to 0 over 0.2 s.

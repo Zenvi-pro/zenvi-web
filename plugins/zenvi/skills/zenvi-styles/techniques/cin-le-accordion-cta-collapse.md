@@ -25,7 +25,7 @@ Use when: A one-line CTA (a sentence plus a URL) after a large type beat. Type-l
 
 ## Build it in Zenvi
 
-1. One title per word in their final centred slots on tracks 3-6: `add_title_tool {"text": "Start", "template": "Standard_1", "position_seconds": 4.0, "duration_seconds": 3.5, "track": "3"}`, then "free", "today", "zenvi.com".
+1. One title per word in their final centred slots on tracks 3-6: `add_title_tool {"text": "Start", "position_seconds": 4.0, "duration_seconds": 3.5, "track": "3"}`, then "free", "today", "zenvi.com".
 2. Word i starts offset off_i = 70 + 80 i px (capped at 290 px, i.e. 0.036 + 0.042 i of width) in the direction of travel: `set_keyframes_tool {"timeline_clip_id": "<w_i>", "property": "location_x", "ease": "ease_out_expo", "points": [{"seconds": 4.0, "value": <off_i>}, {"seconds": 4.73, "value": 0}]}` (a close with tau about 14.6 f: 55 % closed in 10 f, 0.17 s, 95 % by 44 f, 0.73 s; the last word starts at no more than 20 px/f).
 3. Enter on a hard cut from a larger line whose total width matches this line's stretched width.
 4. The URL focus resolve (soft for 8 f, 0.13 s, then sharp over 14 f, 0.23 s) needs a focus pull; skip it here.

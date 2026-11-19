@@ -26,7 +26,7 @@ Use when: Type-led films on white or flat stages with many statement cuts.
 ## Build it in Zenvi
 
 1. Outgoing card on its own ground, ending by its own exit (an ease_in_cubic move or a fade over its last 8 f, 0.13 s): `add_kinetic_title_tool {"text": "<statement one>", "style": "creator", "animation": "pop", "position_seconds": 0, "duration_seconds": 1.6}`.
-2. Incoming stage starts at the cut frame, flat, no type yet: `add_title_tool {"template": "Standard_1", "text": "", "background_color": "#f4f1ea", "position_seconds": 1.6, "duration_seconds": 1.8, "track": 1}`.
+2. Incoming stage starts at the cut frame, flat, no type yet: `add_title_tool {"text": "", "background_color": "#f4f1ea", "position_seconds": 1.6, "duration_seconds": 1.8, "track": 1}`.
 3. The first element arrives two frames later, on its normal entrance: `add_kinetic_title_tool {"text": "<statement two>", "style": "creator", "animation": "pop", "position_seconds": 1.633, "duration_seconds": 1.6}` (cut + 2 f at 60 fps = 0.033 s).
 4. Do this on a few statement-to-statement cuts only (at most a third), never the film's first frame; the hook opens composed and moving.
 

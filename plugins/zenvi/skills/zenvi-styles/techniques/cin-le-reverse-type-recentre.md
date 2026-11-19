@@ -25,7 +25,7 @@ Use when: Agent, assistant or persona products whose mark is an avatar or a disc
 
 ## Build it in Zenvi
 
-1. Mark centred, name letters each a single-letter title in their final slots (measured on `inspect_timeline_tool`): `add_clip_to_timeline_tool {"file_id": "<disc>", "position_seconds": 1.0, "duration_seconds": 4.0, "track": "3"}`; for each letter `add_title_tool {"text": "<ch>", "template": "Standard_1", "position_seconds": <t_i>, "duration_seconds": <rest>, "track": "4"}`.
+1. Mark centred, name letters each a single-letter title in their final slots (measured on `inspect_timeline_tool`): `add_clip_to_timeline_tool {"file_id": "<disc>", "position_seconds": 1.0, "duration_seconds": 4.0, "track": "3"}`; for each letter `add_title_tool {"text": "<ch>", "position_seconds": <t_i>, "duration_seconds": <rest>, "track": "4"}`.
 2. Letter i (n letters) appears at 1.0 + 0.058 x (n-1-i) s (3.5 f apart, 10 letters inside 36 f, 0.6 s) with `alpha` 0 to 1 over 0.067 s, so the name grows leftward from its last letter.
 3. Keep the group centred by moving everything left/right as the width grows: on every letter and the mark, `location_x` keyframes shifting by half each new advance with `ease_in_out_sine`, 20 f (0.33 s) to settle each step (the mark travels about 270 px at 7-8 px/f).
 4. If the story device is a dot, darken it into the mark first: `alpha` crossfade dot to mark over 12 f (0.2 s).

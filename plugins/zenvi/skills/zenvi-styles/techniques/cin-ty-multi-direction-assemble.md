@@ -25,7 +25,7 @@ Use when: Re-spiking energy after a calm, read-paced card; a payoff line that ne
 
 ## Build it in Zenvi
 
-1. One title per word at its final position on tracks 3-7: `add_title_tool {"text": "Build", "template": "Standard_1", "position_seconds": 2.0, "duration_seconds": 2.5, "track": "3"}` (and "it", "once,", "ship", "everywhere").
+1. One title per word at its final position on tracks 3-7: `add_title_tool {"text": "Build", "position_seconds": 2.0, "duration_seconds": 2.5, "track": "3"}` (and "it", "once,", "ship", "everywhere").
 2. Per word i with delay d = [0, 0.067, 0.167, 0.2, 0.267] s: `set_keyframes_tool {"timeline_clip_id": "<w_i>", "property": "location_x", "ease": "ease_out_expo", "points": [{"seconds": <2.0 + d_i>, "value": <side * 0.115>}, {"seconds": <2.0 + d_i + 0.333>, "value": 0}]}` (220 px of 1920, from alternating sides; one word enters from below with `location_y` 0.185).
 3. Same window on `scale_x` and `scale_y`, 1.4 to 1, and `alpha` 0 to 1 over 0.083 s.
 4. Streak the flight: `apply_fx_tool {"clip_id": "<w_i>", "effects": [{"effect": "directional_blur", "amount": 0.6, "start": 0, "end": 0.15}]}`.

@@ -25,7 +25,7 @@ Use when: Making a sentence about the object literally contain it (a product pho
 
 ## Build it in Zenvi
 
-1. Split the line into two titles: left group `add_title_tool {"template": "Standard_1", "text": "Your data stays", "position_seconds": 0, "duration_seconds": 3, "track": 3}` and right group `"text": "private"`, both centred; the line is read as complete for the first beat.
+1. Split the line into two titles: left group `add_title_tool {"text": "Your data stays", "position_seconds": 0, "duration_seconds": 3, "track": 3}` and right group `"text": "private"`, both centred; the line is read as complete for the first beat.
 2. Open the gap: `set_keyframes_tool {"timeline_clip_id": "<left>", "property": "location_x", "mode": "replace", "points": [{"seconds": 0.8, "value": 0}, {"seconds": 1.07, "value": "<-w/2>", "ease": "ease_in_out_sine"}]}` and `<right>` to `+w/2`, w the object's width as a fraction of the frame (for a 200 px gap, 0.104). Gap opens over 16 f (0.27 s), under 20 px/f per side.
 3. Pop the object into the slot once the gap is 70 % open (about 0.99 s): `add_clip_to_timeline_tool {"file_id": "<object>", "position_seconds": 0.99, "duration_seconds": 2.0, "track": 4}` with `scale_x` and `scale_y` 0 to 1 over 6 f (0.1 s), `ease_out_cubic` (no overshoot).
 4. Make the object the next scene, if needed: groups accelerate apart over 16 f (0.27 s) with `ease_in_cubic` and `alpha` to 0, while the object's `scale_x/y` grows to the next shot's rect over 8-20 f (0.13-0.33 s).

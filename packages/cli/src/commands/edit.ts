@@ -368,16 +368,18 @@ export function registerEditCommands(program: Command, ctx: CommandContext): voi
 
   program
     .command("title")
-    .description("add a text title (SVG template) to the timeline")
+    .description("add an animated title to the timeline")
     .argument("<text>", "title text")
-    .option("--template <name>", "title template (e.g. Standard_1)")
+    .option("--style <name>", "headline, lower_third, end_card, bold_box, kicker or credits")
+    .option("--subtitle <text>", "second line, e.g. a role under a name")
     .option("--at <time>", "timeline position")
     .option("--duration <time>", "length")
     .option("-t, --track <track>", "track")
-    .action(async (text: string, opts: { template?: string; at?: string; duration?: string; track?: string }) => {
+    .action(async (text: string, opts: { style?: string; subtitle?: string; at?: string; duration?: string; track?: string }) => {
       await runToolCommand(ctx, "add_title_tool", {
         text,
-        ...(opts.template ? { template: opts.template } : {}),
+        ...(opts.style ? { style: opts.style } : {}),
+        ...(opts.subtitle ? { subtitle: opts.subtitle } : {}),
         ...(opts.at !== undefined ? { position_seconds: parseTime(opts.at) } : {}),
         ...(opts.duration !== undefined ? { duration_seconds: parseTime(opts.duration) } : {}),
         ...(opts.track !== undefined ? { track: opts.track } : {}),

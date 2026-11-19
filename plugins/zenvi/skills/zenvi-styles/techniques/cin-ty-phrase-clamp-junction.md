@@ -25,7 +25,7 @@ Use when: A two-part claim whose halves mean more together (subject + promise, p
 
 ## Build it in Zenvi
 
-1. `add_title_tool {"text": "Say it once,", "template": "Standard_1", "position_seconds": 2.0, "duration_seconds": 2.6, "track": "3"}` first half; `add_title_tool {"text": "ship it twice.", "template": "Standard_1", "position_seconds": 2.0, "duration_seconds": 2.6, "track": "4"}` second half (second half is also a whole-title clip, so the 2 f per-word drop stagger is merged into one drop).
+1. `add_title_tool {"text": "Say it once,", "position_seconds": 2.0, "duration_seconds": 2.6, "track": "3"}` first half; `add_title_tool {"text": "ship it twice.", "position_seconds": 2.0, "duration_seconds": 2.6, "track": "4"}` second half (second half is also a whole-title clip, so the 2 f per-word drop stagger is merged into one drop).
 2. `inspect_timeline_tool {"startFrame": 150}` then pin the junction at x about 48 % of the frame: a constant `set_keyframes_tool {"timeline_clip_id": "<half1>", "property": "location_x", "points": [{"seconds": 2.0, "value": <dx1>}, {"seconds": 4.6, "value": <dx1>}]}` and the same for `<half2>` with `<dx2>`, so the first half ends and the second starts one word space apart.
 3. Vertical lock: `set_keyframes_tool {"timeline_clip_id": "<half1>", "property": "location_y", "ease": "ease_out_expo", "points": [{"seconds": 2.0, "value": 0.059}, {"seconds": 2.3, "value": 0}]}` (64 px of 1080); second half `{"seconds": 2.033, "value": -0.037}` to `{"seconds": 2.333, "value": 0}` (-40 px, f2 later).
 4. `set_keyframes_tool {"timeline_clip_id": "<half1>", "property": "alpha", "points": [{"seconds": 2.0, "value": 0}, {"seconds": 2.05, "value": 1}]}` for both halves (opacity over 3 f).

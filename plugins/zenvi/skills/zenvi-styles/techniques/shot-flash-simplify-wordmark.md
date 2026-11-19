@@ -26,8 +26,7 @@ does the downgrade from sensual to official. Use a made-up or the client's own w
 2. The flash is the cut between the two: `apply_motion_transition_tool {"preset": "flash_white", "clip1_id": "<chrome>",
    "clip2_id": "<flat>", "duration": 0.4, "intensity": 1.5}`.
 3. The flat word, same size and place, a flat ink on paper or black:
-   `add_title_tool {"text": "BRAND", "template": "Standard_1", "font_weight": "bold", "text_color": "#111111",
-   "background_color": "#f4efe6", "position_seconds": 1.6, "duration_seconds": 2.4}` and a `set_keyframes_tool` `scale_x` / `scale_y` 1.03 to 1 over 0.9 s
+   `add_title_tool {"text": "BRAND", "text_color": "#111111", "background_color": "#f4efe6", "position_seconds": 1.6, "duration_seconds": 2.4}` and a `set_keyframes_tool` `scale_x` / `scale_y` 1.03 to 1 over 0.9 s
    `ease_out_cubic`. Tagline words in with `add_kinetic_title_tool {"text": "Craft the shot.", "animation": "rise", "position_seconds": 2.4}`.
 4. Charge: `add_sfx_tool {"recipe": "riser_tonal", "at_seconds": 1.6, "duration": 1.3}` ending on the flash,
    `{"recipe": "impact_boom", "at_seconds": 1.6, "gain_db": -10}` on the white.

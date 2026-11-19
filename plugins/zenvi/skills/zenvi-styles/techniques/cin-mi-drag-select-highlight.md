@@ -25,7 +25,7 @@ Use when: The product acts on a piece of text the user picks (rewrite, translate
 
 ## Build it in Zenvi
 
-1. The text line is a title or screenshot clip on track 2; the highlight is a clip on track 1 BEHIND it (field, highlight, text, cursor): `add_title_tool {"text": " ", "background_color": "<22 % accent tint>", "fit_text": false, "position_seconds": 0.0, "duration_seconds": 4.0, "track": "1"}` with `corner_radius` 3 px, set to the selection start with `origin_x` 0.
+1. The text line is a title or screenshot clip on track 2; the highlight is a clip on track 1 BEHIND it (field, highlight, text, cursor): `add_title_tool {"text": " ", "background_color": "<22 % accent tint>", "position_seconds": 0.0, "duration_seconds": 4.0, "track": "1"}` with `corner_radius` 3 px, set to the selection start with `origin_x` 0.
 2. Grow it one whole glyph at a time, never tweened: `set_keyframes_tool {"timeline_clip_id": "<highlight>", "property": "scale_x", "interpolation": "constant", "points": [{"seconds": <DOWN+0.03>, "value": <w_1>}, {"seconds": <DOWN+0.07>, "value": <w_2>}, "..."]}` with one step per glyph, about 2 f (0.03 s) per glyph (24-40 f = 0.4-0.67 s for the phrase), and widths measured from the real text.
 3. The I-beam (`add_title_tool {"text": "⌶"}`) presses at the start of the phrase and drags with `location_x` over D = max(24 f, 2 x glyph count) frames on `ease_in_out_sine`, at 12 px/f or less; text stays ink.
 4. Release 6 f (0.1 s) after the last step. 4 f (0.07 s) later an action bar grows 12 px above the line from the selection's top centre: `scale_x`/`scale_y` 0.05 to 1 over 10 f (0.17 s) on `ease_out_expo` with `origin_x` 0.5, `origin_y` 1.0 (alpha in over the first 4 f / 0.07 s).

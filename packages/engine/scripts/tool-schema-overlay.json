@@ -358,10 +358,10 @@
       }
     },
     "add_title_tool": {
-      "description": "Create a title / lower-third from a bundled SVG template with your text and place it on the timeline (default 5 s at 0 s).",
+      "description": "Create an animated title (styles: headline, lower_third, end_card, bold_box, kicker, credits) and place it over the video (default 5 s at 0 s).",
       "props": {
         "duration_seconds": {"description": "How long the title shows (default 5)."},
-        "file_name": {"description": "File name for the generated SVG."}
+        "file_name": {"description": "Project Files name for the rendered title (no extension)."}
       }
     },
     "add_animated_title_tool": {

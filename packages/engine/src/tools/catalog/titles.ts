@@ -1,279 +1,219 @@
 /**
  * add_title_tool (add_captions_tool is in captions.ts).
  *
- * Port of zenvi-core develop 1f80cb3d0 src/classes/editor_tools/titles_text.py
- * `add_title`, with the title rules of classes/title_svg.py
- * (titles/title-svg.ts) that list_title_templates_tool and edit_title_tool
- * share: the template's text fields filled from text / subtitle / lines
- * (unfilled placeholders blanked), font, weight, style, size, text and
- * background colours, long lines shrunk to fit, then one clip on the lowest
- * free track above the picture (a new "Titles" track on top when none is
- * free), anchored where the template's text sits (or `screen_position`),
- * lifted clear of the platform UI on vertical video, with optional fades.
- * On a frame that is not 16:9 the artboard grows to the frame's aspect
- * around the drawing (titles/artboard.ts), with the anchor and the lift
- * baked in, so a card with a background fills the frame instead of showing
- * bars (a Zenvi rule the desktop's add_title does not have yet).
- * One undo step adds the file and the clip.
- *
- * Templates are the 50 bundled SVGs (`ToolHost.assets`); the desktop also
- * reads the user's template folder. A template can also be an existing .svg
- * title: an absolute path, or the path of an SVG in the project (Zenvi
- * Cloud keeps titles at `@assets/title/…`), read through the host. Fonts
- * are checked against the fonts the host renders titles with where it can
- * list them (`FrameHost.fontFamilies`), and taken as given where it cannot
- * (the browser), as the desktop does without Qt's font list.
+ * Port of zenvi-core src/classes/editor_tools/titles_text.py `add_title` after
+ * #407: a title is one of six animated styles (titles/styles.ts), never an
+ * OpenShot SVG template. The desktop renders it as a HyperFrames composition;
+ * here a host with headless Chrome renders it as the `title` Zenvi Motion
+ * block (the same look, one transparent clip, or an opaque one for a
+ * full-frame card) and any other surface (the browser editor) draws it with
+ * the engine's keyframed layers (titles/native.ts). Either way it goes on the
+ * lowest free track(s) above the picture, in one undo step, and the spec
+ * rides on the file(s) so edit_title_tool can change it.
  */
 
-import { pyRound } from "../../model/rounding.js";
-import { addFile } from "../../ops/files.js";
+import type { Transaction } from "../../history/document.js";
+import type { Project } from "../../model/types.js";
+import { addFile, updateFile } from "../../ops/files.js";
 import { placeOverlayClip } from "../../ops/overlays.js";
-import { fitArtboardToFrame, type ArtboardPlacement } from "../../titles/artboard.js";
-import { getTitleTemplate, suggestTitleTemplates } from "../../titles/templates.js";
+import { LINK_KEY, motionLink, type MotionLinkSpec } from "../../links/zenvi-link.js";
+import { MotionInputError } from "../../motion/template.js";
+import type { MotionPlan } from "../../motion/types.js";
+import { planInTypeface } from "../../motion/typeface.js";
+import { buildNativeTitle } from "../../titles/native.js";
 import {
-  artboardSize,
-  backgroundColor,
-  centerLines,
-  parseTitleSvg,
-  setFieldText,
-  textZone,
-  titleFields,
-  titleSvgText,
-  uniqueTitleName,
-  type TitleDoc,
-} from "../../titles/title-svg.js";
+  DEFAULT_TITLE_STYLE,
+  TITLE_STYLES,
+  TitleSpecError,
+  isOpaqueTitle,
+  titleFieldsOf,
+  titleMetadata,
+  titleShown,
+  titleSpec,
+  type TitleSpec,
+  type TitleSpecInput,
+} from "../../titles/styles.js";
 import { contractTool, unavailable, type CatalogTool, type ToolCall } from "../define.js";
+import { familyArg, loadFamilies, missingGlyphWarnings } from "../fonts.js";
 import { pyFixed, pyReprString } from "../pyfmt.js";
 import { applied } from "../receipt.js";
 import type { ContractInput } from "../schemas.gen.js";
-import {
-  GRAVITY,
-  constantKeyframe,
-  fadeAlpha,
-  fpsOfProject,
-  guarded,
-  isVertical,
-  projectSize,
-  planOverlayTrack,
-  pyRoundTo,
-  snapToFrame,
-  summaryLine,
-  toolError,
-  trackInfo,
-  warningNote,
-  type ScreenPosition,
-} from "../titles-text.js";
-import { text } from "./common.js";
-import { outlineTitle, titleFontFamilies, titleFontWarnings } from "../fonts.js";
-import { TitleStyle, assignTexts, fieldRows, readProjectSvg, writeTitle } from "./title-templates.js";
+import type { MotionRender } from "../types.js";
+import { colorHexAlpha, fpsOfProject, guarded, planOverlayTrack, projectSize, pyRoundTo, snapToFrame, summaryLine, toolError, trackInfo, warningNote } from "../titles-text.js";
+import { commitDrawn, placeMotionPlan, planOverlayStack, writeDrawings } from "./motion-templates.js";
 
-/** #183's add_title_tool tried these in order when no template was named (titles_text.DEFAULT_TEMPLATES). */
-const DEFAULT_TEMPLATES = ["Bar_1", "Standard_1", "Footer_1"] as const;
+/** The motion block that draws titles (packages/motion/src/blocks/title). */
+export const TITLE_BLOCK = "title";
+/** File key of a title drawn with native layers: its group, spec and length (one per layer file). */
+export const NATIVE_TITLE_KEY = "zenvi_title";
 
-/** The one-centred-line template text is drawn with when the named template is a colour card (no text field). */
-const TEXT_OVER_CARD = "Text_Card";
-
-/** Where a template's text zone anchors its artboard (titles_text.ZONE_POSITION). */
-const ZONE_POSITION: Readonly<Record<"top" | "center" | "bottom", ScreenPosition>> = {
-  top: "top_center",
-  center: "center",
-  bottom: "bottom_center",
-};
-
-/**
- * titles_text.VERTICAL_SAFE_OFFSET: on 9:16 video the platforms' UI (Reels,
- * TikTok, Shorts) covers bands at the bottom and top, so a title anchored
- * there is lifted clear of it by this share of the frame height
- * (libopenshot `location_y`). It moves a 16:9 title artboard in any portrait
- * frame, by the desktop's amounts; motion/layout.ts's PLATFORM_BANDS is a
- * different rule (where a motion template's own words may sit in a frame at
- * least 1.6 times as tall as wide), so the two are not shared.
- */
-const VERTICAL_SAFE_OFFSET: Readonly<Partial<Record<ScreenPosition, number>>> = { bottom_center: -0.12, top_center: 0.06 };
-
-/** Where Best Fit and `posKey`'s gravity put the artboard on the frame. */
-function placementOf(posKey: ScreenPosition, lift: number): ArtboardPlacement {
-  const [v, h = "center"] = posKey === "center" ? ["center"] : posKey.split("_");
-  return { v: v as ArtboardPlacement["v"], h: h as ArtboardPlacement["h"], lift };
+export interface NativeTitleTag {
+  group: string;
+  spec: TitleSpec;
+  /** Seconds from the title's start to its first layer (layers enter a little after the start), and its length. */
+  lead: number;
+  seconds: number;
 }
 
-function basename(path: string): string {
-  return String(path ?? "").split(/[\\/]/).pop() ?? "";
+/** A colour argument in any form the desktop takes ('yellow', 'rgba(...)', '#RRGGBBAA') as '#rrggbb[aa]'. */
+function colour(value: unknown, what: string): string {
+  if (!String(value ?? "").trim()) return "";
+  const [hex, alpha] = colorHexAlpha(value, what);
+  return hex + (alpha >= 1 ? "" : Math.round(alpha * 255).toString(16).padStart(2, "0"));
 }
 
-function isAbsolutePath(path: string): boolean {
-  return path.startsWith("/") || path.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(path);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-interface LoadedTemplate {
-  /** The template's name (file stem), e.g. "Bar_1". */
-  name: string;
-  /** Its file name, e.g. "Bar_1.svg". */
-  file: string;
-  svg: string;
-}
-
-function unknownTemplate(raw: string): never {
-  const hint = suggestTitleTemplates(raw).join(", ") || DEFAULT_TEMPLATES.join(", ");
-  return toolError(`unknown title template ${pyReprString(raw)}; close matches: ${hint} (list_title_templates_tool lists them all)`);
-}
-
-/**
- * `_resolve_template` + `_load_doc`: blank is the first default template,
- * a name is a bundled template, an .svg path (absolute, or a title in the
- * project) is that title, read through the host.
- */
-async function loadTemplate(call: ToolCall, template: string): Promise<LoadedTemplate> {
-  const raw = template.trim();
-  const project = call.doc.project;
-  const inProject = project.files.find((f) => String(f.path ?? "") === raw);
-  if (raw && raw.toLowerCase().endsWith(".svg") && (isAbsolutePath(raw) || inProject)) {
-    // The desktop's find_template: a path it cannot read is not a template.
-    const storage = call.host.storage;
-    if (!inProject && !storage?.readText) return unknownTemplate(raw);
-    try {
-      const svg = inProject ? await readProjectSvg(call, inProject) : await storage!.readText!(raw);
-      return { name: basename(raw).replace(/\.svg$/i, ""), file: basename(raw), svg };
-    } catch (error) {
-      call.host.log?.(`title template ${raw}: ${errorMessage(error)}`);
-      return unknownTemplate(raw);
-    }
-  }
-  const bundled = raw ? getTitleTemplate(raw) : DEFAULT_TEMPLATES.map((name) => getTitleTemplate(name)).find(Boolean);
-  if (!bundled) return unknownTemplate(raw);
+/** `_spec`: the tool's arguments as a validated spec; a refusal for a bad one. */
+export function specOf(input: Omit<TitleSpecInput, "zone"> & { screen_position?: string }): TitleSpec {
   try {
-    return { name: bundled.id, file: bundled.file, svg: await call.host.assets!.readText(bundled.assetPath) };
+    return titleSpec({
+      ...input,
+      text_color: colour(input.text_color, "text_color"),
+      accent_color: colour(input.accent_color, "accent_color"),
+      background_color: colour(input.background_color, "background_color"),
+      zone: input.screen_position && input.screen_position !== "auto" ? input.screen_position : "",
+    });
   } catch (error) {
-    return toolError(`cannot read title SVG ${bundled.file}: ${errorMessage(error)}`);
+    if (error instanceof TitleSpecError) return toolError(error.message);
+    throw error;
   }
+}
+
+/** Whether this host renders titles as the motion block (headless Chrome is there and ready). */
+export async function rendersTitleBlock(call: ToolCall): Promise<boolean> {
+  const motion = call.host.motion;
+  if (!motion || !motion.blocks().some((b) => b.id === TITLE_BLOCK)) return false;
+  const runtime = await motion.runtime?.();
+  return runtime === undefined || runtime.ready;
+}
+
+/** Render `s` with the title block at the project's size: the render, or a refusal. */
+export async function renderTitleBlock(call: ToolCall, project: Project, s: TitleSpec, seconds: number): Promise<{ render: MotionRender; spec: MotionLinkSpec }> {
+  const motion = call.host.motion!;
+  const checked = motion.check(TITLE_BLOCK, { ...s });
+  if (!checked.ok) return toolError(checked.error);
+  const [width, height] = projectSize(project);
+  const spec: MotionLinkSpec = { block: TITLE_BLOCK, params: checked.params, seconds, alpha: !isOpaqueTitle(s), motionBlurSamples: 1, draft: false };
+  try {
+    const render = await motion.render({ block: TITLE_BLOCK, params: spec.params, media: {}, width, height, fps: { num: Number(project.fps?.num) || 30, den: Number(project.fps?.den) || 1 }, seconds, alpha: spec.alpha, motionBlurSamples: 1, draft: false }, call.signal);
+    return { render, spec };
+  } catch (error) {
+    return toolError(`the title could not be rendered: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** The file record of a title rendered with the block: its link, and the spec where the desktop reads it. */
+export function blockFileFields(rendered: { render: MotionRender; spec: MotionLinkSpec }, s: TitleSpec, seconds: number): Record<string, unknown> {
+  const { render, spec } = rendered;
+  return {
+    [LINK_KEY]: motionLink(spec, { codec: render.codec, width: render.width, height: render.height, fps: render.fps, frames: render.frames, output: render.media.path, fingerprint: render.fingerprint, renderedAt: new Date().toISOString(), events: render.events }),
+    ai_metadata: titleMetadata(s, seconds),
+  };
+}
+
+/** `s` drawn with native layers at the project's frame, set in its font where a bundled family matches. */
+export async function nativePlan(call: ToolCall, project: Project, s: TitleSpec, seconds: number, warnings: string[]): Promise<MotionPlan> {
+  const [width, height] = projectSize(project);
+  let plan: MotionPlan;
+  try {
+    plan = buildNativeTitle(s, { width, height, fps: fpsOfProject(project) }, seconds);
+  } catch (error) {
+    if (error instanceof MotionInputError) return toolError(error.message);
+    throw error;
+  }
+  if (!s.font) return plan;
+  const family = familyArg(s.font);
+  if (!family) {
+    warnings.push(`font ${pyReprString(s.font)} is not one of the fonts drawn here, so the title is set in Inter`);
+    return plan;
+  }
+  const lib = await loadFamilies(call, [family]);
+  if (typeof lib === "string") {
+    warnings.push(`${lib.replace(/^Error: /, "").replace(/\.$/, "")}, so the title is set in Inter`);
+    return plan;
+  }
+  const typed = planInTypeface(plan, lib, family);
+  warnings.push(...missingGlyphWarnings(typed.missing));
+  return typed.plan;
+}
+
+/** Place a native plan on `layers` and tag every layer file with the group (inside a transaction). */
+export function placeNativeTitle(tx: Transaction, plan: MotionPlan, written: Parameters<typeof placeMotionPlan>[2], position: number, fps: number, layers: readonly number[], s: TitleSpec, seconds: number): { clipIds: string[]; fileIds: string[] } {
+  const placed = placeMotionPlan(tx, plan, written, position, fps, layers, `Title ${TITLE_STYLES[s.style].label}`, "Titles");
+  const group = placed[0] ? String(placed[0].clip.id) : "";
+  const lead = Math.min(...plan.layers.map((l) => l.start)) / fps;
+  const tag: NativeTitleTag = { group, spec: s, lead, seconds };
+  for (const p of placed) updateFile(tx, p.fileId, { [NATIVE_TITLE_KEY]: structuredClone(tag) } as Record<string, unknown>);
+  return { clipIds: placed.map((p) => String(p.clip.id)), fileIds: placed.map((p) => p.fileId) };
 }
 
 async function addTitle(call: ToolCall, input: ContractInput<"add_title_tool">) {
   const tool = "add_title_tool";
-  if (!call.host.media!.writeGenerated) return unavailable(tool, "it cannot store generated title images.");
-  const lines = (input.lines ?? []).map(String);
-  const body = String(input.text ?? "");
-  const subtitle = String(input.subtitle ?? "");
-  const given = Boolean(body.trim() || subtitle.trim() || lines.some((v) => v.trim()));
-  const colourCard = !given && Boolean(String(input.background_color ?? "").trim());
-  // A blank title with a background colour is a colour card (agents cut white flash frames this way).
-  let template = await loadTemplate(call, String(input.template ?? "").trim() || (colourCard ? "Solid_Color" : ""));
-  const parse = (t: LoadedTemplate): TitleDoc => {
-    try {
-      return parseTitleSvg(t.svg);
-    } catch (error) {
-      return toolError(`cannot read title SVG ${t.file}: ${errorMessage(error)}`);
-    }
-  };
-  let doc = parse(template);
-  let slots = titleFields(doc);
-  const warnings: string[] = [];
-  let card = false;
-  let colour = String(input.background_color ?? "");
-  if (slots.length === 0 && given) {
-    // Agents name Solid_Color for "this text on a coloured frame": draw the text on a text template over the card's colour.
-    card = true;
-    const cardTemplate = template;
-    const [cardColour, cardAlpha] = backgroundColor(doc);
-    template = await loadTemplate(call, TEXT_OVER_CARD);
-    doc = parse(template);
-    slots = titleFields(doc);
-    // '#rrggbb', plus the card's opacity as '#rrggbbaa' when it is not opaque.
-    if (!colour.trim() && cardAlpha > 0) colour = cardColour + (cardAlpha >= 1 ? "" : pyRound(cardAlpha * 255).toString(16).padStart(2, "0"));
-    warnings.push(`${cardTemplate.name} has no text; drew the text with ${template.name} over ${colour.trim() ? `the colour ${colour.trim()}` : "the video"}`);
-  }
-  const name = template.name;
-  if (slots.length > 0 && !given && !colourCard) toolError("add_title_tool needs text (or subtitle / lines), or a background_color for a blank colour card");
-  const style = new TitleStyle({ ...input, background_color: colour });
-  const values = assignTexts(slots, body, subtitle, lines, name, true);
-
+  const s = specOf({
+    style: input.style ?? DEFAULT_TITLE_STYLE,
+    title: String(input.text ?? ""),
+    subtitle: String(input.subtitle ?? ""),
+    lines: (input.lines ?? []).map(String),
+    text_color: input.text_color,
+    accent_color: input.accent_color,
+    background_color: input.background_color,
+    font: input.font,
+    font_scale: input.font_scale,
+    screen_position: input.screen_position,
+  });
   const project = call.doc.project;
   const fps = fpsOfProject(project);
   const position = snapToFrame(project, Number(input.position_seconds ?? 0));
   // `_frames`: whole frames, at least one.
-  const duration = Math.max(1, pyRound(Number(input.duration_seconds ?? 5) * fps)) / fps;
-  const end = position + duration;
+  const seconds = Math.max(1, Math.round(Number(input.duration_seconds ?? 5) * fps)) / fps;
+  const end = position + seconds;
   const track = String(input.track ?? "");
-  // Where it goes, before anything is written: a refused call leaves no file and no undo step.
+  // Where it goes, before anything is rendered: a refused call leaves no file and no undo step.
   planOverlayTrack(project, position, end, track);
-  const taken = project.files.map((f) => String(f.path ?? "")).filter((p) => p.toLowerCase().endsWith(".svg")).map(basename);
-  const families = await titleFontFamilies(call);
-  style.resolveFont(families);
+  const warnings: string[] = [];
+  const opaque = isOpaqueTitle(s);
+  const label = TITLE_STYLES[s.style].label;
+  const base = summaryLine(`Added title ${pyReprString(titleShown(s))} (${label})`);
+  const extra: Record<string, unknown> = { style: s.style, fields: titleFieldsOf(s), position: pyRoundTo(position, 3), duration: pyRoundTo(seconds, 3), end: pyRoundTo(end, 3), screen_position: s.zone, opaque };
 
-  for (const slot of slots) if (values.has(slot.index)) setFieldText(slot, values.get(slot.index)!);
-  const styleInfo = style.apply(doc, families);
-  if (card) centerLines(doc);
-  const zone = textZone(slots, artboardSize(doc)[1]);
-  const wanted = input.screen_position ?? "auto";
-  const posKey: ScreenPosition = ZONE_POSITION[wanted === "auto" ? zone : wanted] ?? "center";
-  const lift = isVertical(project) ? (VERTICAL_SAFE_OFFSET[posKey] ?? 0) : 0;
-  const [frameW, frameH] = projectSize(project);
-  const reshaped = fitArtboardToFrame(doc, { width: frameW, height: frameH }, placementOf(posKey, lift));
-  const fitted = style.fit(doc, slots);
+  if (await rendersTitleBlock(call)) {
+    const rendered = await renderTitleBlock(call, project, s, seconds);
+    const placed = call.commit((tx) => {
+      const plan = planOverlayTrack(tx.project, position, end, track);
+      const added = addFile(tx, rendered.render.media, { mediaType: "video", name: `${titleShown(s)} (${label})`, dedupe: false });
+      const file = updateFile(tx, String(added.id), blockFileFields(rendered, s, seconds));
+      const clip = placeOverlayClip(tx, { fileId: String(file.id), position, duration: seconds, layer: plan.layer, newTrackLabel: "Titles", title: titleShown(s) });
+      return { fileId: String(file.id), clipId: clip.id, ...plan };
+    }, `Add title ${s.style}`);
+    if (placed.moved) warnings.push(placed.moved);
+    const t = trackInfo(call.doc.project, placed.layer);
+    const summary = `${base} on track ${t.track ?? "None"} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s${placed.created ? " on a new track" : ""}.`;
+    return applied(tool, summary + warningNote(warnings), {
+      warnings,
+      data: { timeline_clip_id: placed.clipId, file_id: placed.fileId, path: rendered.render.media.path, renderer: "motion", ...extra, new_track: placed.created, ...t },
+    });
+  }
 
-  const firstText = slots.map((s) => values.get(s.index) ?? "").find((v) => v.trim()) || name;
-  const fileName = uniqueTitleName(text(input.file_name) || firstText, taken);
-  const outlined = await outlineTitle(call, titleSvgText(doc));
-  if (typeof outlined === "string") toolError(outlined.replace(/^Error: /, ""));
-  const media = await writeTitle(call, fileName, outlined.svg);
-
-  const fadeIn = Number(input.fade_in_seconds ?? 0);
-  const fadeOut = Number(input.fade_out_seconds ?? 0);
-  const placed = call.commit((tx) => {
-    const { layer, created, moved } = planOverlayTrack(tx.project, position, end, track);
-    const file = addFile(tx, media, { mediaType: "image" });
-    const props: Record<string, unknown> = { gravity: GRAVITY[posKey] };
-    // A title fitted to the frame carries its lift in its viewBox.
-    if (lift && !reshaped) props.location_y = constantKeyframe(lift);
-    const alpha = fadeAlpha(tx.project, 0, duration, fadeIn, fadeOut);
-    if (alpha) props.alpha = alpha;
-    const clip = placeOverlayClip(tx, { fileId: file.id, position, duration, layer, newTrackLabel: "Titles", props });
-    return { fileId: file.id, clipId: clip.id, layer, created, moved };
-  });
-
-  const shown =
-    slots
-      .map((s) => (values.get(s.index) ?? "").trim())
-      .filter(Boolean)
-      .join(" / ") || name;
-  const t = trackInfo(call.doc.project, placed.layer);
-  const summary =
-    `Added title ${pyReprString(shown)} (${name}) on track ${t.track ?? "None"} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s` +
-    `${placed.created ? " on a new track" : ""}.`;
-  const data: Record<string, unknown> = {
-    timeline_clip_id: placed.clipId,
-    file_id: placed.fileId,
-    path: media.path,
-    file_name: basename(media.path),
-    template: name,
-    fields: fieldRows(slots),
-    position: pyRoundTo(position, 3),
-    duration: pyRoundTo(duration, 3),
-    end: pyRoundTo(end, 3),
-    new_track: placed.created,
-    screen_position: posKey,
-    ...t,
-    ...styleInfo,
-  };
-  if (fadeIn || fadeOut) Object.assign(data, { fade_in: fadeIn, fade_out: fadeOut });
-  if (Object.keys(fitted).length > 0) data.text_shrunk_to_fit = fitted;
-  if (lift) data.lifted_for_vertical_ui = lift;
-  if (placed.moved) warnings.push(placed.moved);
-  if (warnings.length > 0) data.warnings = warnings;
-  return applied(tool, summaryLine(summary + warningNote(warnings)), {
-    data,
-    warnings: [...warnings, ...titleFontWarnings(outlined)],
+  if (!call.host.media!.writeGenerated) return unavailable(tool, "it can neither render titles nor store drawn ones.");
+  const plan = await nativePlan(call, project, s, seconds, warnings);
+  const first = planOverlayTrack(project, position, end, track);
+  const stack = planOverlayStack(project, position, end, plan.tracks, track);
+  const written = await writeDrawings(call, plan, `title-${s.style}`);
+  if (typeof written === "string") return toolError(written.replace(/^Error: /, ""));
+  const placed = await commitDrawn(call, written, (tx) => placeNativeTitle(tx, plan, written, position, fps, stack.layers, s, seconds), `Add title ${s.style}`);
+  if (first.moved) warnings.push(first.moved);
+  const t = trackInfo(call.doc.project, stack.layers[0]!);
+  const created = stack.created.length > 0;
+  const summary = `${base} on track ${t.track ?? "None"} at ${pyFixed(position, 2)}-${pyFixed(end, 2)}s${created ? " on a new track" : ""}.`;
+  return applied(tool, summary + warningNote(warnings), {
+    warnings,
+    data: { timeline_clip_id: placed.clipIds[0], file_id: placed.fileIds[0], timeline_clip_ids: placed.clipIds, file_ids: placed.fileIds, renderer: "native", ...extra, new_track: created, ...t },
   });
 }
 
 export const titleTools: CatalogTool[] = [
   contractTool("add_title_tool", {
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
-    requires: ["media", "assets"],
+    requires: ["media"],
     run: (call, input) => guarded("add_title_tool", () => addTitle(call, input)),
   }),
 ];

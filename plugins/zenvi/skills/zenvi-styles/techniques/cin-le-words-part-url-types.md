@@ -25,7 +25,7 @@ Use when: The closing line is a two-word phrase or pun built around the product,
 
 ## Build it in Zenvi
 
-1. Two flank titles meeting at centre: `add_title_tool {"text": "Make", "template": "Standard_1", "position_seconds": 1.0, "duration_seconds": 4.5, "track": "3"}` (left) and `{"text": "magic", ...}` (right), each placed so they meet with a word space.
+1. Two flank titles meeting at centre: `add_title_tool {"text": "Make", "position_seconds": 1.0, "duration_seconds": 4.5, "track": "3"}` (left) and `{"text": "magic", ...}` (right), each placed so they meet with a word space.
 2. Split them by +-(urlWidth/2 + 40 px) over 44 f (0.73 s): `set_keyframes_tool {"timeline_clip_id": "<left>", "property": "location_x", "ease": "ease_in_out_sine", "points": [{"seconds": 1.8, "value": 0}, {"seconds": 2.53, "value": -0.16}]}` and the mirror on `<right>` (250-300 px, peak 20 px/f or less); dim them with `alpha` 1 to 0.5.
 3. From 40 % of the split (2.1 s) type the URL centred: `add_kinetic_title_tool {"text": "zenvi.com", "style": "documentary", "animation": "typewriter", "stagger_seconds": 0.067, "position_seconds": 2.1, "duration_seconds": 3.4}` (1 character per 4 f).
 4. After the last key (about 2.7 s) fade the flanks: `fade_clip_tool {"clip_id": "<left>", "fade_out_seconds": 0.27}` and the right one, 16 f.

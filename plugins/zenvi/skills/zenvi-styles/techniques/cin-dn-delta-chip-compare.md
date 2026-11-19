@@ -26,9 +26,9 @@ Use when: Improvements such as cost down, speed up or errors falling from 412 to
 ## Build it in Zenvi
 
 1. Hero count from the old to the new value: `add_motion_block_tool {"block": "counter", "position_seconds": 1.0, "duration_seconds": 3.5, "placement": "full_frame", "params": {"values": ["412", "3"], "label": "errors per week", "style": "count"}}` (the count runs 36 f, 0.6 s, with a quad-out feel).
-2. The small "before": `add_title_tool {"text": "412", "template": "Standard_1", "text_color": "#8a8f98", "font_scale": 0.5, "position_seconds": 1.2, "duration_seconds": 3.3, "track": "5"}` rising into the upper-left with `location_y` 0.03 to 0 over 0.5 s `ease_out_expo`, so the two values never crossfade in one place.
+2. The small "before": `add_title_tool {"text": "412", "text_color": "#8a8f98", "font_scale": 0.5, "position_seconds": 1.2, "duration_seconds": 3.3, "track": "5"}` rising into the upper-left with `location_y` 0.03 to 0 over 0.5 s `ease_out_expo`, so the two values never crossfade in one place.
 3. Strike across it over 10 f (0.17 s): `add_type_block_tool {"block": "write_on", "paths": ["M0 5 H100"], "stroke_width": 2, "ink": "#8a8f98", "width": 0.09, "x": 0.3, "y": 0.22, "draw_seconds": 0.17, "position_seconds": 1.8, "duration_seconds": 2.7}`.
-4. On the count's landing frame (about 2.05 s) the chip: `add_title_tool {"text": "-99%", "template": "Standard_1", "text_color": "#ffffff", "background_color": "#00000000", "position_seconds": 2.05, "duration_seconds": 2.45, "track": "6"}` with `scale_x/y` 0.6 to 1 over 0.2 s `ease_out_cubic` from its left edge (`origin_x` 0).
+4. On the count's landing frame (about 2.05 s) the chip: `add_title_tool {"text": "-99%", "text_color": "#ffffff", "background_color": "#00000000", "position_seconds": 2.05, "duration_seconds": 2.45, "track": "6"}` with `scale_x/y` 0.6 to 1 over 0.2 s `ease_out_cubic` from its left edge (`origin_x` 0).
 5. `add_sfx_tool {"recipe": "pop", "at_seconds": 2.05, "gain_db": -12}`.
 
 ## Timing & taste rules

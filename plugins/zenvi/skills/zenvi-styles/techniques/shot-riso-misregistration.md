@@ -20,7 +20,7 @@ apart in opposite directions; the plates shake, then snap into register with a h
 multiply into dark purple when aligned. One-shot: one or two per film.
 
 ## Build it in Zenvi
-1. Paper ground: `add_title_tool {"template":"Solid_Color","text":" ","background_color":"#f3eee2","position_seconds":0,"duration_seconds":4}`; optional texture with `apply_fx_tool` `halftone` (`params`: `cell` 10, `ink` "#3b2a2a", `paper` "#f3eee2") on a still.
+1. Paper ground: `add_title_tool {"text": " ", "background_color": "#f3eee2", "position_seconds": 0, "duration_seconds": 4}`; optional texture with `apply_fx_tool` `halftone` (`params`: `cell` 10, `ink` "#3b2a2a", `paper` "#f3eee2") on a still.
 2. Plate A (pink) and plate B (blue): the same headline twice, `add_kinetic_title_tool {"text":"PRINT IT LOUD","style":"stack","animation":"slam","emphasis":"none","ink":"#ff4fa3","text_size":0.3,"position_seconds":0.5,"duration_seconds":3}` and again with `"ink":"#1f5fc4"`.
    Overlap shows as the darker mix with a multiply blend on both plates: `set_clip_properties_tool {"timeline_clip_ids":["<plate A>","<plate B>"],"properties":{"composite":"multiply"}}` (check with the contact sheet; Zenvi has no edge-tint or ink-bleed pass, `print-ink-look-fx`).
 3. Misregistration: `set_keyframes_tool property=location_x` on plate A: `offset(t) = +A*cos(2*pi*t/18 f)*exp(-t/60 f)`, A=(20,8) px, keyframes every 3-4 f (`linear`) for ~44 f from the slam frame; plate B gets the opposite sign. Sample about 12 points, ending at 11 px, then

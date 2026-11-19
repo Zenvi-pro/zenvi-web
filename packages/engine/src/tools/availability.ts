@@ -129,8 +129,8 @@ export const TOOL_NEEDS: Readonly<Record<string, ToolNeeds>> = {
   generate_tts_and_add_to_timeline_tool: { methods: ["media.writeGenerated"] },
   add_title_tool: {
     methods: ["media.writeGenerated"],
-    optional: ["frames.fontFamilies"],
-    partialNote: FONTS_UNCHECKED,
+    optional: ["motion"],
+    partialNote: "without headless Chrome (the motion host) titles are drawn with keyframed layers: the same styles and layout, simpler motion and the bundled fonts only",
   },
   align_lyrics_tool: { methods: ["audio.transcribe"], webNote: SERVER_ASR },
   place_on_word_tool: {

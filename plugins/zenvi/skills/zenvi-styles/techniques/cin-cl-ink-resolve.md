@@ -27,7 +27,7 @@ Use when: Every headline and caption reveal, especially over textured or busy ba
 
 1. `add_kinetic_title_tool {"text": "Every frame earns its place", "style": "editorial", "animation": "rise", "ink": "#111111", "background": "#f2f0eb", "stagger_seconds": 0.13, "position_seconds": 0.5, "duration_seconds": 3.2}`: words rise about 20 f (0.33 s) and fade in together, 8 f (0.13 s) apart.
 2. For a block headline, `add_motion_block_tool {"block": "kinetic_headline", "position_seconds": 0.5, "duration_seconds": 3.2, "placement": "full_frame", "params": {"text": "Every frame earns its place", "style": "rise", "align": "center"}}` is the same move through a line mask.
-3. Over busy footage, put a 30-40 % dark veil under the type so the pale-to-full resolve still reads: `add_title_tool {"text": " ", "background_color": "#00000066", "position_seconds": 0.5, "duration_seconds": 3.2, "fade_in_seconds": 0.3}` on a track below the title.
+3. Over busy footage, put a 30-40 % dark veil under the type so the pale-to-full resolve still reads: `add_title_tool {"text": " ", "background_color": "#00000066", "position_seconds": 0.5, "duration_seconds": 3.2}` on a track below the title.
 4. Numbers that must read instantly land at full ink with no resolve: use `add_title_tool` with no fade.
 
 Fallback: Zenvi fades the word's opacity from 0, it cannot mix the word's colour from a pale tint to full ink. Get closest by stagger plus rise, and keep the type high contrast; do not fake it with a second pale copy.

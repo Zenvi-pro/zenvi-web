@@ -27,8 +27,7 @@ silence; then the title. A hook that promises, then breathes.
    "points": [{"seconds": 0, "value": 1.0}, {"seconds": 0.3, "value": 1.04}]}` and the same for `scale_y`.
 3. Leave 0.9 s to 1.1 s empty as pure black: nothing on any track, or
    `add_title_tool {"background_color": "#000000", "position_seconds": 0.9, "duration_seconds": 0.2}`.
-4. Title from 1.1 s: `add_title_tool {"text": "<TITLE>", "template": "Standard_1", "position_seconds": 1.1, "duration_seconds": 3.6,
-   "fade_in_seconds": 0.53, "font_weight": "bold", "background_color": "#000000"}`; rises 44 px over the fade (keyframe `location_y`
+4. Title from 1.1 s: `add_title_tool {"text": "<TITLE>", "position_seconds": 1.1, "duration_seconds": 3.6, "background_color": "#000000"}`; rises 44 px over the fade (keyframe `location_y`
    from 0.04 to 0 with `ease_out_cubic`).
 5. Sound: `add_sfx_tool {"recipe": "hit_transient", "at_seconds": 0, "gain_db": -10, "seed": 1}`, again at 0.3 s and 0.6 s; nothing in the black.
 

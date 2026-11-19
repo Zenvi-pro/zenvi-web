@@ -129,25 +129,25 @@ describe("titles in the cloud", () => {
     await client.close();
   });
 
-  it("add_title_tool checks a font against the fonts the cloud renders titles with", async () => {
-    const fontFamilies = async () => ["DejaVu Sans", "DejaVu Sans Mono", "Lato", "Liberation Mono", "Liberation Sans", "Liberation Serif"];
-    const h = await harness({ engine: await loadEngineRegistry(), prober, assets: engineAssets, renderer: fakeRenderer(), fontFamilies });
+  it("add_title_tool sets a bundled font, and says when a font is not one it draws", async () => {
+    const assets: AssetSource = { ...engineAssets, readBytes: async (path) => new Uint8Array(await readFile(`${ENGINE_ASSETS}${path}`)) };
+    const h = await harness({ engine: await loadEngineRegistry(), prober, assets, renderer: fakeRenderer() });
     const client = await connect(h);
-    const projectId = (await call(client, "create_project", { name: "Fonts" })).structuredContent?.project_id as string;
-    const refused = await call(client, "add_title_tool", { text: "Hi", font: "Helvetica Neue" });
-    expect(textOf(refused)).toMatch(/font 'Helvetica Neue' is not installed; installed fonts like it: /);
-    const titled = await call(client, "add_title_tool", { text: "Hi", font: "liberation sans", text_color: "white", fade_in_seconds: 0.5 });
-    expect(textOf(titled)).toContain('"font":"Liberation Sans"');
-    const { project } = await h.services.projects.get(USER_A, projectId);
-    expect(project.clips).toHaveLength(1);
+    await call(client, "create_project", { name: "Fonts" });
+    const other = await call(client, "add_title_tool", { text: "Hi", font: "Comic Papyrus" });
+    expect(other.isError).toBeFalsy();
+    expect(textOf(other)).toMatch(/font 'Comic Papyrus' is not one of the fonts drawn here, so the title is set in Inter/);
+    const anton = await call(client, "add_title_tool", { text: "Hi", font: "Anton", text_color: "white", position_seconds: 6 });
+    expect(anton.isError).toBeFalsy();
+    expect(textOf(anton)).not.toMatch(/is not one of the fonts/);
     await client.close();
   });
 
-  it("title tools stay hidden when the bundled assets are missing", async () => {
+  it("title tools draw without the bundled assets (in Inter)", async () => {
     const h = await harness({ engine: await loadEngineRegistry(), prober });
     const client = await connect(h);
     const names = (await client.listTools()).tools.map((t) => t.name);
-    expect(names).not.toContain("add_title_tool");
+    expect(names).toContain("add_title_tool");
     expect(names).toContain("export_captions_tool");
     await client.close();
   });

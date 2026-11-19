@@ -23,7 +23,6 @@ import {
   titleFields,
   titleSvgText,
   tspanNodes,
-  uniqueTitleName,
   versionName,
   type TitleDoc,
   titleLook,
@@ -105,8 +104,6 @@ describe("title_svg: fields, text, font, colours, names", () => {
   });
 
   it("names copies with the duplicate rule", () => {
-    expect(uniqueTitleName("Tokyo: Day 1", [])).toBe("Tokyo Day 1.svg");
-    expect(uniqueTitleName("Tokyo Day 1", ["Tokyo Day 1.svg"])).toBe("Tokyo Day 1 (1).svg");
     expect(duplicatePattern("Title (3).svg")).toEqual(["Title (", 3]);
     expect(duplicatePattern("Title.svg")).toEqual(["Title (", 0]);
     expect(freeName("TitleFileName (", 0, [])).toBe("TitleFileName (1)");

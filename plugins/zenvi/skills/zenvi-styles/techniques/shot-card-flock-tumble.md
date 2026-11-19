@@ -26,8 +26,7 @@ in 10 frames, a white-hot core and one smoke ring bloom, and the brand line slam
    exact. Pick `fan` and keep the last seconds in motion.)
 2. The suck-in: `set_keyframes_tool` on the scene clip, `scale_x` / `scale_y` 1.0 to 0.05 over 0.33 s `ease_in_quad`, `alpha`
    held at 1 for the first 60 % then to 0, ending at 2.4 s.
-3. The core flash on the same frame: `add_title_tool {"background_color": "#ffffff", "position_seconds": 2.4, "duration_seconds": 0.2,
-   "fade_out_seconds": 0.2}` (a 12 % wash, at most 6 f).
+3. The core flash on the same frame: `add_title_tool {"background_color": "#ffffff", "position_seconds": 2.4, "duration_seconds": 0.2}` (a 12 % wash, at most 6 f).
 4. The ring: `add_motion_block_tool {"block": "particle_burst", "params": {"shape": "rings", "count": 8, "origin": [{"x": 0.5, "y": 0.5}],
    "colors": ["#ffd1b8", "#f472b6", "#8b5cf6"], "rings": true}, "position_seconds": 2.4, "duration_seconds": 2.0, "placement": "over_video"}`
    (clean rings are what the card rejects; a turbulent smoke ring is `needs: turbulent-smoke-ring`; one ring only, no confetti).

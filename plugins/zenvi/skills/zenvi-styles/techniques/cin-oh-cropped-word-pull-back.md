@@ -25,7 +25,7 @@ Use when: Copy-led launches built on one charged word, in calm-to-medium films.
 
 ## Build it in Zenvi
 
-1. The whole sentence once at display size on a dark ground: `add_title_tool {"text": "We never stop building", "position_seconds": 0, "duration_seconds": 2.6, "font_scale": 2.2, "text_color": "#f5f1e8", "background_color": "#111111", "fit_text": false}`.
+1. The whole sentence once at display size on a dark ground: `add_title_tool {"text": "We never stop building", "position_seconds": 0, "duration_seconds": 2.6, "font_scale": 2.2, "text_color": "#f5f1e8", "background_color": "#111111"}`.
 2. Frame the key word big: on that clip `set_keyframes_tool {"timeline_clip_id": "<line>", "property": "scale_x", "mode": "replace", "points": [{"seconds": 0, "value": 3.2}, {"seconds": 0.6, "value": 3.2}, {"seconds": 1.53, "value": 1.0, "ease": "ease_in_out_sine"}]}` and the same on `scale_y`: hold f0-36 (0.6 s) then pull back over 56 f (0.93 s).
 3. Offset so the first glyph is ~40 % cropped by the left edge: `location_x` `[{"seconds": 0, "value": 0.62}, {"seconds": 0.6, "value": 0.62}, {"seconds": 1.53, "value": 0.0, "ease": "ease_in_out_sine"}]`.
 4. Settle at the start: `location_y` `[{"seconds": 0, "value": 0.03}, {"seconds": 0.2, "value": 0.0, "ease": "ease_out_expo"}]` (about 13 px), then a 0.3 px/f drift through the hold.
